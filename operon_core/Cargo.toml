@@ -1,7 +1,0 @@
-[package]
-name = "operon"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-operon-macros = { path = "../operon_macros" }
