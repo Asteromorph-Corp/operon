@@ -1,4 +1,12 @@
-[config.log]
+[storage.data]
+uri = "postgres://user:password@hostname:port/operon-db"
+schema = "data"
+
+[storage.metadata]
+uri = "postgres://user:password@hostname:port/operon-db"
+schema = "metadata"
+
+[log]
 level = "debug"
 buffer_size = 1024
 dump = true
