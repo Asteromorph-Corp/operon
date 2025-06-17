@@ -1,0 +1,7 @@
+[storage.data]
+uri = "postgres://user:password@hostname:port/operon-db"
+schema = "data"
+
+[storage.metadata]
+uri = "postgres://user:password@hostname:port/operon-db"
+schema = "metadata"

@@ -1,0 +1,5 @@
+[config.log]
+level = "debug"
+buffer_size = 1024
+dump = true
+dump_path = "./logs"
