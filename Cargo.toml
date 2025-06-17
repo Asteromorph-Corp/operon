@@ -1,4 +1,4 @@
 [workspace]
-members = ["operon_core", "operon_macros"]
+members = ["core", "macros"]
 resolver = "2"
-exclude = ["examples"]
+exclude = ["examples/ex1", "examples/ex1_expanded"]
