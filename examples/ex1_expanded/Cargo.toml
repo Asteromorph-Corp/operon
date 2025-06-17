@@ -1,7 +1,5 @@
-[workspace]
-
 [package]
-name = "ex1"
+name = "ex1-expanded"
 version = "0.1.0"
 edition = "2024"
 

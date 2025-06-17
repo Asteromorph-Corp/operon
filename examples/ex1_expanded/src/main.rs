@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use dashmap::DashMap;
-use ex1::operon::{self, dimension::*, entity::*, *};
+use ex1_expanded::operon::{self, dimension::*, entity::*, *};
 use futures::SinkExt;
 use rand::Rng;
 use std::sync::Arc;
