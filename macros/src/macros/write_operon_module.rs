@@ -57,36 +57,37 @@ pub fn write_operon_module(_entities: &Entities, config: &GlobalConfig) -> Token
             pub const LOG_DUMP_DIR: &str = #log_dump_dir;
 
             /// Error type returned by Operon.
-            #[derive(Debug, #crate_path::thiserror::Error)]
+            #[derive(Debug)]
             pub enum OperonError {
                 /// Error in a storage operation
-                #[error("Storage error: {0}")]
-                Storage(#[source] #crate_path::anyhow::Error),
-
+                Storage(#crate_path::anyhow::Error),
                 /// Error in the scheduler
-                #[error("Scheduler error: {0}")]
-                Scheduler(#[source] #crate_path::anyhow::Error),
-
+                Scheduler(#crate_path::anyhow::Error),
                 /// Error in a user function
-                #[error("User function error: {0}")]
-                User(#[source] #crate_path::anyhow::Error),
-
+                User(#crate_path::anyhow::Error),
                 /// Error in the metadata storage
-                #[error("Metadata storage error: {0}")]
-                MetaStorage(#[source] #crate_path::anyhow::Error),
-
+                MetaStorage(#crate_path::anyhow::Error),
                 /// Error in the terminal UI
-                #[error("Terminal UI error: {0}")]
-                UI(#[source] #crate_path::anyhow::Error),
-
+                UI(#crate_path::anyhow::Error),
                 /// Error caused by missing data
-                #[error("Data expected but not found: {0}")]
                 NotFound(String),
-
                 /// Tried to resolve a ticket with an irrelevant resolution
-                #[error("Invalid resolution: {0}")]
                 InvalidResolution(String),
             }
+            impl ::std::fmt::Display for OperonError {
+                fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                    match self {
+                        OperonError::Storage(e) => write!(f, "Storage error: {e}"),
+                        OperonError::Scheduler(e) => write!(f, "Scheduler error: {e}"),
+                        OperonError::User(e) => write!(f, "User function error: {e}"),
+                        OperonError::MetaStorage(e) => write!(f, "Metadata storage error: {e}"),
+                        OperonError::UI(e) => write!(f, "Terminal UI error: {e}"),
+                        OperonError::NotFound(s) => write!(f, "Data expected but not found: {s}"),
+                        OperonError::InvalidResolution(s) => write!(f, "Invalid resolution: {s}"),
+                    }
+                }
+            }
+            impl ::std::error::Error for OperonError {}
             pub(super) fn scheduler_error<E: ::std::error::Error + Send + Sync + 'static>(
                 e: E,
             ) -> OperonError {
