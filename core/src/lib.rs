@@ -16,6 +16,5 @@ pub extern crate ratatui;
 pub extern crate serde;
 pub extern crate serde_json;
 pub extern crate textwrap;
-pub extern crate thiserror;
 pub extern crate tokio;
 pub extern crate tokio_postgres;

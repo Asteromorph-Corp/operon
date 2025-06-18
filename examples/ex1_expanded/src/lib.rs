@@ -22,36 +22,37 @@ pub mod operon {
     pub const LOG_DUMP_DIR: &str = "./logs";
 
     /// Error type returned by Operon.
-    #[derive(Debug, ::thiserror::Error)]
+    #[derive(Debug)]
     pub enum OperonError {
         /// Error in a storage operation
-        #[error("Storage error: {0}")]
-        Storage(#[source] ::anyhow::Error),
-
+        Storage(::anyhow::Error),
         /// Error in the scheduler
-        #[error("Scheduler error: {0}")]
-        Scheduler(#[source] ::anyhow::Error),
-
+        Scheduler(::anyhow::Error),
         /// Error in a user function
-        #[error("User function error: {0}")]
-        User(#[source] ::anyhow::Error),
-
+        User(::anyhow::Error),
         /// Error in the metadata storage
-        #[error("Metadata storage error: {0}")]
-        MetaStorage(#[source] ::anyhow::Error),
-
+        MetaStorage(::anyhow::Error),
         /// Error in the terminal UI
-        #[error("Terminal UI error: {0}")]
-        UI(#[source] ::anyhow::Error),
-
+        UI(::anyhow::Error),
         /// Error caused by missing data
-        #[error("Data expected but not found: {0}")]
         NotFound(String),
-
         /// Tried to resolve a ticket with an irrelevant resolution
-        #[error("Invalid resolution: {0}")]
         InvalidResolution(String),
     }
+    impl ::std::fmt::Display for OperonError {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match self {
+                OperonError::Storage(e) => write!(f, "Storage error: {e}"),
+                OperonError::Scheduler(e) => write!(f, "Scheduler error: {e}"),
+                OperonError::User(e) => write!(f, "User function error: {e}"),
+                OperonError::MetaStorage(e) => write!(f, "Metadata storage error: {e}"),
+                OperonError::UI(e) => write!(f, "Terminal UI error: {e}"),
+                OperonError::NotFound(s) => write!(f, "Data expected but not found: {s}"),
+                OperonError::InvalidResolution(s) => write!(f, "Invalid resolution: {s}"),
+            }
+        }
+    }
+    impl ::std::error::Error for OperonError {}
     pub(super) fn scheduler_error<E: ::std::error::Error + Send + Sync + 'static>(
         e: E,
     ) -> OperonError {
@@ -6501,36 +6502,31 @@ mod operon_internal {
                                 .send(PeerEvent::Resolution(masked_dimension::Resolution::I(
                                     resolved_i,
                                 )))
-                                .await
-                                .map_err(scheduler_error)?;
+                                .await?;
                             peer_txs
                                 .to_gamma
                                 .send(PeerEvent::Resolution(masked_dimension::Resolution::I(
                                     resolved_i,
                                 )))
-                                .await
-                                .map_err(scheduler_error)?;
+                                .await?;
                             peer_txs
                                 .to_delta
                                 .send(PeerEvent::Resolution(masked_dimension::Resolution::I(
                                     resolved_i,
                                 )))
-                                .await
-                                .map_err(scheduler_error)?;
+                                .await?;
                             peer_txs
                                 .to_epsilon
                                 .send(PeerEvent::Resolution(masked_dimension::Resolution::I(
                                     resolved_i,
                                 )))
-                                .await
-                                .map_err(scheduler_error)?;
+                                .await?;
                             peer_txs
                                 .to_zeta
                                 .send(PeerEvent::Resolution(masked_dimension::Resolution::I(
                                     resolved_i,
                                 )))
-                                .await
-                                .map_err(scheduler_error)?;
+                                .await?;
                         }
                     }
                     // Otherwise, we just drop `peer_txs`.
@@ -7752,7 +7748,7 @@ Commands:
                         }
 
                         // Draw the UI state after the command execution
-                        draw_ui(&mut terminal, &state).await.map_err(ui_error)?;
+                        draw_ui(&mut terminal, &state).await?;
                     }
                 }
             }
