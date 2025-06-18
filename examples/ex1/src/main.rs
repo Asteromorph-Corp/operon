@@ -1,5 +1,3 @@
-operon_macros::use_psql_storage!(DataStorage);
-
 #[tokio::main]
 async fn main() {
     // Placeholder

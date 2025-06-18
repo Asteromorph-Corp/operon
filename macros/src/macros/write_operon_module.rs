@@ -2,9 +2,9 @@ use proc_macro2::TokenStream;
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
 
-use crate::{Entities, GlobalConfig};
+use crate::{TypesConfig, CommonConfig};
 
-pub fn write_operon_module(_entities: &Entities, config: &GlobalConfig) -> TokenStream {
+pub fn write_operon_module(_types: &TypesConfig, config: &CommonConfig) -> TokenStream {
     let crate_path = match crate_name("operon-macros") {
         Ok(FoundCrate::Itself) => quote! { crate },
         Ok(FoundCrate::Name(name)) => {
@@ -106,6 +106,27 @@ pub fn write_operon_module(_entities: &Entities, config: &GlobalConfig) -> Token
             }
             pub(super) fn ui_error<E: ::std::error::Error + Send + Sync + 'static>(e: E) -> OperonError {
                 OperonError::UI(#crate_path::anyhow::Error::from(e))
+            }
+            /// State of either an `IndividualScheduler` or the whole Operon.
+            #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+            pub(super) enum RunningState {
+                Finished,
+                #[default]
+                Running,
+                Paused,
+                Error,
+                Stopped,
+            }
+            impl RunningState {
+                pub fn color(&self) -> #crate_path::ratatui::style::Color {
+                    match self {
+                        RunningState::Finished => #crate_path::ratatui::style::Color::Green,
+                        RunningState::Running => #crate_path::ratatui::style::Color::Cyan,
+                        RunningState::Paused => #crate_path::ratatui::style::Color::Yellow,
+                        RunningState::Error => #crate_path::ratatui::style::Color::Red,
+                        RunningState::Stopped => #crate_path::ratatui::style::Color::DarkGray,
+                    }
+                }
             }
         }
     }

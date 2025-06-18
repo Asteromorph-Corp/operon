@@ -2,27 +2,26 @@ extern crate proc_macro;
 
 mod macros;
 mod utils;
-use once_cell::sync::Lazy;
-use utils::types::*;
+use once_cell::sync::OnceCell;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{ToTokens, quote};
+use syn::{parse_macro_input, punctuated::Punctuated, ExprAssign, Token};
+use utils::types::*;
 
-static ENTITIES: Lazy<Entities> = Lazy::new(utils::parse::get_entities);
-static CONFIG: Lazy<GlobalConfig> = Lazy::new(utils::parse::get_config);
+static CONFIG: OnceCell<CommonConfig> = OnceCell::new();
+static TYPES: OnceCell<TypesConfig> = OnceCell::new();
 
 #[proc_macro]
-pub fn include_operon(_input: TokenStream) -> TokenStream {
-    let operon = macros::write_operon_module(&ENTITIES, &CONFIG);
-    let operon_internal = macros::write_operon_internal_module(&ENTITIES, &CONFIG);
+pub fn include_operon(input: TokenStream) -> TokenStream {
+
+    let operon = macros::write_operon_module(
+        TYPES.get().expect("Types not initialized"),
+        CONFIG.get().expect("Config not initialized"),
+    );
+    let operon_internal = quote! {};
     quote! {
         #operon
         #operon_internal
-    }.into()
-}
-
-#[proc_macro]
-pub fn use_psql_storage(_input: TokenStream) -> TokenStream {
-    quote! {
-        // TODO
-    }.into()
+    }
+    .into()
 }
