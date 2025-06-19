@@ -1,2 +1,2 @@
 pub mod parse;
-pub mod types;
+pub mod config_types;
