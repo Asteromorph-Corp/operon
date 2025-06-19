@@ -2,38 +2,38 @@ use proc_macro2::TokenStream;
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
 
-use crate::{TypesConfig, CommonConfig};
+use crate::{AllConfig};
 
-pub fn write_operon_module(_types: &TypesConfig, config: &CommonConfig) -> TokenStream {
+pub fn write_operon_module(config: &AllConfig) -> TokenStream {
     let crate_path = match crate_name("operon-macros") {
         Ok(FoundCrate::Itself) => quote! { crate },
         Ok(FoundCrate::Name(name)) => {
             let path = format_ident!("{}", name);
             quote! { #path }},
-        Err(_) => quote! { operon }
+        Err(_) => quote! { operon_macros }
     };
 
-    let meta_uri = &config.storage.metadata.uri;
-    let meta_schema = match &config.storage.metadata.schema {
+    let meta_uri = &config.common.storage.metadata.uri;
+    let meta_schema = match &config.common.storage.metadata.schema {
         Some(schema) => quote! { Some(#schema) },
         None => quote! { None },
     };
-    let data_uri = &config.storage.data.uri;
-    let data_schema = match &config.storage.data.schema {
+    let data_uri = &config.common.storage.data.uri;
+    let data_schema = match &config.common.storage.data.schema {
         Some(schema) => quote! { Some(#schema) },
         None => quote! { None },
     };
-    let log_buffer_size = config.log.buffer_size;
-    let log_level = match &config.log.level {
+    let log_buffer_size = config.common.log.buffer_size;
+    let log_level = match &config.common.log.level {
         s if s == "trace" => quote! { #crate_path::log::Level::Trace },
         s if s == "debug" => quote! { #crate_path::log::Level::Debug },
         s if s == "info" => quote! { #crate_path::log::Level::Info },
         s if s == "warn" => quote! { #crate_path::log::Level::Warn },
         s if s == "error" => quote! { #crate_path::log::Level::Error },
-        _ => panic!("Invalid log level: {}", config.log.level),
+        _ => panic!("Invalid log level: {}", config.common.log.level),
     };
-    let log_dump = config.log.dump;
-    let log_dump_dir = &config.log.dump_path.as_os_str().to_string_lossy();
+    let log_dump = config.common.log.dump;
+    let log_dump_dir = &config.common.log.dump_path.as_os_str().to_string_lossy();
 
     quote! {
         pub mod operon {

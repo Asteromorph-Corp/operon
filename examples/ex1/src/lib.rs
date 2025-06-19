@@ -30,13 +30,13 @@ operon_macros::include_operon! {
             pub a: A,
             pub b: B,
             pub c: C,
-        };
+        }
 
         #[entity(dims = ["i", "k"], def = "epsilon | i, k", from = ["B | j", "D|j"], pool = 4)]
         pub struct E {
             pub b: Vec<B>,
             pub d: Vec<D>,
-        };
+        }
 
         #[entity(dims = ["i"], def = "zeta|i", from = ["C|k", "E|k"])]
         pub enum F {
@@ -45,7 +45,7 @@ operon_macros::include_operon! {
                 e: Vec<E>,
             },
             Failure(String, Option<C>, Option<E>),
-        };
+        }
     };
     use_psql_storage = DataStorage;
 }
