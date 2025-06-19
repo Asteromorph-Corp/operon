@@ -132,6 +132,7 @@ impl Parse for RawEntityAttrs {
                     ));
                 }
             }
+            let _ = input.parse::<Token![,]>();
         }
         Ok(attrs)
     }
@@ -201,7 +202,7 @@ impl Parse for RawTypesConfig {
                     (false, false) => {}
                 }
                 if attrs.primary {
-                    if !attrs.dims.len() != 1 {
+                    if attrs.dims.len() != 1 {
                         return Err(syn::Error::new_spanned(
                             item_struct,
                             "Primary entity must have exactly one dimension",
@@ -323,7 +324,7 @@ impl Parse for RawTypesConfig {
                 }
 
                 if attrs.primary {
-                    if !attrs.dims.len() != 1 {
+                    if attrs.dims.len() != 1 {
                         return Err(syn::Error::new_spanned(
                             item_enum,
                             "Primary entity must have exactly one dimension",
