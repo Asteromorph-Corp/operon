@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use dashmap::DashMap;
-use ex1_expanded::operon::{self, dimension::*, entity::*, *};
+use ex1_expanded::operon::{dimension::*, entity::*, *};
 use futures::SinkExt;
 use rand::Rng;
 use std::sync::Arc;
@@ -577,7 +577,7 @@ impl OperonService for ExampleService {
         // if rng.random_bool(0.001) {
         //     operon::info!("Sample delta: {d:?}");
         // }
-        operon::trace!("Delta computed: {d:?}");
+        log::trace!("Delta computed: {d:?}");
         Ok(d)
     }
 
