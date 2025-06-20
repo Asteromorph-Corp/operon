@@ -6,11 +6,11 @@ pub mod operon {
     /// The size of the internal channel buffers.
     pub const INTERNAL_CHANNEL_SIZE: usize = 1024;
     /// The URI of the PostgreSQL database used by the metadata storage.
-    pub const META_DATABASE_URI: &str = "postgres://crescmoon@localhost/operon-db";
+    pub const META_DATABASE_URI: &str = "postgres://user:password@hostname:port/operon-db";
     /// The name of the metadata schema in the PostgreSQL database.
     pub const META_SCHEMA: Option<&'static str> = Some("metadata");
     /// The URI of the PostgreSQL database used by the data storage.
-    pub const DATABASE_URI: &str = "postgres://crescmoon@localhost/operon-db";
+    pub const DATABASE_URI: &str = "postgres://user:password@hostname:port/operon-db";
     /// The name of the data schema in the PostgreSQL database.
     pub const DATA_SCHEMA: Option<&'static str> = Some("data");
     /// The number of logs that the UI keeps in memory.
