@@ -1,10 +1,9 @@
 use super::config_types::*;
 use indexmap::IndexMap;
-use proc_macro_error::OptionExt;
 use quote::{ToTokens, quote};
 use std::path::PathBuf;
 use syn::{
-    ExprAssign, Item, LitInt, LitStr, Meta, Token, braced, bracketed,
+    Expr, ExprAssign, Item, LitInt, LitStr, Member, Meta, Token, braced, bracketed,
     parse::{Parse, ParseBuffer, ParseStream},
     parse2,
     spanned::Spanned,
@@ -54,6 +53,31 @@ fn check_valid_namedef(namedef: &str) -> syn::Result<()> {
     Ok(())
 }
 
+fn collect_field_chain(expr: &Expr) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut current = expr;
+
+    while let Expr::Field(field) = current {
+        if let Member::Named(ident) = &field.member {
+            fields.push(ident.to_string());
+        }
+        current = &field.base;
+    }
+
+    if let Expr::Path(path) = current {
+        if let Some(ident) = path.path.get_ident() {
+            fields.push(ident.to_string());
+        } else {
+            fields.push(path.path.to_token_stream().to_string());
+        }
+    } else {
+        fields.push(format!("<non-path base: {current:?}>"));
+    }
+
+    fields.reverse();
+    fields
+}
+
 #[derive(Debug, Default)]
 struct RawEntityAttrs {
     primary: bool,
@@ -87,13 +111,23 @@ impl Parse for RawEntityAttrs {
                         .map(|lit| lit.value())
                         .collect();
                     for dim in &attrs.dims {
-                        check_valid_name(dim)?;
+                        check_valid_name(dim).map_err(|_| {
+                            syn::Error::new_spanned(
+                                &arg_name,
+                                format!("Invalid dimension name `{dim}`"),
+                            )
+                        })?;
                     }
                 }
                 "def" => {
                     let _ = input.parse::<Token![=]>()?;
                     let def_lit = input.parse::<LitStr>()?;
-                    check_valid_namedef(&def_lit.value())?;
+                    check_valid_namedef(&def_lit.value()).map_err(|_| {
+                        syn::Error::new_spanned(
+                            &def_lit,
+                            format!("Invalid definition `{}`", def_lit.value()),
+                        )
+                    })?;
                     attrs.def = Some(def_lit.value());
                 }
                 "from" => {
@@ -109,7 +143,12 @@ impl Parse for RawEntityAttrs {
                     );
                     if let Some(from) = &attrs.from {
                         for def in from {
-                            check_valid_namedef(def)?;
+                            check_valid_namedef(def).map_err(|_| {
+                                syn::Error::new_spanned(
+                                    &arg_name,
+                                    format!("Invalid `from` definition `{def}`"),
+                                )
+                            })?;
                         }
                     }
                 }
@@ -243,16 +282,21 @@ impl Parse for RawTypesConfig {
                     }
                 }
                 let name = item_struct.ident.to_string();
-                check_valid_name(&name)?;
+                check_valid_name(&name).map_err(|_| {
+                    syn::Error::new_spanned(
+                        &item_struct.ident,
+                        format!("Invalid entity name `{name}`"),
+                    )
+                })?;
                 if types.entity.contains_key(&name) {
                     return Err(syn::Error::new_spanned(
-                        item_struct.ident,
-                        format!("Entity `{}` is already defined", name),
+                        &item_struct.ident,
+                        format!("Entity `{name}` is already defined"),
                     ));
                 }
                 if !item_struct.generics.params.is_empty() {
                     return Err(syn::Error::new_spanned(
-                        item_struct.generics,
+                        &item_struct.generics,
                         "Generic paramenters are not allowed",
                     ));
                 }
@@ -365,16 +409,21 @@ impl Parse for RawTypesConfig {
                     }
                 }
                 let name = item_enum.ident.to_string();
-                check_valid_name(&name)?;
+                check_valid_name(&name).map_err(|_| {
+                    syn::Error::new_spanned(
+                        &item_enum.ident,
+                        format!("Invalid entity name `{name}`"),
+                    )
+                })?;
                 if types.entity.contains_key(&name) {
                     return Err(syn::Error::new_spanned(
-                        item_enum.ident,
-                        format!("Entity `{}` is already defined", name),
+                        &item_enum.ident,
+                        format!("Entity `{name}` is already defined"),
                     ));
                 }
                 if !item_enum.generics.params.is_empty() {
                     return Err(syn::Error::new_spanned(
-                        item_enum.generics,
+                        &item_enum.generics,
                         "Generic parameters are not allowed",
                     ));
                 }
@@ -426,19 +475,30 @@ impl Parse for RawCommonConfig {
         let mut config = RawCommonConfig::default();
         while !input.is_empty() {
             let arg: ExprAssign = input.parse()?;
-            match arg.left.to_token_stream().to_string().as_str().trim() {
-                "storage.data.uri" => {
-                    config.storage.data.uri = parse2::<LitStr>(arg.right.to_token_stream())?.value();
+            match collect_field_chain(&arg.left)
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .as_slice()
+            {
+                ["storage", "data", "uri"] => {
+                    config.storage.data.uri =
+                        parse2::<LitStr>(arg.right.to_token_stream())?.value();
                 }
-                "storage.data.schema" => {
+                ["storage", "data", "schema"] => {
                     let schema = parse2::<LitStr>(arg.right.to_token_stream())?.value();
                     if schema.is_empty() {
                         return Err(syn::Error::new_spanned(arg.right, "Schema cannot be empty"));
                     }
-                    check_valid_name(&schema)?;
+                    check_valid_name(&schema).map_err(|_| {
+                        syn::Error::new_spanned(
+                            arg.right,
+                            format!("Invalid schema name `{schema}`"),
+                        )
+                    })?;
                     config.storage.data.schema = Some(schema);
                 }
-                "storage.data.pool_size" => {
+                ["storage", "data", "pool_size"] => {
                     config.storage.data.pool_size = arg
                         .right
                         .to_token_stream()
@@ -452,18 +512,24 @@ impl Parse for RawCommonConfig {
                         ));
                     }
                 }
-                "storage.metadata.uri" => {
-                    config.storage.metadata.uri = parse2::<LitStr>(arg.right.to_token_stream())?.value();
+                ["storage", "metadata", "uri"] => {
+                    config.storage.metadata.uri =
+                        parse2::<LitStr>(arg.right.to_token_stream())?.value();
                 }
-                "storage.metadata.schema" => {
+                ["storage", "metadata", "schema"] => {
                     let schema = parse2::<LitStr>(arg.right.to_token_stream())?.value();
                     if schema.is_empty() {
                         return Err(syn::Error::new_spanned(arg.right, "Schema cannot be empty"));
                     }
-                    check_valid_name(&schema)?;
+                    check_valid_name(&schema).map_err(|_| {
+                        syn::Error::new_spanned(
+                            arg.right,
+                            format!("Invalid schema name `{schema}`"),
+                        )
+                    })?;
                     config.storage.metadata.schema = Some(schema);
                 }
-                "storage.metadata.pool_size" => {
+                ["storage", "metadata", "pool_size"] => {
                     config.storage.metadata.pool_size = arg
                         .right
                         .to_token_stream()
@@ -477,7 +543,7 @@ impl Parse for RawCommonConfig {
                         ));
                     }
                 }
-                "log.level" => {
+                ["log", "level"] => {
                     let level = parse2::<LitStr>(arg.right.to_token_stream())?.value();
                     if !matches!(
                         level.as_str(),
@@ -490,16 +556,17 @@ impl Parse for RawCommonConfig {
                     }
                     config.log.level = Some(level);
                 }
-                "log.buffer_size" => {
+                ["log", "buffer_size"] => {
                     config.log.buffer_size =
                         Some(parse2::<LitInt>(arg.right.to_token_stream())?.base10_parse()?);
                 }
-                "log.dump" => {
+                ["log", "dump"] => {
                     config.log.dump =
                         Some(arg.right.to_token_stream().to_string().parse().unwrap());
                 }
-                "log.dump_path" => {
-                    config.log.dump_path = Some(parse2::<LitStr>(arg.right.to_token_stream())?.value());
+                ["log", "dump_path"] => {
+                    config.log.dump_path =
+                        Some(parse2::<LitStr>(arg.right.to_token_stream())?.value());
                 }
                 _ => return Err(syn::Error::new_spanned(arg, "Unknown configuration option")),
             }
@@ -591,6 +658,88 @@ fn resolve_types_config(raw: RawTypesConfig) -> syn::Result<TypesConfig> {
         // raw_entity.dims
         let entity_dims_raw = &raw_entity.dims;
         let (entity_dims, entity_def, entity_from) = if !primary {
+            let Some(def_raw) = &raw_entity.def else {
+                unreachable!("Guarded in `RawEntityAttrs` parse");
+            };
+            let (job_name, job_dims) = match def_raw.split('|').collect::<Vec<&str>>().as_slice() {
+                [def_name] => (def_name.trim().to_string(), vec![]),
+                [def_name, dims] => {
+                    let dims = dims
+                        .split(',')
+                        .map(|d| {
+                            Ok(Dimension::get_by_name(&dimensions, d.trim())
+                                .ok_or(syn::Error::new_spanned(
+                                    d,
+                                    format!(
+                                        "Dimension `{}` used before defined in {name}'s `def`",
+                                        d.trim()
+                                    ),
+                                ))?
+                                .tag)
+                        })
+                        .collect::<syn::Result<Vec<_>>>()?;
+                    (def_name.trim().to_string(), dims)
+                }
+                _ => {
+                    unreachable!("Guarded by check_valid_namedef");
+                }
+            };
+            let from = match &raw_entity.from {
+                Some(from) => from
+                    .iter()
+                    .map(|def| {
+                        Ok(match def.split('|').collect::<Vec<&str>>().as_slice() {
+                            [from_name] => (
+                                Entity::get_by_name(&entities, from_name.trim())
+                                    .ok_or(syn::Error::new_spanned(
+                                        from_name,
+                                        format!("Entity {from_name} used before defined in {name}'s `from`"),
+                                    ))?
+                                    .tag,
+                                vec![],
+                            ),
+                            [from_name, dims] => {
+                                let from_entity = Entity::get_by_name(&entities, from_name.trim())
+                                    .ok_or(syn::Error::new_spanned(
+                                        from_name,
+                                        format!("Entity {from_name} used before defined in {name}'s `from`"),
+                                    ))?;
+                                let dims = dims
+                                    .split(',')
+                                    .map(|d| {
+                                        let tag = Dimension::get_by_name(&dimensions, d.trim())
+                                            .ok_or(syn::Error::new_spanned(
+                                                d,
+                                                format!(
+                                                    "Dimension `{}` used before defined in {name}'s `from` entity {from_name}",
+                                                    d.trim()
+                                                ),
+                                            ))?
+                                            .tag;
+                                        if !from_entity.dims.contains(&tag) {
+                                            return Err(syn::Error::new_spanned(
+                                                d,
+                                                format!(
+                                                    "Dimension `{}` not found in entity {} in {name}'s `from`",
+                                                    d.trim(),
+                                                    from_entity.name
+                                                ),
+                                            ));
+                                        }
+                                        Ok(tag)
+                                    })
+                                    .collect::<syn::Result<Vec<_>>>()?;
+                                (from_entity.tag, dims)
+                            }
+                            _ => unreachable!("Guarded by check_valid_namedef"),
+                        })
+                    })
+                    .collect::<syn::Result<Vec<_>>>()?,
+                _ => {
+                    unreachable!("Guarded by `RawEntityAttrs` parse");
+                }
+            };
+            let pool = raw_entity.pool.unwrap_or(1);
             let mut spawned_dim = None;
             let mut entity_dims = vec![];
             for dim in entity_dims_raw {
@@ -611,89 +760,6 @@ fn resolve_types_config(raw: RawTypesConfig) -> syn::Result<TypesConfig> {
                     panic!("Tried to define multiple dimensions for entity `{name}`");
                 }
             }
-            let Some(def_raw) = &raw_entity.def else {
-                panic!("Non-primary entity `{name}` must have a definition");
-            };
-            let (job_name, job_dims) = match def_raw.split('|').collect::<Vec<&str>>().as_slice() {
-                [def_name] => (def_name.trim().to_string(), vec![]),
-                [def_name, dims] => {
-                    let dims = dims
-                        .split(',')
-                        .map(|d| {
-                            Dimension::get_by_name(&dimensions, d.trim())
-                                .expect_or_abort(&format!(
-                                    "Dimension {} used before defined",
-                                    d.trim()
-                                ))
-                                .tag
-                        })
-                        .collect::<Vec<_>>();
-                    (def_name.trim().to_string(), dims)
-                }
-                _ => {
-                    panic!(
-                        "Invalid definition for entity `{name}`: `{def_raw}`. \
-                        Expected format: `name|dim1,dim2,...` or `name`"
-                    );
-                }
-            };
-            let from = match &raw_entity.from {
-                Some(from) => from
-                    .iter()
-                    .map(
-                        |def| match def.split('|').collect::<Vec<&str>>().as_slice() {
-                            [name] => (
-                                Entity::get_by_name(&entities, name.trim())
-                                    .expect_or_abort(&format!(
-                                        "Entity {} used before defined",
-                                        name.trim()
-                                    ))
-                                    .tag,
-                                vec![],
-                            ),
-                            [name, dims] => {
-                                let from_entity =
-                                    Entity::get_by_name(&entities, name.trim()).expect_or_abort(
-                                        &format!("Entity {} used before defined", name.trim()),
-                                    );
-                                let dims = dims
-                                    .split(',')
-                                    .map(|d| {
-                                        Dimension::get_by_name(&dimensions, d.trim())
-                                            .expect_or_abort(&format!(
-                                                "Dimension {} used before defined",
-                                                d.trim()
-                                            ))
-                                            .tag
-                                    })
-                                    .inspect(|dim| {
-                                        if !from_entity.dims.contains(dim) {
-                                            panic!(
-                                                "Dimension #{} not found in entity {}",
-                                                dim.0, from_entity.name
-                                            );
-                                        }
-                                    })
-                                    .collect::<Vec<_>>();
-                                (from_entity.tag, dims)
-                            }
-                            _ => panic!(
-                                "Invalid `from` definition for entity `{name}`: `{def}`. \
-                                Expected format: `name|dim1,dim2,...` or `name`"
-                            ),
-                        },
-                    )
-                    .collect::<Vec<_>>(),
-                _ => {
-                    if entity_dims_raw.is_empty() {
-                        panic!(
-                            "Non-primary entity `{name}` must have a `from` attribute or dimensions"
-                        );
-                    }
-                    vec![]
-                }
-            };
-            let pool = raw_entity.pool.unwrap_or(1);
 
             let job_defines_dims = entity_dims
                 .iter()
