@@ -16,6 +16,12 @@ fn check_valid_name(name: &str) -> syn::Result<()> {
             "Invalid name, only alphanumeric characters and underscores are allowed",
         ));
     }
+    if name.len() > usize::from(u16::MAX) {
+        return Err(syn::Error::new_spanned(
+            name,
+            "Name is too long, maximum length is 65535 characters",
+        ));
+    }
     Ok(())
 }
 
