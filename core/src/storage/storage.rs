@@ -67,7 +67,7 @@ use crate::storage::StorageError;
 ///     async fn get_all_e_over_k(&self, i: I) -> Result<Vec<E>>;
 /// }
 /// ```
-pub trait OperonStorage {
+pub trait OperonStorage: Send + Sync + 'static {
     async fn clear(&self) -> ::anyhow::Result<()>;
 
     async fn get_footprint(&self) -> Result<Option<String>, StorageError> {
