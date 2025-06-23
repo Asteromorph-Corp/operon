@@ -3,13 +3,12 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
-    error::OperonError,
-    meta_storage::{MetaStorage, MetaStorageConnection, MetaStorageError, MetaStorageOptions},
-    promoter::Promoter,
+    meta_storage::{MetaContext, MetaStorage, MetaStorageConnector, MetaStorageOptions},
     scheduler::{
         ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
         SchedulerError,
     },
+    storage::OperonStorage,
     ui::UiState,
 };
 
@@ -22,20 +21,26 @@ use crate::{
 /// * Initialization of the metadata storage,
 /// * initialization of the individual schedulers, and
 /// * communication between the UI and the individual schedulers.
-pub struct Scheduler<Sto, Svc> {
-    promoter: Box<dyn Promoter<Sto, Svc>>,
+pub struct Scheduler<Sto, Svc, MetaStoCtor>
+where
+    Sto: OperonStorage,
+    MetaStoCtor: MetaStorageConnector,
+{
     storage: Arc<Sto>,
     service: Arc<Svc>,
-    meta_storage: Arc<MetaStorage>,
+    meta_storage: Arc<MetaContext<MetaStoCtor>>,
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
 }
 
-impl<Sto, Svc> Scheduler<Sto, Svc> {
+impl<Sto, Svc, MetaStoCtor> Scheduler<Sto, Svc, MetaStoCtor>
+where
+    Sto: OperonStorage,
+    MetaStoCtor: MetaStorageConnector,
+{
     /// Initialize a new scheduler and its associated storages.
     pub async fn new(
-        promoter: impl Promoter<Sto, Svc> + 'static,
         storage: Arc<Sto>,
         service: Arc<Svc>,
         ui_state: Arc<RwLock<UiState>>,
@@ -43,12 +48,9 @@ impl<Sto, Svc> Scheduler<Sto, Svc> {
         rec_tx: RecoveryStateSender,
         options: MetaStorageOptions,
     ) -> Result<Self, SchedulerError> {
-        let promoter = Box::new(promoter);
-        let meta_storage = Arc::new(MetaStorage::new(options)?);
-        meta_storage.init(promoter.as_ref()).await?;
+        let meta_storage = Arc::new(MetaContext::new(options).await?);
 
         Ok(Self {
-            promoter,
             storage,
             service,
             meta_storage,

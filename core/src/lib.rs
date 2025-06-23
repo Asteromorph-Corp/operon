@@ -3,7 +3,6 @@ pub use operon_macros::*;
 pub mod error;
 pub mod meta_storage;
 pub mod operon;
-pub mod promoter;
 pub mod scheduler;
 pub mod ui;
 
