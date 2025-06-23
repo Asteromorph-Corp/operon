@@ -1,12 +1,8 @@
 use thiserror::Error;
 
-use crate::{meta_storage::MetaStorageError, scheduler::SchedulerError, ui::UiError};
-
-// #[derive(Debug, Error)]
-// pub enum StorageError {
-//     #[error("Other error: {0}")]
-//     Other(String),
-// }
+use crate::{
+    meta_storage::MetaStorageError, scheduler::SchedulerError, storage::StorageError, ui::UiError,
+};
 
 // #[derive(Debug, Error)]
 // pub enum UserError {
@@ -17,15 +13,15 @@ use crate::{meta_storage::MetaStorageError, scheduler::SchedulerError, ui::UiErr
 /// Error type returned by Operon.
 #[derive(Debug, Error)]
 pub enum OperonError {
-    /// Error in a storage operation
-    #[error("Storage error: {0}")]
-    Storage(::anyhow::Error),
     /// Error in the scheduler
     #[error("Scheduler error: {0}")]
     Scheduler(SchedulerError),
     /// Error in a user function
     #[error("User function error: {0}")]
     User(::anyhow::Error),
+    /// Error in a storage operation
+    #[error("Storage error: {0}")]
+    Storage(#[from] StorageError),
     /// Error in the metadata storage
     #[error("Metadata storage error: {0}")]
     MetaStorage(#[from] MetaStorageError),
@@ -53,6 +49,7 @@ impl OperonError {
 impl From<SchedulerError> for OperonError {
     fn from(e: SchedulerError) -> Self {
         match e {
+            SchedulerError::Storage(e) => OperonError::Storage(e),
             SchedulerError::MetaStorage(e) => OperonError::MetaStorage(e),
             other => {
                 // Convert other scheduler errors to OperonError::Scheduler
