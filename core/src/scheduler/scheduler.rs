@@ -44,9 +44,8 @@ impl<Sto, Svc> Scheduler<Sto, Svc> {
         options: MetaStorageOptions,
     ) -> Result<Self, SchedulerError> {
         let promoter = Box::new(promoter);
-        let meta_storage = Arc::new(MetaStorage::new(options).await?);
-        promoter.init_facts(&meta_storage).await;
-        promoter.init_tickets(&meta_storage).await;
+        let meta_storage = Arc::new(MetaStorage::new(options)?);
+        meta_storage.init(promoter.as_ref()).await?;
 
         Ok(Self {
             promoter,
