@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     error::OperonError,
-    meta_storage::{MetaStorage, MetaStorageOptions},
+    meta_storage::{MetaStorage, MetaStorageConnection, MetaStorageError, MetaStorageOptions},
     promoter::Promoter,
     scheduler::{
         ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
@@ -58,117 +58,100 @@ impl<Sto, Svc> Scheduler<Sto, Svc> {
         })
     }
 
-    // /// Main entry point for the scheduler.
-    // pub async fn work(mut self) -> Result<(), SchedulerError> {
-    //     // First, check the recovery state.
-    //     let recovery_state = self.check_recovery_state().await.map_err(|e| {
-    //         log::error!("Failed to check the state from last run.");
-    //         if let Err(e) = self.rec_tx.send(RecoveryState::Error)? {
-    //             return e;
-    //         };
-    //         e
-    //     })?;
-    //     self.rec_tx.send(recovery_state)?;
-    //     match recovery_state {
-    //         RecoveryState::Fresh => {
-    //             log::info!("Type `run` to begin running jobs.");
-    //         }
-    //         RecoveryState::Finished => {
-    //             log::info!(
-    //                 "Found a finished run. \n\
-    //                 Type `run` to begin running jobs and overwrite the existing data, \
-    //                 or `exit` to cancel."
-    //             );
-    //         }
-    //         RecoveryState::GracefullyStopped => {
-    //             log::info!(
-    //                 "Found a gracefully stopped run. \n\
-    //                 Type `run` to resume running jobs from the last run, or `help` for additional options."
-    //             )
-    //         }
-    //         RecoveryState::AbortedUnchecked => {
-    //             log::info!(
-    //                 "Found an aborted run. \n\
-    //                 Type `check` to check if the data is recoverable, \
-    //                 `run` to start a new run and overwrite the existing data, \
-    //                 or `help` for additional options."
-    //             );
-    //         }
-    //         _ => unreachable!("Unexpected recovery state: {recovery_state:?}"),
-    //     }
-    //     // Then, wait for the UI to decide what to do next.
-    //     loop {
-    //         self.ctrl_rx.changed().await.map_err(scheduler_error)?;
-    //         let ctrl_event = self.ctrl_rx.borrow_and_update().clone();
-    //         match ctrl_event {
-    //             ControlEvent::Check { primary_ub } => {
-    //                 let consistent = self.check_consistency(primary_ub).await.map_err(|e| {
-    //                     log::error!("Failed to check data consistency: {e}");
-    //                     if let Err(e) = self.rec_tx.send(RecoveryState::Error)? {
-    //                         return e;
-    //                     };
-    //                     e
-    //                 })?;
-    //                 let state_after_check = if consistent {
-    //                     match recovery_state {
-    //                         RecoveryState::AbortedUnchecked => RecoveryState::AbortedChecked,
-    //                         RecoveryState::GracefullyStopped => {
-    //                             RecoveryState::GracefullyStoppedChecked
-    //                         }
-    //                         _ => unreachable!(
-    //                             "Ran `check_consistency` in an unexpected state: {recovery_state:?}"
-    //                         ),
-    //                     }
-    //                 } else {
-    //                     RecoveryState::MissingData
-    //                 };
-    //                 self.rec_tx.send(state_after_check)?;
-    //                 match state_after_check {
-    //                     RecoveryState::MissingData => {
-    //                         log::info!(
-    //                             "Some data is corrupted or missing. \n\
-    //                             Type `run` to start a new run and overwrite the existing data, or `exit` to cancel."
-    //                         )
-    //                     }
-    //                     RecoveryState::AbortedChecked => {
-    //                         log::info!(
-    //                             "The data is recoverable. \n\
-    //                             Type `run` to rebuild and resume running jobs from the last run, \
-    //                             or `help` for additional options."
-    //                         )
-    //                     }
-    //                     RecoveryState::GracefullyStoppedChecked => {
-    //                         log::info!(
-    //                             "No inconsistencies were found. \n\
-    //                             Type `run` to resume running jobs from the last run, or `help` for additional options."
-    //                         );
-    //                     }
-    //                     _ => unreachable!(
-    //                         "Unexpected recovery state after consistency check: {consistent:?}"
-    //                     ),
-    //                 }
-    //             }
-    //             ControlEvent::CleanRun { primary_ub } => {
-    //                 return self.run(primary_ub, RunMode::Clean).await;
-    //             }
-    //             ControlEvent::RebuildRun { primary_ub } => {
-    //                 return self.run(primary_ub, RunMode::Rebuild).await;
-    //             }
-    //             ControlEvent::RestoreRun { primary_ub } => {
-    //                 return self.run(primary_ub, RunMode::Restore).await;
-    //             }
-    //             ControlEvent::Abort => {
-    //                 // Decided to not start a new run.
-    //                 return Ok(());
-    //             }
-    //             _ => {
-    //                 // Other control events should not be passed in here.
-    //                 log::warn!("Received an unexpected control event: {ctrl_event:?}");
-    //                 return Err(SchedulerError::UnexpectedControlEvent(ctrl_event));
-    //             }
-    //         }
-    //     }
-    // }
+    /// Main entry point for the scheduler.
+    pub async fn work(mut self) -> Result<(), SchedulerError> {
+        // First, check the recovery state.
+        let recovery_state = self.check_recovery_state().await.map_err(|e| {
+            log::error!("Failed to check the state from last run.");
+            if let Err(e) = self.rec_tx.send(RecoveryState::Error) {
+                return SchedulerError::RecoverySendFailed(e.0);
+            };
+            e
+        })?;
+        self.rec_tx.send(recovery_state)?;
+        match recovery_state {
+            RecoveryState::Fresh => log::info!("Type `run` to begin running jobs."),
+            RecoveryState::Finished => log::info!(
+                "Found a finished run. \n\
+                Type `run` to begin running jobs and overwrite the existing data, \
+                or `exit` to cancel."
+            ),
+            RecoveryState::GracefullyStopped => log::info!(
+                "Found a gracefully stopped run. \n\
+                Type `run` to resume running jobs from the last run, or `help` for additional options."
+            ),
+            RecoveryState::AbortedUnchecked => log::info!(
+                "Found an aborted run. \n\
+                Type `check` to check if the data is recoverable, \
+                `run` to start a new run and overwrite the existing data, \
+                or `help` for additional options."
+            ),
+            _ => unreachable!("Unexpected recovery state: {recovery_state:?}"),
+        }
+        // Then, wait for the UI to decide what to do next.
+        loop {
+            self.ctrl_rx.changed().await?;
+            let ctrl_event = self.ctrl_rx.borrow_and_update().clone();
+            match ctrl_event {
+                ControlEvent::Check { primary_ub } => {
+                    let consistent = self.check_consistency(primary_ub).await.map_err(|e| {
+                        log::error!("Failed to check data consistency: {e}");
+                        if let Err(e) = self.rec_tx.send(RecoveryState::Error) {
+                            return SchedulerError::RecoverySendFailed(e.0);
+                        };
+                        e
+                    })?;
+                    let state_after_check = match (recovery_state, consistent) {
+                        (RecoveryState::AbortedUnchecked, true) => RecoveryState::AbortedChecked,
+                        (RecoveryState::GracefullyStopped, true) => {
+                            RecoveryState::GracefullyStoppedChecked
+                        }
+                        (_, true) => unreachable!(
+                            "Ran `check_consistency` in an unexpected state: {recovery_state:?}"
+                        ),
+                        (_, false) => RecoveryState::MissingData,
+                    };
+                    self.rec_tx.send(state_after_check)?;
+                    match state_after_check {
+                        RecoveryState::MissingData => log::info!(
+                            "Some data is corrupted or missing. \n\
+                            Type `run` to start a new run and overwrite the existing data, or `exit` to cancel."
+                        ),
+                        RecoveryState::AbortedChecked => log::info!(
+                            "The data is recoverable. \n\
+                            Type `run` to rebuild and resume running jobs from the last run, \
+                            or `help` for additional options."
+                        ),
+                        RecoveryState::GracefullyStoppedChecked => log::info!(
+                            "No inconsistencies were found. \n\
+                                Type `run` to resume running jobs from the last run, or `help` for additional options."
+                        ),
+                        _ => unreachable!(
+                            "Unexpected recovery state after consistency check: {consistent:?}"
+                        ),
+                    }
+                }
+                ControlEvent::CleanRun { primary_ub } => {
+                    return self.run(primary_ub, RunMode::Clean).await;
+                }
+                ControlEvent::RebuildRun { primary_ub } => {
+                    return self.run(primary_ub, RunMode::Rebuild).await;
+                }
+                ControlEvent::RestoreRun { primary_ub } => {
+                    return self.run(primary_ub, RunMode::Restore).await;
+                }
+                ControlEvent::Abort => {
+                    // Decided to not start a new run.
+                    return Ok(());
+                }
+                _ => {
+                    // Other control events should not be passed in here.
+                    log::warn!("Received an unexpected control event: {ctrl_event:?}");
+                    return Err(SchedulerError::UnexpectedControlEvent(ctrl_event));
+                }
+            }
+        }
+    }
 
     // /// Find out the recovery state.
     // pub async fn check_recovery_state(&self) -> Result<RecoveryState, SchedulerError> {

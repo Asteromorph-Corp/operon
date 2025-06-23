@@ -2,6 +2,7 @@ use std::fmt;
 
 pub type RecoveryStateReceiver = tokio::sync::watch::Receiver<RecoveryState>;
 pub type RecoveryStateSender = tokio::sync::watch::Sender<RecoveryState>;
+pub type RecoveryStateSendError = tokio::sync::watch::error::SendError<RecoveryState>;
 
 /// Information about how recoverable the last run was.
 /// Recovery methods that can be used to recover lower variants
