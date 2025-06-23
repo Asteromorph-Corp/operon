@@ -1,4 +1,7 @@
-use crate::meta_storage::{MetaClient, MetaStorageError};
+use crate::{
+    meta_storage::{MetaClient, MetaStorageError},
+    ui::UiStateUpdate,
+};
 
 pub trait MetaStorage: Send + Sync {
     fn get_client(&self) -> &MetaClient<'_>;
@@ -66,6 +69,8 @@ pub trait MetaStorage: Send + Sync {
         let row = self.get_client().query_opt(&stmt, &[&key]).await?;
         Ok(row.map(|r| r.get::<_, &str>(0).to_string()))
     }
+
+    async fn get_ui_updates(&self) -> Result<Vec<UiStateUpdate>, MetaStorageError>;
 }
 
 // pub struct MetaStorage {
