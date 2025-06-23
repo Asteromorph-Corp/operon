@@ -1,38 +1,56 @@
-/// Wrapper around `deadpool_postgres::GenericClient` that provides
-/// the `copy_in` method.
-#[::async_trait::async_trait]
-pub trait MetaClient: ::deadpool_postgres::GenericClient {
-    async fn copy_in<T, U>(
-        &self,
-        query: &T,
-    ) -> ::std::result::Result<::tokio_postgres::CopyInSink<U>, ::tokio_postgres::Error>
-    where
-        T: ?Sized + ::tokio_postgres::ToStatement + Send + Sync,
-        U: ::bytes::Buf + 'static + Send + Sync;
+use bytes::Buf;
+use tokio_postgres::{CopyInSink, ToStatement};
+
+use crate::meta_storage::MetaStorageError;
+
+macro_rules! impl_meta_client {
+    (
+        $method:ident
+        $(< $($generics:tt),* >)?
+        ( $($arg:ident : $arg_ty:ty),* ) -> $ret:ty
+        $(where $($where_clause:tt)+)?
+    ) => {
+        pub async fn $method
+        $(< $($generics),* >)?
+        (&self, $($arg: $arg_ty),*)  -> Result<$ret, MetaStorageError>
+        $(where $($where_clause)+)?
+        {
+            match self {
+                MetaClient::Object(client) => client.$method($($arg),*).await.map_err(Into::into),
+                MetaClient::Transaction(tx) => tx.$method($($arg),*).await.map_err(Into::into),
+            }
+        }
+    };
 }
-#[::async_trait::async_trait]
-impl MetaClient for ::deadpool_postgres::Object {
-    async fn copy_in<T, U>(
-        &self,
-        query: &T,
-    ) -> ::std::result::Result<::tokio_postgres::CopyInSink<U>, ::tokio_postgres::Error>
-    where
-        T: ?Sized + ::tokio_postgres::ToStatement + Send + Sync,
-        U: ::bytes::Buf + 'static + Send + Sync,
-    {
-        ::tokio_postgres::Client::copy_in(self, query).await
+
+type ToSql = dyn tokio_postgres::types::ToSql + Sync;
+
+#[derive(Debug, Clone, Copy)]
+pub enum MetaClient<'a> {
+    Object(&'a deadpool_postgres::Object),
+    Transaction(&'a deadpool_postgres::Transaction<'a>),
+}
+
+impl MetaClient<'_> {
+    impl_meta_client!(batch_execute(query: &str) -> ());
+    impl_meta_client!(execute(query: &str, params: &[&ToSql]) -> u64);
+    impl_meta_client!(query(query: &str, params: &[&ToSql]) -> Vec<tokio_postgres::Row>);
+    impl_meta_client!(query_opt(query: &str, params: &[&ToSql]) -> Option<tokio_postgres::Row>);
+    impl_meta_client!(
+        copy_in<T, U>(query: &T) -> CopyInSink<U>
+        where T: ?Sized + ToStatement + Send + Sync,
+              U: Buf + 'static + Send + Sync
+    );
+}
+
+impl<'a> From<&'a deadpool_postgres::Object> for MetaClient<'a> {
+    fn from(client: &'a deadpool_postgres::Object) -> Self {
+        MetaClient::Object(client)
     }
 }
-#[::async_trait::async_trait]
-impl MetaClient for ::deadpool_postgres::Transaction<'_> {
-    async fn copy_in<T, U>(
-        &self,
-        query: &T,
-    ) -> ::std::result::Result<::tokio_postgres::CopyInSink<U>, ::tokio_postgres::Error>
-    where
-        T: ?Sized + ::tokio_postgres::ToStatement + Send + Sync,
-        U: ::bytes::Buf + 'static + Send + Sync,
-    {
-        ::tokio_postgres::Transaction::copy_in(self, query).await
+
+impl<'a> From<&'a deadpool_postgres::Transaction<'a>> for MetaClient<'a> {
+    fn from(tx: &'a deadpool_postgres::Transaction<'a>) -> Self {
+        MetaClient::Transaction(tx)
     }
 }
