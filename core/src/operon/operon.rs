@@ -3,9 +3,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
-    error::OperonError,
     meta_storage::MetaStorageConnector,
-    operon::OperonOptions,
+    operon::{OperonError, OperonOptions},
     scheduler::{ControlEvent, RecoveryState, Scheduler},
     service::OperonService,
     storage::OperonStorage,
