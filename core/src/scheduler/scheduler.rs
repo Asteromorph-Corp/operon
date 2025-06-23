@@ -474,99 +474,14 @@ where
     //     Ok(true)
     // }
 
-    // async fn update_ui_all<Cl>(&self, conn: MetaStorageConnection<'_, Cl>) -> Result<()>
-    // where
-    //     Cl: MetaClient,
-    // {
-    //     // Update the UI state with the current status of all individual schedulers.
-    //     let beta_counts = tickets_psql::get_beta_status(conn).await?;
-    //     let beta_state = if beta_counts.1 + beta_counts.2 == 0 {
-    //         RunningState::Finished
-    //     } else {
-    //         RunningState::Running
-    //     };
-    //     let gamma_counts = tickets_psql::get_gamma_status(conn).await?;
-    //     let gamma_state = if gamma_counts.1 + gamma_counts.2 == 0 {
-    //         RunningState::Finished
-    //     } else {
-    //         RunningState::Running
-    //     };
-    //     let delta_counts = tickets_psql::get_delta_status(conn).await?;
-    //     let delta_state = if delta_counts.1 + delta_counts.2 == 0 {
-    //         RunningState::Finished
-    //     } else {
-    //         RunningState::Running
-    //     };
-    //     let epsilon_counts = tickets_psql::get_epsilon_status(conn).await?;
-    //     let epsilon_state = if epsilon_counts.1 + epsilon_counts.2 == 0 {
-    //         RunningState::Finished
-    //     } else {
-    //         RunningState::Running
-    //     };
-    //     let zeta_counts = tickets_psql::get_zeta_status(conn).await?;
-    //     let zeta_state = if zeta_counts.1 + zeta_counts.2 == 0 {
-    //         RunningState::Finished
-    //     } else {
-    //         RunningState::Running
-    //     };
-
-    //     ui::update_ui_state(
-    //         &self.ui_state.clone(),
-    //         ui::UiStateUpdate::Beta((
-    //             beta_counts.0,
-    //             beta_counts.1,
-    //             beta_counts.2,
-    //             beta_state,
-    //             false,
-    //         )),
-    //     )
-    //     .await;
-    //     ui::update_ui_state(
-    //         &self.ui_state.clone(),
-    //         ui::UiStateUpdate::Gamma((
-    //             gamma_counts.0,
-    //             gamma_counts.1,
-    //             gamma_counts.2,
-    //             gamma_state,
-    //             false,
-    //         )),
-    //     )
-    //     .await;
-    //     ui::update_ui_state(
-    //         &self.ui_state.clone(),
-    //         ui::UiStateUpdate::Delta((
-    //             delta_counts.0,
-    //             delta_counts.1,
-    //             delta_counts.2,
-    //             delta_state,
-    //             false,
-    //         )),
-    //     )
-    //     .await;
-    //     ui::update_ui_state(
-    //         &self.ui_state.clone(),
-    //         ui::UiStateUpdate::Epsilon((
-    //             epsilon_counts.0,
-    //             epsilon_counts.1,
-    //             epsilon_counts.2,
-    //             epsilon_state,
-    //             false,
-    //         )),
-    //     )
-    //     .await;
-    //     ui::update_ui_state(
-    //         &self.ui_state.clone(),
-    //         ui::UiStateUpdate::Zeta((
-    //             zeta_counts.0,
-    //             zeta_counts.1,
-    //             zeta_counts.2,
-    //             zeta_state,
-    //             false,
-    //         )),
-    //     )
-    //     .await;
-    //     Ok(())
-    // }
+    async fn update_ui_all(&self, conn: &MetaStoCtor::MetaSto<'_>) -> Result<(), SchedulerError> {
+        let updates = conn.get_ui_updates().await?;
+        let mut ui_state = self.ui_state.write().await; // Might break
+        for update in updates {
+            ui_state.update_ui_state(update)?;
+        }
+        Ok(())
+    }
 
     // async fn run(mut self, primary_ub: usize, run_mode: RunMode) -> Result<()> {
     //     // Set up the initial storage setup and initial tickets for the individual schedulers.

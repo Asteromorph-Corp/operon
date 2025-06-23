@@ -51,6 +51,7 @@ impl From<SchedulerError> for OperonError {
         match e {
             SchedulerError::Storage(e) => OperonError::Storage(e),
             SchedulerError::MetaStorage(e) => OperonError::MetaStorage(e),
+            SchedulerError::Ui(e) => OperonError::UI(e),
             other => {
                 // Convert other scheduler errors to OperonError::Scheduler
                 OperonError::Scheduler(other)

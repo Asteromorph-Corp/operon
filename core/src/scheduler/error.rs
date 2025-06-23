@@ -4,6 +4,7 @@ use crate::{
     meta_storage::MetaStorageError,
     scheduler::{ControlEvent, RecoveryState, RecoveryStateSendError},
     storage::StorageError,
+    ui::UiError,
 };
 
 #[derive(Debug, Error)]
@@ -12,6 +13,8 @@ pub enum SchedulerError {
     Storage(#[from] StorageError),
     #[error("Metadata storage error: {0}")]
     MetaStorage(#[from] MetaStorageError),
+    #[error("UI Error: {0}")]
+    Ui(#[from] UiError),
     #[error("Failed to send recovery state: {0}")]
     RecoverySendFailed(RecoveryState),
     #[error("Unexpected control event: {0:?}")]
