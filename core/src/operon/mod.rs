@@ -7,3 +7,6 @@ pub use running_state::*;
 
 mod options;
 pub use options::*;
+
+mod error;
+pub use error::*;
