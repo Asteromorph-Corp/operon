@@ -4,6 +4,7 @@ pub mod error;
 pub mod meta_storage;
 pub mod operon;
 pub mod scheduler;
+pub mod storage;
 pub mod ui;
 
 mod utils;

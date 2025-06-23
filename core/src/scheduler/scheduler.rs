@@ -155,51 +155,35 @@ where
         }
     }
 
-    // /// Find out the recovery state.
-    // pub async fn check_recovery_state(&self) -> Result<RecoveryState, SchedulerError> {
-    //     // Get footprints from both storages.
-    //     let data_footprint = self
-    //         .storage
-    //         .get_footprint()
-    //         .await
-    //         .map_err(OperonError::Storage)?;
-    //     let meta_footprint = {
-    //         let client = self.meta_pool.get().await.map_err(meta_storage_error)?;
-    //         // Read-only, so no transaction needed.
-    //         let conn = MetaStorageConnection {
-    //             client: &client,
-    //             schema: &self.meta_schema,
-    //         };
-    //         footprint_psql::get_footprint(conn, "global".to_string()).await?
-    //     };
-    //     // Early return if the state can be inferred through the footprints.
-    //     match (&data_footprint, &meta_footprint) {
-    //         (Some(df), Some(mf)) if df == mf && df.starts_with("F@") => {
-    //             // Both storages have the same footprint, and it is a "finished" one.
-    //             return Ok(RecoveryState::Finished);
-    //         }
-    //         (Some(df), Some(mf)) if df == mf && df.starts_with("S@") => {
-    //             // Both storages have the same footprint, and it is a "stopped" one.
-    //             return Ok(RecoveryState::GracefullyStopped);
-    //         }
-    //         _ => {}
-    //     }
-    //     // Check for `Fresh`: whether the metadata storage holds the primary resolution.
-    //     let client = self.meta_pool.get().await.map_err(meta_storage_error)?;
-    //     let conn = MetaStorageConnection {
-    //         client: &client,
-    //         schema: &self.meta_schema,
-    //     };
-    //     let resolution =
-    //         facts_psql::get_resolution(conn, &masked_dimension::ResolutionRequest::I).await?;
-    //     if resolution.is_none() {
-    //         // No resolution found, so the metadata storage is empty.
-    //         return Ok(RecoveryState::Fresh);
-    //     }
-    //     // Fall back to `AbortedUnchecked`: the metadata storage has some data,
-    //     // but it is not consistent with the data storage.
-    //     Ok(RecoveryState::AbortedUnchecked)
-    // }
+    /// Find out the recovery state.
+    pub async fn check_recovery_state(&self) -> Result<RecoveryState, SchedulerError> {
+        let meta_conn = self.meta_storage.get_conn().await?;
+
+        // Get footprints from both storages.
+        let data_footprint = self.storage.get_footprint().await?;
+        let meta_footprint = meta_conn.get_footprint("global").await?;
+        // Early return if the state can be inferred through the footprints.
+        match (&data_footprint, &meta_footprint) {
+            (Some(df), Some(mf)) if df == mf && df.starts_with("F@") => {
+                // Both storages have the same footprint, and it is a "finished" one.
+                return Ok(RecoveryState::Finished);
+            }
+            (Some(df), Some(mf)) if df == mf && df.starts_with("S@") => {
+                // Both storages have the same footprint, and it is a "stopped" one.
+                return Ok(RecoveryState::GracefullyStopped);
+            }
+            _ => (),
+        }
+
+        let resolution = meta_conn.get_resolution(&Default::default()).await?;
+        if resolution.is_none() {
+            // No resolution found, so the metadata storage is empty.
+            return Ok(RecoveryState::Fresh);
+        }
+        // Fall back to `AbortedUnchecked`: the metadata storage has some data,
+        // but it is not consistent with the data storage.
+        Ok(RecoveryState::AbortedUnchecked)
+    }
 
     // /// Run a check on the data consistency between the data storage and the metadata storage.
     // /// Return `true` if the data storage holds all needed data to restore,
