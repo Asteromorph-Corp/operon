@@ -1,4 +1,7 @@
-use crate::meta_storage::{MetaStorageConnection, MetaStorageError, MetaStorageOptions};
+use crate::{
+    meta_storage::{MetaStorageConnection, MetaStorageError, MetaStorageOptions},
+    promoter::Promoter,
+};
 
 pub struct MetaStorage {
     pub pool: deadpool_postgres::Pool,
@@ -17,33 +20,39 @@ impl MetaStorage {
         Ok(config)
     }
 
-    pub async fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
+    pub fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
         let schema = options.schema;
 
         // Might want to make these hardcoded config values configurable.
-        let pg_config: ::tokio_postgres::Config = Self::build_config(&options.database_uri)?;
-        let manager_config = ::deadpool_postgres::ManagerConfig {
-            recycling_method: ::deadpool_postgres::RecyclingMethod::Clean,
+        let pg_config: tokio_postgres::Config = Self::build_config(&options.database_uri)?;
+        let manager_config = deadpool_postgres::ManagerConfig {
+            recycling_method: deadpool_postgres::RecyclingMethod::Clean,
         };
-        let manager = ::deadpool_postgres::Manager::from_config(
+        let manager = deadpool_postgres::Manager::from_config(
             pg_config,
-            ::tokio_postgres::NoTls,
+            tokio_postgres::NoTls,
             manager_config,
         );
-        let pool = ::deadpool_postgres::Pool::builder(manager)
+        let pool = deadpool_postgres::Pool::builder(manager)
             .max_size(options.pool_size)
             .build()?;
 
-        {
-            // Initialize the metadata storage.
-            let mut client = pool.get().await?;
-            let tx = client.transaction().await?;
-            let conn = MetaStorageConnection::new(&tx, &schema);
-            conn.init_schema().await?;
-            conn.init_footprints().await?;
-            tx.commit().await?;
-        }
-
         Ok(Self { pool, schema })
+    }
+
+    pub async fn init<Sto, Svc>(
+        &self,
+        promoter: &impl Promoter<Sto, Svc>,
+    ) -> Result<(), MetaStorageError> {
+        // Initialize the metadata storage.
+        let mut client = self.pool.get().await?;
+        let tx = client.transaction().await?;
+        let conn = MetaStorageConnection::new(&tx, &self.schema);
+        conn.init_schema().await?;
+        conn.init_footprints().await?;
+        promoter.init_facts(&conn).await?;
+        promoter.init_tickets(&conn).await?;
+        tx.commit().await?;
+        Ok(())
     }
 }
