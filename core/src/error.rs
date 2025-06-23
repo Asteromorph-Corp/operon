@@ -34,6 +34,9 @@ pub enum OperonError {
     /// Tried to resolve a ticket with an irrelevant resolution
     #[error("Invalid resolution: {0}")]
     InvalidResolution(String),
+    /// Error in the scheduler loop join
+    #[error("Scheduler loop join error: {0}")]
+    SchedulerJoinError(#[from] tokio::task::JoinError),
 }
 
 impl OperonError {
