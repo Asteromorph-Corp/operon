@@ -507,7 +507,8 @@ dependencies = [
 name = "ex1"
 version = "0.1.0"
 dependencies = [
- "operon-macros",
+ "operon",
+ "tokio",
 ]
 
 [[package]]
@@ -728,6 +729,7 @@ checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
 dependencies = [
  "equivalent",
  "hashbrown",
+ "serde",
 ]
 
 [[package]]
@@ -907,7 +909,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
-name = "operon-macros"
+name = "operon"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -919,8 +921,9 @@ dependencies = [
  "csv",
  "deadpool-postgres",
  "futures",
+ "indexmap",
  "log",
- "operon-macros-internal",
+ "operon-macros",
  "postgres-types",
  "ratatui",
  "serde",
@@ -932,12 +935,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "operon-macros-internal"
+name = "operon-macros"
 version = "0.1.0"
 dependencies = [
+ "indexmap",
+ "once_cell",
+ "proc-macro-crate",
  "proc-macro-error",
  "proc-macro2",
  "quote",
+ "serde",
  "syn 2.0.103",
  "toml",
 ]
@@ -1058,6 +1065,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "proc-macro-crate"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edce586971a4dfaa28950c6f18ed55e0406c1ab88bbce2c6f6293a7aaba73d35"
+dependencies = [
+ "toml_edit",
 ]
 
 [[package]]
