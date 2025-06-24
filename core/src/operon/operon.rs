@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
+    job::Job,
     meta_storage::MetaStorage,
     operon::{OperonError, OperonOptions},
     scheduler::{ControlEvent, RecoveryState, Scheduler},
@@ -48,7 +49,12 @@ where
     /// Running this will take over the terminal, so it is strongly discouraged to make any
     /// other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
-    pub async fn run(self, primary_ub: usize, options: OperonOptions) -> Result<(), OperonError> {
+    pub async fn run(
+        self,
+        jobs: Vec<Box<dyn Job + Send + Sync>>,
+        primary_ub: usize,
+        options: OperonOptions,
+    ) -> Result<(), OperonError> {
         let (meta_storage_options, log_options) = options.split();
 
         // Initialize the logger
@@ -67,6 +73,7 @@ where
         let scheduler = Scheduler::<Sto, Svc, MetaSto>::new(
             self.storage,
             self.service,
+            jobs,
             ui_state.clone(),
             ctrl_rx,
             rec_tx,

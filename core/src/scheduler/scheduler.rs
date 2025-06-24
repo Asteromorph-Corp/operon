@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
+    job::Job,
     meta_storage::{MetaClient, MetaContext, MetaStorage, MetaStorageError, MetaStorageOptions},
     scheduler::{
         ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
@@ -30,7 +31,8 @@ where
 {
     storage: Arc<Sto>,
     service: Arc<Svc>,
-    meta_storage: Arc<MetaContext<MetaStoCtor>>,
+    meta_storage: Arc<MetaSto>,
+    jobs: Vec<Box<dyn Job + Send + Sync>>,
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
@@ -46,6 +48,7 @@ where
     pub async fn new(
         storage: Arc<Sto>,
         service: Arc<Svc>,
+        jobs: Vec<Box<dyn Job + Send + Sync>>,
         ui_state: Arc<RwLock<UiState>>,
         ctrl_rx: ControlEventReceiver,
         rec_tx: RecoveryStateSender,
@@ -58,6 +61,7 @@ where
             storage,
             service,
             meta_storage,
+            jobs,
             ui_state,
             ctrl_rx,
             rec_tx,
@@ -193,297 +197,23 @@ where
         Ok(RecoveryState::AbortedUnchecked)
     }
 
-    // /// Run a check on the data consistency between the data storage and the metadata storage.
-    // /// Return `true` if the data storage holds all needed data to restore,
-    // /// or `false` if it does not.
-    // ///
-    // /// This should be called only when the recovery state is either
-    // /// `AbortedUnchecked` or `GracefullyStopped`.
-    // async fn check_consistency(&self, primary_ub: usize) -> Result<bool> {
-    //     '_a: {
-    //         // Pull the primary resolution from the metadata storage...
-    //         let client = self.meta_pool.get().await.map_err(meta_storage_error)?;
-    //         let conn = MetaStorageConnection {
-    //             client: &client,
-    //             schema: &self.meta_schema,
-    //         };
-    //         let Some(i_ub) =
-    //             facts_psql::get_resolution(conn, &masked_dimension::ResolutionRequest::I)
-    //                 .await?
-    //                 .and_then(|r| {
-    //                     if let masked_dimension::Resolution::I(i) = r {
-    //                         Some(i)
-    //                     } else {
-    //                         None
-    //                     }
-    //                 })
-    //         else {
-    //             // This is technically unreachable, because we check this same value
-    //             // in `check_recovery_state`.
-    //             info!("No primary resolution found in the metadata storage.");
-    //             return Ok(false);
-    //         };
-    //         // ...and check if the data storage holds all the data for it.
-    //         for i in 0..i_ub.max(primary_ub) {
-    //             if self
-    //                 .storage
-    //                 .get_a(i)
-    //                 .await
-    //                 .map_err(operon::error::OperonError::Storage)?
-    //                 .is_none()
-    //             {
-    //                 info!("Data storage does not hold `A_{i}`.");
-    //                 return Ok(false);
-    //             }
-    //         }
-    //         // Additionally check if the primary resolution agrees with the given upper bound.
-    //         if i_ub != primary_ub {
-    //             warn!(
-    //                 "Previous run's upper bound `{i_ub}` is different from the current run's upper bound `{primary_ub}`. \n\
-    //                         If you overwrote the primary data, consider running `run --fresh` to overwrite the existing data, \
-    //                         otherwise the resulting data may be inconsistent. \n\
-    //                         If you want to keep the existing data, and intendedly set the upper bound to `{primary_ub}`, \
-    //                         you may ignore this warning."
-    //             );
-    //         }
-    //     }
-    //     '_b: {
-    //         // Pull the "done" beta jobs from the metadata storage...
-    //         let client = self.meta_pool.get().await.map_err(meta_storage_error)?;
-    //         let conn = MetaStorageConnection {
-    //             client: &client,
-    //             schema: &self.meta_schema,
-    //         };
-    //         let Some(beta_jobs) = tickets_psql::get_all_done::<_, BetaTicket>(conn)
-    //             .await?
-    //             .iter()
-    //             .map(|t| {
-    //                 t.resolve().and_then(|job| {
-    //                     if let job::Job::Beta { i } = job {
-    //                         Some((i,))
-    //                     } else {
-    //                         None
-    //                     }
-    //                 })
-    //             })
-    //             .collect::<Option<Vec<_>>>()
-    //         else {
-    //             info!("Some `beta` tickets are corrupt in the metadata storage.");
-    //             return Ok(false);
-    //         };
-    //         // ...and map them with the dimensions they spawned...
-    //         let mut b_tags = vec![];
-    //         for (i,) in beta_jobs {
-    //             let Some(j_ub) =
-    //                 facts_psql::get_resolution(conn, &masked_dimension::ResolutionRequest::J(i))
-    //                     .await?
-    //                     .and_then(|r| {
-    //                         if let masked_dimension::Resolution::J(j_ub, _) = r {
-    //                             Some(j_ub)
-    //                         } else {
-    //                             None
-    //                         }
-    //                     })
-    //             else {
-    //                 info!("No `j` resolution found for `beta_{i}` in the metadata storage.");
-    //                 return Ok(false);
-    //             };
-    //             for j in 0..j_ub {
-    //                 b_tags.push((i, j));
-    //             }
-    //         }
-    //         // ...and check if the data storage holds all the data for them.
-    //         for (i, j) in b_tags {
-    //             if self
-    //                 .storage
-    //                 .get_b(i, j)
-    //                 .await
-    //                 .map_err(operon::error::OperonError::Storage)?
-    //                 .is_none()
-    //             {
-    //                 info!("Data storage does not hold `B_{i},{j}`.");
-    //                 return Ok(false);
-    //             }
-    //         }
-    //     }
-    //     '_c: {
-    //         // Pull the "done" gamma jobs from the metadata storage...
-    //         let client = self.meta_pool.get().await.map_err(meta_storage_error)?;
-    //         let conn = MetaStorageConnection {
-    //             client: &client,
-    //             schema: &self.meta_schema,
-    //         };
-    //         let Some(gamma_jobs) = tickets_psql::get_all_done::<_, GammaTicket>(conn)
-    //             .await?
-    //             .iter()
-    //             .map(|t| {
-    //                 t.resolve().and_then(|job| {
-    //                     if let job::Job::Gamma { i } = job {
-    //                         Some((i,))
-    //                     } else {
-    //                         None
-    //                     }
-    //                 })
-    //             })
-    //             .collect::<Option<Vec<_>>>()
-    //         else {
-    //             info!("Some `gamma` tickets are corrupt in the metadata storage.");
-    //             return Ok(false);
-    //         };
-    //         // ...and map them with the dimensions they spawned...
-    //         let mut c_tags = vec![];
-    //         for (i,) in gamma_jobs {
-    //             let Some(k_ub) =
-    //                 facts_psql::get_resolution(conn, &masked_dimension::ResolutionRequest::K(i))
-    //                     .await?
-    //                     .and_then(|r| {
-    //                         if let masked_dimension::Resolution::K(k_ub, _) = r {
-    //                             Some(k_ub)
-    //                         } else {
-    //                             None
-    //                         }
-    //                     })
-    //             else {
-    //                 info!("No `k` resolution found for `gamma_{i}` in the metadata storage.");
-    //                 return Ok(false);
-    //             };
-    //             for k in 0..k_ub {
-    //                 c_tags.push((i, k));
-    //             }
-    //         }
-    //         // ...and check if the data storage holds all the data for them.
-    //         for (i, k) in c_tags {
-    //             if self
-    //                 .storage
-    //                 .get_c(i, k)
-    //                 .await
-    //                 .map_err(operon::error::OperonError::Storage)?
-    //                 .is_none()
-    //             {
-    //                 info!("Data storage does not hold `G_{i},{k}`.");
-    //                 return Ok(false);
-    //             }
-    //         }
-    //     }
-    //     '_d: {
-    //         // Pull the "done" delta jobs from the metadata storage...
-    //         let client = self.meta_pool.get().await.map_err(meta_storage_error)?;
-    //         let conn = MetaStorageConnection {
-    //             client: &client,
-    //             schema: &self.meta_schema,
-    //         };
-    //         let Some(delta_jobs) = tickets_psql::get_all_done::<_, DeltaTicket>(conn)
-    //             .await?
-    //             .iter()
-    //             .map(|t| {
-    //                 t.resolve().and_then(|job| {
-    //                     if let job::Job::Delta { i, j, k } = job {
-    //                         Some((i, j, k))
-    //                     } else {
-    //                         None
-    //                     }
-    //                 })
-    //             })
-    //             .collect::<Option<Vec<_>>>()
-    //         else {
-    //             info!("Some `delta` tickets are corrupt in the metadata storage.");
-    //             return Ok(false);
-    //         };
-    //         // ...and check if the data storage holds all the data for them.
-    //         for (i, j, k) in delta_jobs {
-    //             if self
-    //                 .storage
-    //                 .get_d(i, j, k)
-    //                 .await
-    //                 .map_err(operon::error::OperonError::Storage)?
-    //                 .is_none()
-    //             {
-    //                 info!("Data storage does not hold `D_{i},{j},{k}`.");
-    //                 return Ok(false);
-    //             }
-    //         }
-    //     }
-    //     '_e: {
-    //         // Pull the "done" epsilon jobs from the metadata storage...
-    //         let client = self.meta_pool.get().await.map_err(meta_storage_error)?;
-    //         let conn = MetaStorageConnection {
-    //             client: &client,
-    //             schema: &self.meta_schema,
-    //         };
-    //         let Some(epsilon_jobs) = tickets_psql::get_all_done::<_, EpsilonTicket>(conn)
-    //             .await?
-    //             .iter()
-    //             .map(|t| {
-    //                 t.resolve().and_then(|job| {
-    //                     if let job::Job::Epsilon { i, k } = job {
-    //                         Some((i, k))
-    //                     } else {
-    //                         None
-    //                     }
-    //                 })
-    //             })
-    //             .collect::<Option<Vec<_>>>()
-    //         else {
-    //             info!("Some `epsilon` tickets are corrupt in the metadata storage.");
-    //             return Ok(false);
-    //         };
-    //         // ...and check if the data storage holds all the data for them.
-    //         for (i, k) in epsilon_jobs {
-    //             if self
-    //                 .storage
-    //                 .get_e(i, k)
-    //                 .await
-    //                 .map_err(operon::error::OperonError::Storage)?
-    //                 .is_none()
-    //             {
-    //                 info!("Data storage does not hold `E_{i},{k}`.");
-    //                 return Ok(false);
-    //             }
-    //         }
-    //     }
-    //     '_f: {
-    //         // Pull the "done" zeta jobs from the metadata storage...
-    //         let client = self.meta_pool.get().await.map_err(meta_storage_error)?;
-    //         let conn = MetaStorageConnection {
-    //             client: &client,
-    //             schema: &self.meta_schema,
-    //         };
-    //         let Some(zeta_jobs) = tickets_psql::get_all_done::<_, ZetaTicket>(conn)
-    //             .await?
-    //             .iter()
-    //             .map(|t| {
-    //                 t.resolve().and_then(|job| {
-    //                     if let job::Job::Zeta { i } = job {
-    //                         Some((i,))
-    //                     } else {
-    //                         None
-    //                     }
-    //                 })
-    //             })
-    //             .collect::<Option<Vec<_>>>()
-    //         else {
-    //             info!("Some `zeta` tickets are corrupt in the metadata storage.");
-    //             return Ok(false);
-    //         };
-    //         // ...and check if the data storage holds all the data for them.
-    //         for (i,) in zeta_jobs {
-    //             if self
-    //                 .storage
-    //                 .get_f(i)
-    //                 .await
-    //                 .map_err(operon::error::OperonError::Storage)?
-    //                 .is_none()
-    //             {
-    //                 info!("Data storage does not hold `F_{i}`.");
-    //                 return Ok(false);
-    //             }
-    //         }
-    //     }
-    //     Ok(true)
-    // }
+    /// Run a check on the data consistency between the data storage and the metadata storage.
+    /// Return `true` if the data storage holds all needed data to restore,
+    /// or `false` if it does not.
+    ///
+    /// This should be called only when the recovery state is either
+    /// `AbortedUnchecked` or `GracefullyStopped`.
+    async fn check_consistency(&self, primary_ub: usize) -> Result<bool, SchedulerError> {
+        for job in &self.jobs {
+            if !job.check_consistency(primary_ub).await? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
 
-    async fn update_ui_all(&self, conn: &MetaStoCtor::MetaSto<'_>) -> Result<(), SchedulerError> {
-        let updates = conn.get_ui_updates().await?;
+    pub async fn update_ui_all(&self, conn: MetaClient<'_>) -> Result<(), SchedulerError> {
+        let updates = self.meta_storage.get_ui_updates(conn).await?;
         let mut ui_state = self.ui_state.write().await; // Might break
         for update in updates {
             ui_state.update_ui_state(update)?;
