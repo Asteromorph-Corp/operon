@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
-    meta_storage::MetaStorageConnector,
+    meta_storage::MetaStorage,
     operon::{OperonError, OperonOptions},
     scheduler::{ControlEvent, RecoveryState, Scheduler},
     service::OperonService,
@@ -16,22 +16,22 @@ use crate::{
 /// The interface for the Operon library.
 ///
 /// Provided a data storage and a service, calling `run` will start executing the jobs.
-pub struct Operon<Sto, Svc, MetaStoCtor>
+pub struct Operon<Sto, Svc, MetaSto>
 where
     Sto: OperonStorage,
     Svc: OperonService,
-    MetaStoCtor: MetaStorageConnector,
+    MetaSto: MetaStorage,
 {
     storage: Arc<Sto>,
     service: Arc<Svc>,
-    _phantom: std::marker::PhantomData<MetaStoCtor>,
+    _phantom: std::marker::PhantomData<MetaSto>,
 }
 
-impl<Sto, Svc, MetaStoCtor> Operon<Sto, Svc, MetaStoCtor>
+impl<Sto, Svc, MetaSto> Operon<Sto, Svc, MetaSto>
 where
     Sto: OperonStorage,
     Svc: OperonService,
-    MetaStoCtor: MetaStorageConnector,
+    MetaSto: MetaStorage,
 {
     /// Create a new Operon instance with the given storage and service.
     pub fn new(storage: ::std::sync::Arc<Sto>, service: ::std::sync::Arc<Svc>) -> Self {
@@ -64,7 +64,7 @@ where
         let ui_state = Arc::new(RwLock::new(UiState::default()));
 
         // Create the scheduler
-        let scheduler = Scheduler::<Sto, Svc, MetaStoCtor>::new(
+        let scheduler = Scheduler::<Sto, Svc, MetaSto>::new(
             self.storage,
             self.service,
             ui_state.clone(),

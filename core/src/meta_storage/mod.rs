@@ -2,9 +2,6 @@
 mod meta_storage;
 pub use meta_storage::*;
 
-mod meta_storage_connector;
-pub use meta_storage_connector::*;
-
 mod meta_context;
 pub use meta_context::*;
 

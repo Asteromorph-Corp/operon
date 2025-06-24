@@ -1,14 +1,11 @@
-use crate::meta_storage::{
-    MetaStorage, MetaStorageConnector, MetaStorageError, MetaStorageOptions,
-};
+use crate::meta_storage::{MetaStorageError, MetaStorageOptions};
 
-pub struct MetaContext<C: MetaStorageConnector> {
+pub struct MetaContext {
     pub pool: deadpool_postgres::Pool,
     pub schema: Option<String>,
-    _phantom: std::marker::PhantomData<C>,
 }
 
-impl<C: MetaStorageConnector> MetaContext<C> {
+impl MetaContext {
     pub async fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
         let schema = options.schema;
 
@@ -25,16 +22,7 @@ impl<C: MetaStorageConnector> MetaContext<C> {
         let pool = deadpool_postgres::Pool::builder(manager)
             .max_size(options.pool_size)
             .build()?;
-
-        let ctx = MetaContext {
-            pool,
-            schema,
-            _phantom: std::marker::PhantomData,
-        };
-
-        ctx.init().await?;
-
-        Ok(ctx)
+        Ok(MetaContext { pool, schema })
     }
 
     fn build_config(database_uri: &str) -> Result<tokio_postgres::Config, MetaStorageError> {
@@ -46,23 +34,5 @@ impl<C: MetaStorageConnector> MetaContext<C> {
             .keepalives_idle(::std::time::Duration::from_secs(60))
             .keepalives_interval(::std::time::Duration::from_secs(30)); // TODO: Make this configurable.
         Ok(config)
-    }
-
-    async fn init(&self) -> Result<(), MetaStorageError> {
-        // Initialize the metadata storage.
-        let mut client = self.pool.get().await?;
-        let tx = client.transaction().await?;
-        let conn = C::connect(tx, self.schema.as_deref());
-        conn.init_schema().await?;
-        conn.init_footprints().await?;
-        conn.init_resolution().await?;
-        conn.init_tickets().await?;
-        conn.commit().await?;
-        Ok(())
-    }
-
-    pub async fn get_conn(&self) -> Result<C::MetaSto<'_>, MetaStorageError> {
-        let client = self.pool.get().await?;
-        Ok(C::connect(client, self.schema.as_deref()))
     }
 }
