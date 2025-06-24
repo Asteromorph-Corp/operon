@@ -25,10 +25,10 @@ macro_rules! impl_meta_client {
 
 type ToSql = dyn tokio_postgres::types::ToSql + Sync;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum MetaClient<'a> {
-    Object(deadpool_postgres::Object),
-    Transaction(deadpool_postgres::Transaction<'a>),
+    Object(&'a deadpool_postgres::Object),
+    Transaction(&'a deadpool_postgres::Transaction<'a>),
 }
 
 impl MetaClient<'_> {
@@ -43,14 +43,14 @@ impl MetaClient<'_> {
     );
 }
 
-impl<'a> From<deadpool_postgres::Object> for MetaClient<'a> {
-    fn from(client: deadpool_postgres::Object) -> Self {
+impl<'a> From<&'a deadpool_postgres::Object> for MetaClient<'a> {
+    fn from(client: &'a deadpool_postgres::Object) -> Self {
         MetaClient::Object(client)
     }
 }
 
-impl<'a> From<deadpool_postgres::Transaction<'a>> for MetaClient<'a> {
-    fn from(tx: deadpool_postgres::Transaction<'a>) -> Self {
+impl<'a> From<&'a deadpool_postgres::Transaction<'a>> for MetaClient<'a> {
+    fn from(tx: &'a deadpool_postgres::Transaction<'a>) -> Self {
         MetaClient::Transaction(tx)
     }
 }

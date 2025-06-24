@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
-    meta_storage::{MetaContext, MetaStorage, MetaStorageConnector, MetaStorageOptions},
+    meta_storage::{MetaClient, MetaContext, MetaStorage, MetaStorageError, MetaStorageOptions},
     scheduler::{
         ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
         SchedulerError,
@@ -21,10 +21,10 @@ use crate::{
 /// * Initialization of the metadata storage,
 /// * initialization of the individual schedulers, and
 /// * communication between the UI and the individual schedulers.
-pub struct Scheduler<Sto, Svc, MetaStoCtor>
+pub struct Scheduler<Sto, Svc, MetaSto>
 where
     Sto: OperonStorage,
-    MetaStoCtor: MetaStorageConnector,
+    MetaSto: MetaStorage,
 {
     storage: Arc<Sto>,
     service: Arc<Svc>,
@@ -34,10 +34,10 @@ where
     rec_tx: RecoveryStateSender,
 }
 
-impl<Sto, Svc, MetaStoCtor> Scheduler<Sto, Svc, MetaStoCtor>
+impl<Sto, Svc, MetaSto> Scheduler<Sto, Svc, MetaSto>
 where
     Sto: OperonStorage,
-    MetaStoCtor: MetaStorageConnector,
+    MetaSto: MetaStorage,
 {
     /// Initialize a new scheduler and its associated storages.
     pub async fn new(
@@ -48,7 +48,8 @@ where
         rec_tx: RecoveryStateSender,
         options: MetaStorageOptions,
     ) -> Result<Self, SchedulerError> {
-        let meta_storage = Arc::new(MetaContext::new(options).await?);
+        let meta_storage = Arc::new(MetaSto::new(MetaContext::new(options).await?));
+        meta_storage.init().await?;
 
         Ok(Self {
             storage,
@@ -157,11 +158,13 @@ where
 
     /// Find out the recovery state.
     pub async fn check_recovery_state(&self) -> Result<RecoveryState, SchedulerError> {
-        let meta_conn = self.meta_storage.get_conn().await?;
+        let storage = &self.storage;
+        let meta_storage = &self.meta_storage;
+        let meta_conn = meta_storage.client().await?;
 
         // Get footprints from both storages.
-        let data_footprint = self.storage.get_footprint().await?;
-        let meta_footprint = meta_conn.get_footprint("global").await?;
+        let data_footprint = storage.get_footprint().await?;
+        let meta_footprint = meta_storage.get_footprint(&meta_conn, "global").await?;
         // Early return if the state can be inferred through the footprints.
         match (&data_footprint, &meta_footprint) {
             (Some(df), Some(mf)) if df == mf && df.starts_with("F@") => {
@@ -175,7 +178,9 @@ where
             _ => (),
         }
 
-        let resolution = meta_conn.get_resolution(&Default::default()).await?;
+        let resolution = meta_storage
+            .get_resolution(&meta_conn, &Default::default())
+            .await?;
         if resolution.is_none() {
             // No resolution found, so the metadata storage is empty.
             return Ok(RecoveryState::Fresh);
