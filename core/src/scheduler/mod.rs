@@ -11,8 +11,16 @@ pub use control_event::*;
 mod run_mode;
 pub use run_mode::*;
 
+mod peer_event;
+pub use peer_event::*;
+
+mod job_manager;
+pub use job_manager::*;
+
 mod options;
 pub use options::*;
 
 mod error;
 pub use error::*;
+
+mod misc;

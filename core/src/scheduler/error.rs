@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tokio::task::JoinError;
 
 use crate::{
     meta_storage::MetaStorageError,
@@ -15,12 +16,18 @@ pub enum SchedulerError {
     MetaStorage(#[from] MetaStorageError),
     #[error("UI Error: {0}")]
     Ui(#[from] UiError),
+    #[error("Join failed: {0}")]
+    JobJoinFailed(#[from] JoinError),
     #[error("Failed to send recovery state: {0}")]
     RecoverySendFailed(RecoveryState),
     #[error("Unexpected control event: {0:?}")]
     UnexpectedControlEvent(ControlEvent),
     #[error("Failed to receive control event")]
     ControlEventReceiveFailed,
+    #[error("Failed to send peer event")]
+    PeerEventSendFailed,
+    #[error("Tried to send a PeerEvent through a downgraded sender")]
+    SendThroughDowngradedSender,
     #[error("Other error: {0}")]
     Other(String),
 }
