@@ -8,6 +8,7 @@ use crate::{
         ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
         SchedulerError,
     },
+    service::OperonService,
     storage::OperonStorage,
     ui::UiState,
 };
@@ -24,6 +25,7 @@ use crate::{
 pub struct Scheduler<Sto, Svc, MetaSto>
 where
     Sto: OperonStorage,
+    Svc: OperonService,
     MetaSto: MetaStorage,
 {
     storage: Arc<Sto>,
@@ -37,6 +39,7 @@ where
 impl<Sto, Svc, MetaSto> Scheduler<Sto, Svc, MetaSto>
 where
     Sto: OperonStorage,
+    Svc: OperonService,
     MetaSto: MetaStorage,
 {
     /// Initialize a new scheduler and its associated storages.
