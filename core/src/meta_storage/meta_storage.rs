@@ -284,6 +284,12 @@ pub trait MetaStorage: Send + Sync + 'static {
         conn: impl Into<MetaClient<'_>> + Send + Sync,
     ) -> Result<(), MetaStorageError>; // `tickets_psql::clear`, 1623~
 
+    /// Put the default (fully unresolved) tickets into the PSQL ticket storage.
+    async fn put_default_tickets(
+        &self,
+        conn: impl Into<MetaClient<'_>> + Send + Sync,
+    ) -> Result<(), MetaStorageError>;
+
     async fn get_ui_updates(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,

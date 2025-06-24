@@ -3,10 +3,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
-    job::Job,
+    dimension::{Job, Resolution},
     meta_storage::MetaStorage,
     operon::{OperonError, OperonOptions},
-    scheduler::{ControlEvent, RecoveryState, Scheduler},
+    scheduler::{ControlEvent, JobManager, RecoveryState, Scheduler},
     service::OperonService,
     storage::OperonStorage,
     ui::{UiLogger, UiLoop, UiState},
@@ -17,22 +17,26 @@ use crate::{
 /// The interface for the Operon library.
 ///
 /// Provided a data storage and a service, calling `run` will start executing the jobs.
-pub struct Operon<Sto, Svc, MetaSto>
+pub struct Operon<Sto, Svc, MSto, J, R>
 where
     Sto: OperonStorage,
     Svc: OperonService,
-    MetaSto: MetaStorage,
+    MSto: MetaStorage<Resolution = R>,
+    J: Job,
+    R: Resolution,
 {
     storage: Arc<Sto>,
     service: Arc<Svc>,
-    _phantom: std::marker::PhantomData<MetaSto>,
+    _phantom: std::marker::PhantomData<(MSto, J, R)>,
 }
 
-impl<Sto, Svc, MetaSto> Operon<Sto, Svc, MetaSto>
+impl<Sto, Svc, MSto, J, R> Operon<Sto, Svc, MSto, J, R>
 where
     Sto: OperonStorage,
     Svc: OperonService,
-    MetaSto: MetaStorage,
+    MSto: MetaStorage<Resolution = R>,
+    J: Job,
+    R: Resolution,
 {
     /// Create a new Operon instance with the given storage and service.
     pub fn new(storage: ::std::sync::Arc<Sto>, service: ::std::sync::Arc<Svc>) -> Self {
@@ -51,7 +55,7 @@ where
     /// Instead, you can use the provided macros to log messages to the UI.
     pub async fn run(
         self,
-        jobs: Vec<Box<dyn Job + Send + Sync>>,
+        job_managers: Vec<Box<dyn JobManager<Sto, Svc, MSto, J, R>>>,
         primary_ub: usize,
         options: OperonOptions,
     ) -> Result<(), OperonError> {
@@ -70,10 +74,10 @@ where
         let ui_state = Arc::new(RwLock::new(UiState::default()));
 
         // Create the scheduler
-        let scheduler = Scheduler::<Sto, Svc, MetaSto>::new(
+        let scheduler = Scheduler::<Sto, Svc, MSto, J, R>::new(
             self.storage,
             self.service,
-            jobs,
+            job_managers,
             ui_state.clone(),
             ctrl_rx,
             rec_tx,
