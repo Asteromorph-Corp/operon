@@ -36,6 +36,7 @@ where
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
+    internal_channel_size: usize,
 }
 
 impl<Sto, Svc, MetaSto> Scheduler<Sto, Svc, MetaSto>
@@ -52,9 +53,10 @@ where
         ui_state: Arc<RwLock<UiState>>,
         ctrl_rx: ControlEventReceiver,
         rec_tx: RecoveryStateSender,
-        options: MetaStorageOptions,
+        options: SchedulerOptions,
     ) -> Result<Self, SchedulerError> {
-        let meta_storage = Arc::new(MetaSto::new(MetaContext::new(options).await?));
+        let (internal_channel_size, meta_storage_options) = options.split();
+        let meta_storage = Arc::new(MSto::new(MetaContext::new(meta_storage_options).await?));
         meta_storage.init().await?;
 
         Ok(Self {

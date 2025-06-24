@@ -55,7 +55,7 @@ where
         primary_ub: usize,
         options: OperonOptions,
     ) -> Result<(), OperonError> {
-        let (meta_storage_options, log_options) = options.split();
+        let (scheduler_options, log_options) = options.split();
 
         // Initialize the logger
         let (log_tx, log_rx) = ::tokio::sync::broadcast::channel(log_options.buffer_size);
@@ -77,7 +77,7 @@ where
             ui_state.clone(),
             ctrl_rx,
             rec_tx,
-            meta_storage_options,
+            scheduler_options,
         )
         .await?;
         let ui_loop = UiLoop::new(ui_state, primary_ub, log_rx, ctrl_tx, rec_rx);

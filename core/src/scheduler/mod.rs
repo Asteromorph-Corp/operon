@@ -11,5 +11,8 @@ pub use control_event::*;
 mod run_mode;
 pub use run_mode::*;
 
+mod options;
+pub use options::*;
+
 mod error;
 pub use error::*;
