@@ -11,8 +11,8 @@ use crate::{
 pub trait MetaStorage: Send + Sync + 'static {
     fn new(context: MetaContext) -> Self;
 
-    async fn client(&self) -> Result<Object, MetaStorageError>;
-    fn schema(&self) -> Option<&str>;
+    async fn client(&self) -> Result<Object, MetaStorageError>; // `Return self.context.pool.get().await`
+    fn schema(&self) -> Option<&str>; // `Return self.context.schema.as_deref()`
 
     fn get_prefix(&self) -> String {
         match self.schema() {
@@ -32,6 +32,7 @@ pub trait MetaStorage: Send + Sync + 'static {
         Ok(())
     }
 
+    /// If given, initialize the schema in the database.
     async fn init_schema(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
@@ -45,6 +46,13 @@ pub trait MetaStorage: Send + Sync + 'static {
         Ok(())
     }
 
+    // Footprint
+    // Operations for footprinting the PSQL metadata storage.
+    // Given a connection, these methods footprint the metadata storage.
+
+    /// Initialize the footprint table.
+    /// Note that this function is idempotent, i.e. calling it multiple times,
+    /// or calling it on an already-initialized storage will do nothing.
     async fn init_footprint(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
@@ -61,6 +69,7 @@ pub trait MetaStorage: Send + Sync + 'static {
         Ok(())
     }
 
+    /// Clear the footprint table.
     async fn clear_footprint(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
@@ -72,6 +81,7 @@ pub trait MetaStorage: Send + Sync + 'static {
         Ok(())
     }
 
+    /// Get a footprint value by key.
     async fn get_footprint(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
@@ -85,6 +95,7 @@ pub trait MetaStorage: Send + Sync + 'static {
         Ok(row.map(|r| r.get::<_, &str>(0).to_string()))
     }
 
+    /// Set a footprint key-value pair.
     async fn put_footprint(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
@@ -108,40 +119,173 @@ pub trait MetaStorage: Send + Sync + 'static {
     type Resolution: Resolution;
     type ResolutionRequest: Default + Send + Sync;
 
+    // Resolution
+    // Operations for the PSQL fact storage.
+    // Given a connection, these methods perform the necessaray operations on the fact storage.
+
+    /// Initialize the PSQL fact storage.
+    /// Note that this function is idempotent, i.e. calling it multiple times,
+    /// or calling it on an already-initialized storage will do nothing.
+    ///
+    /// This function will `CREATE IF NOT EXISTS` the following tables under the given schema:
+    ///
+    /// * `dimension_i`:
+    ///   ```sql
+    ///   CREATE TABLE dimension_i (
+    ///       i_ub BIGINT NOT NULL
+    ///   )
+    ///   ```
+    /// * `dimension_j`:
+    ///   ```sql
+    ///   CREATE TABLE dimension_j (
+    ///       i BIGINT,
+    ///       j_ub BIGINT NOT NULL,
+    ///       PRIMARY KEY (i)
+    ///   )
+    ///   ```
+    /// * `dimension_k`:
+    ///   ```sql
+    ///   CREATE TABLE dimension_k (
+    ///       i BIGINT,
+    ///       k_ub BIGINT NOT NULL,
+    ///       PRIMARY KEY (i)
+    ///   )
+    ///   ```
     async fn init_resolution(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>;
+    ) -> Result<(), MetaStorageError>; // `facts_psql::init`, 847~
 
+    /// Clear the data in the PSQL fact storage, assuming the tables are already initialized.
     async fn clear_resolution(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>;
+    ) -> Result<(), MetaStorageError>; // `facts_psql::clear`, 877~
 
+    /// Get the resolution for a given masked dimension request.
     async fn get_resolution(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
         request: &Self::ResolutionRequest,
-    ) -> Result<Option<Self::Resolution>, MetaStorageError>;
+    ) -> Result<Option<Self::Resolution>, MetaStorageError>; // `facts_psql::get_resolution`, 891~
 
+    /// Put a resolution into the storage.
     async fn put_resolution(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
         resolution: &Self::Resolution,
-    ) -> Result<(), MetaStorageError>;
+    ) -> Result<(), MetaStorageError>; // `facts_psql::put_resolution`, 929~
 
+    // Ticket
+    // Operations for the PSQL ticket storage.
+    // Given a connection, these methods perform the necessary operations on the ticket storage.
+
+    /// Initialize the PSQL ticket storage.
+    /// Note that this function is idempotent, i.e. calling it multiple times,
+    /// or calling it on an already-initialized storage will do nothing.
+    ///
+    /// This function will `CREATE IF NOT EXISTS` the necessary type and tables under the given schema:
+    ///
+    /// * `ticket_status`:
+    /// ```sql
+    /// CREATE TYPE ticket_status AS ENUM (
+    ///     'waiting',
+    ///     'queued',
+    ///     'done',
+    /// )
+    /// ```
+    /// * `ticket_beta`:
+    /// ```sql
+    /// CREATE TABLE ticket_beta (
+    ///     i BIGINT,
+    ///     resolved BOOLEAN NOT NULL,
+    ///     deps_count BIGINT NOT NULL,
+    ///     deps_quota BIGINT,
+    ///     deps_done BOOLEAN NOT NULL,
+    ///     status ticket_status NOT NULL,
+    ///     PRIMARY KEY (i)
+    /// )
+    /// ```
+    /// * `ticket_gamma`:
+    /// ```sql
+    /// CREATE TABLE ticket_gamma (
+    ///     i BIGINT,
+    ///     resolved BOOLEAN NOT NULL,
+    ///     deps_count BIGINT NOT NULL,
+    ///     deps_quota BIGINT,
+    ///     deps_done BOOLEAN NOT NULL,
+    ///     status ticket_status NOT NULL,
+    ///     PRIMARY KEY (i)
+    /// )
+    /// ```
+    /// * `ticket_delta`:
+    /// ```sql
+    /// CREATE TABLE ticket_delta (
+    ///     i BIGINT,
+    ///     j BIGINT,
+    ///     k BIGINT,
+    ///     resolved BOOLEAN NOT NULL,
+    ///     deps_count BIGINT NOT NULL,
+    ///     deps_quota BIGINT,
+    ///     deps_done BOOLEAN NOT NULL,
+    ///     status ticket_status NOT NULL,
+    ///     PRIMARY KEY (i, j, k)
+    /// )
+    /// ```
+    /// * `ticket_epsilon`:
+    /// ```sql
+    /// CREATE TABLE ticket_epsilon (
+    ///     i BIGINT,
+    ///     k BIGINT,
+    ///     resolved BOOLEAN NOT NULL,
+    ///     deps_count BIGINT NOT NULL,
+    ///     deps_quota BIGINT,
+    ///     deps_done BOOLEAN NOT NULL,
+    ///     status ticket_status NOT NULL,
+    ///     PRIMARY KEY (i, k)
+    /// )
+    /// ```
+    /// * `ticket_zeta`:
+    /// ```sql
+    /// CREATE TABLE ticket_zeta (
+    ///     i BIGINT,
+    ///     resolved BOOLEAN NOT NULL,
+    ///     deps_count BIGINT NOT NULL,
+    ///     deps_quota BIGINT,
+    ///     deps_done BOOLEAN NOT NULL,
+    ///     status ticket_status NOT NULL,
+    ///     PRIMARY KEY (i)
+    /// )
+    /// ```
+    ///
+    /// Also, each table will have an associated summary table
+    /// that keeps track of the number of tickets per status, for example:
+    /// * `ticket_beta_status`:
+    /// ```sql
+    /// CREATE TABLE ticket_beta_status (
+    ///     waiting BIGINT NOT NULL,
+    ///     queued BIGINT NOT NULL,
+    ///     done BIGINT NOT NULL,
+    ///     CHECK (
+    ///         waiting >= 0 AND
+    ///         queued >= 0 AND
+    ///         done >= 0
+    ///     )
+    /// )
+    /// ```
     async fn init_tickets(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>;
+    ) -> Result<(), MetaStorageError>; // `tickets_psql::init`, 1079~
 
+    /// Clear the data from the PSQL ticket storage, assuming the tables are already initialized.
     async fn clear_tickets(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>;
+    ) -> Result<(), MetaStorageError>; // `tickets_psql::clear`, 1623~
 
     async fn get_ui_updates(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<Vec<UiStateUpdate>, MetaStorageError>;
+    ) -> Result<Vec<UiStateUpdate>, MetaStorageError>; // `Scheduler::update_ui_all`, 5900~
 }
