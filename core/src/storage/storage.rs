@@ -71,7 +71,7 @@ use crate::storage::StorageError;
 /// ```
 #[async_trait]
 pub trait OperonStorage: Send + Sync + 'static {
-    async fn clear(&self) -> ::anyhow::Result<()>;
+    async fn clear(&self) -> Result<(), StorageError>;
 
     async fn get_footprint(&self) -> Result<Option<String>, StorageError> {
         // This function is no-op by default, disallowing recovery runs if not implemented.
