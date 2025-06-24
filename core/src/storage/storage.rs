@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 use crate::storage::StorageError;
 
 /// # OperonStorage trait
@@ -67,6 +69,7 @@ use crate::storage::StorageError;
 ///     async fn get_all_e_over_k(&self, i: I) -> Result<Vec<E>>;
 /// }
 /// ```
+#[async_trait]
 pub trait OperonStorage: Send + Sync + 'static {
     async fn clear(&self) -> ::anyhow::Result<()>;
 
