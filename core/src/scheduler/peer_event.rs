@@ -1,27 +1,32 @@
-use crate::scheduler::SchedulerError;
+use std::collections::HashMap;
+
+use crate::{
+    dimension::{JobEnum, ResolutionEnum},
+    scheduler::SchedulerError,
+};
 
 /// `IndividualScheduler`-`IndividualScheduler` communication events.
 ///
 /// These are used for communication between individual schedulers,
-/// where each scheduler should modify its tickets based on the events.
+/// where each scheduler should modify its tickets based on the events.\
 #[derive(Debug, Clone)]
-pub enum PeerEvent<J, R> {
+pub enum PeerEvent<JE: JobEnum, RE: ResolutionEnum> {
     /// A job was run and finished.
-    Job(J),
+    Job(JE),
     /// A resolution was made known.
-    Resolution(R),
+    Resolution(RE),
 }
 
 #[derive(Debug, Clone)]
-pub enum PeerEventSender<J, R> {
-    Up(::tokio::sync::mpsc::Sender<PeerEvent<J, R>>),
-    Downgraded(::tokio::sync::mpsc::WeakSender<PeerEvent<J, R>>),
+pub enum PeerEventSender<JE: JobEnum, RE: ResolutionEnum> {
+    Up(tokio::sync::mpsc::Sender<PeerEvent<JE, RE>>),
+    Downgraded(tokio::sync::mpsc::WeakSender<PeerEvent<JE, RE>>),
 }
-pub type PeerEventReceiver<Job, Resolution> =
-    ::tokio::sync::mpsc::Receiver<PeerEvent<Job, Resolution>>;
 
-impl<J, R> PeerEventSender<J, R> {
-    pub async fn send(&self, event: PeerEvent<J, R>) -> Result<(), SchedulerError> {
+pub type PeerEventReceiver<JE, RE> = tokio::sync::mpsc::Receiver<PeerEvent<JE, RE>>;
+
+impl<JE: JobEnum, RE: ResolutionEnum> PeerEventSender<JE, RE> {
+    pub async fn send(&self, event: PeerEvent<JE, RE>) -> Result<(), SchedulerError> {
         match self {
             PeerEventSender::Up(tx) => tx
                 .send(event)

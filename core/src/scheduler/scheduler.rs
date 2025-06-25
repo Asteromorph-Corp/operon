@@ -4,7 +4,7 @@ use futures::future::try_join_all;
 use tokio::{sync::RwLock, task::JoinSet};
 
 use crate::{
-    dimension::{Job, Resolution},
+    dimension::ResolutionEnum,
     meta_storage::{MetaClient, MetaContext, MetaStorage, MetaStorageError},
     operon::RunningState,
     scheduler::{
@@ -26,37 +26,33 @@ use crate::{
 /// * Initialization of the metadata storage,
 /// * initialization of the individual schedulers, and
 /// * communication between the UI and the individual schedulers.
-pub struct Scheduler<Sto, Svc, MSto, J, R>
+pub struct Scheduler<Sto, Svc, MSto>
 where
     Sto: OperonStorage,
     Svc: OperonService,
     MSto: MetaStorage,
-    J: Job,
-    R: Resolution,
 {
     storage: Arc<Sto>,
     service: Arc<Svc>,
     meta_storage: Arc<MSto>,
-    job_managers: Vec<Box<dyn JobManager<Sto, Svc, MSto, J, R>>>,
+    job_managers: Vec<Box<dyn JobManager<Sto, Svc, MSto>>>,
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
     internal_channel_size: usize,
 }
 
-impl<Sto, Svc, MSto, J, R> Scheduler<Sto, Svc, MSto, J, R>
+impl<Sto, Svc, MSto> Scheduler<Sto, Svc, MSto>
 where
     Sto: OperonStorage,
     Svc: OperonService,
-    MSto: MetaStorage<Resolution = R>,
-    J: Job,
-    R: Resolution,
+    MSto: MetaStorage,
 {
     /// Initialize a new scheduler and its associated storages.
     pub async fn new(
         storage: Arc<Sto>,
         service: Arc<Svc>,
-        job_managers: Vec<Box<dyn JobManager<Sto, Svc, MSto, J, R>>>,
+        job_managers: Vec<Box<dyn JobManager<Sto, Svc, MSto>>>,
         ui_state: Arc<RwLock<UiState>>,
         ctrl_rx: ControlEventReceiver,
         rec_tx: RecoveryStateSender,
@@ -214,8 +210,8 @@ where
     /// This should be called only when the recovery state is either
     /// `AbortedUnchecked` or `GracefullyStopped`.
     async fn check_consistency(&self, primary_ub: usize) -> Result<bool, SchedulerError> {
-        for job in &self.job_managers {
-            if !job.check_consistency(primary_ub).await? {
+        for manager in &self.job_managers {
+            if !manager.check_consistency(primary_ub).await? {
                 return Ok(false);
             }
         }
@@ -294,7 +290,7 @@ where
         let tx = client.transaction().await.map_err(MetaStorageError::from)?;
         self.meta_storage.clear_resolution(&tx).await?;
         self.meta_storage
-            .put_resolution(&tx, &R::primary(primary_ub))
+            .put_resolution(&tx, &MSto::ResolutionEnum::primary(primary_ub))
             .await?;
         self.meta_storage.clear_tickets(&tx).await?;
         self.meta_storage.put_default_tickets(&tx).await?;
@@ -320,7 +316,9 @@ where
         ));
         for peer_tx in peer_txs.into_values() {
             peer_tx
-                .send(PeerEvent::Resolution(R::primary(primary_ub)))
+                .send(PeerEvent::Resolution(MSto::ResolutionEnum::primary(
+                    primary_ub,
+                )))
                 .await?;
         }
 
@@ -354,7 +352,7 @@ where
 
         self.meta_storage.put_default_tickets(&tx).await?;
         self.meta_storage
-            .put_resolution(&tx, &R::primary(primary_ub))
+            .put_resolution(&tx, &MSto::ResolutionEnum::primary(primary_ub))
             .await?;
         for rebuilder in &rebuilders {
             rebuilder.explode(primary_ub).await?;
@@ -424,15 +422,16 @@ where
         )))
     }
 
-    fn prepare_channels(&self) -> PreparedJobs<'_, Sto, Svc, MSto, J, R> {
+    fn prepare_channels(&self) -> PreparedJobs<'_, Sto, Svc, MSto> {
         let len = self.job_managers.len();
 
         let mut managers_with_rx = Vec::with_capacity(len);
         let mut peer_txs = HashMap::with_capacity(len);
 
         self.job_managers.iter().for_each(|manager| {
-            let (peer_tx, peer_rx) =
-                tokio::sync::mpsc::channel::<PeerEvent<J, R>>(self.internal_channel_size);
+            let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
+                PeerEvent<MSto::JobEnum, MSto::ResolutionEnum>,
+            >(self.internal_channel_size);
             peer_txs.insert(manager.id(), PeerEventSender::Up(peer_tx));
             managers_with_rx.push(JobManagerWithRx::new(manager.as_ref(), peer_rx));
         });

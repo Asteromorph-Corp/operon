@@ -2,13 +2,17 @@ use async_trait::async_trait;
 use deadpool_postgres::Object;
 
 use crate::{
-    dimension::Resolution,
+    dimension::{JobEnum, ResolutionEnum},
     meta_storage::{MetaClient, MetaContext, MetaStorageError},
     ui::UiStateUpdate,
 };
 
 #[async_trait]
 pub trait MetaStorage: Send + Sync + 'static {
+    type JobEnum: JobEnum;
+    type ResolutionEnum: ResolutionEnum;
+    type ResolutionRequest: Default + Send + Sync;
+
     fn new(context: MetaContext) -> Self;
 
     async fn client(&self) -> Result<Object, MetaStorageError>; // `Return self.context.pool.get().await`
@@ -116,9 +120,6 @@ pub trait MetaStorage: Send + Sync + 'static {
         Ok(())
     }
 
-    type Resolution: Resolution;
-    type ResolutionRequest: Default + Send + Sync;
-
     // Resolution
     // Operations for the PSQL fact storage.
     // Given a connection, these methods perform the necessaray operations on the fact storage.
@@ -167,13 +168,13 @@ pub trait MetaStorage: Send + Sync + 'static {
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
         request: &Self::ResolutionRequest,
-    ) -> Result<Option<Self::Resolution>, MetaStorageError>; // `facts_psql::get_resolution`, 891~
+    ) -> Result<Option<Self::ResolutionEnum>, MetaStorageError>; // `facts_psql::get_resolution`, 891~
 
     /// Put a resolution into the storage.
     async fn put_resolution(
         &self,
         conn: impl Into<MetaClient<'_>> + Send + Sync,
-        resolution: &Self::Resolution,
+        resolution: &Self::ResolutionEnum,
     ) -> Result<(), MetaStorageError>; // `facts_psql::put_resolution`, 929~
 
     // Ticket
