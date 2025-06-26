@@ -45,7 +45,7 @@ pub trait PeerEventSenders {
     /// Remove the senders from the map.
     ///
     /// TODO: tx channels probably close when dropped, so taking owned `HashMap` should work. But I don't want to break anything, will refactor later.
-    fn gather_from(senders: &mut HashMap<String, PeerEventSender>) -> Self;
+    fn gather_from(senders: &mut HashMap<&'static str, PeerEventSender>) -> Self;
 
     fn downgrade_all(&mut self);
 }

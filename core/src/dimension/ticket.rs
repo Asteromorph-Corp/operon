@@ -118,7 +118,7 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
     fn from_sql_row(row: &::tokio_postgres::Row) -> Result<Self, MetaStorageError>;
 
     /// The job type for this ticket.
-    fn job_type() -> String;
+    fn job_type() -> &'static str;
 
     fn is_descendant_of(other: &str) -> bool;
 }
