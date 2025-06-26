@@ -1,5 +1,5 @@
 use thiserror::Error;
-use tokio::task::JoinError;
+use tokio::{sync::AcquireError, task::JoinError};
 
 use crate::{
     meta_storage::MetaStorageError,
@@ -22,12 +22,16 @@ pub enum SchedulerError {
     RecoverySendFailed(RecoveryState),
     #[error("Unexpected control event: {0:?}")]
     UnexpectedControlEvent(ControlEvent),
+    #[error("Failed to acquire semaphore")]
+    SemaphoreAcquireFailed,
     #[error("Failed to receive control event")]
     ControlEventReceiveFailed,
     #[error("Failed to send peer event")]
     PeerEventSendFailed,
     #[error("Tried to send a PeerEvent through a downgraded sender")]
     SendThroughDowngradedSender,
+    #[error("Error in user provided function: {0}")]
+    UserError(Box<dyn std::error::Error + Send + Sync>),
     #[error("Other error: {0}")]
     Other(String),
 }
@@ -35,6 +39,12 @@ pub enum SchedulerError {
 impl From<RecoveryStateSendError> for SchedulerError {
     fn from(err: RecoveryStateSendError) -> Self {
         SchedulerError::RecoverySendFailed(err.0)
+    }
+}
+
+impl From<AcquireError> for SchedulerError {
+    fn from(_: AcquireError) -> Self {
+        SchedulerError::SemaphoreAcquireFailed
     }
 }
 

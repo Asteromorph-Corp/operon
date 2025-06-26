@@ -1,35 +1,27 @@
 use std::collections::HashMap;
 
-use crate::{
-    dimension::{JobEnum, ResolutionEnum},
-    scheduler::SchedulerError,
-};
+use crate::scheduler::SchedulerError;
 
 /// `IndividualScheduler`-`IndividualScheduler` communication events.
 ///
 /// These are used for communication between individual schedulers,
 /// where each scheduler should modify its tickets based on the events.\
 #[derive(Debug, Clone)]
-pub enum PeerEvent<JE: JobEnum, RE: ResolutionEnum> {
-    /// A job was run and finished.
-    Job(JE),
-    /// A resolution was made known.
-    Resolution(RE),
-}
+pub struct PeerEvent;
 
 #[derive(Debug, Clone)]
-pub enum PeerEventSender<JE: JobEnum, RE: ResolutionEnum> {
-    Up(tokio::sync::mpsc::Sender<PeerEvent<JE, RE>>),
-    Downgraded(tokio::sync::mpsc::WeakSender<PeerEvent<JE, RE>>),
+pub enum PeerEventSender {
+    Up(tokio::sync::mpsc::Sender<PeerEvent>),
+    Downgraded(tokio::sync::mpsc::WeakSender<PeerEvent>),
 }
 
-pub type PeerEventReceiver<JE, RE> = tokio::sync::mpsc::Receiver<PeerEvent<JE, RE>>;
+pub type PeerEventReceiver = tokio::sync::mpsc::Receiver<PeerEvent>;
 
-impl<JE: JobEnum, RE: ResolutionEnum> PeerEventSender<JE, RE> {
-    pub async fn send(&self, event: PeerEvent<JE, RE>) -> Result<(), SchedulerError> {
+impl PeerEventSender {
+    pub async fn send(&self) -> Result<(), SchedulerError> {
         match self {
             PeerEventSender::Up(tx) => tx
-                .send(event)
+                .send(PeerEvent)
                 .await
                 .map_err(|_| SchedulerError::PeerEventSendFailed),
             PeerEventSender::Downgraded(_) => Err(SchedulerError::SendThroughDowngradedSender),
@@ -45,4 +37,15 @@ impl<JE: JobEnum, RE: ResolutionEnum> PeerEventSender<JE, RE> {
             PeerEventSender::Downgraded(_) => {}
         }
     }
+}
+
+pub trait PeerEventSenders {
+    /// Constructs a new `PeerEventSenders` instance from the given senders.
+    ///
+    /// Remove the senders from the map.
+    ///
+    /// TODO: tx channels probably close when dropped, so taking owned `HashMap` should work. But I don't want to break anything, will refactor later.
+    fn gather_from(senders: &mut HashMap<String, PeerEventSender>) -> Self;
+
+    fn downgrade_all(&mut self);
 }

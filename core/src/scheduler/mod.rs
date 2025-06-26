@@ -14,13 +14,13 @@ pub use run_mode::*;
 mod peer_event;
 pub use peer_event::*;
 
-mod job_manager;
-pub use job_manager::*;
-
 mod options;
 pub use options::*;
 
 mod error;
 pub use error::*;
+
+mod individual_scheduler;
+pub use individual_scheduler::*;
 
 mod misc;

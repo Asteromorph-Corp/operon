@@ -4,13 +4,12 @@ use futures::future::try_join_all;
 use tokio::{sync::RwLock, task::JoinSet};
 
 use crate::{
-    dimension::ResolutionEnum,
     meta_storage::{MetaClient, MetaContext, MetaStorage, MetaStorageError},
     operon::RunningState,
     scheduler::{
-        ControlEvent, ControlEventReceiver, JobManager, PeerEvent, PeerEventSender, RecoveryState,
-        RecoveryStateSender, RunMode, SchedulerError, SchedulerOptions,
-        misc::{JobManagerWithRx, PreparedJobs},
+        ControlEvent, ControlEventReceiver, IndividualSchedule, PeerEvent, PeerEventSender,
+        RecoveryState, RecoveryStateSender, RunMode, SchedulerError, SchedulerOptions,
+        misc::{PreparedSchedules, ScheduleWithRx},
     },
     service::OperonService,
     storage::OperonStorage,
@@ -35,7 +34,7 @@ where
     storage: Arc<Sto>,
     service: Arc<Svc>,
     meta_storage: Arc<MSto>,
-    job_managers: Vec<Box<dyn JobManager<Sto, Svc, MSto>>>,
+    schedules: Vec<Box<dyn IndividualSchedule<Sto, Svc, MSto>>>,
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
@@ -52,7 +51,7 @@ where
     pub async fn new(
         storage: Arc<Sto>,
         service: Arc<Svc>,
-        job_managers: Vec<Box<dyn JobManager<Sto, Svc, MSto>>>,
+        schedules: Vec<Box<dyn IndividualSchedule<Sto, Svc, MSto>>>,
         ui_state: Arc<RwLock<UiState>>,
         ctrl_rx: ControlEventReceiver,
         rec_tx: RecoveryStateSender,
@@ -66,7 +65,7 @@ where
             storage,
             service,
             meta_storage,
-            job_managers,
+            schedules,
             ui_state,
             ctrl_rx,
             rec_tx,
@@ -191,9 +190,7 @@ where
             _ => (),
         }
 
-        let resolution = meta_storage
-            .get_resolution(&meta_conn, &MSto::ResolutionRequest::default())
-            .await?;
+        let resolution = meta_storage.get_primary_resolution(&meta_conn).await?;
         if resolution.is_none() {
             // No resolution found, so the metadata storage is empty.
             return Ok(RecoveryState::Fresh);
@@ -210,8 +207,8 @@ where
     /// This should be called only when the recovery state is either
     /// `AbortedUnchecked` or `GracefullyStopped`.
     async fn check_consistency(&self, primary_ub: usize) -> Result<bool, SchedulerError> {
-        for manager in &self.job_managers {
-            if !manager.check_consistency(primary_ub).await? {
+        for schedule in &self.schedules {
+            if !schedule.check_consistency(primary_ub).await? {
                 return Ok(false);
             }
         }
@@ -290,20 +287,20 @@ where
         let tx = client.transaction().await.map_err(MetaStorageError::from)?;
         self.meta_storage.clear_resolution(&tx).await?;
         self.meta_storage
-            .put_resolution(&tx, &MSto::ResolutionEnum::primary(primary_ub))
+            .put_primary_resolution(&tx, primary_ub)
             .await?;
         self.meta_storage.clear_tickets(&tx).await?;
         self.meta_storage.put_default_tickets(&tx).await?;
         self.meta_storage.clear_footprint(&tx).await?;
         tx.commit().await.map_err(MetaStorageError::from)?;
 
-        let PreparedJobs {
-            managers_with_rx,
+        let PreparedSchedules {
+            schedules_with_rx: schedule_with_rx,
             peer_txs,
         } = self.prepare_channels();
-        let handles = JoinSet::from_iter(managers_with_rx.into_iter().map(
-            |JobManagerWithRx { manager, peer_rx }| {
-                manager.start_clean(
+        let handles = JoinSet::from_iter(schedule_with_rx.into_iter().map(
+            |ScheduleWithRx { schedule, peer_rx }| {
+                schedule.start_clean(
                     self.storage.clone(),
                     self.service.clone(),
                     self.meta_storage.clone(),
@@ -315,11 +312,7 @@ where
             },
         ));
         for peer_tx in peer_txs.into_values() {
-            peer_tx
-                .send(PeerEvent::Resolution(MSto::ResolutionEnum::primary(
-                    primary_ub,
-                )))
-                .await?;
+            peer_tx.send().await?;
         }
 
         Ok(handles)
@@ -344,7 +337,7 @@ where
         let mut client = self.meta_storage.client().await?;
         let tx = client.transaction().await.map_err(MetaStorageError::from)?;
         let rebuilders =
-            try_join_all(self.job_managers.iter().map(|job| job.prepare_rebuild(&tx))).await?;
+            try_join_all(self.schedules.iter().map(|job| job.prepare_rebuild(&tx))).await?;
 
         self.meta_storage.clear_resolution(&tx).await?;
         self.meta_storage.clear_tickets(&tx).await?;
@@ -352,7 +345,7 @@ where
 
         self.meta_storage.put_default_tickets(&tx).await?;
         self.meta_storage
-            .put_resolution(&tx, &MSto::ResolutionEnum::primary(primary_ub))
+            .put_primary_resolution(&tx, primary_ub)
             .await?;
         for rebuilder in &rebuilders {
             rebuilder.explode(primary_ub).await?;
@@ -366,13 +359,13 @@ where
         tx.commit().await.map_err(MetaStorageError::from)?;
         log::info!("Rebuild complete, starting the run.");
 
-        let PreparedJobs {
-            managers_with_rx,
+        let PreparedSchedules {
+            schedules_with_rx,
             peer_txs,
         } = self.prepare_channels();
-        Ok(JoinSet::from_iter(managers_with_rx.into_iter().map(
-            |JobManagerWithRx { manager, peer_rx }| {
-                manager.start_rebuild(
+        Ok(JoinSet::from_iter(schedules_with_rx.into_iter().map(
+            |ScheduleWithRx { schedule, peer_rx }| {
+                schedule.start_rebuild(
                     self.storage.clone(),
                     self.service.clone(),
                     self.meta_storage.clone(),
@@ -403,13 +396,13 @@ where
             tx.commit().await.map_err(MetaStorageError::from)?;
         }
 
-        let PreparedJobs {
-            managers_with_rx,
+        let PreparedSchedules {
+            schedules_with_rx,
             peer_txs,
         } = self.prepare_channels();
-        Ok(JoinSet::from_iter(managers_with_rx.into_iter().map(
-            |JobManagerWithRx { manager, peer_rx }| {
-                manager.start_restore(
+        Ok(JoinSet::from_iter(schedules_with_rx.into_iter().map(
+            |ScheduleWithRx { schedule, peer_rx }| {
+                schedule.start_restore(
                     self.storage.clone(),
                     self.service.clone(),
                     self.meta_storage.clone(),
@@ -422,20 +415,19 @@ where
         )))
     }
 
-    fn prepare_channels(&self) -> PreparedJobs<'_, Sto, Svc, MSto> {
-        let len = self.job_managers.len();
+    fn prepare_channels(&self) -> PreparedSchedules<'_, Sto, Svc, MSto> {
+        let len = self.schedules.len();
 
-        let mut managers_with_rx = Vec::with_capacity(len);
+        let mut schedules_with_rx = Vec::with_capacity(len);
         let mut peer_txs = HashMap::with_capacity(len);
 
-        self.job_managers.iter().for_each(|manager| {
-            let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
-                PeerEvent<MSto::JobEnum, MSto::ResolutionEnum>,
-            >(self.internal_channel_size);
-            peer_txs.insert(manager.id(), PeerEventSender::Up(peer_tx));
-            managers_with_rx.push(JobManagerWithRx::new(manager.as_ref(), peer_rx));
+        self.schedules.iter().for_each(|schedule| {
+            let (peer_tx, peer_rx) =
+                tokio::sync::mpsc::channel::<PeerEvent>(self.internal_channel_size);
+            peer_txs.insert(schedule.id(), PeerEventSender::Up(peer_tx));
+            schedules_with_rx.push(ScheduleWithRx::new(schedule.as_ref(), peer_rx));
         });
 
-        PreparedJobs::new(managers_with_rx, peer_txs)
+        PreparedSchedules::new(schedules_with_rx, peer_txs)
     }
 }
