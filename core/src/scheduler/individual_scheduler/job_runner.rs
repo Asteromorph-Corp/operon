@@ -29,12 +29,18 @@ where
         job: &J,
     ) -> Result<R, SchedulerError>;
 
-    async fn mark_done(&self, conn: MetaClient<'_>, job: &J) -> Result<(), SchedulerError>;
+    async fn mark_done(
+        &self,
+        conn: MetaClient<'_>,
+        schema_prefix: &str,
+        job: &J,
+    ) -> Result<(), SchedulerError>;
 
     /// Put a resolution into the storage.
     async fn put_resolution(
         &self,
         conn: MetaClient<'_>,
+        schema_prefix: &str,
         resolution: &R,
     ) -> Result<(), SchedulerError>;
 }
