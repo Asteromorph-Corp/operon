@@ -25,23 +25,23 @@ use crate::{
 /// * Initialization of the metadata storage,
 /// * initialization of the individual schedulers, and
 /// * communication between the UI and the individual schedulers.
-pub struct Scheduler<Sto, Svc, MSto>
+pub struct Scheduler<Svc, Sto, MSto>
 where
-    Sto: OperonStorage,
     Svc: OperonService,
+    Sto: OperonStorage,
     MSto: MetaStorage,
 {
-    storage: Arc<Sto>,
     service: Arc<Svc>,
+    storage: Arc<Sto>,
     meta_storage: Arc<MSto>,
-    schedules: Vec<Box<dyn IndividualSchedule<Sto, Svc, MSto>>>,
+    schedules: Vec<Box<dyn IndividualSchedule<Svc, Sto, MSto>>>,
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
     internal_channel_size: usize,
 }
 
-impl<Sto, Svc, MSto> Scheduler<Sto, Svc, MSto>
+impl<Svc, Sto, MSto> Scheduler<Svc, Sto, MSto>
 where
     Sto: OperonStorage,
     Svc: OperonService,
@@ -49,9 +49,9 @@ where
 {
     /// Initialize a new scheduler and its associated storages.
     pub async fn new(
-        storage: Arc<Sto>,
         service: Arc<Svc>,
-        schedules: Vec<Box<dyn IndividualSchedule<Sto, Svc, MSto>>>,
+        storage: Arc<Sto>,
+        schedules: Vec<Box<dyn IndividualSchedule<Svc, Sto, MSto>>>,
         ui_state: Arc<RwLock<UiState>>,
         ctrl_rx: ControlEventReceiver,
         rec_tx: RecoveryStateSender,
@@ -62,8 +62,8 @@ where
         meta_storage.init().await?;
 
         Ok(Self {
-            storage,
             service,
+            storage,
             meta_storage,
             schedules,
             ui_state,
@@ -301,8 +301,8 @@ where
         let handles = JoinSet::from_iter(schedule_with_rx.into_iter().map(
             |ScheduleWithRx { schedule, peer_rx }| {
                 schedule.start_clean(
-                    self.storage.clone(),
                     self.service.clone(),
+                    self.storage.clone(),
                     self.meta_storage.clone(),
                     self.ui_state.clone(),
                     peer_txs.clone(),
@@ -366,8 +366,8 @@ where
         Ok(JoinSet::from_iter(schedules_with_rx.into_iter().map(
             |ScheduleWithRx { schedule, peer_rx }| {
                 schedule.start_rebuild(
-                    self.storage.clone(),
                     self.service.clone(),
+                    self.storage.clone(),
                     self.meta_storage.clone(),
                     self.ui_state.clone(),
                     peer_txs.clone(),
@@ -403,8 +403,8 @@ where
         Ok(JoinSet::from_iter(schedules_with_rx.into_iter().map(
             |ScheduleWithRx { schedule, peer_rx }| {
                 schedule.start_restore(
-                    self.storage.clone(),
                     self.service.clone(),
+                    self.storage.clone(),
                     self.meta_storage.clone(),
                     self.ui_state.clone(),
                     peer_txs.clone(),
@@ -415,7 +415,7 @@ where
         )))
     }
 
-    fn prepare_channels(&self) -> PreparedSchedules<'_, Sto, Svc, MSto> {
+    fn prepare_channels(&self) -> PreparedSchedules<'_, Svc, Sto, MSto> {
         let len = self.schedules.len();
 
         let mut schedules_with_rx = Vec::with_capacity(len);
