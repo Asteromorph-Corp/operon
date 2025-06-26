@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 use crate::{
     meta_storage::MetaStorage,
     operon::{OperonError, OperonOptions},
-    scheduler::{ControlEvent, JobManager, RecoveryState, Scheduler},
+    scheduler::{ControlEvent, IndividualSchedule, RecoveryState, Scheduler},
     service::OperonService,
     storage::OperonStorage,
     ui::{UiLogger, UiLoop, UiState},
@@ -50,7 +50,7 @@ where
     /// Instead, you can use the provided macros to log messages to the UI.
     pub async fn run(
         self,
-        job_managers: Vec<Box<dyn JobManager<Sto, Svc, MSto>>>,
+        job_managers: Vec<Box<dyn IndividualSchedule<Sto, Svc, MSto>>>,
         primary_ub: usize,
         options: OperonOptions,
     ) -> Result<(), OperonError> {
