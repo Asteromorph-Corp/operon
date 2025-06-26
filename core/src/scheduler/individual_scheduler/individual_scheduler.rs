@@ -364,8 +364,9 @@ where
                         match runner.run_job(conn, &*service, &*storage, &job).await {
                             Ok(resolution) => {
                                 // Mark the ticket as done in the ticket storage
-                                runner.mark_done(conn, &job).await?;
-                                runner.put_resolution(conn, &resolution).await?;
+                                let schema_prefix = meta_storage.get_prefix();
+                                runner.mark_done(conn, &schema_prefix, &job).await?;
+                                runner.put_resolution(conn, &schema_prefix, &resolution).await?;
                                 tx.commit().await.map_err(MetaStorageError::from)?;
 
                                 // Alert the results to the scheduler
