@@ -42,7 +42,7 @@ where
     MSto: MetaStorage,
 {
     pub(super) schedules_with_rx: Vec<ScheduleWithRx<'a, Svc, Sto, MSto>>,
-    pub(super) peer_txs: HashMap<String, PeerEventSender>,
+    pub(super) peer_txs: HashMap<&'static str, PeerEventSender>,
 }
 
 impl<'a, Svc, Sto, MSto> PreparedSchedules<'a, Svc, Sto, MSto>
@@ -53,7 +53,7 @@ where
 {
     pub(super) fn new(
         schedules_with_rx: Vec<ScheduleWithRx<'a, Svc, Sto, MSto>>,
-        peer_txs: HashMap<String, PeerEventSender>,
+        peer_txs: HashMap<&'static str, PeerEventSender>,
     ) -> Self {
         Self {
             schedules_with_rx,

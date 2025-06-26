@@ -95,7 +95,7 @@ where
         meta_storage: Arc<MSto>,
         pool_size: usize,
         ui_state: Arc<RwLock<UiState>>,
-        mut peer_tx_map: HashMap<String, PeerEventSender>,
+        mut peer_tx_map: HashMap<&'static str, PeerEventSender>,
         peer_rx: PeerEventReceiver,
         ctrl_rx: ControlEventReceiver,
     ) -> Self {
@@ -401,7 +401,7 @@ where
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
         if !(targets.is_empty()
-            || targets.contains(&T::job_type())
+            || targets.iter().any(|t| t == T::job_type())
             || cascade && targets.iter().any(|t| T::is_descendant_of(t)))
         {
             return Ok(());
@@ -445,7 +445,7 @@ where
         targets: Vec<String>,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
-        if !(targets.is_empty() || targets.contains(&T::job_type())) {
+        if !(targets.is_empty() || targets.iter().any(|t| t == T::job_type())) {
             return Ok(());
         }
 

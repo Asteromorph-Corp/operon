@@ -22,7 +22,7 @@ where
     Sto: OperonStorage,
     MSto: MetaStorage,
 {
-    fn id(&self) -> String;
+    fn id(&self) -> &'static str;
 
     async fn check_consistency(&self, primary_ub: usize) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
 
@@ -40,7 +40,7 @@ where
         storage: Arc<Sto>,
         meta_storage: Arc<MSto>,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<String, PeerEventSender>,
+        peer_txs: HashMap<&'static str, PeerEventSender>,
         peer_rx: PeerEventReceiver,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // call `start` with empty Vector (`Scheduler::run` 6023)
@@ -52,7 +52,7 @@ where
         storage: Arc<Sto>,
         meta_storage: Arc<MSto>,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<String, PeerEventSender>,
+        peer_txs: HashMap<&'static str, PeerEventSender>,
         peer_rx: PeerEventReceiver,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // fetch `get_all_queued` and then get call `start` (`Scheduler::run` 6302)
@@ -64,7 +64,7 @@ where
         storage: Arc<Sto>,
         meta_storage: Arc<MSto>,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<String, PeerEventSender>,
+        peer_txs: HashMap<&'static str, PeerEventSender>,
         peer_rx: PeerEventReceiver,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // fetch `get_all_queued` and then get call `start` (`Scheduler::run` 6302), possibly merge with `start_rebuild`
