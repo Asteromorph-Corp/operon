@@ -16,10 +16,10 @@ use crate::{
 };
 
 #[async_trait]
-pub trait IndividualSchedule<Sto, Svc, MSto>: Send + Sync + 'static
+pub trait IndividualSchedule<Svc, Sto, MSto>: Send + Sync + 'static
 where
-    Sto: OperonStorage,
     Svc: OperonService,
+    Sto: OperonStorage,
     MSto: MetaStorage,
 {
     fn id(&self) -> String;
@@ -36,8 +36,8 @@ where
     #[allow(clippy::too_many_arguments)]
     fn start_clean(
         &self,
-        storage: Arc<Sto>,
         service: Arc<Svc>,
+        storage: Arc<Sto>,
         meta_storage: Arc<MSto>,
         ui_state: Arc<RwLock<UiState>>,
         peer_txs: HashMap<String, PeerEventSender>,
@@ -48,8 +48,8 @@ where
     #[allow(clippy::too_many_arguments)]
     fn start_rebuild(
         &self,
-        storage: Arc<Sto>,
         service: Arc<Svc>,
+        storage: Arc<Sto>,
         meta_storage: Arc<MSto>,
         ui_state: Arc<RwLock<UiState>>,
         peer_txs: HashMap<String, PeerEventSender>,
@@ -60,8 +60,8 @@ where
     #[allow(clippy::too_many_arguments)]
     fn start_restore(
         &self,
-        storage: Arc<Sto>,
         service: Arc<Svc>,
+        storage: Arc<Sto>,
         meta_storage: Arc<MSto>,
         ui_state: Arc<RwLock<UiState>>,
         peer_txs: HashMap<String, PeerEventSender>,

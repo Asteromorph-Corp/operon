@@ -16,28 +16,28 @@ use crate::{
 /// The interface for the Operon library.
 ///
 /// Provided a data storage and a service, calling `run` will start executing the jobs.
-pub struct Operon<Sto, Svc, MSto>
+pub struct Operon<Svc, Sto, MSto>
 where
-    Sto: OperonStorage,
     Svc: OperonService,
+    Sto: OperonStorage,
     MSto: MetaStorage,
 {
-    storage: Arc<Sto>,
     service: Arc<Svc>,
+    storage: Arc<Sto>,
     _phantom: std::marker::PhantomData<MSto>,
 }
 
-impl<Sto, Svc, MSto> Operon<Sto, Svc, MSto>
+impl<Svc, Sto, MSto> Operon<Svc, Sto, MSto>
 where
-    Sto: OperonStorage,
     Svc: OperonService,
+    Sto: OperonStorage,
     MSto: MetaStorage,
 {
     /// Create a new Operon instance with the given storage and service.
-    pub fn new(storage: ::std::sync::Arc<Sto>, service: ::std::sync::Arc<Svc>) -> Self {
+    pub fn new(service: ::std::sync::Arc<Svc>, storage: ::std::sync::Arc<Sto>) -> Self {
         Self {
-            storage,
             service,
+            storage,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -50,7 +50,7 @@ where
     /// Instead, you can use the provided macros to log messages to the UI.
     pub async fn run(
         self,
-        job_managers: Vec<Box<dyn IndividualSchedule<Sto, Svc, MSto>>>,
+        schedules: Vec<Box<dyn IndividualSchedule<Svc, Sto, MSto>>>,
         primary_ub: usize,
         options: OperonOptions,
     ) -> Result<(), OperonError> {
@@ -69,10 +69,10 @@ where
         let ui_state = Arc::new(RwLock::new(UiState::default()));
 
         // Create the scheduler
-        let scheduler = Scheduler::<Sto, Svc, MSto>::new(
-            self.storage,
+        let scheduler = Scheduler::<Svc, Sto, MSto>::new(
             self.service,
-            job_managers,
+            self.storage,
+            schedules,
             ui_state.clone(),
             ctrl_rx,
             rec_tx,

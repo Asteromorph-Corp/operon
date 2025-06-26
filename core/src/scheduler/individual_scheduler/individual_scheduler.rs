@@ -60,16 +60,16 @@ where
 /// * Updating waiting tickets from `Event` messages.
 ///
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Sto, Svc, MSto, T>
+pub struct IndividualScheduler<Svc, Sto, MSto, T>
 where
-    Sto: OperonStorage,
     Svc: OperonService,
+    Sto: OperonStorage,
     MSto: MetaStorage,
     T: Ticket,
 {
-    pub runner: Box<dyn JobRunner<Sto, Svc, T::Job, T::Resolution>>,
-    pub storage: Arc<Sto>,
+    pub runner: Box<dyn JobRunner<Svc, Sto, T::Job, T::Resolution>>,
     pub service: Arc<Svc>,
+    pub storage: Arc<Sto>,
     pub meta_storage: Arc<MSto>,
     pub pool: Arc<Semaphore>,
     pub pool_size: usize,
@@ -79,19 +79,19 @@ where
     pub ctrl_rx: ControlEventReceiver,
 }
 
-impl<Sto, Svc, MSto, T> IndividualScheduler<Sto, Svc, MSto, T>
+impl<Svc, Sto, MSto, T> IndividualScheduler<Svc, Sto, MSto, T>
 where
-    Sto: OperonStorage,
     Svc: OperonService,
+    Sto: OperonStorage,
     MSto: MetaStorage,
     T: Ticket,
     Self: IndividualSchedulerOps<T>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        runner: Box<dyn JobRunner<Sto, Svc, T::Job, T::Resolution>>,
-        storage: Arc<Sto>,
+        runner: Box<dyn JobRunner<Svc, Sto, T::Job, T::Resolution>>,
         service: Arc<Svc>,
+        storage: Arc<Sto>,
         meta_storage: Arc<MSto>,
         pool_size: usize,
         ui_state: Arc<RwLock<UiState>>,
@@ -361,7 +361,7 @@ where
                         let mut client = meta_storage.client().await?;
                         let tx = client.transaction().await.map_err(MetaStorageError::from)?;
                         let conn = MetaClient::Transaction(&tx);
-                        match runner.run_job(conn, &*storage, &*service, &job).await {
+                        match runner.run_job(conn, &*service, &*storage, &job).await {
                             Ok(resolution) => {
                                 // Mark the ticket as done in the ticket storage
                                 runner.mark_done(conn, &job).await?;

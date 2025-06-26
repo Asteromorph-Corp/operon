@@ -9,14 +9,14 @@ use crate::{
 };
 
 #[async_trait]
-pub trait JobRunner<Sto, Svc, J, R>: Send + Sync + 'static
+pub trait JobRunner<Svc, Sto, J, R>: Send + Sync + 'static
 where
     Sto: OperonStorage,
     Svc: OperonService,
     J: Job,
     R: Resolution,
 {
-    fn clone_box(&self) -> Box<dyn JobRunner<Sto, Svc, J, R> + Send + Sync>;
+    fn clone_box(&self) -> Box<dyn JobRunner<Svc, Sto, J, R>>;
 
     /// Call the user function and stores the result in the storage.
     ///
@@ -24,8 +24,8 @@ where
     async fn run_job(
         &self,
         conn: MetaClient<'_>,
-        storage: &Sto,
         service: &Svc,
+        storage: &Sto,
         job: &J,
     ) -> Result<R, SchedulerError>;
 
