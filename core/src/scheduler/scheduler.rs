@@ -224,8 +224,8 @@ where
         Ok(true)
     }
 
-    pub async fn update_ui_all(&self, conn: MetaClient<'_>) -> Result<(), SchedulerError> {
-        let updates = self.meta_storage.get_ui_updates(conn).await?;
+    pub async fn update_ui_all(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
+        let updates = self.meta_storage.get_ui_updates(client).await?;
         let mut ui_state = self.ui_state.write().await; // Might break
         for update in updates {
             ui_state.update_ui_state(update)?;
