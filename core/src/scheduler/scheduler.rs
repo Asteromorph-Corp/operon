@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use futures::future::try_join_all;
+use futures::{StreamExt, TryStreamExt};
 use tokio::{sync::RwLock, task::JoinSet};
 
 use crate::{
@@ -347,12 +347,10 @@ where
         // Clear the data storage's footprint. (The metadata storage will be cleared later.)
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
-        let rebuilders = try_join_all(
-            self.schedules
-                .iter()
-                .map(|job| job.prepare_rebuild(tx.as_client())),
-        )
-        .await?;
+        let rebuilders = futures::stream::iter(&self.schedules)
+            .then(|schedule| schedule.prepare_rebuild(tx.as_client()))
+            .try_collect::<Vec<_>>()
+            .await?;
 
         self.meta_storage.clear_resolution(tx.as_client()).await?;
         self.meta_storage.clear_tickets(tx.as_client()).await?;
