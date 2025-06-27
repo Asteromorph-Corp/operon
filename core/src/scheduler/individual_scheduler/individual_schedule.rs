@@ -26,7 +26,6 @@ where
     async fn check_consistency(
         &self,
         client: MetaClient<'_>,
-        schema_prefix: &str,
         primary_ub: usize,
     ) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
 

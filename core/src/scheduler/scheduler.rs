@@ -212,10 +212,9 @@ where
     /// `AbortedUnchecked` or `GracefullyStopped`.
     async fn check_consistency(&self, primary_ub: usize) -> Result<bool, SchedulerError> {
         let conn = self.meta_storage.conn().await?;
-        let schema_prefix = self.meta_storage.get_prefix();
         for schedule in &self.schedules {
             if !schedule
-                .check_consistency(conn.as_client(), &schema_prefix, primary_ub)
+                .check_consistency(conn.as_client(), primary_ub)
                 .await?
             {
                 return Ok(false);
