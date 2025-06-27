@@ -1,7 +1,7 @@
 pub use operon_macros::*;
 
-pub mod dimension;
 pub mod meta_storage;
+pub mod misc;
 pub mod operon;
 pub mod scheduler;
 pub mod service;

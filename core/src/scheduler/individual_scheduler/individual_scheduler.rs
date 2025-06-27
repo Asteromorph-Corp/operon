@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use tokio::sync::{RwLock, Semaphore};
 
 use crate::{
-    dimension::Ticket,
+    misc::Ticket,
     meta_storage::{MetaClient, MetaStorage},
     operon::RunningState,
     scheduler::{

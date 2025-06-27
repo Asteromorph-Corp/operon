@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::{
-    dimension::{Job, Resolution},
+    misc::{Job, Resolution},
     meta_storage::MetaClient,
     scheduler::SchedulerError,
     service::OperonService,
