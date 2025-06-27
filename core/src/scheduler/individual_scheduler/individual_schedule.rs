@@ -1,11 +1,10 @@
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 
 use async_trait::async_trait;
-use deadpool_postgres::Transaction;
 use tokio::sync::RwLock;
 
 use crate::{
-    meta_storage::MetaStorage,
+    meta_storage::{MetaClient, MetaStorage},
     operon::RunningState,
     scheduler::{
         ControlEventReceiver, JobRebuilder, PeerEventReceiver, PeerEventSender, SchedulerError,
@@ -24,11 +23,16 @@ where
 {
     fn id(&self) -> &'static str;
 
-    async fn check_consistency(&self, primary_ub: usize) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
+    async fn check_consistency(
+        &self,
+        conn: MetaClient<'_>,
+        schema_prefix: &str,
+        primary_ub: usize,
+    ) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
 
     async fn prepare_rebuild(
         &self,
-        tx: &Transaction<'_>,
+        tx: MetaClient<'_>,
     ) -> Result<Box<dyn JobRebuilder>, SchedulerError>; // `Scheduler::run` 6049~
 
     // Implement `start` (`IndividualScheduler::run` 4462~) and call it using different initial data_fetching

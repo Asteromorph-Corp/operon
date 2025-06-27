@@ -1,8 +1,7 @@
 use async_trait::async_trait;
-use deadpool_postgres::Object;
 
 use crate::{
-    meta_storage::{MetaClient, MetaContext, MetaStorageError},
+    meta_storage::{ConnectionWithSchema, MetaClient, MetaContext, MetaStorageError},
     ui::UiStateUpdate,
 };
 
@@ -10,7 +9,9 @@ use crate::{
 pub trait MetaStorage: Send + Sync + 'static {
     fn new(context: MetaContext) -> Self;
 
-    async fn client(&self) -> Result<Object, MetaStorageError>; // `Return self.context.pool.get().await`
+    async fn conn(&self) -> Result<ConnectionWithSchema, MetaStorageError>; // `Return self.context.pool.get().await`
+    async fn conn_static(&self) -> Result<ConnectionWithSchema<'static>, MetaStorageError>; // `Return self.context.pool.get().await`
+
     fn schema(&self) -> Option<&str>; // `Return self.context.schema.as_deref()`
 
     fn get_prefix(&self) -> String {
@@ -21,27 +22,23 @@ pub trait MetaStorage: Send + Sync + 'static {
     }
 
     async fn init(&self) -> Result<(), MetaStorageError> {
-        let mut client = self.client().await?;
-        let tx = client.transaction().await?;
-        self.init_schema(&tx).await?;
-        self.init_footprint(&tx).await?;
-        self.init_resolution(&tx).await?;
-        self.init_tickets(&tx).await?;
+        let mut conn = self.conn().await?;
+        let tx = conn.transaction().await?;
+        self.init_schema(tx.as_client()).await?;
+        self.init_footprint(tx.as_client()).await?;
+        self.init_resolution(tx.as_client()).await?;
+        self.init_tickets(tx.as_client()).await?;
         tx.commit().await?;
         Ok(())
     }
 
     /// If given, initialize the schema in the database.
-    async fn init_schema(
-        &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError> {
+    async fn init_schema(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError> {
         let Some(schema) = self.schema() else {
             return Ok(());
         };
-        let conn: MetaClient<'_> = conn.into();
         let create_schema = format!("CREATE SCHEMA IF NOT EXISTS {schema}");
-        conn.execute(&create_schema, &[]).await?;
+        client.execute(&create_schema, &[]).await?;
         Ok(())
     }
 
@@ -52,11 +49,7 @@ pub trait MetaStorage: Send + Sync + 'static {
     /// Initialize the footprint table.
     /// Note that this function is idempotent, i.e. calling it multiple times,
     /// or calling it on an already-initialized storage will do nothing.
-    async fn init_footprint(
-        &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError> {
-        let conn: MetaClient<'_> = conn.into();
+    async fn init_footprint(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError> {
         let schema_prefix = self.get_prefix();
         let stmt = format!(
             "CREATE TABLE IF NOT EXISTS {schema_prefix}footprint (
@@ -64,44 +57,38 @@ pub trait MetaStorage: Send + Sync + 'static {
                 value TEXT NOT NULL
             )"
         );
-        conn.execute(&stmt, &[]).await?;
+        client.execute(&stmt, &[]).await?;
         Ok(())
     }
 
     /// Clear the footprint table.
-    async fn clear_footprint(
-        &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError> {
-        let conn: MetaClient<'_> = conn.into();
+    async fn clear_footprint(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError> {
         let schema_prefix = self.get_prefix();
         let stmt = format!("TRUNCATE TABLE {schema_prefix}footprint");
-        conn.execute(&stmt, &[]).await?;
+        client.execute(&stmt, &[]).await?;
         Ok(())
     }
 
     /// Get a footprint value by key.
     async fn get_footprint(
         &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
+        client: MetaClient<'_>,
         key: impl Into<String> + Send + Sync,
     ) -> Result<Option<String>, MetaStorageError> {
-        let conn: MetaClient<'_> = conn.into();
         let key: String = key.into();
         let schema_prefix = self.get_prefix();
         let stmt = format!("SELECT value FROM {schema_prefix}footprint WHERE key = $1");
-        let row = conn.query_opt(&stmt, &[&key]).await?;
+        let row = client.query_opt(&stmt, &[&key]).await?;
         Ok(row.map(|r| r.get::<_, &str>(0).to_string()))
     }
 
     /// Set a footprint key-value pair.
     async fn put_footprint(
         &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
+        client: MetaClient<'_>,
         key: impl Into<String> + Send + Sync,
         value: impl Into<String> + Send + Sync,
     ) -> Result<(), MetaStorageError> {
-        let conn: MetaClient<'_> = conn.into();
         let key: String = key.into();
         let value: String = value.into();
 
@@ -111,7 +98,7 @@ pub trait MetaStorage: Send + Sync + 'static {
             VALUES ($1, $2)
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
         );
-        conn.execute(&stmt, &[&key, &value]).await?;
+        client.execute(&stmt, &[&key, &value]).await?;
         Ok(())
     }
 
@@ -147,27 +134,21 @@ pub trait MetaStorage: Send + Sync + 'static {
     ///       PRIMARY KEY (i)
     ///   )
     ///   ```
-    async fn init_resolution(
-        &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>; // `facts_psql::init`, 847~
+    async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>; // `facts_psql::init`, 847~
 
     /// Clear the data in the PSQL fact storage, assuming the tables are already initialized.
-    async fn clear_resolution(
-        &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>; // `facts_psql::clear`, 877~
+    async fn clear_resolution(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>; // `facts_psql::clear`, 877~
 
     /// Get the primary resolution from the PSQL fact storage.
     async fn get_primary_resolution(
         &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
+        client: MetaClient<'_>,
     ) -> Result<Option<usize>, MetaStorageError>; // `facts_psql::get_resolution`, 891~
 
     /// Put a primary resolution into the PSQL fact storage.
     async fn put_primary_resolution(
         &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
+        client: MetaClient<'_>,
         resolution: usize,
     ) -> Result<(), MetaStorageError>;
 
@@ -268,25 +249,16 @@ pub trait MetaStorage: Send + Sync + 'static {
     ///     )
     /// )
     /// ```
-    async fn init_tickets(
-        &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>; // `tickets_psql::init`, 1079~
+    async fn init_tickets(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>; // `tickets_psql::init`, 1079~
 
     /// Clear the data from the PSQL ticket storage, assuming the tables are already initialized.
-    async fn clear_tickets(
-        &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>; // `tickets_psql::clear`, 1623~
+    async fn clear_tickets(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>; // `tickets_psql::clear`, 1623~
 
     /// Put the default (fully unresolved) tickets into the PSQL ticket storage.
-    async fn put_default_tickets(
-        &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
-    ) -> Result<(), MetaStorageError>;
+    async fn put_default_tickets(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>;
 
     async fn get_ui_updates(
         &self,
-        conn: impl Into<MetaClient<'_>> + Send + Sync,
+        client: MetaClient<'_>,
     ) -> Result<Vec<UiStateUpdate>, MetaStorageError>; // `Scheduler::update_ui_all`, 5900~
 }

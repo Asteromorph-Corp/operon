@@ -4,7 +4,7 @@ use futures::future::try_join_all;
 use tokio::{sync::RwLock, task::JoinSet};
 
 use crate::{
-    meta_storage::{MetaClient, MetaContext, MetaStorage, MetaStorageError},
+    meta_storage::{MetaClient, MetaContext, MetaStorage},
     operon::RunningState,
     scheduler::{
         ControlEvent, ControlEventReceiver, IndividualSchedule, PeerEvent, PeerEventSender,
@@ -172,11 +172,13 @@ where
     pub async fn check_recovery_state(&self) -> Result<RecoveryState, SchedulerError> {
         let storage = &self.storage;
         let meta_storage = &self.meta_storage;
-        let meta_conn = meta_storage.client().await?;
+        let meta_conn = meta_storage.conn().await?;
 
         // Get footprints from both storages.
         let data_footprint = storage.get_footprint().await?;
-        let meta_footprint = meta_storage.get_footprint(&meta_conn, "global").await?;
+        let meta_footprint = meta_storage
+            .get_footprint(meta_conn.as_client(), "global")
+            .await?;
         // Early return if the state can be inferred through the footprints.
         match (&data_footprint, &meta_footprint) {
             (Some(df), Some(mf)) if df == mf && df.starts_with("F@") => {
@@ -190,7 +192,9 @@ where
             _ => (),
         }
 
-        let resolution = meta_storage.get_primary_resolution(&meta_conn).await?;
+        let resolution = meta_storage
+            .get_primary_resolution(meta_conn.as_client())
+            .await?;
         if resolution.is_none() {
             // No resolution found, so the metadata storage is empty.
             return Ok(RecoveryState::Fresh);
@@ -207,8 +211,13 @@ where
     /// This should be called only when the recovery state is either
     /// `AbortedUnchecked` or `GracefullyStopped`.
     async fn check_consistency(&self, primary_ub: usize) -> Result<bool, SchedulerError> {
+        let conn = self.meta_storage.conn().await?;
+        let schema_prefix = self.meta_storage.get_prefix();
         for schedule in &self.schedules {
-            if !schedule.check_consistency(primary_ub).await? {
+            if !schedule
+                .check_consistency(conn.as_client(), &schema_prefix, primary_ub)
+                .await?
+            {
                 return Ok(false);
             }
         }
@@ -269,12 +278,12 @@ where
             // Write the footprint to the data storage...
             self.storage.put_footprint(&footprint).await?;
             // ...and to the metadata storage.
-            let mut client = self.meta_storage.client().await?;
-            let tx = client.transaction().await.map_err(MetaStorageError::from)?;
+            let mut conn = self.meta_storage.conn().await?;
+            let tx = conn.transaction().await?;
             self.meta_storage
-                .put_footprint(&tx, "global", footprint)
+                .put_footprint(tx.as_client(), "global", footprint)
                 .await?;
-            tx.commit().await.map_err(MetaStorageError::from)?;
+            tx.commit().await?;
         }
         log::info!("All jobs closed.");
         Ok(())
@@ -283,16 +292,18 @@ where
     async fn run_clean(&self, primary_ub: usize) -> Result<JoinSet<RunningState>, SchedulerError> {
         // Wipe the data storage clean.
         self.storage.clear().await?;
-        let mut client = self.meta_storage.client().await?;
-        let tx = client.transaction().await.map_err(MetaStorageError::from)?;
-        self.meta_storage.clear_resolution(&tx).await?;
+        let mut conn = self.meta_storage.conn().await?;
+        let tx = conn.transaction().await?;
+        self.meta_storage.clear_resolution(tx.as_client()).await?;
         self.meta_storage
-            .put_primary_resolution(&tx, primary_ub)
+            .put_primary_resolution(tx.as_client(), primary_ub)
             .await?;
-        self.meta_storage.clear_tickets(&tx).await?;
-        self.meta_storage.put_default_tickets(&tx).await?;
-        self.meta_storage.clear_footprint(&tx).await?;
-        tx.commit().await.map_err(MetaStorageError::from)?;
+        self.meta_storage.clear_tickets(tx.as_client()).await?;
+        self.meta_storage
+            .put_default_tickets(tx.as_client())
+            .await?;
+        self.meta_storage.clear_footprint(tx.as_client()).await?;
+        tx.commit().await?;
 
         let PreparedSchedules {
             schedules_with_rx: schedule_with_rx,
@@ -334,29 +345,35 @@ where
         //   - and finally feed the resulting queued tickets to the individual schedulers.
 
         // Clear the data storage's footprint. (The metadata storage will be cleared later.)
-        let mut client = self.meta_storage.client().await?;
-        let tx = client.transaction().await.map_err(MetaStorageError::from)?;
-        let rebuilders =
-            try_join_all(self.schedules.iter().map(|job| job.prepare_rebuild(&tx))).await?;
+        let mut conn = self.meta_storage.conn().await?;
+        let tx = conn.transaction().await?;
+        let rebuilders = try_join_all(
+            self.schedules
+                .iter()
+                .map(|job| job.prepare_rebuild(tx.as_client())),
+        )
+        .await?;
 
-        self.meta_storage.clear_resolution(&tx).await?;
-        self.meta_storage.clear_tickets(&tx).await?;
-        self.meta_storage.clear_footprint(&tx).await?;
+        self.meta_storage.clear_resolution(tx.as_client()).await?;
+        self.meta_storage.clear_tickets(tx.as_client()).await?;
+        self.meta_storage.clear_footprint(tx.as_client()).await?;
 
-        self.meta_storage.put_default_tickets(&tx).await?;
         self.meta_storage
-            .put_primary_resolution(&tx, primary_ub)
+            .put_default_tickets(tx.as_client())
+            .await?;
+        self.meta_storage
+            .put_primary_resolution(tx.as_client(), primary_ub)
             .await?;
         for rebuilder in &rebuilders {
             rebuilder.explode(primary_ub).await?;
         }
-        self.update_ui_all(MetaClient::Transaction(&tx)).await?;
+        self.update_ui_all(tx.as_client()).await?;
 
         for rebuilder in rebuilders {
             rebuilder.rebuild().await?;
-            self.update_ui_all(MetaClient::Transaction(&tx)).await?;
+            self.update_ui_all(tx.as_client()).await?;
         }
-        tx.commit().await.map_err(MetaStorageError::from)?;
+        tx.commit().await?;
         log::info!("Rebuild complete, starting the run.");
 
         let PreparedSchedules {
@@ -390,10 +407,10 @@ where
         storage.clear_footprint().await?;
         // Clear the metadata storage's footprint.
         {
-            let mut client = meta_storage.client().await?;
-            let tx = client.transaction().await.map_err(MetaStorageError::from)?;
-            meta_storage.clear_footprint(&tx).await?;
-            tx.commit().await.map_err(MetaStorageError::from)?;
+            let mut conn = meta_storage.conn().await?;
+            let tx = conn.transaction().await?;
+            meta_storage.clear_footprint(tx.as_client()).await?;
+            tx.commit().await?;
         }
 
         let PreparedSchedules {
