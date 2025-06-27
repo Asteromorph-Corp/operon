@@ -75,6 +75,18 @@ pub enum MetaClient<'a> {
     Transaction(&'a TransactionWithSchema<'a>),
 }
 
+pub struct SchemaPrefix<'a>(Option<&'a str>);
+
+impl std::fmt::Display for SchemaPrefix<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(schema) = self.0 {
+            write!(f, "{}.", schema)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl MetaClient<'_> {
     impl_meta_client!(batch_execute(query: &str) -> ());
     impl_meta_client!(execute(query: &str, params: &[&ToSql]) -> u64);
@@ -91,6 +103,10 @@ impl MetaClient<'_> {
             MetaClient::Object(ConnectionWithSchema { schema, .. }) => schema.as_deref(),
             MetaClient::Transaction(TransactionWithSchema { schema, .. }) => schema.as_deref(),
         }
+    }
+
+    pub fn schema_prefix(&self) -> SchemaPrefix<'_> {
+        SchemaPrefix(self.schema())
     }
 }
 
