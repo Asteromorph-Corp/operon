@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bytes::Buf;
 use tokio_postgres::{CopyInSink, ToStatement};
 
@@ -16,8 +18,12 @@ macro_rules! impl_meta_client {
         $(where $($where_clause)+)?
         {
             match self {
-                MetaClient::Object(client) => client.$method($($arg),*).await.map_err(Into::into),
-                MetaClient::Transaction(tx) => tx.$method($($arg),*).await.map_err(Into::into),
+                MetaClient::Object(ConnectionWithSchema { client, .. }) => {
+                    client.$method($($arg),*).await.map_err(Into::into)
+                }
+                MetaClient::Transaction(TransactionWithSchema { tx, .. }) => {
+                    tx.$method($($arg),*).await.map_err(Into::into)
+                }
             }
         }
     };
@@ -25,10 +31,48 @@ macro_rules! impl_meta_client {
 
 type ToSql = dyn tokio_postgres::types::ToSql + Sync;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
+pub struct ConnectionWithSchema<'a> {
+    client: deadpool_postgres::Object,
+    schema: Option<Cow<'a, str>>,
+}
+
+impl<'a> ConnectionWithSchema<'a> {
+    pub async fn transaction(&'a mut self) -> Result<TransactionWithSchema<'a>, MetaStorageError> {
+        let tx = self.client.transaction().await?;
+        let schema = self.schema.as_deref().map(Cow::Borrowed);
+        Ok(TransactionWithSchema { tx, schema })
+    }
+
+    pub fn as_client(&self) -> MetaClient {
+        MetaClient::Object(self)
+    }
+}
+
+#[derive(Debug)]
+pub struct TransactionWithSchema<'a> {
+    tx: deadpool_postgres::Transaction<'a>,
+    schema: Option<Cow<'a, str>>,
+}
+
+impl<'a> TransactionWithSchema<'a> {
+    pub async fn commit(self) -> Result<(), MetaStorageError> {
+        self.tx.commit().await.map_err(Into::into)
+    }
+
+    pub async fn rollback(self) -> Result<(), MetaStorageError> {
+        self.tx.rollback().await.map_err(Into::into)
+    }
+
+    pub fn as_client(&self) -> MetaClient {
+        MetaClient::Transaction(self)
+    }
+}
+
+#[derive(Debug)]
 pub enum MetaClient<'a> {
-    Object(&'a deadpool_postgres::Object),
-    Transaction(&'a deadpool_postgres::Transaction<'a>),
+    Object(&'a ConnectionWithSchema<'a>),
+    Transaction(&'a TransactionWithSchema<'a>),
 }
 
 impl MetaClient<'_> {
@@ -41,16 +85,23 @@ impl MetaClient<'_> {
         where T: ?Sized + ToStatement + Send + Sync,
               U: Buf + 'static + Send + Sync
     );
+
+    pub fn schema(&self) -> Option<&str> {
+        match self {
+            MetaClient::Object(ConnectionWithSchema { schema, .. }) => schema.as_deref(),
+            MetaClient::Transaction(TransactionWithSchema { schema, .. }) => schema.as_deref(),
+        }
+    }
 }
 
-impl<'a> From<&'a deadpool_postgres::Object> for MetaClient<'a> {
-    fn from(client: &'a deadpool_postgres::Object) -> Self {
+impl<'a> From<&'a ConnectionWithSchema<'a>> for MetaClient<'a> {
+    fn from(client: &'a ConnectionWithSchema<'a>) -> Self {
         MetaClient::Object(client)
     }
 }
 
-impl<'a> From<&'a deadpool_postgres::Transaction<'a>> for MetaClient<'a> {
-    fn from(tx: &'a deadpool_postgres::Transaction<'a>) -> Self {
+impl<'a> From<&'a TransactionWithSchema<'a>> for MetaClient<'a> {
+    fn from(tx: &'a TransactionWithSchema<'a>) -> Self {
         MetaClient::Transaction(tx)
     }
 }

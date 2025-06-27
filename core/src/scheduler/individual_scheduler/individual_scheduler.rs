@@ -8,7 +8,7 @@ use tokio::sync::{RwLock, Semaphore};
 
 use crate::{
     dimension::Ticket,
-    meta_storage::{MetaClient, MetaStorage, MetaStorageError},
+    meta_storage::{MetaClient, MetaStorage},
     operon::RunningState,
     scheduler::{
         ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobRunner,
@@ -121,10 +121,9 @@ where
     }
 
     /// Call `update_ui` without an ongoing connection.
-    async fn update_ui_no_conn(&mut self, returning: bool) -> Result<(), SchedulerError> {
-        let client = self.meta_storage.client().await?;
-        self.update_ui(MetaClient::Object(&client), returning)
-            .await?;
+    async fn update_ui_without_client(&mut self, returning: bool) -> Result<(), SchedulerError> {
+        let conn = self.meta_storage.conn_static().await?;
+        self.update_ui(conn.as_client(), returning).await?;
         Ok(())
     }
 
@@ -135,12 +134,11 @@ where
         &mut self,
         ready_tickets: &mut VecDeque<T>,
     ) -> Result<(), SchedulerError> {
-        let mut client = self.meta_storage.client().await?;
-        let tx = client.transaction().await.map_err(MetaStorageError::from)?;
-        let conn = MetaClient::Transaction(&tx);
-        self.poll_ready(conn, ready_tickets).await?;
-        self.update_ui(conn, false).await?;
-        tx.commit().await.map_err(MetaStorageError::from)?;
+        let mut conn = self.meta_storage.conn_static().await?;
+        let tx = conn.transaction().await?;
+        self.poll_ready(tx.as_client(), ready_tickets).await?;
+        self.update_ui(tx.as_client(), false).await?;
+        tx.commit().await?;
         Ok(())
     }
 
@@ -174,7 +172,7 @@ where
         };
 
         // Update the UI state before entering the loop.
-        if self.update_ui_no_conn(false).await.is_err() {
+        if self.update_ui_without_client(false).await.is_err() {
             log::error!(
                 "Failed to update UI state for `{}` scheduler after initial data processing.",
                 T::job_type()
@@ -188,10 +186,12 @@ where
                 "Scheduler for `{}` exited due to being finished from the start.",
                 T::job_type()
             );
-            self.update_ui_no_conn(true).await.unwrap_or_else(|e| {
-                log::error!("Failed to update UI state after scheduler run: {e}");
-                state = RunningState::Error;
-            });
+            self.update_ui_without_client(true)
+                .await
+                .unwrap_or_else(|e| {
+                    log::error!("Failed to update UI state after scheduler run: {e}");
+                    state = RunningState::Error;
+                });
             return state;
         }
         let res = self.run_internal(ready_tickets, &mut state).await;
@@ -223,10 +223,12 @@ where
         }
 
         // Update the UI state one last time.
-        self.update_ui_no_conn(true).await.unwrap_or_else(|e| {
-            log::error!("Failed to update UI state after scheduler run: {e}");
-            state = RunningState::Error;
-        });
+        self.update_ui_without_client(true)
+            .await
+            .unwrap_or_else(|e| {
+                log::error!("Failed to update UI state after scheduler run: {e}");
+                state = RunningState::Error;
+            });
         state
     }
 
@@ -286,7 +288,7 @@ where
                             "Scheduler internal channel closed prematurely".into()
                         )
                     )?;
-                    self.update_ui_no_conn(false).await?;
+                    self.update_ui_without_client(false).await?;
                     match int_event {
                         InternalEvent::JobSuccess(job, resolution) => {
                             // Trace the job success
@@ -358,16 +360,15 @@ where
                         // Trace the job start.
                         log::trace!("Running job {job:?} in `{}` scheduler.", T::job_type());
                         let _permit = permit;
-                        let mut client = meta_storage.client().await?;
-                        let tx = client.transaction().await.map_err(MetaStorageError::from)?;
-                        let conn = MetaClient::Transaction(&tx);
-                        match runner.run_job(conn, &*service, &*storage, &job).await {
+                        let mut conn = meta_storage.conn().await?;
+                        let tx = conn.transaction().await?;
+                        match runner.run_job(tx.as_client(), &*service, &*storage, &job).await {
                             Ok(resolution) => {
                                 // Mark the ticket as done in the ticket storage
                                 let schema_prefix = meta_storage.get_prefix();
-                                runner.mark_done(conn, &schema_prefix, &job).await?;
-                                runner.put_resolution(conn, &schema_prefix, &resolution).await?;
-                                tx.commit().await.map_err(MetaStorageError::from)?;
+                                runner.mark_done(tx.as_client(), &schema_prefix, &job).await?;
+                                runner.put_resolution(tx.as_client(), &schema_prefix, &resolution).await?;
+                                tx.commit().await?;
 
                                 // Alert the results to the scheduler
                                 int_sender.send(InternalEvent::JobSuccess(job.clone(), resolution.clone()))
@@ -381,7 +382,7 @@ where
                             }
                             Err(e) => {
                                 // Rollback the transaction
-                                tx.rollback().await.map_err(MetaStorageError::from)?;
+                                tx.rollback().await?;
 
                                 // Alert the error to the scheduler
                                 int_sender.send(InternalEvent::JobFailure(job, e))
@@ -412,7 +413,7 @@ where
             RunningState::Running => {
                 log::info!("Pausing `{}` jobs.", T::job_type());
                 *state = RunningState::Paused;
-                self.update_ui_no_conn(false).await?;
+                self.update_ui_without_client(false).await?;
                 // Acquire and forget all permits.
                 let permit = self
                     .pool
@@ -454,7 +455,7 @@ where
             RunningState::Paused => {
                 log::info!("Resuming `{}` jobs.", T::job_type());
                 *state = RunningState::Running;
-                self.update_ui_no_conn(false).await?;
+                self.update_ui_without_client(false).await?;
                 // Add back all permits.
                 self.pool.add_permits(self.pool_size);
             }
@@ -484,7 +485,7 @@ where
         if *state == RunningState::Running {
             log::info!("Pausing `{}` jobs for graceful stop.", T::job_type());
             *state = RunningState::Paused;
-            self.update_ui_no_conn(false).await?;
+            self.update_ui_without_client(false).await?;
             // Acquire and forget all permits.
             let permit = self
                 .pool
