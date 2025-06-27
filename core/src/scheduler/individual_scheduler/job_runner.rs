@@ -23,7 +23,7 @@ where
     /// Return the dimension resolution that was resolved by this job, if any.
     async fn run_job(
         &self,
-        conn: MetaClient<'_>,
+        client: MetaClient<'_>,
         service: &Svc,
         storage: &Sto,
         job: &J,
@@ -31,7 +31,7 @@ where
 
     async fn mark_done(
         &self,
-        conn: MetaClient<'_>,
+        client: MetaClient<'_>,
         schema_prefix: &str,
         job: &J,
     ) -> Result<(), SchedulerError>;
@@ -39,7 +39,7 @@ where
     /// Put a resolution into the storage.
     async fn put_resolution(
         &self,
-        conn: MetaClient<'_>,
+        client: MetaClient<'_>,
         schema_prefix: &str,
         resolution: &R,
     ) -> Result<(), SchedulerError>;

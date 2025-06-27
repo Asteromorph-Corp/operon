@@ -30,7 +30,7 @@ where
     /// Handle a job event.
     async fn poll_ready(
         &mut self,
-        conn: MetaClient<'_>,
+        client: MetaClient<'_>,
         ready_tickets: &mut VecDeque<T>,
     ) -> Result<(), SchedulerError>;
 
@@ -44,7 +44,7 @@ where
     /// Called whenever the UI state information may be changed.
     async fn update_ui(
         &mut self,
-        conn: MetaClient<'_>,
+        client: MetaClient<'_>,
         returning: bool,
     ) -> Result<(), SchedulerError>;
 }
