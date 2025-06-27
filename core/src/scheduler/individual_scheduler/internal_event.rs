@@ -1,5 +1,5 @@
 use crate::{
-    dimension::{Job, Resolution},
+    misc::{Job, Resolution},
     scheduler::SchedulerError,
 };
 
