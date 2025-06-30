@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use futures::{StreamExt, TryStreamExt};
 
 use crate::{
-    meta_storage::{MetaClient, init_footprint, init_schema},
+    meta_storage::{MetaClient, init_footprint, init_schema, init_ticket_status_type},
     scheduler::{
         IndividualRebuilder, IndividualSpec, PeerEvent, PeerEventSender, PrimarySpec,
         SchedulerError, SpecWithRx, SpecsWithChannels,
@@ -54,11 +54,12 @@ where
     ) -> Result<(), SchedulerError> {
         init_schema(client).await?;
         self.primary_spec.init_resolution(client).await?;
-        for schedule in &self.individual_specs {
-            schedule.init_resolution(client).await?;
+        for individual_spec in &self.individual_specs {
+            individual_spec.init_resolution(client).await?;
         }
-        for schedule in &self.individual_specs {
-            schedule.init_tickets(client).await?;
+        init_ticket_status_type(client).await?;
+        for individual_spec in &self.individual_specs {
+            individual_spec.init_tickets(client).await?;
         }
         init_footprint(client).await?;
 
