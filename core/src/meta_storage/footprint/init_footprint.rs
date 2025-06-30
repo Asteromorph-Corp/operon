@@ -8,9 +8,9 @@ pub async fn init_footprint(client: MetaClient<'_>) -> Result<(), MetaStorageErr
 
     let stmt = format!(
         "CREATE TABLE IF NOT EXISTS {schema_prefix}footprint (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )"
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )"
     );
     client.execute(&stmt, &[]).await?;
     Ok(())
