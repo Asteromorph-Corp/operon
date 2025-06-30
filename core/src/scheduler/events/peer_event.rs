@@ -49,3 +49,9 @@ pub trait PeerEventSenders {
 
     fn downgrade_all(&mut self);
 }
+
+impl PeerEventSenders for () {
+    fn gather_from(_: &mut HashMap<&'static str, PeerEventSender>) -> Self {}
+
+    fn downgrade_all(&mut self) {}
+}
