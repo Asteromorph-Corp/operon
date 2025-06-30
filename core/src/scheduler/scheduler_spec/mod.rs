@@ -8,11 +8,11 @@ pub use primary_spec::*;
 mod individual_spec;
 pub use individual_spec::*;
 
-mod job_rebuilder;
-pub use job_rebuilder::*;
+mod individual_rebuilder;
+pub use individual_rebuilder::*;
 
-mod job_runner;
-pub use job_runner::*;
+mod job_manager;
+pub use job_manager::*;
 
 mod specs_with_channels;
 pub(crate) use specs_with_channels::*;
