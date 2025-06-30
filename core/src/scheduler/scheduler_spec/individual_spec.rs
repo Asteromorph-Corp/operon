@@ -7,7 +7,8 @@ use crate::{
     meta_storage::{MetaClient, MetaStorage},
     operon::RunningState,
     scheduler::{
-        ControlEventReceiver, IndividualRebuilder, PeerEventReceiver, PeerEventSender, SchedulerError,
+        ControlEventReceiver, IndividualRebuilder, PeerEventReceiver, PeerEventSender,
+        SchedulerError,
     },
     service::OperonService,
     storage::OperonStorage,
@@ -20,7 +21,7 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
 {
-    fn id(&self) -> &'static str;
+    fn job_id(&self) -> &'static str;
 
     /// Initialize the PSQL fact storage for the primary resolution.
     ///
@@ -51,11 +52,7 @@ where
         client: MetaClient<'_>,
     ) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
 
-    async fn update_ui(
-        &self,
-        client: MetaClient<'_>,
-        ui_state: &mut UiState,
-    ) -> Result<(), SchedulerError>; // `Scheduler::update_ui`, 6030~
+    async fn get_status(&self, client: MetaClient<'_>) -> Result<(i64, i64, i64), SchedulerError>;
 
     async fn prepare_rebuild(
         &self,
@@ -72,8 +69,8 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<&'static str, PeerEventSender>,
-        peer_rx: PeerEventReceiver,
+        peer_txs: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
+        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // call `start` with empty Vector (`Scheduler::run` 6023)
 
@@ -84,8 +81,8 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<&'static str, PeerEventSender>,
-        peer_rx: PeerEventReceiver,
+        peer_txs: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
+        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // fetch `get_all_queued` and then get call `start` (`Scheduler::run` 6302)
 
@@ -96,8 +93,8 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<&'static str, PeerEventSender>,
-        peer_rx: PeerEventReceiver,
+        peer_txs: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
+        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // fetch `get_all_queued` and then get call `start` (`Scheduler::run` 6302), possibly merge with `start_rebuild`
 }

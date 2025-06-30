@@ -4,13 +4,14 @@ use futures::{StreamExt, TryStreamExt};
 
 use crate::{
     meta_storage::{MetaClient, init_footprint, init_schema, init_ticket_status_type},
+    operon::RunningState,
     scheduler::{
         IndividualRebuilder, IndividualSpec, PeerEvent, PeerEventSender, PrimarySpec,
         SchedulerError, SpecWithRx, SpecsWithChannels,
     },
     service::OperonService,
     storage::OperonStorage,
-    ui::UiState,
+    ui::{UiState, UiStateUpdate},
 };
 
 pub struct SchedulerSpec<Svc, Sto> {
@@ -40,8 +41,10 @@ where
         let mut peer_txs = HashMap::with_capacity(len);
 
         self.individual_specs.iter().for_each(|schedule| {
-            let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<PeerEvent>(channel_size);
-            peer_txs.insert(schedule.id(), PeerEventSender::Up(peer_tx));
+            let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
+                PeerEvent<Svc::JobEnum, Svc::ResolutionEnum>,
+            >(channel_size);
+            peer_txs.insert(schedule.job_id(), PeerEventSender::Up(peer_tx));
             schedules_with_rx.push(SpecWithRx::new(schedule.as_ref(), peer_rx));
         });
 
@@ -144,7 +147,17 @@ where
         ui_state: &mut UiState,
     ) -> Result<(), SchedulerError> {
         for schedule in &self.individual_specs {
-            schedule.update_ui(client, ui_state).await?;
+            let (done, queued, waiting) = schedule.get_status(client).await?;
+            let state = if queued + waiting == 0 {
+                RunningState::Finished
+            } else {
+                RunningState::Running
+            };
+
+            ui_state.update_ui_state(UiStateUpdate::ProgressUpdate(
+                schedule.job_id().to_string(),
+                (done, queued, waiting, state, false),
+            ))?;
         }
         Ok(())
     }

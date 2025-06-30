@@ -3,24 +3,21 @@ use async_trait::async_trait;
 use crate::{
     meta_storage::MetaClient,
     misc::{Job, Resolution, Ticket},
-    scheduler::{PeerEventSenders, SchedulerError},
+    scheduler::{IndividualSpec, PeerEventSenders, SchedulerError},
     service::OperonService,
     storage::OperonStorage,
 };
 
 #[async_trait]
-pub trait JobManager<Svc, Sto>: Clone + Send + Sync + 'static
+pub trait JobManager<Svc, Sto>: IndividualSpec<Svc, Sto> + Clone + Send + Sync + 'static
 where
-    Sto: OperonStorage,
     Svc: OperonService,
+    Sto: OperonStorage,
 {
     type Job: Job;
     type Resolution: Resolution;
     type Ticket: Ticket<Job = Self::Job, Resolution = Self::Resolution>;
-    type PeerEventSenders: PeerEventSenders;
-
-    /// The identifier for this job type.
-    fn job_type() -> &'static str;
+    type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;
 
     /// Check if this job type is a descendant of the given job type.
     fn is_descendant_of(other: &str) -> bool;
@@ -48,4 +45,23 @@ where
         client: MetaClient<'_>,
         resolution: &Self::Resolution,
     ) -> Result<(), SchedulerError>;
+
+    async fn send_event(
+        &self,
+        peer_txs: &Self::PeerEventSenders,
+        job: Self::Job,
+        resolution: Self::Resolution,
+    ) -> Result<(), SchedulerError>;
+
+    async fn on_job_ready_tickets(
+        &self,
+        client: MetaClient<'_>,
+        job: Svc::JobEnum,
+    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
+
+    async fn on_resolution_ready_tickets(
+        &self,
+        client: MetaClient<'_>,
+        resolution: Svc::ResolutionEnum,
+    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
 }
