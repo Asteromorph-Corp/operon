@@ -9,3 +9,20 @@ pub async fn init_schema(client: MetaClient<'_>) -> Result<(), MetaStorageError>
     client.execute(&create_schema, &[]).await?;
     Ok(())
 }
+
+pub async fn init_ticket_status_type(client: MetaClient<'_>) -> Result<(), MetaStorageError> {
+    let schema_prefix = client.schema_prefix();
+    let create_status_type = format!(
+        "DO $$ BEGIN
+            CREATE TYPE {schema_prefix}ticket_status AS ENUM (
+                'waiting',
+                'queued',
+                'done'
+            );
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;"
+    );
+    client.execute(&create_status_type, &[]).await?;
+    Ok(())
+}
