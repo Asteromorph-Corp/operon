@@ -3,9 +3,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
-    meta_storage::MetaStorage,
     operon::{OperonError, OperonOptions},
-    scheduler::{ControlEvent, IndividualSchedule, RecoveryState, Scheduler},
+    scheduler::{ControlEvent, RecoveryState, Scheduler, SchedulerSpec},
     service::OperonService,
     storage::OperonStorage,
     ui::{UiLogger, UiLoop, UiState},
@@ -16,30 +15,23 @@ use crate::{
 /// The interface for the Operon library.
 ///
 /// Provided a data storage and a service, calling `run` will start executing the jobs.
-pub struct Operon<Svc, Sto, MSto>
+pub struct Operon<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    MSto: MetaStorage,
 {
     service: Arc<Svc>,
     storage: Arc<Sto>,
-    _phantom: std::marker::PhantomData<MSto>,
 }
 
-impl<Svc, Sto, MSto> Operon<Svc, Sto, MSto>
+impl<Svc, Sto> Operon<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    MSto: MetaStorage,
 {
     /// Create a new Operon instance with the given storage and service.
     pub fn new(service: ::std::sync::Arc<Svc>, storage: ::std::sync::Arc<Sto>) -> Self {
-        Self {
-            service,
-            storage,
-            _phantom: std::marker::PhantomData,
-        }
+        Self { service, storage }
     }
 
     /// Run the Operon instance with the given primary upper bound.
@@ -50,7 +42,7 @@ where
     /// Instead, you can use the provided macros to log messages to the UI.
     pub async fn run(
         self,
-        schedules: Vec<Box<dyn IndividualSchedule<Svc, Sto, MSto>>>,
+        spec: SchedulerSpec<Svc, Sto>,
         primary_ub: usize,
         options: OperonOptions,
     ) -> Result<(), OperonError> {
@@ -69,16 +61,15 @@ where
         let ui_state = Arc::new(RwLock::new(UiState::default()));
 
         // Create the scheduler
-        let scheduler = Scheduler::<Svc, Sto, MSto>::new(
+        let scheduler = Scheduler::<Svc, Sto>::new(
             self.service,
             self.storage,
-            schedules,
+            spec,
             ui_state.clone(),
             ctrl_rx,
             rec_tx,
             scheduler_options,
-        )
-        .await?;
+        )?;
         let ui_loop = UiLoop::new(ui_state, primary_ub, log_rx, ctrl_tx, rec_rx);
 
         // Spawn the scheduler thread

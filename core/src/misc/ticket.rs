@@ -1,7 +1,6 @@
 use crate::{
-    misc::{Job, Resolution},
     meta_storage::{MetaClient, MetaStorageError},
-    scheduler::PeerEventSenders,
+    misc::{Job, Resolution},
 };
 
 /// Trait that represents tickets for the jobs.
@@ -9,7 +8,6 @@ use crate::{
 pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'static {
     type Job: Job;
     type Resolution: Resolution;
-    type PeerEventSenders: PeerEventSenders;
 
     /// Brand-new ticket, with none of the dimensions resolved.
     /// Return the ticket that should be present at startup time.
@@ -53,8 +51,10 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
     /// `deps_done` is made true if and only if:
     /// * the dependency quota has become known,
     /// * and the dependency count is equal to the required dependency count.
-    async fn raise_dependency_count(self, client: MetaClient<'_>)
-    -> Result<Self, MetaStorageError>;
+    async fn raise_dependency_count(
+        &mut self,
+        client: MetaClient<'_>,
+    ) -> Result<Self, MetaStorageError>;
 
     /// Whether this ticket is ready to run,
     /// i.e. whether all dependencies are done and the job is fully resolved.
@@ -69,27 +69,22 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
     /// If the dimensions or dependencies are not fully resolved, the job will be `None`.
     fn resolve(&self) -> Option<Self::Job>;
 
-    /// Given a dimension resolution, consume this ticket and return the updated tickets.
-    /// It is an error if the given dimension is irrelevant to this ticket.
-    fn explode(self, resolution: Self::Resolution) -> Result<Vec<Self>, MetaStorageError>;
+    // /// Given a dimension resolution, consume this ticket and return the updated tickets.
+    // /// It is an error if the given dimension is irrelevant to this ticket.
+    // fn explode(self, resolution: Self::Resolution) -> Result<Vec<Self>, MetaStorageError>;
 
     /// Convert into a string that represents the SQL parameters for this ticket,
     /// in the format that can be used in an `INSERT` statement.
     ///
     /// Formatted as "(value,value,'value',\[...\])".
-    fn to_sql_insert_params(&self) -> String;
+    fn to_sql_insert_params(&self) -> Result<String, MetaStorageError>;
 
     /// Convert into a CSV string that represents the SQL parameters for this ticket,
     /// in the format that can be used in a `COPY` statement.
     ///
     /// Formatted as "value,value,value,\[...\]\n".
-    fn to_sql_copy_params(&self) -> String;
+    fn to_sql_copy_params(&self) -> Result<String, MetaStorageError>;
 
     /// Convert a SQL row into this ticket.
     fn from_sql_row(row: &::tokio_postgres::Row) -> Result<Self, MetaStorageError>;
-
-    /// The job type for this ticket.
-    fn job_type() -> &'static str;
-
-    fn is_descendant_of(other: &str) -> bool;
 }

@@ -38,6 +38,11 @@ pub struct ConnectionWithSchema<'a> {
 }
 
 impl<'a> ConnectionWithSchema<'a> {
+    pub fn new(client: deadpool_postgres::Object, schema: Option<impl Into<Cow<'a, str>>>) -> Self {
+        let schema = schema.map(Into::into);
+        ConnectionWithSchema { client, schema }
+    }
+
     pub async fn transaction(&'a mut self) -> Result<TransactionWithSchema<'a>, MetaStorageError> {
         let tx = self.client.transaction().await?;
         let schema = self.schema.as_deref().map(Cow::Borrowed);
@@ -69,7 +74,7 @@ impl<'a> TransactionWithSchema<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum MetaClient<'a> {
     Object(&'a ConnectionWithSchema<'a>),
     Transaction(&'a TransactionWithSchema<'a>),

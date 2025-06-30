@@ -1,3 +1,5 @@
+use std::num::TryFromIntError;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -10,6 +12,10 @@ pub enum MetaStorageError {
     PoolBuildError(#[from] deadpool_postgres::BuildError),
     #[error("Database uri parse error: {0}")]
     DatabaseUriParseError(String),
+    #[error("Integer conversion error: {0}")]
+    IntegerConversionError(#[from] TryFromIntError),
+    #[error("Invalid resolution: {0}")]
+    InvalidResolution(String),
     #[error("Other error: {0}")]
     Other(String),
 }

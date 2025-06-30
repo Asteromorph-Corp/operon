@@ -1,0 +1,8 @@
+[package]
+name = "ex1_expanded_new"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+operon.path = "../../core"
+tokio-postgres = "0.7.13"
