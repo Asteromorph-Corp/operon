@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[async_trait]
-pub trait JobRunner<Svc, Sto>: Clone + Send + Sync + 'static
+pub trait JobManager<Svc, Sto>: Clone + Send + Sync + 'static
 where
     Sto: OperonStorage,
     Svc: OperonService,

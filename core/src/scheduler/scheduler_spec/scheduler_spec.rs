@@ -5,8 +5,8 @@ use futures::{StreamExt, TryStreamExt};
 use crate::{
     meta_storage::{MetaClient, init_footprint, init_schema},
     scheduler::{
-        IndividualSpec, JobRebuilder, PeerEvent, PeerEventSender, PrimarySpec, SchedulerError,
-        SpecWithRx, SpecsWithChannels,
+        IndividualRebuilder, IndividualSpec, PeerEvent, PeerEventSender, PrimarySpec,
+        SchedulerError, SpecWithRx, SpecsWithChannels,
     },
     service::OperonService,
     storage::OperonStorage,
@@ -152,7 +152,7 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-    ) -> Result<Vec<Box<dyn JobRebuilder>>, SchedulerError> {
+    ) -> Result<Vec<Box<dyn IndividualRebuilder>>, SchedulerError> {
         futures::stream::iter(&self.individual_specs)
             .then(|schedule| schedule.prepare_rebuild(storage, client))
             .try_collect::<Vec<_>>()

@@ -7,7 +7,7 @@ use crate::{
     meta_storage::{MetaClient, MetaStorage},
     operon::RunningState,
     scheduler::{
-        ControlEventReceiver, JobRebuilder, PeerEventReceiver, PeerEventSender, SchedulerError,
+        ControlEventReceiver, IndividualRebuilder, PeerEventReceiver, PeerEventSender, SchedulerError,
     },
     service::OperonService,
     storage::OperonStorage,
@@ -61,7 +61,7 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-    ) -> Result<Box<dyn JobRebuilder>, SchedulerError>; // `Scheduler::run` 6049~
+    ) -> Result<Box<dyn IndividualRebuilder>, SchedulerError>; // `Scheduler::run` 6049~
 
     // Implement `start` (`IndividualScheduler::run` 4462~) and call it using different initial data_fetching
 
