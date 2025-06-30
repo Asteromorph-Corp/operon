@@ -54,7 +54,7 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
     async fn raise_dependency_count(
         &mut self,
         client: MetaClient<'_>,
-    ) -> Result<Self, MetaStorageError>;
+    ) -> Result<(), MetaStorageError>;
 
     /// Whether this ticket is ready to run,
     /// i.e. whether all dependencies are done and the job is fully resolved.
