@@ -15,23 +15,52 @@ use crate::{
 };
 
 #[async_trait]
-pub trait IndividualSchedule<Svc, Sto, MSto>: Send + Sync + 'static
+pub trait IndividualSpec<Svc, Sto>: Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    MSto: MetaStorage,
 {
     fn id(&self) -> &'static str;
 
+    /// Initialize the PSQL fact storage for the primary resolution.
+    ///
+    /// This function should be idempotent,
+    /// i.e. calling it multiple times, or calling it on an already-initialized storage should do nothing.
+    async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>;
+
+    /// Clear the primary resolution from the PSQL fact storage, assuming the table is already initialized.
+    async fn clear_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>; // `facts_psql::clear`, 877~
+
+    /// Initialize the PSQL ticket storage.
+    ///
+    /// This function should be idempotent,
+    /// i.e. calling it multiple times, or calling it on an already-initialized storage should do nothing.
+    async fn init_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>; // `tickets_psql::init`, 1079~
+
+    /// Clear the data from the PSQL ticket storage, assuming the tables are already initialized.
+    async fn clear_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>; // `tickets_psql::clear`, 1623~
+
+    /// Put the default (fully unresolved) tickets into the PSQL ticket storage.
+    async fn put_default_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>;
+
+    /// Run a check on the data consistency between the data storage and the metadata storage.
+    /// Return `true` if the data storage holds all needed data to restore, `false` if it does not.
     async fn check_consistency(
         &self,
+        storage: &Sto,
         client: MetaClient<'_>,
-        primary_ub: usize,
     ) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
+
+    async fn update_ui(
+        &self,
+        client: MetaClient<'_>,
+        ui_state: &mut UiState,
+    ) -> Result<(), SchedulerError>; // `Scheduler::update_ui`, 6030~
 
     async fn prepare_rebuild(
         &self,
-        tx: MetaClient<'_>,
+        storage: &Sto,
+        client: MetaClient<'_>,
     ) -> Result<Box<dyn JobRebuilder>, SchedulerError>; // `Scheduler::run` 6049~
 
     // Implement `start` (`IndividualScheduler::run` 4462~) and call it using different initial data_fetching
@@ -41,7 +70,7 @@ where
         &self,
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        meta_storage: Arc<MSto>,
+        meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
         peer_txs: HashMap<&'static str, PeerEventSender>,
         peer_rx: PeerEventReceiver,
@@ -53,7 +82,7 @@ where
         &self,
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        meta_storage: Arc<MSto>,
+        meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
         peer_txs: HashMap<&'static str, PeerEventSender>,
         peer_rx: PeerEventReceiver,
@@ -65,7 +94,7 @@ where
         &self,
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        meta_storage: Arc<MSto>,
+        meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
         peer_txs: HashMap<&'static str, PeerEventSender>,
         peer_rx: PeerEventReceiver,

@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use tokio::sync::{RwLock, Semaphore};
 
 use crate::{
-    misc::Ticket,
     meta_storage::{MetaClient, MetaStorage},
+    misc::Ticket,
     operon::RunningState,
     scheduler::{
         ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobRunner,
@@ -23,15 +23,15 @@ use crate::{
 ///
 /// This trait defines the event operations that an individual scheduler must implement.
 #[async_trait]
-pub trait IndividualSchedulerOps<T>: Send + Sync + 'static
-where
-    T: Ticket,
-{
+pub trait IndividualSchedulerOps: Send + Sync + 'static {
+    type Ticket: Ticket;
+    type PeerEventSenders: PeerEventSenders;
+
     /// Handle a job event.
     async fn poll_ready(
         &mut self,
         client: MetaClient<'_>,
-        ready_tickets: &mut VecDeque<T>,
+        ready_tickets: &mut VecDeque<Self::Ticket>,
     ) -> Result<(), SchedulerError>;
 
     /// Send out the events associated with the just processed job.
@@ -60,39 +60,37 @@ where
 /// * Updating waiting tickets from `Event` messages.
 ///
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Svc, Sto, MSto, T>
+pub struct IndividualScheduler<Svc, Sto, JR>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    MSto: MetaStorage,
-    T: Ticket,
+    JR: JobRunner<Svc, Sto>,
 {
-    pub runner: Box<dyn JobRunner<Svc, Sto, T::Job, T::Resolution>>,
+    pub runner: JR,
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
-    pub meta_storage: Arc<MSto>,
+    pub meta_storage: MetaStorage,
     pub pool: Arc<Semaphore>,
     pub pool_size: usize,
     pub ui_state: Arc<RwLock<UiState>>,
-    pub peer_txs: T::PeerEventSenders,
+    pub peer_txs: JR::PeerEventSenders,
     pub peer_rx: PeerEventReceiver,
     pub ctrl_rx: ControlEventReceiver,
 }
 
-impl<Svc, Sto, MSto, T> IndividualScheduler<Svc, Sto, MSto, T>
+impl<Svc, Sto, JR> IndividualScheduler<Svc, Sto, JR>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    MSto: MetaStorage,
-    T: Ticket,
-    Self: IndividualSchedulerOps<T>,
+    JR: JobRunner<Svc, Sto>,
+    Self: IndividualSchedulerOps<Ticket = JR::Ticket, PeerEventSenders = JR::PeerEventSenders>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        runner: Box<dyn JobRunner<Svc, Sto, T::Job, T::Resolution>>,
+        runner: JR,
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        meta_storage: Arc<MSto>,
+        meta_storage: MetaStorage,
         pool_size: usize,
         ui_state: Arc<RwLock<UiState>>,
         mut peer_tx_map: HashMap<&'static str, PeerEventSender>,
@@ -100,7 +98,7 @@ where
         ctrl_rx: ControlEventReceiver,
     ) -> Self {
         // Create an internal channel for `InternalEvent`s.
-        let peer_txs = T::PeerEventSenders::gather_from(&mut peer_tx_map);
+        let peer_txs = JR::PeerEventSenders::gather_from(&mut peer_tx_map);
 
         // Downgrade unused peer senders to weak senders.
         for tx in peer_tx_map.values_mut() {
@@ -132,7 +130,7 @@ where
     /// One event corresponds to one metadata transaction.
     async fn on_receive_peer_event(
         &mut self,
-        ready_tickets: &mut VecDeque<T>,
+        ready_tickets: &mut VecDeque<JR::Ticket>,
     ) -> Result<(), SchedulerError> {
         let mut conn = self.meta_storage.conn_static().await?;
         let tx = conn.transaction().await?;
@@ -142,7 +140,7 @@ where
         Ok(())
     }
 
-    fn check_initial_data(initial_data: Vec<T>) -> Result<VecDeque<T>, ()> {
+    fn check_initial_data(initial_data: Vec<JR::Ticket>) -> Result<VecDeque<JR::Ticket>, ()> {
         let (ready, not_ready) = initial_data
             .into_iter()
             .partition::<Vec<_>, _>(|ticket| ticket.is_ready());
@@ -151,7 +149,7 @@ where
             for ticket in not_ready {
                 log::error!(
                     "Restored ticket for `{}` job is not ready to run: {ticket:?}",
-                    T::job_type()
+                    JR::job_type()
                 );
             }
             return Err(());
@@ -164,7 +162,7 @@ where
     /// **and** the broadcast channel has closed.
     ///
     /// Usually called by the top-level `Scheduler::run` with `tokio::spawn`.
-    pub async fn run(mut self, initial_data: Vec<T>) -> RunningState {
+    pub async fn run(mut self, initial_data: Vec<JR::Ticket>) -> RunningState {
         let mut state = RunningState::Running;
         let Ok(ready_tickets) = Self::check_initial_data(initial_data) else {
             // state = RunningState::Error;
@@ -175,7 +173,7 @@ where
         if self.update_ui_without_client(false).await.is_err() {
             log::error!(
                 "Failed to update UI state for `{}` scheduler after initial data processing.",
-                T::job_type()
+                JR::job_type()
             );
             // state = RunningState::Error;
             return RunningState::Error;
@@ -184,7 +182,7 @@ where
         if state == RunningState::Finished {
             log::debug!(
                 "Scheduler for `{}` exited due to being finished from the start.",
-                T::job_type()
+                JR::job_type()
             );
             self.update_ui_without_client(true)
                 .await
@@ -201,22 +199,22 @@ where
 
         match (&res, state) {
             (Ok(()), RunningState::Finished) => {
-                log::debug!("Scheduler for `{}` exited normally.", T::job_type())
+                log::debug!("Scheduler for `{}` exited normally.", JR::job_type())
             }
             (Ok(()), RunningState::Stopped) => {
-                log::debug!("Scheduler for `{}` was stopped and exited.", T::job_type())
+                log::debug!("Scheduler for `{}` was stopped and exited.", JR::job_type())
             }
             (Ok(()), _) => {
                 log::error!(
                     "Scheduler for `{}` exited with an unexpected state: {state:?}",
-                    T::job_type(),
+                    JR::job_type(),
                 );
                 state = RunningState::Error;
             }
             (Err(e), _) => {
                 log::error!(
                     "Scheduler for `{}` exited with an error: {e}",
-                    T::job_type()
+                    JR::job_type()
                 );
                 state = RunningState::Error;
             }
@@ -234,14 +232,14 @@ where
 
     async fn run_internal(
         &mut self,
-        mut ready_tickets: VecDeque<T>,
+        mut ready_tickets: VecDeque<JR::Ticket>,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
         let pool = self.pool.clone();
         let mut got_all_updates = false;
 
         let (int_tx, mut int_rx) =
-            tokio::sync::mpsc::unbounded_channel::<InternalEvent<T::Job, T::Resolution>>();
+            tokio::sync::mpsc::unbounded_channel::<InternalEvent<JR::Job, JR::Resolution>>();
 
         // Main event loop.
         loop {
@@ -263,7 +261,7 @@ where
                     }
                 }
                 ControlEvent::Abort => {
-                    log::info!("Aborting `{}` jobs.", T::job_type());
+                    log::info!("Aborting `{}` jobs.", JR::job_type());
                     // If this is a finished scheduler rolling out peer events,
                     // don't change the state to `Stopped`,
                     // since it is already `Finished`.
@@ -295,7 +293,7 @@ where
                             log::trace!(
                                 "{} received internal event: JobSuccess({job:?}, {resolution:?}); \
                                 Internal channel has {} events left.",
-                                T::job_type(), int_rx.len()
+                                JR::job_type(), int_rx.len()
                             );
 
                             // Broadcast the job result events
@@ -324,7 +322,7 @@ where
                             log::trace!(
                                 "{} received peer event: {event:?}; \
                                 Peer channel has {} events left.",
-                                T::job_type(), self.peer_rx.len()
+                                JR::job_type(), self.peer_rx.len()
                             );
                             self.on_receive_peer_event(&mut ready_tickets).await?
                         },
@@ -333,7 +331,7 @@ where
                             // meaning that all peer updates were received,
                             // or that the upstream scheduler was gracefully stopped.
                             // Either way, we stop listening this branch.
-                            log::debug!("`{}` finished receiving updates.", T::job_type());
+                            log::debug!("`{}` finished receiving updates.", JR::job_type());
                             got_all_updates = true;
                         }
                     }
@@ -348,7 +346,7 @@ where
                     let permit = permit?;
                     let ticket = ready_tickets.pop_front().ok_or(SchedulerError::Other("Ready to run queue is empty".into()))?;
                     let job = ticket.resolve().ok_or(SchedulerError::Other("Ticket is not ready to run".into()))?;
-                    let runner = self.runner.clone_box();
+                    let runner = self.runner.clone();
                     let storage = self.storage.clone();
                     let service = self.service.clone();
                     let meta_storage = self.meta_storage.clone();
@@ -358,16 +356,15 @@ where
                     // The metadata storage operations are grouped in one transaction here.
                     tokio::spawn(async move {
                         // Trace the job start.
-                        log::trace!("Running job {job:?} in `{}` scheduler.", T::job_type());
+                        log::trace!("Running job {job:?} in `{}` scheduler.", JR::job_type());
                         let _permit = permit;
                         let mut conn = meta_storage.conn().await?;
                         let tx = conn.transaction().await?;
-                        match runner.run_job(tx.as_client(), &*service, &*storage, &job).await {
+                        match runner.run_job(&*service, &*storage, tx.as_client(), &job).await {
                             Ok(resolution) => {
                                 // Mark the ticket as done in the ticket storage
-                                let schema_prefix = meta_storage.get_prefix();
-                                runner.mark_done(tx.as_client(), &schema_prefix, &job).await?;
-                                runner.put_resolution(tx.as_client(), &schema_prefix, &resolution).await?;
+                                runner.mark_done(tx.as_client(), &job).await?;
+                                runner.put_resolution(tx.as_client(), &resolution).await?;
                                 tx.commit().await?;
 
                                 // Alert the results to the scheduler
@@ -375,7 +372,7 @@ where
                                     .map_err(|e| SchedulerError::Other(format!("Failed to send internal event: {e}")))?;
                                 log::trace!(
                                     "{} sent internal event: JobSuccess({job:?}, {resolution:?});",
-                                    T::job_type()
+                                    JR::job_type()
                                 );
 
                                 Ok(())
@@ -403,15 +400,15 @@ where
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
         if !(targets.is_empty()
-            || targets.iter().any(|t| t == T::job_type())
-            || cascade && targets.iter().any(|t| T::is_descendant_of(t)))
+            || targets.iter().any(|t| t == JR::job_type())
+            || cascade && targets.iter().any(|t| JR::is_descendant_of(t)))
         {
             return Ok(());
         }
 
         match state {
             RunningState::Running => {
-                log::info!("Pausing `{}` jobs.", T::job_type());
+                log::info!("Pausing `{}` jobs.", JR::job_type());
                 *state = RunningState::Paused;
                 self.update_ui_without_client(false).await?;
                 // Acquire and forget all permits.
@@ -421,7 +418,7 @@ where
                     .acquire_many_owned(self.pool_size as u32)
                     .await?;
                 permit.forget();
-                log::debug!("Remaining `{}` jobs were finished.", T::job_type());
+                log::debug!("Remaining `{}` jobs were finished.", JR::job_type());
             }
             RunningState::Paused => (),   // Silent no-op, already paused.
             RunningState::Finished => (), // No jobs to pause, no-op.
@@ -430,7 +427,7 @@ where
             _ => {
                 log::error!(
                     "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    T::job_type(),
+                    JR::job_type(),
                     state
                 );
                 *state = RunningState::Error;
@@ -447,13 +444,13 @@ where
         targets: Vec<String>,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
-        if !(targets.is_empty() || targets.iter().any(|t| t == T::job_type())) {
+        if !(targets.is_empty() || targets.iter().any(|t| t == JR::job_type())) {
             return Ok(());
         }
 
         match state {
             RunningState::Paused => {
-                log::info!("Resuming `{}` jobs.", T::job_type());
+                log::info!("Resuming `{}` jobs.", JR::job_type());
                 *state = RunningState::Running;
                 self.update_ui_without_client(false).await?;
                 // Add back all permits.
@@ -464,7 +461,7 @@ where
             _ => {
                 log::error!(
                     "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    T::job_type(),
+                    JR::job_type(),
                     state
                 );
                 *state = RunningState::Error;
@@ -480,10 +477,10 @@ where
         &mut self,
         state: &mut RunningState,
         got_all_updates: bool,
-        int_rx: &IntEventReceiver<T::Job, T::Resolution>,
+        int_rx: &IntEventReceiver<JR::Job, JR::Resolution>,
     ) -> Result<bool, SchedulerError> {
         if *state == RunningState::Running {
-            log::info!("Pausing `{}` jobs for graceful stop.", T::job_type());
+            log::info!("Pausing `{}` jobs for graceful stop.", JR::job_type());
             *state = RunningState::Paused;
             self.update_ui_without_client(false).await?;
             // Acquire and forget all permits.
@@ -493,12 +490,12 @@ where
                 .acquire_many_owned(self.pool_size as u32)
                 .await?;
             permit.forget();
-            log::debug!("Remaining `{}` jobs were finished.", T::job_type());
+            log::debug!("Remaining `{}` jobs were finished.", JR::job_type());
         }
         match state {
             RunningState::Paused | RunningState::Finished => {
                 if int_rx.is_empty() && got_all_updates {
-                    log::info!("Gracefully stopped `{}` jobs.", T::job_type());
+                    log::info!("Gracefully stopped `{}` jobs.", JR::job_type());
                     // If the state is `Paused`, set it to `Stopped`,
                     // If the state is `Finished`, keep it as `Finished`.
                     if *state == RunningState::Paused {
@@ -512,7 +509,7 @@ where
             _ => {
                 log::error!(
                     "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    T::job_type(),
+                    JR::job_type(),
                     state
                 );
                 *state = RunningState::Error;

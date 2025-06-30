@@ -1,15 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use futures::{StreamExt, TryStreamExt};
 use tokio::{sync::RwLock, task::JoinSet};
 
 use crate::{
-    meta_storage::{MetaClient, MetaContext, MetaStorage},
+    meta_storage::{MetaClient, MetaStorage, clear_footprint, get_footprint, put_footprint},
     operon::RunningState,
     scheduler::{
-        ControlEvent, ControlEventReceiver, IndividualSchedule, PeerEvent, PeerEventSender,
-        RecoveryState, RecoveryStateSender, RunMode, SchedulerError, SchedulerOptions,
-        misc::{PreparedSchedules, ScheduleWithRx},
+        ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
+        SchedulerError, SchedulerOptions, SchedulerSpec,
     },
     service::OperonService,
     storage::OperonStorage,
@@ -25,47 +23,44 @@ use crate::{
 /// * Initialization of the metadata storage,
 /// * initialization of the individual schedulers, and
 /// * communication between the UI and the individual schedulers.
-pub struct Scheduler<Svc, Sto, MSto>
+pub struct Scheduler<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    MSto: MetaStorage,
 {
     service: Arc<Svc>,
     storage: Arc<Sto>,
-    meta_storage: Arc<MSto>,
-    schedules: Vec<Box<dyn IndividualSchedule<Svc, Sto, MSto>>>,
+    meta_storage: MetaStorage,
+    spec: SchedulerSpec<Svc, Sto>,
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
     internal_channel_size: usize,
 }
 
-impl<Svc, Sto, MSto> Scheduler<Svc, Sto, MSto>
+impl<Svc, Sto> Scheduler<Svc, Sto>
 where
     Sto: OperonStorage,
     Svc: OperonService,
-    MSto: MetaStorage,
 {
     /// Initialize a new scheduler and its associated storages.
-    pub async fn new(
+    pub fn new(
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        schedules: Vec<Box<dyn IndividualSchedule<Svc, Sto, MSto>>>,
+        spec: SchedulerSpec<Svc, Sto>,
         ui_state: Arc<RwLock<UiState>>,
         ctrl_rx: ControlEventReceiver,
         rec_tx: RecoveryStateSender,
         options: SchedulerOptions,
     ) -> Result<Self, SchedulerError> {
         let (internal_channel_size, meta_storage_options) = options.split();
-        let meta_storage = Arc::new(MSto::new(MetaContext::new(meta_storage_options).await?));
-        meta_storage.init().await?;
+        let meta_storage = MetaStorage::new(meta_storage_options)?;
 
         Ok(Self {
             service,
             storage,
             meta_storage,
-            schedules,
+            spec,
             ui_state,
             ctrl_rx,
             rec_tx,
@@ -75,6 +70,8 @@ where
 
     /// Main entry point for the scheduler.
     pub async fn work(mut self) -> Result<(), SchedulerError> {
+        self.init_meta_storage().await?;
+
         // First, check the recovery state.
         let recovery_state = self.check_recovery_state().await.map_err(|e| {
             log::error!("Failed to check the state from last run.");
@@ -109,13 +106,21 @@ where
             let ctrl_event = self.ctrl_rx.borrow_and_update().clone();
             match ctrl_event {
                 ControlEvent::Check { primary_ub } => {
-                    let consistent = self.check_consistency(primary_ub).await.map_err(|e| {
-                        log::error!("Failed to check data consistency: {e}");
-                        if let Err(e) = self.rec_tx.send(RecoveryState::Error) {
-                            return SchedulerError::RecoverySendFailed(e.0);
-                        };
-                        e
-                    })?;
+                    let consistent = self
+                        .spec
+                        .check_consistency(
+                            &self.storage,
+                            self.meta_storage.conn().await?.as_client(),
+                            primary_ub,
+                        )
+                        .await
+                        .map_err(|e| {
+                            log::error!("Failed to check data consistency: {e}");
+                            if let Err(e) = self.rec_tx.send(RecoveryState::Error) {
+                                return SchedulerError::RecoverySendFailed(e.0);
+                            };
+                            e
+                        })?;
                     let state_after_check = match (recovery_state, consistent) {
                         (RecoveryState::AbortedUnchecked, true) => RecoveryState::AbortedChecked,
                         (RecoveryState::GracefullyStopped, true) => {
@@ -170,15 +175,11 @@ where
 
     /// Find out the recovery state.
     pub async fn check_recovery_state(&self) -> Result<RecoveryState, SchedulerError> {
-        let storage = &self.storage;
-        let meta_storage = &self.meta_storage;
-        let meta_conn = meta_storage.conn().await?;
+        let meta_conn = self.meta_storage.conn().await?;
 
         // Get footprints from both storages.
-        let data_footprint = storage.get_footprint().await?;
-        let meta_footprint = meta_storage
-            .get_footprint(meta_conn.as_client(), "global")
-            .await?;
+        let data_footprint = self.storage.get_footprint().await?;
+        let meta_footprint = get_footprint(meta_conn.as_client(), "global").await?;
         // Early return if the state can be inferred through the footprints.
         match (&data_footprint, &meta_footprint) {
             (Some(df), Some(mf)) if df == mf && df.starts_with("F@") => {
@@ -192,7 +193,8 @@ where
             _ => (),
         }
 
-        let resolution = meta_storage
+        let resolution = self
+            .spec
             .get_primary_resolution(meta_conn.as_client())
             .await?;
         if resolution.is_none() {
@@ -202,34 +204,6 @@ where
         // Fall back to `AbortedUnchecked`: the metadata storage has some data,
         // but it is not consistent with the data storage.
         Ok(RecoveryState::AbortedUnchecked)
-    }
-
-    /// Run a check on the data consistency between the data storage and the metadata storage.
-    /// Return `true` if the data storage holds all needed data to restore,
-    /// or `false` if it does not.
-    ///
-    /// This should be called only when the recovery state is either
-    /// `AbortedUnchecked` or `GracefullyStopped`.
-    async fn check_consistency(&self, primary_ub: usize) -> Result<bool, SchedulerError> {
-        let conn = self.meta_storage.conn().await?;
-        for schedule in &self.schedules {
-            if !schedule
-                .check_consistency(conn.as_client(), primary_ub)
-                .await?
-            {
-                return Ok(false);
-            }
-        }
-        Ok(true)
-    }
-
-    pub async fn update_ui_all(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        let updates = self.meta_storage.get_ui_updates(client).await?;
-        let mut ui_state = self.ui_state.write().await; // Might break
-        for update in updates {
-            ui_state.update_ui_state(update)?;
-        }
-        Ok(())
     }
 
     async fn run(self, primary_ub: usize, run_mode: RunMode) -> Result<(), SchedulerError> {
@@ -279,9 +253,7 @@ where
             // ...and to the metadata storage.
             let mut conn = self.meta_storage.conn().await?;
             let tx = conn.transaction().await?;
-            self.meta_storage
-                .put_footprint(tx.as_client(), "global", footprint)
-                .await?;
+            put_footprint(tx.as_client(), "global", footprint).await?;
             tx.commit().await?;
         }
         log::info!("All jobs closed.");
@@ -293,34 +265,25 @@ where
         self.storage.clear().await?;
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
-        self.meta_storage.clear_resolution(tx.as_client()).await?;
-        self.meta_storage
+        self.spec.clear_resolution(tx.as_client()).await?;
+        self.spec
             .put_primary_resolution(tx.as_client(), primary_ub)
             .await?;
-        self.meta_storage.clear_tickets(tx.as_client()).await?;
-        self.meta_storage
-            .put_default_tickets(tx.as_client())
-            .await?;
-        self.meta_storage.clear_footprint(tx.as_client()).await?;
+        self.spec.clear_tickets(tx.as_client()).await?;
+        self.spec.put_default_tickets(tx.as_client()).await?;
+        clear_footprint(tx.as_client()).await?;
         tx.commit().await?;
 
-        let PreparedSchedules {
-            schedules_with_rx: schedule_with_rx,
-            peer_txs,
-        } = self.prepare_channels();
-        let handles = JoinSet::from_iter(schedule_with_rx.into_iter().map(
-            |ScheduleWithRx { schedule, peer_rx }| {
-                schedule.start_clean(
-                    self.service.clone(),
-                    self.storage.clone(),
-                    self.meta_storage.clone(),
-                    self.ui_state.clone(),
-                    peer_txs.clone(),
-                    peer_rx,
-                    self.ctrl_rx.clone(),
-                )
-            },
-        ));
+        let (handles, peer_txs) = self
+            .spec
+            .prepare_channels(self.internal_channel_size)
+            .start_clean(
+                &self.service,
+                &self.storage,
+                &self.meta_storage,
+                &self.ui_state,
+                &self.ctrl_rx,
+            );
         for peer_tx in peer_txs.into_values() {
             peer_tx.send().await?;
         }
@@ -346,50 +309,42 @@ where
         // Clear the data storage's footprint. (The metadata storage will be cleared later.)
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
-        let rebuilders = futures::stream::iter(&self.schedules)
-            .then(|schedule| schedule.prepare_rebuild(tx.as_client()))
-            .try_collect::<Vec<_>>()
+        let rebuilders = self
+            .spec
+            .prepare_rebuilders(&self.storage, tx.as_client())
             .await?;
 
-        self.meta_storage.clear_resolution(tx.as_client()).await?;
-        self.meta_storage.clear_tickets(tx.as_client()).await?;
-        self.meta_storage.clear_footprint(tx.as_client()).await?;
+        self.spec.clear_resolution(tx.as_client()).await?;
+        self.spec.clear_tickets(tx.as_client()).await?;
+        clear_footprint(tx.as_client()).await?;
 
-        self.meta_storage
-            .put_default_tickets(tx.as_client())
-            .await?;
-        self.meta_storage
+        self.spec.put_default_tickets(tx.as_client()).await?;
+        self.spec
             .put_primary_resolution(tx.as_client(), primary_ub)
             .await?;
         for rebuilder in &rebuilders {
-            rebuilder.explode(primary_ub).await?;
+            rebuilder.explode(tx.as_client(), primary_ub).await?;
         }
-        self.update_ui_all(tx.as_client()).await?;
+        self.update_ui(tx.as_client()).await?;
 
         for rebuilder in rebuilders {
-            rebuilder.rebuild().await?;
-            self.update_ui_all(tx.as_client()).await?;
+            rebuilder.rebuild(tx.as_client()).await?;
+            self.update_ui(tx.as_client()).await?;
         }
         tx.commit().await?;
         log::info!("Rebuild complete, starting the run.");
 
-        let PreparedSchedules {
-            schedules_with_rx,
-            peer_txs,
-        } = self.prepare_channels();
-        Ok(JoinSet::from_iter(schedules_with_rx.into_iter().map(
-            |ScheduleWithRx { schedule, peer_rx }| {
-                schedule.start_rebuild(
-                    self.service.clone(),
-                    self.storage.clone(),
-                    self.meta_storage.clone(),
-                    self.ui_state.clone(),
-                    peer_txs.clone(),
-                    peer_rx,
-                    self.ctrl_rx.clone(),
-                )
-            },
-        )))
+        let handles = self
+            .spec
+            .prepare_channels(self.internal_channel_size)
+            .start_rebuild(
+                &self.service,
+                &self.storage,
+                &self.meta_storage,
+                &self.ui_state,
+                &self.ctrl_rx,
+            );
+        Ok(handles)
     }
 
     async fn run_restore(&self) -> Result<JoinSet<RunningState>, SchedulerError> {
@@ -406,42 +361,35 @@ where
         {
             let mut conn = meta_storage.conn().await?;
             let tx = conn.transaction().await?;
-            meta_storage.clear_footprint(tx.as_client()).await?;
+            clear_footprint(tx.as_client()).await?;
             tx.commit().await?;
         }
 
-        let PreparedSchedules {
-            schedules_with_rx,
-            peer_txs,
-        } = self.prepare_channels();
-        Ok(JoinSet::from_iter(schedules_with_rx.into_iter().map(
-            |ScheduleWithRx { schedule, peer_rx }| {
-                schedule.start_restore(
-                    self.service.clone(),
-                    self.storage.clone(),
-                    self.meta_storage.clone(),
-                    self.ui_state.clone(),
-                    peer_txs.clone(),
-                    peer_rx,
-                    self.ctrl_rx.clone(),
-                )
-            },
-        )))
+        let handles = self
+            .spec
+            .prepare_channels(self.internal_channel_size)
+            .start_restore(
+                &self.service,
+                &self.storage,
+                &self.meta_storage,
+                &self.ui_state,
+                &self.ctrl_rx,
+            );
+        Ok(handles)
     }
 
-    fn prepare_channels(&self) -> PreparedSchedules<'_, Svc, Sto, MSto> {
-        let len = self.schedules.len();
+    /// An helper function to call `self.spec.init_meta_storage` with a transaction.
+    async fn init_meta_storage(&self) -> Result<(), SchedulerError> {
+        let mut conn = self.meta_storage.conn().await?;
+        let tx = conn.transaction().await?;
+        self.spec.init_meta_storage(tx.as_client()).await?;
+        tx.commit().await?;
+        Ok(())
+    }
 
-        let mut schedules_with_rx = Vec::with_capacity(len);
-        let mut peer_txs = HashMap::with_capacity(len);
-
-        self.schedules.iter().for_each(|schedule| {
-            let (peer_tx, peer_rx) =
-                tokio::sync::mpsc::channel::<PeerEvent>(self.internal_channel_size);
-            peer_txs.insert(schedule.id(), PeerEventSender::Up(peer_tx));
-            schedules_with_rx.push(ScheduleWithRx::new(schedule.as_ref(), peer_rx));
-        });
-
-        PreparedSchedules::new(schedules_with_rx, peer_txs)
+    /// An helper function to call `self.spec.update_ui` with a `RwLock` write guard.
+    async fn update_ui(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
+        let mut ui_state = self.ui_state.write().await;
+        self.spec.update_ui(client, &mut ui_state).await
     }
 }
