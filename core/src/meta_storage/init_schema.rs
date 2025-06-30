@@ -11,10 +11,10 @@ pub async fn init_schema(client: MetaClient<'_>) -> Result<(), MetaStorageError>
 }
 
 pub async fn init_ticket_status_type(client: MetaClient<'_>) -> Result<(), MetaStorageError> {
-    let schema_prefix = client.schema_prefix();
+    let ticket_status_type = client.ticket_status_type();
     let create_status_type = format!(
         "DO $$ BEGIN
-            CREATE TYPE {schema_prefix}ticket_status AS ENUM (
+            CREATE TYPE {ticket_status_type}ticket_status AS ENUM (
                 'waiting',
                 'queued',
                 'done'
