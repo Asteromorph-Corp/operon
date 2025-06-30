@@ -3,10 +3,13 @@ use std::sync::Arc;
 use tokio::{sync::RwLock, task::JoinSet};
 
 use crate::{
-    meta_storage::{MetaClient, MetaStorage, clear_footprint, get_footprint, put_footprint},
+    meta_storage::{
+        MetaClient, MetaStorage, MetaStorageError, clear_footprint, get_footprint, put_footprint,
+    },
+    misc::ResolutionEnum,
     operon::RunningState,
     scheduler::{
-        ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
+        ControlEvent, ControlEventReceiver, PeerEvent, RecoveryState, RecoveryStateSender, RunMode,
         SchedulerError, SchedulerOptions, SchedulerSpec,
     },
     service::OperonService,
@@ -284,8 +287,15 @@ where
                 &self.ui_state,
                 &self.ctrl_rx,
             );
+
+        let resolved_i = self
+            .spec
+            .get_primary_resolution(self.meta_storage.conn().await?.as_client())
+            .await?
+            .ok_or(MetaStorageError::NotFound("Initial resolution".into()))?;
+        let event = PeerEvent::Resolution(Svc::ResolutionEnum::primary(resolved_i));
         for peer_tx in peer_txs.into_values() {
-            peer_tx.send().await?;
+            peer_tx.send(event.clone()).await?;
         }
 
         Ok(handles)

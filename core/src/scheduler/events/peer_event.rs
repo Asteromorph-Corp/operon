@@ -1,27 +1,48 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
-use crate::scheduler::SchedulerError;
+use async_trait::async_trait;
+
+use crate::{
+    misc::{JobEnum, ResolutionEnum},
+    scheduler::SchedulerError,
+};
 
 /// `IndividualScheduler`-`IndividualScheduler` communication events.
 ///
 /// These are used for communication between individual schedulers,
 /// where each scheduler should modify its tickets based on the events.\
 #[derive(Debug, Clone)]
-pub struct PeerEvent;
-
-#[derive(Debug, Clone)]
-pub enum PeerEventSender {
-    Up(tokio::sync::mpsc::Sender<PeerEvent>),
-    Downgraded(tokio::sync::mpsc::WeakSender<PeerEvent>),
+pub enum PeerEvent<JE, RE>
+where
+    JE: JobEnum,
+    RE: ResolutionEnum,
+{
+    Job(JE),
+    Resolution(RE),
 }
 
-pub type PeerEventReceiver = tokio::sync::mpsc::Receiver<PeerEvent>;
+#[derive(Debug, Clone)]
+pub enum PeerEventSender<JE, RE>
+where
+    JE: JobEnum,
+    RE: ResolutionEnum,
+{
+    Up(tokio::sync::mpsc::Sender<PeerEvent<JE, RE>>),
+    Downgraded(tokio::sync::mpsc::WeakSender<PeerEvent<JE, RE>>),
+}
 
-impl PeerEventSender {
-    pub async fn send(&self) -> Result<(), SchedulerError> {
+pub type PeerEventReceiver<JE, RE> = tokio::sync::mpsc::Receiver<PeerEvent<JE, RE>>;
+pub type PeerEventSenderMap<JE, RE> = HashMap<&'static str, PeerEventSender<JE, RE>>;
+
+impl<JE, RE> PeerEventSender<JE, RE>
+where
+    JE: JobEnum,
+    RE: ResolutionEnum,
+{
+    pub async fn send(&self, event: PeerEvent<JE, RE>) -> Result<(), SchedulerError> {
         match self {
             PeerEventSender::Up(tx) => tx
-                .send(PeerEvent)
+                .send(event)
                 .await
                 .map_err(|_| SchedulerError::PeerEventSendFailed),
             PeerEventSender::Downgraded(_) => Err(SchedulerError::SendThroughDowngradedSender),
@@ -39,19 +60,39 @@ impl PeerEventSender {
     }
 }
 
-pub trait PeerEventSenders {
+#[async_trait]
+pub trait PeerEventSenders<JE, RE>
+where
+    JE: JobEnum,
+    RE: ResolutionEnum,
+{
     /// Constructs a new `PeerEventSenders` instance from the given senders.
     ///
     /// Remove the senders from the map.
     ///
     /// TODO: tx channels probably close when dropped, so taking owned `HashMap` should work. But I don't want to break anything, will refactor later.
-    fn gather_from(senders: &mut HashMap<&'static str, PeerEventSender>) -> Self;
+    fn gather_from(senders: &mut HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self;
 
     fn downgrade_all(&mut self);
+
+    /// Send out the events associated with the just processed job.
+    ///
+    /// NOTE that peer receivers might be dropped due to a stop signal or an error,
+    /// so this function should not error out if the receiver is gone.
+    async fn send(&self, event: PeerEvent<JE, RE>) -> Result<(), SchedulerError>;
 }
 
-impl PeerEventSenders for () {
-    fn gather_from(_: &mut HashMap<&'static str, PeerEventSender>) -> Self {}
+#[async_trait]
+impl<JE, RE> PeerEventSenders<JE, RE> for ()
+where
+    JE: JobEnum,
+    RE: ResolutionEnum,
+{
+    fn gather_from(_: &mut HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self {}
 
     fn downgrade_all(&mut self) {}
+
+    async fn send(&self, _event: PeerEvent<JE, RE>) -> Result<(), SchedulerError> {
+        Ok(())
+    }
 }

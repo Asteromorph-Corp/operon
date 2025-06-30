@@ -1,11 +1,11 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use tokio::{sync::RwLock, task::JoinSet};
 
 use crate::{
     meta_storage::MetaStorage,
     operon::RunningState,
-    scheduler::{ControlEventReceiver, IndividualSpec, PeerEventReceiver, PeerEventSender},
+    scheduler::{ControlEventReceiver, IndividualSpec, PeerEventReceiver, PeerEventSenderMap},
     service::OperonService,
     storage::OperonStorage,
     ui::UiState,
@@ -20,7 +20,7 @@ where
     Sto: OperonStorage,
 {
     pub schedule: &'a dyn IndividualSpec<Svc, Sto>,
-    pub peer_rx: PeerEventReceiver,
+    pub peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
 }
 
 impl<'a, Svc, Sto> SpecWithRx<'a, Svc, Sto>
@@ -28,7 +28,10 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
 {
-    pub fn new(schedule: &'a dyn IndividualSpec<Svc, Sto>, peer_rx: PeerEventReceiver) -> Self {
+    pub fn new(
+        schedule: &'a dyn IndividualSpec<Svc, Sto>,
+        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+    ) -> Self {
         Self { schedule, peer_rx }
     }
 }
@@ -40,7 +43,7 @@ where
     Sto: OperonStorage,
 {
     pub spec_with_rx: Vec<SpecWithRx<'a, Svc, Sto>>,
-    pub peer_txs: HashMap<&'static str, PeerEventSender>,
+    pub peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
 }
 
 impl<'a, Svc, Sto> SpecsWithChannels<'a, Svc, Sto>
@@ -50,7 +53,7 @@ where
 {
     pub fn new(
         schedules_with_rx: Vec<SpecWithRx<'a, Svc, Sto>>,
-        peer_txs: HashMap<&'static str, PeerEventSender>,
+        peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
     ) -> Self {
         Self {
             spec_with_rx: schedules_with_rx,
@@ -73,11 +76,11 @@ where
         ctrl_rx: &ControlEventReceiver,
     ) -> (
         JoinSet<RunningState>,
-        HashMap<&'static str, PeerEventSender>,
+        PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
     ) {
         let handles = JoinSet::from_iter(self.spec_with_rx.into_iter().map(
             |SpecWithRx { schedule, peer_rx }| {
-                schedule.start_rebuild(
+                schedule.start_clean(
                     service.clone(),
                     storage.clone(),
                     meta_storage.clone(),
