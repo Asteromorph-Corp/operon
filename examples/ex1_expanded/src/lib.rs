@@ -1180,7 +1180,7 @@ mod operon_internal {
                         SELECT 1 FROM {schema_prefix}ticket_beta_status
                     );
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_beta_status() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_beta_status() RETURNS TRIGGER AS $$
                     BEGIN
                         IF TG_OP = 'INSERT' THEN
                             UPDATE {schema_prefix}ticket_beta_status
@@ -1214,7 +1214,7 @@ mod operon_internal {
                     END;
                     $$ LANGUAGE plpgsql;
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_beta_truncate() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_beta_truncate() RETURNS TRIGGER AS $$
                     BEGIN
                         UPDATE {schema_prefix}ticket_beta_status
                         SET
@@ -1230,7 +1230,7 @@ mod operon_internal {
                         REFERENCING
                             NEW TABLE AS NEW_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_beta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_beta_status();
                         
                     CREATE OR REPLACE TRIGGER ticket_beta_status_upd_trg
                         AFTER UPDATE ON {schema_prefix}ticket_beta
@@ -1238,19 +1238,19 @@ mod operon_internal {
                             NEW TABLE AS NEW_TABLE
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_beta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_beta_status();
                         
                     CREATE OR REPLACE TRIGGER ticket_beta_status_del_trg
                         AFTER DELETE ON {schema_prefix}ticket_beta
                         REFERENCING
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_beta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_beta_status();
                         
                     CREATE OR REPLACE TRIGGER ticket_beta_status_trunc_trg
                         AFTER TRUNCATE ON {schema_prefix}ticket_beta
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_beta_truncate();"
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_beta_truncate();"
                 );
                 let create_gamma_summary = format!(
                     "CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_gamma_status (
@@ -1270,7 +1270,7 @@ mod operon_internal {
                         SELECT 1 FROM {schema_prefix}ticket_gamma_status
                     );
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_gamma_status() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_gamma_status() RETURNS TRIGGER AS $$
                     BEGIN
                         IF TG_OP = 'INSERT' THEN
                             UPDATE {schema_prefix}ticket_gamma_status
@@ -1304,7 +1304,7 @@ mod operon_internal {
                     END;
                     $$ LANGUAGE plpgsql;
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_gamma_truncate() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_gamma_truncate() RETURNS TRIGGER AS $$
                     BEGIN
                         UPDATE {schema_prefix}ticket_gamma_status
                         SET
@@ -1320,7 +1320,7 @@ mod operon_internal {
                         REFERENCING
                             NEW TABLE AS NEW_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_gamma_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_gamma_status();
                     
                     CREATE OR REPLACE TRIGGER ticket_gamma_status_upd_trg
                         AFTER UPDATE ON {schema_prefix}ticket_gamma
@@ -1328,19 +1328,19 @@ mod operon_internal {
                             NEW TABLE AS NEW_TABLE
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_gamma_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_gamma_status();
 
                     CREATE OR REPLACE TRIGGER ticket_gamma_status_del_trg
                         AFTER DELETE ON {schema_prefix}ticket_gamma
                         REFERENCING
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_gamma_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_gamma_status();
                     
                     CREATE OR REPLACE TRIGGER ticket_gamma_status_trunc_trg
                         AFTER TRUNCATE ON {schema_prefix}ticket_gamma
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_gamma_truncate();"
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_gamma_truncate();"
                 );
                 let create_delta_summary = format!(
                     "CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_delta_status (
@@ -1360,7 +1360,7 @@ mod operon_internal {
                         SELECT 1 FROM {schema_prefix}ticket_delta_status
                     );
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_delta_status() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_delta_status() RETURNS TRIGGER AS $$
                     BEGIN
                         IF TG_OP = 'INSERT' THEN
                             UPDATE {schema_prefix}ticket_delta_status
@@ -1394,7 +1394,7 @@ mod operon_internal {
                     END;
                     $$ LANGUAGE plpgsql;
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_delta_truncate() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_delta_truncate() RETURNS TRIGGER AS $$
                     BEGIN
                         UPDATE {schema_prefix}ticket_delta_status
                         SET
@@ -1410,7 +1410,7 @@ mod operon_internal {
                         REFERENCING
                             NEW TABLE AS NEW_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_delta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_delta_status();
                         
                     CREATE OR REPLACE TRIGGER ticket_delta_status_upd_trg
                         AFTER UPDATE ON {schema_prefix}ticket_delta
@@ -1418,19 +1418,19 @@ mod operon_internal {
                             NEW TABLE AS NEW_TABLE
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_delta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_delta_status();
                     
                     CREATE OR REPLACE TRIGGER ticket_delta_status_del_trg
                         AFTER DELETE ON {schema_prefix}ticket_delta
                         REFERENCING
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_delta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_delta_status();
                         
                     CREATE OR REPLACE TRIGGER ticket_delta_status_trunc_trg
                         AFTER TRUNCATE ON {schema_prefix}ticket_delta
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_delta_truncate();"
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_delta_truncate();"
                 );
                 let create_epsilon_summary = format!(
                     "CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_epsilon_status (
@@ -1450,7 +1450,7 @@ mod operon_internal {
                         SELECT 1 FROM {schema_prefix}ticket_epsilon_status
                     );
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_epsilon_status() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_epsilon_status() RETURNS TRIGGER AS $$
                     BEGIN
                         IF TG_OP = 'INSERT' THEN
                             UPDATE {schema_prefix}ticket_epsilon_status
@@ -1484,7 +1484,7 @@ mod operon_internal {
                     END;
                     $$ LANGUAGE plpgsql;
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_epsilon_truncate() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_epsilon_truncate() RETURNS TRIGGER AS $$
                     BEGIN
                         UPDATE {schema_prefix}ticket_epsilon_status
                         SET
@@ -1500,7 +1500,7 @@ mod operon_internal {
                         REFERENCING
                             NEW TABLE AS NEW_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_epsilon_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_epsilon_status();
                     
                     CREATE OR REPLACE TRIGGER ticket_epsilon_status_upd_trg
                         AFTER UPDATE ON {schema_prefix}ticket_epsilon
@@ -1508,19 +1508,19 @@ mod operon_internal {
                             NEW TABLE AS NEW_TABLE
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_epsilon_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_epsilon_status();
 
                     CREATE OR REPLACE TRIGGER ticket_epsilon_status_del_trg
                         AFTER DELETE ON {schema_prefix}ticket_epsilon
                         REFERENCING
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_epsilon_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_epsilon_status();
                         
                     CREATE OR REPLACE TRIGGER ticket_epsilon_status_trunc_trg
                         AFTER TRUNCATE ON {schema_prefix}ticket_epsilon
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_epsilon_truncate();"
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_epsilon_truncate();"
                 );
                 let create_zeta_summary = format!(
                     "CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_zeta_status (
@@ -1540,7 +1540,7 @@ mod operon_internal {
                         SELECT 1 FROM {schema_prefix}ticket_zeta_status
                     );
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_zeta_status() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_zeta_status() RETURNS TRIGGER AS $$
                     BEGIN
                         IF TG_OP = 'INSERT' THEN
                             UPDATE {schema_prefix}ticket_zeta_status
@@ -1574,7 +1574,7 @@ mod operon_internal {
                     END;
                     $$ LANGUAGE plpgsql;
 
-                    CREATE OR REPLACE FUNCTION trg_ticket_zeta_truncate() RETURNS TRIGGER AS $$
+                    CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_zeta_truncate() RETURNS TRIGGER AS $$
                     BEGIN
                         UPDATE {schema_prefix}ticket_zeta_status
                         SET
@@ -1590,7 +1590,7 @@ mod operon_internal {
                         REFERENCING
                             NEW TABLE AS NEW_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_zeta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_zeta_status();
                     
                     CREATE OR REPLACE TRIGGER ticket_zeta_status_upd_trg
                         AFTER UPDATE ON {schema_prefix}ticket_zeta
@@ -1598,19 +1598,19 @@ mod operon_internal {
                             NEW TABLE AS NEW_TABLE
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_zeta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_zeta_status();
                     
                     CREATE OR REPLACE TRIGGER ticket_zeta_status_del_trg
                         AFTER DELETE ON {schema_prefix}ticket_zeta
                         REFERENCING
                             OLD TABLE AS OLD_TABLE
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_zeta_status();
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_zeta_status();
                         
                     CREATE OR REPLACE TRIGGER ticket_zeta_status_trunc_trg
                         AFTER TRUNCATE ON {schema_prefix}ticket_zeta
                         FOR EACH STATEMENT
-                        EXECUTE FUNCTION trg_ticket_zeta_truncate();"
+                        EXECUTE FUNCTION {schema_prefix}trg_ticket_zeta_truncate();"
                 );
                 conn.batch_execute(&create_beta_summary).await?;
                 conn.batch_execute(&create_gamma_summary).await?;
