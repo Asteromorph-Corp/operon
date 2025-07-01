@@ -1,4 +1,4 @@
-use std::{collections::HashMap, pin::Pin, sync::Arc};
+use std::{pin::Pin, sync::Arc};
 
 use async_trait::async_trait;
 use tokio::sync::RwLock;
@@ -7,7 +7,7 @@ use crate::{
     meta_storage::{MetaClient, MetaStorage},
     operon::RunningState,
     scheduler::{
-        ControlEventReceiver, IndividualRebuilder, PeerEventReceiver, PeerEventSender,
+        ControlEventReceiver, IndividualRebuilder, PeerEventReceiver, PeerEventSenderMap,
         SchedulerError,
     },
     service::OperonService,
@@ -69,7 +69,7 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
+        peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
         peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // call `start` with empty Vector (`Scheduler::run` 6023)
@@ -81,7 +81,7 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
+        peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
         peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // fetch `get_all_queued` and then get call `start` (`Scheduler::run` 6302)
@@ -93,7 +93,7 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
+        peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
         peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         ctrl_rx: ControlEventReceiver,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // fetch `get_all_queued` and then get call `start` (`Scheduler::run` 6302), possibly merge with `start_rebuild`
