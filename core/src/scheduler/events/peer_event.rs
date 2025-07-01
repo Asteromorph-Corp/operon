@@ -74,12 +74,6 @@ where
     fn gather_from(senders: &mut HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self;
 
     fn downgrade_all(&mut self);
-
-    /// Send out the events associated with the just processed job.
-    ///
-    /// NOTE that peer receivers might be dropped due to a stop signal or an error,
-    /// so this function should not error out if the receiver is gone.
-    async fn send(&self, event: PeerEvent<JE, RE>) -> Result<(), SchedulerError>;
 }
 
 #[async_trait]
@@ -91,8 +85,4 @@ where
     fn gather_from(_: &mut HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self {}
 
     fn downgrade_all(&mut self) {}
-
-    async fn send(&self, _event: PeerEvent<JE, RE>) -> Result<(), SchedulerError> {
-        Ok(())
-    }
 }
