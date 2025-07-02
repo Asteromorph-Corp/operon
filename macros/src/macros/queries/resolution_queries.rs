@@ -8,6 +8,18 @@ use crate::{
     },
 };
 
+/// Generates the `init_resolution_*` function for a given dimension.
+///
+/// Example:
+/// ```
+/// pub async fn init_resolution_i(
+///     client: operon::meta_storage::MetaClient<'_>
+/// ) -> Result<(), operon::meta_storage::MetaStorageError> {
+///     let schema_prefix = client.schema_prefix();
+///     let stmt = format!("CREATE TABLE IF NOT EXISTS {schema_prefix}dimension_i (i_ub BIGINT NOT NULL);");
+///     client.execute(&stmt, &[]).await?;
+///     Ok(())
+/// }
 fn fn_init_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let fn_name = init_resolution_ident(&dimension.id);
@@ -25,6 +37,19 @@ fn fn_init_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     }
 }
 
+/// Generates the `clear_resolution_*` function for a given dimension.
+///
+/// Example:
+/// ```
+/// pub async fn clear_resolution_i(
+///   client: operon::meta_storage::MetaClient<'_>,
+/// ) -> Result<(), operon::meta_storage::MetaStorageError> {
+///     let schema_prefix = client.schema_prefix();
+///     
+///     let stmt = format!("TRUNCATE TABLE {schema_prefix}dimension_i;");
+///     client.execute(&stmt, &[]).await?;
+///     Ok(())
+/// }
 fn fn_clear_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let fn_name = clear_resolution_ident(&dimension.id);
@@ -42,6 +67,23 @@ fn fn_clear_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream 
     }
 }
 
+/// Generates the `get_resolution_*` function for a given dimension.
+///
+/// Example:
+/// ```
+/// pub async fn get_resolution_i(
+///    client: operon::meta_storage::MetaClient<'_>,
+/// ) -> Result<Option<IResolution>, operon::meta_storage::MetaStorageError> {
+///     let schema_prefix = client.schema_prefix();
+///     let stmt = format!("SELECT i_ub FROM {schema_prefix}dimension_i");
+///     let Some(row) = client.query_opt(&stmt, &[]).await? else {
+///         return Ok(None);
+///     };
+///     Ok(IResolution(
+///         usize::try_from(r.get::<_, i64>("i_ub"))?,
+///     ))
+/// }
+/// ```
 fn fn_get_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let fn_name = get_resolution_ident(&dimension.id);
@@ -62,17 +104,30 @@ fn fn_get_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
         ) -> Result<Option<#resolution_ident>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
-            let row = client.query_opt(&stmt, &[#(&i64::try_from(#deps)?),*]).await?;
-            Ok(row.map(|r| {
-                #resolution_ident(
-                    usize::try_from(r.get::<_, i64>(#ub_id))?,
-                    #(#deps,)*
-                )
-            }))
+            let Some(row) = client.query_opt(&stmt, &[#(&i64::try_from(#deps)?),*]).await? else {
+                return Ok(None);
+            };
+            Ok(#resolution_ident(
+                usize::try_from(r.get::<_, i64>(#ub_id))?,
+                #(#deps,)*
+            ))
         }
     }
 }
 
+/// Generates the `put_resolution_*` function for a given dimension.
+///
+/// Example:
+/// ```
+/// pub async fn put_resolution_i(
+///     client: operon::meta_storage::MetaClient<'_>,
+///     resolution: &IResolution,
+/// ) -> Result<(), operon::meta_storage::MetaStorageError> {
+///     let schema_prefix = client.schema_prefix();
+///     let stmt = format!("INSERT INTO {schema_prefix}dimension_i (i_ub) VALUES ($1) ON CONFLICT DO NOTHING;");
+///     client.execute(&stmt, &[&i64::try_from(resolution.0)?]).await?;
+///     Ok(())
+/// }
 fn fn_put_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let fn_name = format_ident!("put_resolution_{}", dimension.id);
@@ -94,7 +149,8 @@ fn fn_put_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     }
 }
 
-pub fn generate_resolution_queries(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
+/// Generates all resolution-related queries for a given dimension.
+pub fn resolution_queries(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     let init_fn = fn_init_resolution(dimension);
     let clear_fn = fn_clear_resolution(dimension);
     let get_fn = fn_get_resolution(dimension);
