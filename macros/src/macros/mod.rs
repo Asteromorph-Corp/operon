@@ -1,2 +1,2 @@
-mod generate_resolution_queries;
-pub use generate_resolution_queries::*;
+mod queries;
+pub use queries::*;
