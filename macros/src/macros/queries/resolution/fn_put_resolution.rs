@@ -37,6 +37,7 @@ impl std::fmt::Display for PutResolutionQuery<'_> {
 ///     client.execute(&stmt, &[&i64::try_from(resolution.0)?]).await?;
 ///     Ok(())
 /// }
+/// ```
 pub(super) fn fn_put_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let fn_name = format_ident!("put_resolution_{}", dimension.id);

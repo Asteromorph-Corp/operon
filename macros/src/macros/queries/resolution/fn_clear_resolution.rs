@@ -31,6 +31,7 @@ impl std::fmt::Display for ClearResolutionQuery<'_> {
 ///     client.execute(&stmt, &[]).await?;
 ///     Ok(())
 /// }
+/// ```
 pub(super) fn fn_clear_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let fn_name = clear_resolution_ident(&dimension.id);
