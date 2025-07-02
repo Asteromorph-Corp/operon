@@ -1,12 +1,6 @@
 use crate::configs::DimensionConfig;
 
-impl DimensionConfig {
-    pub fn init_resolution_query(&self) -> InitResolutionQuery<'_> {
-        InitResolutionQuery(self)
-    }
-}
-
-pub struct InitResolutionQuery<'a>(&'a DimensionConfig);
+pub struct InitResolutionQuery<'a>(pub(super) &'a DimensionConfig);
 
 impl std::fmt::Display for InitResolutionQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -16,14 +10,14 @@ impl std::fmt::Display for InitResolutionQuery<'_> {
             self.0.id
         )?;
         for dep in &self.0.depends_on {
-            writeln!(f, "    {} BIGINT,", dep)?;
+            writeln!(f, "    {dep} BIGINT,")?;
         }
         write!(f, "    {}_ub BIGINT NOT NULL", self.0.id)?;
         if !self.0.depends_on.is_empty() {
             writeln!(f, ",")?;
             writeln!(f, "    PRIMARY KEY ({})", self.0.depends_on.join(","))?;
         } else {
-            writeln!(f, "")?;
+            writeln!(f)?;
         }
         write!(f, ");")
     }
@@ -31,7 +25,7 @@ impl std::fmt::Display for InitResolutionQuery<'_> {
 
 #[cfg(test)]
 mod tests {
-    use indoc::{formatdoc, indoc};
+    use indoc::indoc;
 
     use super::*;
 

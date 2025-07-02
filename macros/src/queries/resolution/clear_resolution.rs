@@ -1,12 +1,6 @@
 use crate::configs::DimensionConfig;
 
-impl DimensionConfig {
-    pub fn clear_resolution_query(&self) -> ClearResolutionQuery<'_> {
-        ClearResolutionQuery(self)
-    }
-}
-
-pub struct ClearResolutionQuery<'a>(&'a DimensionConfig);
+pub struct ClearResolutionQuery<'a>(pub(super) &'a DimensionConfig);
 
 impl std::fmt::Display for ClearResolutionQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,7 +23,7 @@ mod tests {
             depends_on: vec![],
         };
 
-        let clear_resolution = dimension_i.clear_resolution_query();
+        let clear_resolution = ClearResolutionQuery(&dimension_i);
 
         let stmt_i = "TRUNCATE TABLE {schema_prefix}dimension_i;";
 
