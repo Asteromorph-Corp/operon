@@ -1,18 +1,12 @@
 use crate::configs::DimensionConfig;
 
-impl DimensionConfig {
-    pub fn put_resolution_query(&self) -> PutResolutionQuery<'_> {
-        PutResolutionQuery(self)
-    }
-}
-
-pub struct PutResolutionQuery<'a>(&'a DimensionConfig);
+pub struct PutResolutionQuery<'a>(pub(super) &'a DimensionConfig);
 
 impl std::fmt::Display for PutResolutionQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "INSERT INTO {{schema_prefix}}dimension_{} (", self.0.id)?;
         for dep in &self.0.depends_on {
-            write!(f, "{}, ", dep)?;
+            write!(f, "{dep}, ")?;
         }
         write!(f, "{}_ub) VALUES ($1", self.0.id)?;
         for i in 1..(self.0.depends_on.len() + 1) {
@@ -35,7 +29,7 @@ mod tests {
             depends_on: vec![],
         };
 
-        let put_resolution = dimension_i.put_resolution_query();
+        let put_resolution = PutResolutionQuery(&dimension_i);
 
         let stmt_i =
             "INSERT INTO {schema_prefix}dimension_i (i_ub) VALUES ($1) ON CONFLICT DO NOTHING;";
@@ -50,7 +44,7 @@ mod tests {
             depends_on: vec!["i".to_string()],
         };
 
-        let put_resolution = dimension_j.put_resolution_query();
+        let put_resolution = PutResolutionQuery(&dimension_j);
 
         let stmt_j = "INSERT INTO {schema_prefix}dimension_j (i, j_ub) VALUES ($1, $2) ON CONFLICT DO NOTHING;";
 

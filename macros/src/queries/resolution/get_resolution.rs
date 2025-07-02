@@ -1,12 +1,6 @@
 use crate::configs::DimensionConfig;
 
-impl DimensionConfig {
-    pub fn get_resolution_query(&self) -> GetResolutionQuery<'_> {
-        GetResolutionQuery(self)
-    }
-}
-
-pub struct GetResolutionQuery<'a>(&'a DimensionConfig);
+pub struct GetResolutionQuery<'a>(pub(super) &'a DimensionConfig);
 
 impl std::fmt::Display for GetResolutionQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
