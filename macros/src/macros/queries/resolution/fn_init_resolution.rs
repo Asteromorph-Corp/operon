@@ -41,6 +41,7 @@ impl std::fmt::Display for InitResolutionQuery<'_> {
 ///     client.execute(&stmt, &[]).await?;
 ///     Ok(())
 /// }
+/// ```
 pub(super) fn fn_init_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let fn_name = init_resolution_ident(&dimension.id);
