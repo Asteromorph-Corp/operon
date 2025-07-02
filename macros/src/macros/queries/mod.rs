@@ -1,2 +1,2 @@
-mod resolution_queries;
-pub use resolution_queries::*;
+mod resolution;
+pub use resolution::*;
