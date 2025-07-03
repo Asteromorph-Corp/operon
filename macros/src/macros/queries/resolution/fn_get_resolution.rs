@@ -1,4 +1,4 @@
-use quote::quote;
+use quote::{format_ident, quote};
 
 use crate::{
     configs::DimensionConfig,
@@ -52,14 +52,23 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> proc_macro2::Tok
     let deps = &dimension
         .depends_on
         .iter()
-        .map(|d| dimension_ident(d))
+        .map(|d| format_ident!("{d}"))
+        .collect::<Vec<_>>();
+    let args = &dimension
+        .depends_on
+        .iter()
+        .map(|d| {
+            let arg = format_ident!("{d}");
+            let ty = dimension_ident(d);
+            quote! { #arg: &dimension::#ty }
+        })
         .collect::<Vec<_>>();
     let ub_id = format!("{}_ub", dimension.id);
 
     quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            #(#deps: usize,)*
+            #(#args,)*
         ) -> Result<Option<#resolution_ident>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
@@ -123,12 +132,12 @@ mod tests {
             ) -> Result<Option<IResolution>, operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt_i);
-                let row = client.query_opt(&stmt, &[]).await?;
-                Ok(row.map(|r| {
-                    IResolution(
-                        usize::try_from(r.get::<_, i64>("i_ub"))?,
-                    )
-                }))
+                let Some(row) = client.query_opt(&stmt, &[]).await? else {
+                    return Ok(None);
+                };
+                Ok(IResolution(
+                    usize::try_from(r.get::<_, i64>("i_ub"))?,
+                ))
             }
         };
 
@@ -144,19 +153,19 @@ mod tests {
         let expected_l = quote! {
             pub async fn get_resolution_l(
                 client: operon::meta_storage::MetaClient<'_>,
-                j: usize,
-                k: usize,
+                j: &dimension::J,
+                k: &dimension::K,
             ) -> Result<Option<LResolution>, operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt_l);
-                let row = client.query_opt(&stmt, &[&i64::try_from(j)?, &i64::try_from(k)?]).await?;
-                Ok(row.map(|r| {
-                    LResolution(
-                        usize::try_from(r.get::<_, i64>("l_ub"))?,
-                        j,
-                        k,
-                    )
-                }))
+                let Some(row) = client.query_opt(&stmt, &[&i64::try_from(j)?, &i64::try_from(k)?]).await? else {
+                    return Ok(None);
+                };
+                Ok(LResolution(
+                    usize::try_from(r.get::<_, i64>("l_ub"))?,
+                    j,
+                    k,
+                ))
             }
         };
 
