@@ -233,8 +233,8 @@ mod tests {
             CREATE OR REPLACE TRIGGER ticket_beta_summary_trunc_trg
                 AFTER TRUNCATE ON {schema_prefix}ticket_beta
                 FOR EACH STATEMENT
-                EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');
-        "};
+                EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');"
+        };
 
         assert_eq!(ticket_summary, expected);
     }
