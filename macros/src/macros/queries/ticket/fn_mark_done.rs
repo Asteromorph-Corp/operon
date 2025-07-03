@@ -1,0 +1,103 @@
+use quote::{format_ident, quote};
+
+use crate::{
+    configs::JobConfig,
+    utils::{dimension_ident, mark_done_ident, operon_ident},
+};
+
+/// Generates the SQL query to mark a ticket as done for a given job.
+struct MarkDoneQuery<'a>(&'a JobConfig);
+
+impl std::fmt::Display for MarkDoneQuery<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "UPDATE {{schema_prefix}}ticket_{} SET status = 'done' WHERE",
+            self.0.id
+        )?;
+        for (i, dim) in self.0.dims.iter().enumerate() {
+            if i != 0 {
+                write!(f, " AND")?;
+            }
+            write!(f, " {dim} = ${}", i + 1)?;
+        }
+        write!(f, ";")
+    }
+}
+
+pub(super) fn fn_mark_done(job: &JobConfig) -> proc_macro2::TokenStream {
+    let operon = operon_ident();
+    let fn_name = mark_done_ident(&job.id);
+    let stmt = MarkDoneQuery(job).to_string();
+
+    let dims = job
+        .dims
+        .iter()
+        .map(|d| format_ident!("{d}"))
+        .collect::<Vec<_>>();
+    let args = job
+        .dims
+        .iter()
+        .map(|d| {
+            let arg = dimension_ident(d);
+            let ty = dimension_ident(d);
+            quote! { #arg: &dimension::#ty }
+        })
+        .collect::<Vec<_>>();
+
+    quote! {
+        pub async fn #fn_name(
+            client: #operon::meta_storage::MetaClient<'_>,
+            #(#dims: usize),*
+        ) -> Result<(), #operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!(#stmt);
+            client.execute(&stmt, &[#(#dims),*]).await?;
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mark_done_query() {
+        let job = JobConfig {
+            id: "beta".to_string(),
+            from: vec!["a".to_string()],
+            to: "b".to_string(),
+            dims: vec!["i".to_string(), "j".to_string()],
+        };
+        let query = MarkDoneQuery(&job).to_string();
+        assert_eq!(
+            query,
+            "UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1 AND j = $2;"
+        );
+    }
+
+    #[test]
+    fn test_fn_mark_done() {
+        let job = JobConfig {
+            id: "beta".to_string(),
+            from: vec!["a".to_string()],
+            to: "b".to_string(),
+            dims: vec!["i".to_string(), "j".to_string()],
+        };
+        let tokens = fn_mark_done(&job);
+        let expected = quote! {
+            pub async fn mark_done_beta(
+                client: operon::meta_storage::MetaClient<'_>,
+                i: usize,
+                j: usize
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                let schema_prefix = client.schema_prefix();
+                let stmt = format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1 AND j = $2;");
+                client.execute(&stmt, &[i, j]).await?;
+                Ok(())
+            }
+        };
+        assert_eq!(tokens.to_string(), expected.to_string());
+    }
+}
