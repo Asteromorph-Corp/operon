@@ -1,9 +1,11 @@
+use indexmap::IndexMap;
+
 use crate::configs::{DimensionId, EntityId};
 
 pub type JobId = String;
 
 /// An Operon job, which defines a transformation from one entity to another.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JobConfig {
     /// Unique identifier for the job.
     pub id: JobId,
@@ -14,3 +16,5 @@ pub struct JobConfig {
     /// Dimensions this job repeat on.
     pub dims: Vec<DimensionId>,
 }
+
+pub type JobConfigMap = IndexMap<JobId, JobConfig>;

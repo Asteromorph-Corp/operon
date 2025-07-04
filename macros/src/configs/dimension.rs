@@ -11,7 +11,4 @@ pub struct DimensionConfig {
     pub depends_on: Vec<DimensionId>,
 }
 
-pub struct DimensionConfigs {
-    pub primary: DimensionId,
-    pub dimensions: IndexMap<DimensionId, DimensionConfig>,
-}
+pub type DimensionConfigMap = IndexMap<DimensionId, DimensionConfig>;
