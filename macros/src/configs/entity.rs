@@ -1,9 +1,11 @@
+use indexmap::IndexMap;
+
 use crate::configs::DimensionId;
 
 pub type EntityId = String;
 
 /// An Operon entity, which can be a struct or an enum.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EntityConfig {
     /// Unique identifier for the entity.
     pub id: EntityId,
@@ -12,3 +14,5 @@ pub struct EntityConfig {
     /// The Rust definition of this entity.
     pub body: String,
 }
+
+pub type EntityConfigMap = IndexMap<EntityId, EntityConfig>;
