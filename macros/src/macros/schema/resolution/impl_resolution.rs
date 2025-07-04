@@ -31,11 +31,7 @@ use crate::{
 pub(super) fn impl_resolution(dimension: &DimensionConfig) -> syn::ItemImpl {
     let operon = operon_ident();
     let res_ident = resolution_ident(&dimension.id);
-    let dep_dim_idents = dimension
-        .depends_on
-        .iter()
-        .map(|d| dimension_ident(d))
-        .collect::<Vec<_>>();
+    let dep_dim_idents = dimension.depends_on.iter().map(dimension_ident);
 
     let indices = (1..=dep_dim_idents.len()).map(syn::Index::from);
     let pkey_indices = (0..dep_dim_idents.len()).map(syn::Index::from);

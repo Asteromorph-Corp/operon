@@ -16,11 +16,7 @@ use crate::{
 pub(super) fn resolution_definition(dimension: &DimensionConfig) -> syn::ItemStruct {
     let res_ident = resolution_ident(&dimension.id);
     let dim_ident = dimension_ident(&dimension.id);
-    let dep_dim_idents = dimension
-        .depends_on
-        .iter()
-        .map(|d| dimension_ident(d))
-        .collect::<Vec<_>>();
+    let dep_dim_idents = dimension.depends_on.iter().map(dimension_ident);
 
     let doc = format!(
         "A struct representing the resolution of dimension {}",

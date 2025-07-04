@@ -45,11 +45,7 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> syn::ItemFn {
     let job_ident = job_ident(&job.id);
     let stmt = MarkDoneQuery(job).to_string();
 
-    let dims = job
-        .dims
-        .iter()
-        .map(|d| job_field_ident(d))
-        .collect::<Vec<_>>();
+    let dims = job.dims.iter().map(job_field_ident);
 
     parse_quote! {
         pub async fn #fn_name(
