@@ -31,7 +31,7 @@ impl std::fmt::Display for MarkDoneQuery<'_> {
 /// ```rust,ignore
 /// pub async fn mark_done_beta(
 ///     client: operon::meta_storage::MetaClient<'_>,
-///     job: &BetaJob,
+///     job: &schema::BetaJob,
 /// ) -> Result<(), operon::meta_storage::MetaStorageError> {
 ///     let schema_prefix = client.schema_prefix();
 ///     let stmt = format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1 AND j = $2;");
@@ -50,7 +50,7 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> syn::ItemFn {
     parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            job: &#job_ident,
+            job: &schema::#job_ident,
         ) -> Result<(), #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
@@ -93,7 +93,7 @@ mod tests {
         let expected: syn::ItemFn = parse_quote! {
             pub async fn mark_done_beta(
                 client: operon::meta_storage::MetaClient<'_>,
-                job: &BetaJob,
+                job: &schema::BetaJob,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1 AND j = $2;");
