@@ -1,0 +1,26 @@
+use quote::quote;
+
+use crate::{
+    configs::JobConfig,
+    macros::queries::ticket::{
+        fn_clear_ticket::fn_clear_ticket, fn_get_all::fn_get_all, fn_init_ticket::fn_init_ticket,
+        fn_mark_done::fn_mark_done, fn_put_ticket::fn_put_ticket,
+    },
+};
+
+/// Generates all resolution-related queries for a given dimension.
+pub fn ticket_queries(job: &JobConfig) -> proc_macro2::TokenStream {
+    let init_fn = fn_init_ticket(job);
+    let clear_fn = fn_clear_ticket(job);
+    let put_fn = fn_put_ticket(job);
+    let get_all_fn = fn_get_all(job);
+    let mark_done_fn = fn_mark_done(job);
+
+    quote! {
+        #init_fn
+        #clear_fn
+        #put_fn
+        #get_all_fn
+        #mark_done_fn
+    }
+}
