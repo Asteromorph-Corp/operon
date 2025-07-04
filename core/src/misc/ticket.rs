@@ -101,10 +101,10 @@ pub trait TicketSql<Svc: OperonService>: Ticket {
     async fn put(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>;
 
     /// Get all tickets that is `status = 'done'`.
-    async fn get_all_done(client: MetaClient<'_>) -> Result<Vec<Self>, MetaStorageError>;
-
-    /// Get all tickets that is `status = 'queued`.
-    async fn get_all_queued(client: MetaClient<'_>) -> Result<Vec<Self>, MetaStorageError>;
+    async fn get_all(
+        client: MetaClient<'_>,
+        status: TicketStatus,
+    ) -> Result<Vec<Self>, MetaStorageError>;
 
     /// Get the status of the tickets.
     async fn get_status(client: MetaClient<'_>) -> Result<(i64, i64, i64), MetaStorageError>;
