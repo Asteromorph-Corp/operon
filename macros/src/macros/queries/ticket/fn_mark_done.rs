@@ -2,7 +2,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     configs::JobConfig,
-    utils::{dimension_ident, job_ident, mark_done_ident, operon_ident},
+    utils::{job_ident, mark_done_ident, operon_ident},
 };
 
 /// An helper struct to generate the SQL query for marking a ticket as done for a given job.
