@@ -13,6 +13,9 @@ pub use init_schema::*;
 mod footprint;
 pub use footprint::*;
 
+mod ticket_summary;
+pub use ticket_summary::*;
+
 mod options;
 pub use options::*;
 

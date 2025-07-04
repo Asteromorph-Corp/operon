@@ -16,7 +16,7 @@ pub enum MetaStorageError {
     IntegerConversionError(#[from] TryFromIntError),
     #[error("Invalid resolution: {0}")]
     InvalidResolution(String),
-    #[error("Not found: No rows found in table `{0}`")]
+    #[error("Not found: {0}")]
     NotFound(String),
     #[error("Other error: {0}")]
     Other(String),
