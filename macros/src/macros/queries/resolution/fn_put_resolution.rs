@@ -28,7 +28,7 @@ impl std::fmt::Display for PutResolutionQuery<'_> {
 /// Generates the `put_resolution_*` function for a given dimension.
 ///
 /// Example:
-/// ```ignore
+/// ```rust,ignore
 /// pub async fn put_resolution_i(
 ///     client: operon::meta_storage::MetaClient<'_>,
 ///     resolution: &IResolution,

@@ -32,7 +32,7 @@ impl std::fmt::Display for InitResolutionQuery<'_> {
 /// Generates the `init_resolution_*` function for a given dimension.
 ///
 /// Example:
-/// ```ignore
+/// ```rust,ignore
 /// pub async fn init_resolution_i(
 ///     client: operon::meta_storage::MetaClient<'_>
 /// ) -> Result<(), operon::meta_storage::MetaStorageError> {
