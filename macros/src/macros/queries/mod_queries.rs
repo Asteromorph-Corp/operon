@@ -1,18 +1,15 @@
-use quote::quote;
+use syn::parse_quote;
 
 use crate::{
     DimensionConfig, JobConfig,
     macros::queries::{resolution::resolution_queries, ticket::ticket_queries},
 };
 
-pub fn mod_queries(
-    dimensions: Vec<DimensionConfig>,
-    jobs: Vec<JobConfig>,
-) -> proc_macro2::TokenStream {
+pub fn mod_queries(dimensions: Vec<DimensionConfig>, jobs: Vec<JobConfig>) -> syn::ItemMod {
     let resolution_queries = dimensions.iter().map(resolution_queries);
     let ticket_queries = jobs.iter().map(ticket_queries);
 
-    quote! {
+    parse_quote! {
         mod queries {
             use super::*;
 

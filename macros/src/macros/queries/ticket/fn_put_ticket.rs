@@ -1,4 +1,4 @@
-use quote::quote;
+use syn::parse_quote;
 
 use crate::{
     configs::JobConfig,
@@ -46,13 +46,13 @@ impl std::fmt::Display for PutTicketQuery<'_> {
 ///     Ok(())
 /// }
 /// ```
-pub(super) fn fn_put_ticket(job: &JobConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_put_ticket(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let ticket_ident = ticket_ident(&job.id);
     let fn_name = put_ticket_ident(&job.id);
     let stmt = PutTicketQuery(job).to_string();
 
-    quote! {
+    parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             ticket: &#ticket_ident,
@@ -73,6 +73,7 @@ pub(super) fn fn_put_ticket(job: &JobConfig) -> proc_macro2::TokenStream {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use quote::ToTokens;
 
     use super::*;
 
@@ -110,7 +111,7 @@ mod tests {
             ON CONFLICT DO NOTHING;"
         };
 
-        let expected = quote! {
+        let expected: syn::ItemFn = parse_quote! {
             pub async fn put_ticket_beta(
                 client: operon::meta_storage::MetaClient<'_>,
                 ticket: &BetaTicket,
@@ -127,6 +128,9 @@ mod tests {
                 Ok(())
             }
         };
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_eq!(
+            result.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
     }
 }

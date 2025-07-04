@@ -1,4 +1,4 @@
-use quote::quote;
+use syn::parse_quote;
 
 use crate::{
     configs::JobConfig,
@@ -18,13 +18,13 @@ impl std::fmt::Display for GetAllTicketQuery<'_> {
     }
 }
 
-pub(super) fn fn_get_all(job: &JobConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_get_all(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = get_all_ident(&job.id);
     let ticket_ident = ticket_ident(&job.id);
     let stmt = GetAllTicketQuery(job).to_string();
 
-    quote! {
+    parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             status: #operon::schema_base::TicketStatus,
@@ -43,6 +43,8 @@ pub(super) fn fn_get_all(job: &JobConfig) -> proc_macro2::TokenStream {
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
 
     #[test]
@@ -67,7 +69,7 @@ mod tests {
             dims: vec!["dim1".to_string(), "dim2".to_string()],
         };
         let tokens = fn_get_all(&job);
-        let expected = quote! {
+        let expected: syn::ItemFn = parse_quote! {
             pub async fn get_all_beta(
                 client: operon::meta_storage::MetaClient<'_>,
                 status: operon::schema_base::TicketStatus,
@@ -83,6 +85,9 @@ mod tests {
             }
         };
 
-        assert_eq!(tokens.to_string(), expected.to_string());
+        assert_eq!(
+            tokens.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
     }
 }

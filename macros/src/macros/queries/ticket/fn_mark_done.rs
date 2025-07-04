@@ -1,8 +1,8 @@
-use quote::{format_ident, quote};
+use syn::parse_quote;
 
 use crate::{
     configs::JobConfig,
-    utils::{job_ident, mark_done_ident, operon_ident},
+    utils::{dimension_ident, job_ident, mark_done_ident, operon_ident},
 };
 
 /// An helper struct to generate the SQL query for marking a ticket as done for a given job.
@@ -25,7 +25,7 @@ impl std::fmt::Display for MarkDoneQuery<'_> {
     }
 }
 
-pub(super) fn fn_mark_done(job: &JobConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_mark_done(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = mark_done_ident(&job.id);
     let job_ident = job_ident(&job.id);
@@ -34,10 +34,10 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> proc_macro2::TokenStream {
     let dims = job
         .dims
         .iter()
-        .map(|d| format_ident!("{d}"))
+        .map(|d| dimension_ident(d))
         .collect::<Vec<_>>();
 
-    quote! {
+    parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             job: &#job_ident,
@@ -52,6 +52,8 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> proc_macro2::TokenStream {
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
 
     #[test]
@@ -78,7 +80,7 @@ mod tests {
             dims: vec!["i".to_string(), "j".to_string()],
         };
         let tokens = fn_mark_done(&job);
-        let expected = quote! {
+        let expected: syn::ItemFn = parse_quote! {
             pub async fn mark_done_beta(
                 client: operon::meta_storage::MetaClient<'_>,
                 job: &BetaJob,
@@ -89,6 +91,9 @@ mod tests {
                 Ok(())
             }
         };
-        assert_eq!(tokens.to_string(), expected.to_string());
+        assert_eq!(
+            tokens.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
     }
 }

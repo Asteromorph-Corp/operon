@@ -1,4 +1,4 @@
-use quote::quote;
+use syn::parse_quote;
 
 use crate::{
     configs::JobConfig,
@@ -27,12 +27,12 @@ impl std::fmt::Display for ClearTicketQuery<'_> {
 ///     Ok(())
 /// }
 /// ```
-pub(super) fn fn_clear_ticket(job: &JobConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_clear_ticket(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = clear_ticket_ident(&job.id);
     let stmt = ClearTicketQuery(job).to_string();
 
-    quote! {
+    parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
         ) -> Result<(), #operon::meta_storage::MetaStorageError> {
@@ -46,6 +46,8 @@ pub(super) fn fn_clear_ticket(job: &JobConfig) -> proc_macro2::TokenStream {
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
 
     #[test]
@@ -69,7 +71,7 @@ mod tests {
             dims: vec!["i".to_string()],
         };
         let tokens = fn_clear_ticket(&job_beta);
-        let expected = quote! {
+        let expected: syn::ItemFn = parse_quote! {
             pub async fn clear_ticket_beta(
                 client: operon::meta_storage::MetaClient<'_>,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
@@ -79,6 +81,9 @@ mod tests {
                 Ok(())
             }
         };
-        assert_eq!(tokens.to_string(), expected.to_string());
+        assert_eq!(
+            tokens.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
     }
 }
