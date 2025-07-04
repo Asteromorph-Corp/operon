@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::{meta_storage::MetaClient, scheduler::SchedulerError};
 
 #[async_trait]
-pub trait IndividualRebuilder: Send + Sync + 'static {
+pub trait JobRebuilder: Send + Sync + 'static {
     async fn explode(
         &self,
         client: MetaClient<'_>,

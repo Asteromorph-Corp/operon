@@ -10,7 +10,7 @@ use crate::{
     operon::RunningState,
     scheduler::{
         ControlEvent, ControlEventReceiver, PeerEvent, RecoveryState, RecoveryStateSender, RunMode,
-        SchedulerError, SchedulerOptions, SchedulerSpec,
+        SchedulerError, SchedulerHandler, SchedulerOptions,
     },
     service::OperonService,
     storage::OperonStorage,
@@ -34,7 +34,7 @@ where
     service: Arc<Svc>,
     storage: Arc<Sto>,
     meta_storage: MetaStorage,
-    spec: SchedulerSpec<Svc, Sto>,
+    handler: SchedulerHandler<Svc, Sto>,
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
@@ -50,7 +50,7 @@ where
     pub fn new(
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        spec: SchedulerSpec<Svc, Sto>,
+        handler: SchedulerHandler<Svc, Sto>,
         ui_state: Arc<RwLock<UiState>>,
         ctrl_rx: ControlEventReceiver,
         rec_tx: RecoveryStateSender,
@@ -63,7 +63,7 @@ where
             service,
             storage,
             meta_storage,
-            spec,
+            handler,
             ui_state,
             ctrl_rx,
             rec_tx,
@@ -110,7 +110,7 @@ where
             match ctrl_event {
                 ControlEvent::Check { primary_ub } => {
                     let consistent = self
-                        .spec
+                        .handler
                         .check_consistency(
                             &self.storage,
                             self.meta_storage.conn().await?.as_client(),
@@ -197,7 +197,7 @@ where
         }
 
         let resolution = self
-            .spec
+            .handler
             .get_primary_resolution(meta_conn.as_client())
             .await?;
         if resolution.is_none() {
@@ -268,28 +268,29 @@ where
         self.storage.clear().await?;
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
-        self.spec.clear_resolution(tx.as_client()).await?;
-        self.spec
+        self.handler.clear_resolution(tx.as_client()).await?;
+        self.handler
             .put_primary_resolution(tx.as_client(), primary_ub)
             .await?;
-        self.spec.clear_tickets(tx.as_client()).await?;
-        self.spec.put_default_tickets(tx.as_client()).await?;
+        self.handler.clear_tickets(tx.as_client()).await?;
+        self.handler.put_default_tickets(tx.as_client()).await?;
         clear_footprint(tx.as_client()).await?;
         tx.commit().await?;
 
         let (handles, peer_txs) = self
-            .spec
+            .handler
             .prepare_channels(self.internal_channel_size)
-            .start_clean(
+            .run_schedulers(
                 &self.service,
                 &self.storage,
                 &self.meta_storage,
                 &self.ui_state,
                 &self.ctrl_rx,
+                true,
             );
 
         let resolved_i = self
-            .spec
+            .handler
             .get_primary_resolution(self.meta_storage.conn().await?.as_client())
             .await?
             .ok_or(MetaStorageError::NotFound("Initial resolution".into()))?;
@@ -320,16 +321,16 @@ where
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
         let rebuilders = self
-            .spec
+            .handler
             .prepare_rebuilders(&self.storage, tx.as_client())
             .await?;
 
-        self.spec.clear_resolution(tx.as_client()).await?;
-        self.spec.clear_tickets(tx.as_client()).await?;
+        self.handler.clear_resolution(tx.as_client()).await?;
+        self.handler.clear_tickets(tx.as_client()).await?;
         clear_footprint(tx.as_client()).await?;
 
-        self.spec.put_default_tickets(tx.as_client()).await?;
-        self.spec
+        self.handler.put_default_tickets(tx.as_client()).await?;
+        self.handler
             .put_primary_resolution(tx.as_client(), primary_ub)
             .await?;
         for rebuilder in &rebuilders {
@@ -344,15 +345,16 @@ where
         tx.commit().await?;
         log::info!("Rebuild complete, starting the run.");
 
-        let handles = self
-            .spec
+        let (handles, _) = self
+            .handler
             .prepare_channels(self.internal_channel_size)
-            .start_rebuild(
+            .run_schedulers(
                 &self.service,
                 &self.storage,
                 &self.meta_storage,
                 &self.ui_state,
                 &self.ctrl_rx,
+                false,
             );
         Ok(handles)
     }
@@ -375,15 +377,16 @@ where
             tx.commit().await?;
         }
 
-        let handles = self
-            .spec
+        let (handles, _) = self
+            .handler
             .prepare_channels(self.internal_channel_size)
-            .start_restore(
+            .run_schedulers(
                 &self.service,
                 &self.storage,
                 &self.meta_storage,
                 &self.ui_state,
                 &self.ctrl_rx,
+                false,
             );
         Ok(handles)
     }
@@ -392,7 +395,7 @@ where
     async fn init_meta_storage(&self) -> Result<(), SchedulerError> {
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
-        self.spec.init_meta_storage(tx.as_client()).await?;
+        self.handler.init_meta_storage(tx.as_client()).await?;
         tx.commit().await?;
         Ok(())
     }
@@ -400,6 +403,6 @@ where
     /// An helper function to call `self.spec.update_ui` with a `RwLock` write guard.
     async fn update_ui(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
         let mut ui_state = self.ui_state.write().await;
-        self.spec.update_ui(client, &mut ui_state).await
+        self.handler.update_ui(client, &mut ui_state).await
     }
 }

@@ -1,10 +1,14 @@
+use async_trait::async_trait;
+use postgres_types::ToSql;
+
 use crate::{
     meta_storage::{MetaClient, MetaStorageError},
     misc::{Job, Resolution},
+    service::OperonService,
 };
 
 /// Trait that represents tickets for the jobs.
-#[::async_trait::async_trait]
+#[async_trait]
 pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'static {
     type Job: Job;
     type Resolution: Resolution;
@@ -68,16 +72,15 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
     /// The job that this ticket represents.
     /// If the dimensions or dependencies are not fully resolved, the job will be `None`.
     fn resolve(&self) -> Option<Self::Job>;
+}
 
-    // /// Given a dimension resolution, consume this ticket and return the updated tickets.
-    // /// It is an error if the given dimension is irrelevant to this ticket.
-    // fn explode(self, resolution: Self::Resolution) -> Result<Vec<Self>, MetaStorageError>;
-
+#[async_trait]
+pub trait TicketSql<Svc: OperonService>: Ticket {
     /// Convert into a string that represents the SQL parameters for this ticket,
     /// in the format that can be used in an `INSERT` statement.
     ///
     /// Formatted as "(value,value,'value',\[...\])".
-    fn to_sql_insert_params(&self) -> Result<String, MetaStorageError>;
+    fn to_sql_insert_params(&self) -> Result<Vec<Box<dyn ToSql + Send + Sync>>, MetaStorageError>;
 
     /// Convert into a CSV string that represents the SQL parameters for this ticket,
     /// in the format that can be used in a `COPY` statement.
@@ -87,4 +90,29 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
 
     /// Convert a SQL row into this ticket.
     fn from_sql_row(row: &::tokio_postgres::Row) -> Result<Self, MetaStorageError>;
+
+    /// Initialize the ticket storage in the metadata storage.
+    async fn init_table(client: MetaClient<'_>) -> Result<(), MetaStorageError>;
+
+    /// Clear the ticket storage in the metadata storage.
+    async fn clear_table(client: MetaClient<'_>) -> Result<(), MetaStorageError>;
+
+    /// Put the ticket into the metadata storage.
+    async fn put(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>;
+
+    /// Get all tickets that is `status = 'done'`.
+    async fn get_all_done(client: MetaClient<'_>) -> Result<Vec<Self>, MetaStorageError>;
+
+    /// Get all tickets that is `status = 'queued`.
+    async fn get_all_queued(client: MetaClient<'_>) -> Result<Vec<Self>, MetaStorageError>;
+
+    /// Get the status of the tickets.
+    async fn get_status(client: MetaClient<'_>) -> Result<(i64, i64, i64), MetaStorageError>;
+
+    /// Given a dimension resolution, apply the resolution to the tickets that can be exploded.
+    /// Return the tickets that are now ready to run.
+    async fn explode(
+        client: MetaClient<'_>,
+        resolution: Svc::ResolutionEnum,
+    ) -> Result<Vec<Self>, MetaStorageError>;
 }

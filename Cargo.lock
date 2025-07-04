@@ -930,7 +930,9 @@ dependencies = [
 name = "operon-macros"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "indexmap",
+ "indoc",
  "once_cell",
  "proc-macro-crate",
  "proc-macro-error",
