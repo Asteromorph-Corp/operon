@@ -25,6 +25,20 @@ impl std::fmt::Display for MarkDoneQuery<'_> {
     }
 }
 
+/// Generates the `mark_done_*` function for a given job.
+///
+/// Example:
+/// ```rust,ignore
+/// pub async fn mark_done_beta(
+///     client: operon::meta_storage::MetaClient<'_>,
+///     job: &BetaJob,
+/// ) -> Result<(), operon::meta_storage::MetaStorageError> {
+///     let schema_prefix = client.schema_prefix();
+///     let stmt = format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1 AND j = $2;");
+///     client.execute(&stmt, &[&i64::try_from(job.i)?, &i64::try_from(job.j)?]).await?;
+///     Ok(())
+/// }
+/// ```
 pub(super) fn fn_mark_done(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = mark_done_ident(&job.id);
