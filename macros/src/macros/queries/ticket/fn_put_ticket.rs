@@ -35,13 +35,18 @@ impl std::fmt::Display for PutTicketQuery<'_> {
 ///
 /// Example:
 /// ```rust,ignore
-/// pub async fn put_default_tickets_beta(
+/// pub async fn put_ticket_beta(
 ///     client: operon::meta_storage::MetaClient<'_>,
+///     ticket: &schema::BetaTicket,
 /// ) -> Result<(), operon::meta_storage::MetaStorageError> {
 ///     let schema_prefix = client.schema_prefix();
-///     let stmt = format!("INSERT INTO {schema_prefix}ticket_beta (i, resolved, deps_count, deps_quota, deps_done, status) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING;");
-///     let params = BetaTicket::new().to_sql_insert_params()?;
-///     let params = params.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
+///     let stmt = format!(#stmt);
+///     let params = operon::schema_base::TicketSql::to_sql_insert_params(ticket)?;
+///     let params = params
+///         .iter()
+///         .map(|p| p.as_ref() as &(dyn operon::postgres_typesToSql + Sync))
+///         .collect::<Vec<_>>();
+///
 ///     client.execute(&stmt, &params).await?;
 ///     Ok(())
 /// }
@@ -62,7 +67,7 @@ pub(super) fn fn_put_ticket(job: &JobConfig) -> syn::ItemFn {
             let params = operon::schema_base::TicketSql::to_sql_insert_params(ticket)?;
             let params = params
                 .iter()
-                .map(|p| p.as_ref() as &(dyn ToSql + Sync)).collect::<Vec<_>>();
+                .map(|p| p.as_ref() as &(dyn operon::postgres_types::ToSql + Sync)).collect::<Vec<_>>();
 
             client.execute(&stmt, &params).await?;
             Ok(())
@@ -121,7 +126,7 @@ mod tests {
                 let params = operon::schema_base::TicketSql::to_sql_insert_params(ticket)?;
                 let params = params
                     .iter()
-                    .map(|p| p.as_ref() as &(dyn ToSql + Sync))
+                    .map(|p| p.as_ref() as &(dyn operon::postgres_typesToSql + Sync))
                     .collect::<Vec<_>>();
 
                 client.execute(&stmt, &params).await?;
