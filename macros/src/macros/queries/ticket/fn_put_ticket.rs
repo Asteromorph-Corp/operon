@@ -126,7 +126,7 @@ mod tests {
                 let params = operon::schema_base::TicketSql::to_sql_insert_params(ticket)?;
                 let params = params
                     .iter()
-                    .map(|p| p.as_ref() as &(dyn operon::postgres_typesToSql + Sync))
+                    .map(|p| p.as_ref() as &(dyn operon::postgres_types::ToSql + Sync))
                     .collect::<Vec<_>>();
 
                 client.execute(&stmt, &params).await?;

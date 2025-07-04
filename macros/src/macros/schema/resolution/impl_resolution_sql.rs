@@ -117,7 +117,7 @@ mod tests {
                     client: operon::meta_storage::MetaClient<'_>,
                     primary_key: Self::PrimaryKey,
                 ) -> Result<Option<Self>, operon::meta_storage::MetaStorageError> {
-                    queries::get_resolution_i(client).await
+                    queries::get_resolution_i(client,).await
                 }
 
                 async fn put(
