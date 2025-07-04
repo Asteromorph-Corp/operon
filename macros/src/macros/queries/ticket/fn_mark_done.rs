@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::{
     configs::JobConfig,
-    utils::{dimension_ident, job_ident, mark_done_ident, operon_ident},
+    utils::{job_field_ident, job_ident, mark_done_ident, operon_ident},
 };
 
 /// An helper struct to generate the SQL query for marking a ticket as done for a given job.
@@ -34,7 +34,7 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> syn::ItemFn {
     let dims = job
         .dims
         .iter()
-        .map(|d| dimension_ident(d))
+        .map(|d| job_field_ident(d))
         .collect::<Vec<_>>();
 
     parse_quote! {
