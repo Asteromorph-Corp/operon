@@ -30,7 +30,7 @@ use crate::{
 ///         client: operon::meta_storage::MetaClient<'_>,
 ///         primary_key: Self::PrimaryKey,
 ///     ) -> Result<Option<Self>, operon::meta_storage::MetaStorageError> {
-///         queries::get_resolution_i(client, primary_key).await
+///         queries::get_resolution_i(client).await
 ///     }
 ///
 ///     async fn put(
@@ -49,6 +49,8 @@ pub(super) fn impl_resolution_sql(dimension: &DimensionConfig) -> syn::ItemImpl 
     let clear_fn_name = clear_resolution_ident(&dimension.id);
     let get_fn_name = get_resolution_ident(&dimension.id);
     let put_fn_name = put_resolution_ident(&dimension.id);
+
+    let indices = (0..dimension.depends_on.len()).map(syn::Index::from);
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -69,7 +71,7 @@ pub(super) fn impl_resolution_sql(dimension: &DimensionConfig) -> syn::ItemImpl 
                 client: #operon::meta_storage::MetaClient<'_>,
                 primary_key: Self::PrimaryKey,
             ) -> Result<Option<Self>, #operon::meta_storage::MetaStorageError> {
-                queries::#get_fn_name(client, primary_key).await
+                queries::#get_fn_name(client, #(primary_key.#indices)*).await
             }
 
             async fn put(
@@ -115,7 +117,7 @@ mod tests {
                     client: operon::meta_storage::MetaClient<'_>,
                     primary_key: Self::PrimaryKey,
                 ) -> Result<Option<Self>, operon::meta_storage::MetaStorageError> {
-                    queries::get_resolution_i(client, primary_key).await
+                    queries::get_resolution_i(client).await
                 }
 
                 async fn put(
