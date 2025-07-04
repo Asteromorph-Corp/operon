@@ -2,10 +2,10 @@ use quote::{format_ident, quote};
 
 use crate::{
     configs::JobConfig,
-    utils::{dimension_ident, mark_done_ident, operon_ident},
+    utils::{dimension_ident, job_ident, mark_done_ident, operon_ident},
 };
 
-/// Generates the SQL query to mark a ticket as done for a given job.
+/// An helper struct to generate the SQL query for marking a ticket as done for a given job.
 struct MarkDoneQuery<'a>(&'a JobConfig);
 
 impl std::fmt::Display for MarkDoneQuery<'_> {
@@ -28,6 +28,7 @@ impl std::fmt::Display for MarkDoneQuery<'_> {
 pub(super) fn fn_mark_done(job: &JobConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let fn_name = mark_done_ident(&job.id);
+    let job_ident = job_ident(&job.id);
     let stmt = MarkDoneQuery(job).to_string();
 
     let dims = job
@@ -48,11 +49,11 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> proc_macro2::TokenStream {
     quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            #(#dims: usize),*
+            job: &#job_ident,
         ) -> Result<(), #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
-            client.execute(&stmt, &[#(#dims),*]).await?;
+            client.execute(&stmt, &[#(&i64::try_from(job.#dims)?),*]).await?;
             Ok(())
         }
     }
@@ -89,12 +90,11 @@ mod tests {
         let expected = quote! {
             pub async fn mark_done_beta(
                 client: operon::meta_storage::MetaClient<'_>,
-                i: usize,
-                j: usize
+                job: &BetaJob,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1 AND j = $2;");
-                client.execute(&stmt, &[i, j]).await?;
+                client.execute(&stmt, &[&i64::try_from(job.i)?, &i64::try_from(job.j)?]).await?;
                 Ok(())
             }
         };
