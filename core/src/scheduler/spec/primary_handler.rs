@@ -1,12 +1,15 @@
 use async_trait::async_trait;
 
 use crate::{
-    meta_storage::MetaClient, scheduler::SchedulerError, service::OperonService,
+    meta_storage::MetaClient,
+    misc::ResolutionSql,
+    scheduler::{PrimarySpec, SchedulerError},
+    service::OperonService,
     storage::OperonStorage,
 };
 
 #[async_trait]
-pub trait PrimarySpec<Svc, Sto>: Send + Sync + 'static
+pub trait PrimaryHandler<Svc, Sto>: Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -41,4 +44,50 @@ where
         client: MetaClient<'_>,
         primary_ub: usize,
     ) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
+}
+
+#[async_trait]
+impl<Svc, Sto, R, PS> PrimaryHandler<Svc, Sto> for PS
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    R: ResolutionSql<Svc, PrimaryKey = ()>,
+    PS: PrimarySpec<Svc, Sto, Resolution = R>,
+{
+    async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
+        R::init_table(client).await?;
+        Ok(())
+    }
+
+    async fn clear_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
+        R::clear_table(client).await?;
+        Ok(())
+    }
+
+    async fn get_primary_resolution(
+        &self,
+        client: MetaClient<'_>,
+    ) -> Result<Option<usize>, SchedulerError> {
+        let resolution = R::get(client, ()).await?;
+        Ok(resolution.map(|r| r.ub()))
+    }
+
+    async fn put_primary_resolution(
+        &self,
+        client: MetaClient<'_>,
+        ub: usize,
+    ) -> Result<(), SchedulerError> {
+        let resolution = R::new(ub, ());
+        resolution.put(client).await?;
+        Ok(())
+    }
+
+    async fn check_consistency(
+        &self,
+        storage: &Sto,
+        client: MetaClient<'_>,
+        primary_ub: usize,
+    ) -> Result<bool, SchedulerError> {
+        PrimarySpec::check_consistency(self, storage, client, primary_ub).await
+    }
 }

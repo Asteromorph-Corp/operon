@@ -5,8 +5,8 @@ pub use scheduler::*;
 mod individual_scheduler;
 pub use individual_scheduler::*;
 
-mod scheduler_spec;
-pub use scheduler_spec::*;
+mod spec;
+pub use spec::*;
 
 mod run_mode;
 pub use run_mode::*;

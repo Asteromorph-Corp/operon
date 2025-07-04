@@ -1,8 +1,10 @@
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, ::postgres_types::FromSql)]
+use postgres_types::{FromSql, ToSql};
+
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, ToSql, FromSql)]
 #[postgres(name = "ticket_status")]
 pub enum TicketStatus {
-    #[postgres(name = "waiting")]
     #[default]
+    #[postgres(name = "waiting")]
     Waiting,
     #[postgres(name = "queued")]
     Queued,

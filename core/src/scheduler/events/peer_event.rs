@@ -61,7 +61,7 @@ where
 }
 
 #[async_trait]
-pub trait PeerEventSenders<JE, RE>
+pub trait PeerEventSenders<JE, RE>: Send + Sync
 where
     JE: JobEnum,
     RE: ResolutionEnum,
@@ -71,7 +71,7 @@ where
     /// Remove the senders from the map.
     ///
     /// TODO: tx channels probably close when dropped, so taking owned `HashMap` should work. But I don't want to break anything, will refactor later.
-    fn gather_from(senders: &mut HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self;
+    fn gather_from(senders: HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self;
 
     fn downgrade_all(&mut self);
 }
@@ -82,7 +82,7 @@ where
     JE: JobEnum,
     RE: ResolutionEnum,
 {
-    fn gather_from(_: &mut HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self {}
+    fn gather_from(_: HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self {}
 
     fn downgrade_all(&mut self) {}
 }

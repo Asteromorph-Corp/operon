@@ -3,13 +3,13 @@ use async_trait::async_trait;
 use crate::{
     meta_storage::MetaClient,
     misc::{Job, Resolution, Ticket},
-    scheduler::{IndividualSpec, PeerEventSenders, SchedulerError},
+    scheduler::{JobRebuilder, PeerEventSenders, SchedulerError},
     service::OperonService,
     storage::OperonStorage,
 };
 
 #[async_trait]
-pub trait JobManager<Svc, Sto>: IndividualSpec<Svc, Sto> + Clone + Send + Sync + 'static
+pub trait JobSpec<Svc, Sto>: Clone + Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -19,8 +19,20 @@ where
     type Ticket: Ticket<Job = Self::Job, Resolution = Self::Resolution>;
     type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;
 
-    /// Check if this job type is a descendant of the given job type.
-    fn is_descendant_of(other: &str) -> bool;
+    /// Run a check on the data consistency between the data storage and the metadata storage.
+    /// Return `true` if the data storage holds all needed data to restore, `false` if it does not.
+    async fn check_consistency(
+        &self,
+        storage: &Sto,
+        client: MetaClient<'_>,
+    ) -> Result<bool, SchedulerError>;
+
+    /// Prepare the job rebuilder for the given storage and metadata client by fetching the necessary data.
+    async fn prepare_rebuild(
+        &self,
+        storage: &Sto,
+        client: MetaClient<'_>,
+    ) -> Result<Box<dyn JobRebuilder>, SchedulerError>;
 
     /// Call the user function and stores the result in the storage.
     ///
@@ -32,19 +44,6 @@ where
         client: MetaClient<'_>,
         job: &Self::Job,
     ) -> Result<Self::Resolution, SchedulerError>;
-
-    async fn mark_done(
-        &self,
-        client: MetaClient<'_>,
-        job: &Self::Job,
-    ) -> Result<(), SchedulerError>;
-
-    /// Put a resolution into the storage.
-    async fn put_resolution(
-        &self,
-        client: MetaClient<'_>,
-        resolution: &Self::Resolution,
-    ) -> Result<(), SchedulerError>;
 
     async fn send_event(
         &self,

@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     operon::{OperonError, OperonOptions},
-    scheduler::{ControlEvent, RecoveryState, Scheduler, SchedulerSpec},
+    scheduler::{ControlEvent, RecoveryState, Scheduler, SchedulerHandler},
     service::OperonService,
     storage::OperonStorage,
     ui::{UiLogger, UiLoop, UiState},
@@ -42,7 +42,7 @@ where
     /// Instead, you can use the provided macros to log messages to the UI.
     pub async fn run(
         self,
-        spec: SchedulerSpec<Svc, Sto>,
+        handler: SchedulerHandler<Svc, Sto>,
         primary_ub: usize,
         options: OperonOptions,
     ) -> Result<(), OperonError> {
@@ -64,7 +64,7 @@ where
         let scheduler = Scheduler::<Svc, Sto>::new(
             self.service,
             self.storage,
-            spec,
+            handler,
             ui_state.clone(),
             ctrl_rx,
             rec_tx,

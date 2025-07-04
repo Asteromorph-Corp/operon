@@ -28,6 +28,8 @@ pub enum SchedulerError {
     ControlEventReceiveFailed,
     #[error("Failed to send peer event")]
     PeerEventSendFailed,
+    #[error("Irrelevant {0} event received in `{1}` scheduler")]
+    InvalidPeerEventReceived(&'static str, &'static str),
     #[error("Tried to send a PeerEvent through a downgraded sender")]
     SendThroughDowngradedSender,
     #[error("Error in user provided function: {0}")]

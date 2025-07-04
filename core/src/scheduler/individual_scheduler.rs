@@ -7,10 +7,10 @@ use tokio::sync::{RwLock, Semaphore};
 
 use crate::{
     meta_storage::{MetaClient, MetaStorage},
-    misc::Ticket,
+    misc::{JobSql, ResolutionSql, TicketSql},
     operon::RunningState,
     scheduler::{
-        ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobManager, PeerEvent,
+        ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
         PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError,
     },
     service::OperonService,
@@ -29,60 +29,47 @@ use crate::{
 /// * Updating waiting tickets from `Event` messages.
 ///
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Svc, Sto, JM>
+pub struct IndividualScheduler<Svc, Sto, JS>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JM: JobManager<Svc, Sto>,
+    JS: JobSpec<Svc, Sto>,
 {
-    pub manager: JM,
+    pub spec: JS,
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
     pub meta_storage: MetaStorage,
     pub pool: Arc<Semaphore>,
     pub pool_size: usize,
     pub ui_state: Arc<RwLock<UiState>>,
-    pub peer_txs: JM::PeerEventSenders,
-    pub peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
-    pub ctrl_rx: ControlEventReceiver,
 }
 
-impl<Svc, Sto, JM> IndividualScheduler<Svc, Sto, JM>
+impl<Svc, Sto, J, R, T, JS> IndividualScheduler<Svc, Sto, JS>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JM: JobManager<Svc, Sto>,
+    J: JobSql,
+    R: ResolutionSql<Svc>,
+    T: TicketSql<Svc, Job = J, Resolution = R>,
+    JS: JobSpec<Svc, Sto, Job = J, Resolution = R, Ticket = T>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        runner: JM,
+        spec: JS,
         service: Arc<Svc>,
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         pool_size: usize,
         ui_state: Arc<RwLock<UiState>>,
-        mut peer_tx_map: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
-        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
-        ctrl_rx: ControlEventReceiver,
     ) -> Self {
-        // Create an internal channel for `InternalEvent`s.
-        let peer_txs = JM::PeerEventSenders::gather_from(&mut peer_tx_map);
-
-        // Downgrade unused peer senders to weak senders.
-        for tx in peer_tx_map.values_mut() {
-            tx.downgrade();
-        }
         Self {
-            manager: runner,
+            spec,
             storage,
             service,
             meta_storage,
             pool: Arc::new(Semaphore::new(pool_size)),
             pool_size,
             ui_state,
-            peer_txs,
-            peer_rx,
-            ctrl_rx,
         }
     }
 
@@ -92,21 +79,17 @@ where
         returning: bool,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
-        let (done, queued, waiting) = self.manager.get_status(client).await?;
-        let state = if queued + waiting == 0 {
-            if *state != RunningState::Finished {
-                log::info!("All `{}` jobs are finished.", self.manager.job_id());
-            }
-            RunningState::Finished
-        } else {
-            *state
-        };
+        let (done, queued, waiting) = T::get_status(client).await?;
+        if queued + waiting == 0 && *state != RunningState::Finished {
+            log::info!("All `{}` jobs are finished.", J::id());
+            *state = RunningState::Finished
+        }
         self.ui_state
             .write()
             .await
             .update_ui_state(UiStateUpdate::ProgressUpdate(
-                self.manager.job_id().into(),
-                (done, queued, waiting, state, returning),
+                J::id().into(),
+                (done, queued, waiting, *state, returning),
             ))?;
         Ok(())
     }
@@ -130,17 +113,13 @@ where
         &mut self,
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum>,
         state: &mut RunningState,
-    ) -> Result<Vec<JM::Ticket>, SchedulerError> {
+    ) -> Result<Vec<T>, SchedulerError> {
         let mut conn = self.meta_storage.conn_static().await?;
         let tx = conn.transaction().await?;
         let ready_tickets = match event {
-            PeerEvent::Job(job) => {
-                self.manager
-                    .on_job_ready_tickets(tx.as_client(), job)
-                    .await?
-            }
+            PeerEvent::Job(job) => self.spec.on_job_ready_tickets(tx.as_client(), job).await?,
             PeerEvent::Resolution(resolution) => {
-                self.manager
+                self.spec
                     .on_resolution_ready_tickets(tx.as_client(), resolution)
                     .await?
             }
@@ -150,10 +129,7 @@ where
         Ok(ready_tickets)
     }
 
-    fn check_initial_data(
-        &self,
-        initial_data: Vec<JM::Ticket>,
-    ) -> Result<VecDeque<JM::Ticket>, ()> {
+    fn check_initial_data(&self, initial_data: Vec<T>) -> Result<VecDeque<T>, ()> {
         let (ready, not_ready) = initial_data
             .into_iter()
             .partition::<Vec<_>, _>(|ticket| ticket.is_ready());
@@ -162,7 +138,7 @@ where
             for ticket in not_ready {
                 log::error!(
                     "Restored ticket for `{}` job is not ready to run: {ticket:?}",
-                    self.manager.job_id()
+                    J::id()
                 );
             }
             return Err(());
@@ -175,11 +151,34 @@ where
     /// **and** the broadcast channel has closed.
     ///
     /// Usually called by the top-level `Scheduler::run` with `tokio::spawn`.
-    pub async fn run(mut self, initial_data: Vec<JM::Ticket>) -> RunningState {
+    pub async fn run(
+        mut self,
+        peer_tx_map: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
+        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+        ctrl_rx: ControlEventReceiver,
+        clean: bool,
+    ) -> RunningState
+    where
+        T: TicketSql<Svc>,
+    {
+        // Create an internal channel for `InternalEvent`s.
+        let mut peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
+
         let mut state = RunningState::Running;
-        let Ok(ready_tickets) = self.check_initial_data(initial_data) else {
-            // state = RunningState::Error;
-            return RunningState::Error;
+
+        let ready_tickets = if clean {
+            VecDeque::new()
+        } else {
+            let Ok(conn) = self.meta_storage.conn().await.map_err(SchedulerError::from) else {
+                return RunningState::Error;
+            };
+            let Ok(tickets) = T::get_all_queued(conn.as_client()).await else {
+                return RunningState::Error;
+            };
+            match self.check_initial_data(tickets) {
+                Ok(ready_tickets) => ready_tickets,
+                Err(_) => return RunningState::Error,
+            }
         };
 
         // Update the UI state before entering the loop.
@@ -190,7 +189,7 @@ where
         {
             log::error!(
                 "Failed to update UI state for `{}` scheduler after initial data processing.",
-                self.manager.job_id()
+                J::id()
             );
             // state = RunningState::Error;
             return RunningState::Error;
@@ -199,7 +198,7 @@ where
         if state == RunningState::Finished {
             log::debug!(
                 "Scheduler for `{}` exited due to being finished from the start.",
-                self.manager.job_id()
+                J::id()
             );
             self.update_state_without_client(true, &mut state)
                 .await
@@ -209,33 +208,29 @@ where
                 });
             return state;
         }
-        let res = self.run_internal(ready_tickets, &mut state).await;
+        let res = self
+            .run_internal(ready_tickets, &peer_txs, peer_rx, ctrl_rx, &mut state)
+            .await;
 
         // Close peer senders
-        self.peer_txs.downgrade_all();
+        peer_txs.downgrade_all();
 
         match (&res, state) {
             (Ok(()), RunningState::Finished) => {
-                log::debug!("Scheduler for `{}` exited normally.", self.manager.job_id())
+                log::debug!("Scheduler for `{}` exited normally.", J::id())
             }
             (Ok(()), RunningState::Stopped) => {
-                log::debug!(
-                    "Scheduler for `{}` was stopped and exited.",
-                    self.manager.job_id()
-                )
+                log::debug!("Scheduler for `{}` was stopped and exited.", J::id())
             }
             (Ok(()), _) => {
                 log::error!(
                     "Scheduler for `{}` exited with an unexpected state: {state:?}",
-                    self.manager.job_id(),
+                    J::id(),
                 );
                 state = RunningState::Error;
             }
             (Err(e), _) => {
-                log::error!(
-                    "Scheduler for `{}` exited with an error: {e}",
-                    self.manager.job_id()
-                );
+                log::error!("Scheduler for `{}` exited with an error: {e}", J::id());
                 state = RunningState::Error;
             }
         }
@@ -252,21 +247,23 @@ where
 
     async fn run_internal(
         &mut self,
-        mut ready_tickets: VecDeque<JM::Ticket>,
+        mut ready_tickets: VecDeque<T>,
+        peer_txs: &JS::PeerEventSenders,
+        mut peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+        mut ctrl_rx: ControlEventReceiver,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
         let pool = self.pool.clone();
         let mut got_all_updates = false;
 
-        let (int_tx, mut int_rx) =
-            tokio::sync::mpsc::unbounded_channel::<InternalEvent<JM::Job, JM::Resolution>>();
+        let (int_tx, mut int_rx) = tokio::sync::mpsc::unbounded_channel::<InternalEvent<J, R>>();
 
         // Main event loop.
         loop {
             // This loop cannot be entered with the `Error` or `Stopped` state,
             // as changing the state to `Error` or `Stopped` always exits `run_internal` immediately.
             // 0. Check the control channel.
-            let ctrl_event = self.ctrl_rx.borrow_and_update().clone();
+            let ctrl_event = ctrl_rx.borrow_and_update().clone();
             match ctrl_event {
                 ControlEvent::Pause { targets, cascade } => {
                     self.handle_pause(targets, cascade, state).await?
@@ -281,7 +278,7 @@ where
                     }
                 }
                 ControlEvent::Abort => {
-                    log::info!("Aborting `{}` jobs.", self.manager.job_id());
+                    log::info!("Aborting `{}` jobs.", J::id());
                     // If this is a finished scheduler rolling out peer events,
                     // don't change the state to `Stopped`,
                     // since it is already `Finished`.
@@ -295,7 +292,7 @@ where
 
             ::tokio::select! {
                 // 0. Also wait on the control channel to avoid being stuck in this loop.
-                ctrl_event = self.ctrl_rx.changed() => {
+                ctrl_event = ctrl_rx.changed() => {
                     ctrl_event?;
                 }
 
@@ -313,11 +310,11 @@ where
                             log::trace!(
                                 "{} received internal event: JobSuccess({job:?}, {resolution:?}); \
                                 Internal channel has {} events left.",
-                                self.manager.job_id(), int_rx.len()
+                                J::id(), int_rx.len()
                             );
 
                             // Broadcast the job result events
-                            self.manager.send_event(&self.peer_txs, job, resolution).await?;
+                            self.spec.send_event(peer_txs, job, resolution).await?;
                             // If all the tickets are finished
                             // AND the scheduler's internal events are drained,
                             // exit the loop.
@@ -335,14 +332,14 @@ where
                 }
 
                 // 2. A peer event.
-                event = self.peer_rx.recv(), if !got_all_updates => {
+                event = peer_rx.recv(), if !got_all_updates => {
                     match event {
                         Some(evt) => {
                             // Trace the peer event
                             log::trace!(
                                 "{} received peer event: {evt:?}; \
                                 Peer channel has {} events left.",
-                                self.manager.job_id(), self.peer_rx.len()
+                                J::id(), peer_rx.len()
                             );
                             ready_tickets.extend(self.on_event_ready_tickets(evt, state).await?)
                         },
@@ -351,7 +348,7 @@ where
                             // meaning that all peer updates were received,
                             // or that the upstream scheduler was gracefully stopped.
                             // Either way, we stop listening this branch.
-                            log::debug!("`{}` finished receiving updates.", self.manager.job_id());
+                            log::debug!("`{}` finished receiving updates.", J::id());
                             got_all_updates = true;
                         }
                     }
@@ -366,8 +363,8 @@ where
                     let permit = permit?;
                     let ticket = ready_tickets.pop_front().ok_or(SchedulerError::Other("Ready to run queue is empty".into()))?;
                     let job = ticket.resolve().ok_or(SchedulerError::Other("Ticket is not ready to run".into()))?;
-                    let job_id = self.manager.job_id();
-                    let runner = self.manager.clone();
+                    let job_id = J::id();
+                    let spec = self.spec.clone();
                     let storage = self.storage.clone();
                     let service = self.service.clone();
                     let meta_storage = self.meta_storage.clone();
@@ -381,11 +378,11 @@ where
                         let _permit = permit;
                         let mut conn = meta_storage.conn().await?;
                         let tx = conn.transaction().await?;
-                        match runner.run_job(&*service, &*storage, tx.as_client(), &job).await {
+                        match spec.run_job(&*service, &*storage, tx.as_client(), &job).await {
                             Ok(resolution) => {
                                 // Mark the ticket as done in the ticket storage
-                                runner.mark_done(tx.as_client(), &job).await?;
-                                runner.put_resolution(tx.as_client(), &resolution).await?;
+                                job.mark_done(tx.as_client()).await?;
+                                resolution.put(tx.as_client()).await?;
                                 tx.commit().await?;
 
                                 // Alert the results to the scheduler
@@ -420,15 +417,15 @@ where
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
         if !(targets.is_empty()
-            || targets.iter().any(|t| t == self.manager.job_id())
-            || cascade && targets.iter().any(|t| JM::is_descendant_of(t)))
+            || targets.iter().any(|t| t == J::id())
+            || cascade && targets.iter().any(|t| J::is_descendant_of(t)))
         {
             return Ok(());
         }
 
         match state {
             RunningState::Running => {
-                log::info!("Pausing `{}` jobs.", self.manager.job_id());
+                log::info!("Pausing `{}` jobs.", J::id());
                 *state = RunningState::Paused;
                 self.update_state_without_client(false, state).await?;
                 // Acquire and forget all permits.
@@ -438,7 +435,7 @@ where
                     .acquire_many_owned(self.pool_size as u32)
                     .await?;
                 permit.forget();
-                log::debug!("Remaining `{}` jobs were finished.", self.manager.job_id());
+                log::debug!("Remaining `{}` jobs were finished.", J::id());
             }
             RunningState::Paused => (),   // Silent no-op, already paused.
             RunningState::Finished => (), // No jobs to pause, no-op.
@@ -447,7 +444,7 @@ where
             _ => {
                 log::error!(
                     "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    self.manager.job_id(),
+                    J::id(),
                     state
                 );
                 *state = RunningState::Error;
@@ -464,13 +461,13 @@ where
         targets: Vec<String>,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
-        if !(targets.is_empty() || targets.iter().any(|t| t == self.manager.job_id())) {
+        if !(targets.is_empty() || targets.iter().any(|t| t == J::id())) {
             return Ok(());
         }
 
         match state {
             RunningState::Paused => {
-                log::info!("Resuming `{}` jobs.", self.manager.job_id());
+                log::info!("Resuming `{}` jobs.", J::id());
                 *state = RunningState::Running;
                 self.update_state_without_client(false, state).await?;
                 // Add back all permits.
@@ -481,7 +478,7 @@ where
             _ => {
                 log::error!(
                     "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    self.manager.job_id(),
+                    J::id(),
                     state
                 );
                 *state = RunningState::Error;
@@ -497,13 +494,10 @@ where
         &mut self,
         state: &mut RunningState,
         got_all_updates: bool,
-        int_rx: &IntEventReceiver<JM::Job, JM::Resolution>,
+        int_rx: &IntEventReceiver<J, R>,
     ) -> Result<bool, SchedulerError> {
         if *state == RunningState::Running {
-            log::info!(
-                "Pausing `{}` jobs for graceful stop.",
-                self.manager.job_id()
-            );
+            log::info!("Pausing `{}` jobs for graceful stop.", J::id());
             *state = RunningState::Paused;
             self.update_state_without_client(false, state).await?;
             // Acquire and forget all permits.
@@ -513,12 +507,12 @@ where
                 .acquire_many_owned(self.pool_size as u32)
                 .await?;
             permit.forget();
-            log::debug!("Remaining `{}` jobs were finished.", self.manager.job_id());
+            log::debug!("Remaining `{}` jobs were finished.", J::id());
         }
         match state {
             RunningState::Paused | RunningState::Finished => {
                 if int_rx.is_empty() && got_all_updates {
-                    log::info!("Gracefully stopped `{}` jobs.", self.manager.job_id());
+                    log::info!("Gracefully stopped `{}` jobs.", J::id());
                     // If the state is `Paused`, set it to `Stopped`,
                     // If the state is `Finished`, keep it as `Finished`.
                     if *state == RunningState::Paused {
@@ -532,7 +526,7 @@ where
             _ => {
                 log::error!(
                     "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    self.manager.job_id(),
+                    J::id(),
                     state
                 );
                 *state = RunningState::Error;

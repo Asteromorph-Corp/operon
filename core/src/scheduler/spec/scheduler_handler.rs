@@ -3,52 +3,57 @@ use std::collections::HashMap;
 use futures::{StreamExt, TryStreamExt};
 
 use crate::{
-    meta_storage::{MetaClient, init_footprint, init_schema, init_ticket_status_type},
+    meta_storage::{
+        MetaClient, init_footprint, init_schema, init_ticket_status_type, init_ticket_summary,
+    },
     operon::RunningState,
     scheduler::{
-        IndividualRebuilder, IndividualSpec, PeerEvent, PeerEventSender, PrimarySpec,
-        SchedulerError, SpecWithRx, SpecsWithChannels,
+        HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent, PeerEventSender,
+        PrimaryHandler, SchedulerError,
     },
     service::OperonService,
     storage::OperonStorage,
     ui::{UiState, UiStateUpdate},
 };
 
-pub struct SchedulerSpec<Svc, Sto> {
-    pub primary_spec: Box<dyn PrimarySpec<Svc, Sto>>,
-    pub individual_specs: Vec<Box<dyn IndividualSpec<Svc, Sto>>>,
+pub struct SchedulerHandler<Svc, Sto> {
+    pub primary_handler: Box<dyn PrimaryHandler<Svc, Sto>>,
+    pub job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>,
 }
 
-impl<Svc, Sto> SchedulerSpec<Svc, Sto>
+impl<Svc, Sto> SchedulerHandler<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
 {
     pub fn new(
-        primary_schedule: Box<dyn PrimarySpec<Svc, Sto>>,
-        schedules: Vec<Box<dyn IndividualSpec<Svc, Sto>>>,
+        primary_handler: Box<dyn PrimaryHandler<Svc, Sto>>,
+        job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>,
     ) -> Self {
         Self {
-            primary_spec: primary_schedule,
-            individual_specs: schedules,
+            primary_handler,
+            job_handlers,
         }
     }
 
-    pub(crate) fn prepare_channels(&self, channel_size: usize) -> SpecsWithChannels<'_, Svc, Sto> {
-        let len = self.individual_specs.len();
+    pub(crate) fn prepare_channels(
+        &self,
+        channel_size: usize,
+    ) -> HandlersWithChannels<'_, Svc, Sto> {
+        let len = self.job_handlers.len();
 
         let mut schedules_with_rx = Vec::with_capacity(len);
         let mut peer_txs = HashMap::with_capacity(len);
 
-        self.individual_specs.iter().for_each(|schedule| {
+        self.job_handlers.iter().for_each(|job_handler| {
             let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
                 PeerEvent<Svc::JobEnum, Svc::ResolutionEnum>,
             >(channel_size);
-            peer_txs.insert(schedule.job_id(), PeerEventSender::Up(peer_tx));
-            schedules_with_rx.push(SpecWithRx::new(schedule.as_ref(), peer_rx));
+            peer_txs.insert(job_handler.job_id(), PeerEventSender::Up(peer_tx));
+            schedules_with_rx.push(HandlerWithRx::new(job_handler.as_ref(), peer_rx));
         });
 
-        SpecsWithChannels::new(schedules_with_rx, peer_txs)
+        HandlersWithChannels::new(schedules_with_rx, peer_txs)
     }
 
     pub(crate) async fn init_meta_storage(
@@ -56,13 +61,14 @@ where
         client: MetaClient<'_>,
     ) -> Result<(), SchedulerError> {
         init_schema(client).await?;
-        self.primary_spec.init_resolution(client).await?;
-        for individual_spec in &self.individual_specs {
-            individual_spec.init_resolution(client).await?;
+        self.primary_handler.init_resolution(client).await?;
+        for job_handler in &self.job_handlers {
+            job_handler.init_resolution(client).await?;
         }
+        init_ticket_summary(client).await?;
         init_ticket_status_type(client).await?;
-        for individual_spec in &self.individual_specs {
-            individual_spec.init_tickets(client).await?;
+        for job_handler in &self.job_handlers {
+            job_handler.init_tickets(client).await?;
         }
         init_footprint(client).await?;
 
@@ -80,13 +86,13 @@ where
         primary_ub: usize,
     ) -> Result<bool, SchedulerError> {
         if !self
-            .primary_spec
+            .primary_handler
             .check_consistency(storage, client, primary_ub)
             .await?
         {
             return Ok(false);
         }
-        for schedule in &self.individual_specs {
+        for schedule in &self.job_handlers {
             if !schedule.check_consistency(storage, client).await? {
                 return Ok(false);
             }
@@ -98,9 +104,9 @@ where
         &self,
         client: MetaClient<'_>,
     ) -> Result<(), SchedulerError> {
-        self.primary_spec.clear_resolution(client).await?;
-        for schedule in &self.individual_specs {
-            schedule.clear_resolution(client).await?;
+        self.primary_handler.clear_resolution(client).await?;
+        for spec in &self.job_handlers {
+            spec.clear_resolution(client).await?;
         }
         Ok(())
     }
@@ -109,7 +115,7 @@ where
         &self,
         client: MetaClient<'_>,
     ) -> Result<Option<usize>, SchedulerError> {
-        let primary_resolution = self.primary_spec.get_primary_resolution(client).await?;
+        let primary_resolution = self.primary_handler.get_primary_resolution(client).await?;
         Ok(primary_resolution)
     }
 
@@ -118,14 +124,14 @@ where
         client: MetaClient<'_>,
         primary_ub: usize,
     ) -> Result<(), SchedulerError> {
-        self.primary_spec
+        self.primary_handler
             .put_primary_resolution(client, primary_ub)
             .await?;
         Ok(())
     }
 
     pub(crate) async fn clear_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        for schedule in &self.individual_specs {
+        for schedule in &self.job_handlers {
             schedule.clear_tickets(client).await?;
         }
         Ok(())
@@ -135,7 +141,7 @@ where
         &self,
         client: MetaClient<'_>,
     ) -> Result<(), SchedulerError> {
-        for schedule in &self.individual_specs {
+        for schedule in &self.job_handlers {
             schedule.put_default_tickets(client).await?;
         }
         Ok(())
@@ -146,7 +152,7 @@ where
         client: MetaClient<'_>,
         ui_state: &mut UiState,
     ) -> Result<(), SchedulerError> {
-        for schedule in &self.individual_specs {
+        for schedule in &self.job_handlers {
             let (done, queued, waiting) = schedule.get_status(client).await?;
             let state = if queued + waiting == 0 {
                 RunningState::Finished
@@ -166,8 +172,8 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-    ) -> Result<Vec<Box<dyn IndividualRebuilder>>, SchedulerError> {
-        futures::stream::iter(&self.individual_specs)
+    ) -> Result<Vec<Box<dyn JobRebuilder>>, SchedulerError> {
+        futures::stream::iter(&self.job_handlers)
             .then(|schedule| schedule.prepare_rebuild(storage, client))
             .try_collect::<Vec<_>>()
             .await

@@ -85,7 +85,7 @@ pub struct SchemaPrefix<'a>(Option<&'a str>);
 impl std::fmt::Display for SchemaPrefix<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(schema) = self.0 {
-            write!(f, "{}.", schema)
+            write!(f, "{schema}.")
         } else {
             Ok(())
         }
@@ -97,7 +97,7 @@ pub struct TicketStatusType<'a>(Option<&'a str>);
 impl std::fmt::Display for TicketStatusType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(schema) = self.0 {
-            write!(f, "{}.", schema)?;
+            write!(f, "{schema}.")?;
         }
         write!(f, "ticket_status")
     }
