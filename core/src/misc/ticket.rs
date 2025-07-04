@@ -3,8 +3,7 @@ use postgres_types::ToSql;
 
 use crate::{
     meta_storage::{MetaClient, MetaStorageError},
-    misc::{Job, Resolution},
-    service::OperonService,
+    misc::{Job, Resolution, TicketStatus},
 };
 
 /// Trait that represents tickets for the jobs.
@@ -75,7 +74,7 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
 }
 
 #[async_trait]
-pub trait TicketSql<Svc: OperonService>: Ticket {
+pub trait TicketSql: Ticket {
     /// Convert into a string that represents the SQL parameters for this ticket,
     /// in the format that can be used in an `INSERT` statement.
     ///
@@ -109,10 +108,8 @@ pub trait TicketSql<Svc: OperonService>: Ticket {
     /// Get the status of the tickets.
     async fn get_status(client: MetaClient<'_>) -> Result<(i64, i64, i64), MetaStorageError>;
 
-    /// Given a dimension resolution, apply the resolution to the tickets that can be exploded.
-    /// Return the tickets that are now ready to run.
-    async fn explode(
-        client: MetaClient<'_>,
-        resolution: Svc::ResolutionEnum,
-    ) -> Result<Vec<Self>, MetaStorageError>;
+    // /// Given a dimension resolution, apply the resolution to the tickets that can be exploded.
+    // /// Return the tickets that are now ready to run.
+    // async fn explode(client: MetaClient<'_>, resolution: RE)
+    // -> Result<Vec<Self>, MetaStorageError>;
 }
