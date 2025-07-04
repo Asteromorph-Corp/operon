@@ -2,13 +2,13 @@ use quote::quote;
 
 use crate::{
     configs::JobConfig,
-    utils::{operon_ident, put_default_tickets_ident, ticket_ident},
+    utils::{operon_ident, put_ticket_ident, ticket_ident},
 };
 
 /// Helper struct to generate the SQL query for inserting default tickets for a job.
-struct PutDefaultTicketQuery<'a>(&'a JobConfig);
+struct PutTicketQuery<'a>(&'a JobConfig);
 
-impl std::fmt::Display for PutDefaultTicketQuery<'_> {
+impl std::fmt::Display for PutTicketQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "INSERT INTO {{schema_prefix}}ticket_{} (", self.0.id)?;
         for dim in &self.0.dims {
@@ -46,20 +46,23 @@ impl std::fmt::Display for PutDefaultTicketQuery<'_> {
 ///     Ok(())
 /// }
 /// ```
-pub(super) fn fn_put_default_tickets(job: &JobConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_put_ticket(job: &JobConfig) -> proc_macro2::TokenStream {
     let operon = operon_ident();
     let ticket_ident = ticket_ident(&job.id);
-    let fn_name = put_default_tickets_ident(&job.id);
-    let stmt = PutDefaultTicketQuery(job).to_string();
+    let fn_name = put_ticket_ident(&job.id);
+    let stmt = PutTicketQuery(job).to_string();
 
     quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
+            ticket: &#ticket_ident,
         ) -> Result<(), #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
-            let params = #ticket_ident::new().to_sql_insert_params()?;
-            let params = params.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
+            let params = operon::schema_base::TicketSql::to_sql_insert_params(ticket)?;
+            let params = params
+                .iter()
+                .map(|p| p.as_ref() as &(dyn ToSql + Sync)).collect::<Vec<_>>();
 
             client.execute(&stmt, &params).await?;
             Ok(())
@@ -74,14 +77,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_put_default_ticket_query() {
+    fn test_put_ticket_query() {
         let job = JobConfig {
             id: "beta".to_string(),
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
         };
-        let query = PutDefaultTicketQuery(&job).to_string();
+        let query = PutTicketQuery(&job).to_string();
         let expected = indoc! {"
             INSERT INTO {schema_prefix}ticket_beta (i, resolved, deps_count, deps_quota, deps_done, status)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -91,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fn_put_default_tickets() {
+    fn test_fn_put_ticket() {
         let job = JobConfig {
             id: "beta".to_string(),
             from: vec!["a".to_string()],
@@ -99,7 +102,7 @@ mod tests {
             dims: vec!["i".to_string()],
         };
 
-        let result = fn_put_default_tickets(&job);
+        let result = fn_put_ticket(&job);
 
         let stmt = indoc! {"
             INSERT INTO {schema_prefix}ticket_beta (i, resolved, deps_count, deps_quota, deps_done, status)
@@ -108,13 +111,17 @@ mod tests {
         };
 
         let expected = quote! {
-            pub async fn put_default_tickets_beta(
+            pub async fn put_ticket_beta(
                 client: operon::meta_storage::MetaClient<'_>,
+                ticket: &BetaTicket,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt);
-                let params = BetaTicket::new().to_sql_insert_params()?;
-                let params = params.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
+                let params = operon::schema_base::TicketSql::to_sql_insert_params(ticket)?;
+                let params = params
+                    .iter()
+                    .map(|p| p.as_ref() as &(dyn ToSql + Sync))
+                    .collect::<Vec<_>>();
 
                 client.execute(&stmt, &params).await?;
                 Ok(())
