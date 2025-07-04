@@ -51,7 +51,7 @@ impl<Svc, Sto, R, PS> PrimaryHandler<Svc, Sto> for PS
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    R: ResolutionSql<Svc, PrimaryKey = ()>,
+    R: ResolutionSql<PrimaryKey = ()>,
     PS: PrimarySpec<Svc, Sto, Resolution = R>,
 {
     async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {

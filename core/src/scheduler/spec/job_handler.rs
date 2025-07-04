@@ -88,7 +88,7 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
     J: JobSql,
-    R: ResolutionSql<Svc>,
+    R: ResolutionSql,
     T: TicketSql<Svc, Job = J, Resolution = R>,
     JS: JobSpec<Svc, Sto, Job = J, Resolution = R, Ticket = T> + Clone,
 {

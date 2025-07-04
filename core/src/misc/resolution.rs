@@ -2,10 +2,7 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 
-use crate::{
-    meta_storage::{MetaClient, MetaStorageError},
-    service::OperonService,
-};
+use crate::meta_storage::{MetaClient, MetaStorageError};
 
 pub trait Resolution: Debug + Clone + Send + Sync + 'static {
     type PrimaryKey: Copy;
@@ -18,7 +15,7 @@ pub trait Resolution: Debug + Clone + Send + Sync + 'static {
 }
 
 #[async_trait]
-pub trait ResolutionSql<Svc: OperonService>: Resolution {
+pub trait ResolutionSql: Resolution {
     async fn init_table(client: MetaClient<'_>) -> Result<(), MetaStorageError>;
 
     async fn clear_table(client: MetaClient<'_>) -> Result<(), MetaStorageError>;
