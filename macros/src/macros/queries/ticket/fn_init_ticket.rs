@@ -180,7 +180,7 @@ mod tests {
         };
 
         let init_ticket = InitTicketQuery(&job).to_string();
-        let expected = indoc::indoc! {"
+        let expected = indoc! {"
             CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_beta (
                 i BIGINT,
                 resolved BOOLEAN NOT NULL,
@@ -205,7 +205,7 @@ mod tests {
         };
 
         let ticket_summary = TicketSummaryQuery(&job).to_string();
-        let expected = indoc::indoc! {"
+        let expected = indoc! {"
             INSERT INTO {schema_prefix}ticket_summary (job_id, waiting, queued, done)
             VALUES ($1, 0, 0, 0)
             ON CONFLICT DO NOTHING;
