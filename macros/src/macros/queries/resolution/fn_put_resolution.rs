@@ -1,4 +1,5 @@
-use quote::{format_ident, quote};
+use quote::format_ident;
+use syn::parse_quote;
 
 use crate::{
     configs::DimensionConfig,
@@ -38,7 +39,7 @@ impl std::fmt::Display for PutResolutionQuery<'_> {
 ///     Ok(())
 /// }
 /// ```
-pub(super) fn fn_put_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_put_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = format_ident!("put_resolution_{}", dimension.id);
     let resolution_ident = resolution_ident(&dimension.id);
@@ -46,7 +47,7 @@ pub(super) fn fn_put_resolution(dimension: &DimensionConfig) -> proc_macro2::Tok
 
     let indices = (1..=dimension.depends_on.len()).map(syn::Index::from);
 
-    quote! {
+    parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             resolution: &#resolution_ident,
@@ -61,6 +62,8 @@ pub(super) fn fn_put_resolution(dimension: &DimensionConfig) -> proc_macro2::Tok
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
 
     #[test]
@@ -104,7 +107,7 @@ mod tests {
         let stmt_i =
             "INSERT INTO {schema_prefix}dimension_i (i_ub) VALUES ($1) ON CONFLICT DO NOTHING;"; // Note: placing this string literal inside the quote! macro results in a `\n` instead of `\\n`, causing the test to fail.
 
-        let expected_i = quote! {
+        let expected_i: syn::ItemFn = parse_quote! {
             pub async fn put_resolution_i(
                 client: operon::meta_storage::MetaClient<'_>,
                 resolution: &IResolution,
@@ -116,7 +119,10 @@ mod tests {
             }
         };
 
-        assert_eq!(result_i.to_string(), expected_i.to_string());
+        assert_eq!(
+            result_i.to_token_stream().to_string(),
+            expected_i.to_token_stream().to_string()
+        );
 
         let dimension_l = DimensionConfig {
             id: "l".to_string(),
@@ -125,7 +131,7 @@ mod tests {
 
         let result_l = fn_put_resolution(&dimension_l);
         let stmt_l = "INSERT INTO {schema_prefix}dimension_l (j, k, l_ub) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;";
-        let expected_l = quote! {
+        let expected_l: syn::ItemFn = parse_quote! {
             pub async fn put_resolution_l(
                 client: operon::meta_storage::MetaClient<'_>,
                 resolution: &LResolution,
@@ -137,6 +143,9 @@ mod tests {
             }
         };
 
-        assert_eq!(result_l.to_string(), expected_l.to_string());
+        assert_eq!(
+            result_l.to_token_stream().to_string(),
+            expected_l.to_token_stream().to_string()
+        );
     }
 }

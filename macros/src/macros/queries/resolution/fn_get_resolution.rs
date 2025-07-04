@@ -1,4 +1,5 @@
 use quote::{format_ident, quote};
+use syn::parse_quote;
 
 use crate::{
     configs::DimensionConfig,
@@ -43,7 +44,7 @@ impl std::fmt::Display for GetResolutionQuery<'_> {
 ///     ))
 /// }
 /// ```
-pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = get_resolution_ident(&dimension.id);
     let resolution_ident = resolution_ident(&dimension.id);
@@ -65,7 +66,7 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> proc_macro2::Tok
         .collect::<Vec<_>>();
     let ub_id = format!("{}_ub", dimension.id);
 
-    quote! {
+    parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             #(#args,)*
@@ -85,6 +86,8 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> proc_macro2::Tok
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
 
     #[test]
@@ -126,7 +129,7 @@ mod tests {
 
         let stmt_i = "SELECT i_ub FROM {schema_prefix}dimension_i"; // Note: placing this string literal inside the quote! macro results in a `\n` instead of `\\n`, causing the test to fail.
 
-        let expected_i = quote! {
+        let expected_i: syn::ItemFn = parse_quote! {
             pub async fn get_resolution_i(
                 client: operon::meta_storage::MetaClient<'_>,
             ) -> Result<Option<IResolution>, operon::meta_storage::MetaStorageError> {
@@ -141,7 +144,10 @@ mod tests {
             }
         };
 
-        assert_eq!(result_i.to_string(), expected_i.to_string());
+        assert_eq!(
+            result_i.to_token_stream().to_string(),
+            expected_i.to_token_stream().to_string()
+        );
 
         let dimension_l = DimensionConfig {
             id: "l".to_string(),
@@ -150,7 +156,7 @@ mod tests {
 
         let result_l = fn_get_resolution(&dimension_l);
         let stmt_l = "SELECT l_ub FROM {schema_prefix}dimension_l WHERE j = $1 AND k = $2";
-        let expected_l = quote! {
+        let expected_l: syn::ItemFn = parse_quote! {
             pub async fn get_resolution_l(
                 client: operon::meta_storage::MetaClient<'_>,
                 j: &dimension::J,
@@ -169,6 +175,9 @@ mod tests {
             }
         };
 
-        assert_eq!(result_l.to_string(), expected_l.to_string());
+        assert_eq!(
+            result_l.to_token_stream().to_string(),
+            expected_l.to_token_stream().to_string()
+        );
     }
 }

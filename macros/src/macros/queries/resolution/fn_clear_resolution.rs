@@ -1,4 +1,4 @@
-use quote::quote;
+use syn::parse_quote;
 
 use crate::{
     configs::DimensionConfig,
@@ -32,12 +32,12 @@ impl std::fmt::Display for ClearResolutionQuery<'_> {
 ///     Ok(())
 /// }
 /// ```
-pub(super) fn fn_clear_resolution(dimension: &DimensionConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_clear_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = clear_resolution_ident(&dimension.id);
     let stmt = ClearResolutionQuery(dimension).to_string();
 
-    quote! {
+    parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
         ) -> Result<(), #operon::meta_storage::MetaStorageError> {
@@ -51,6 +51,8 @@ pub(super) fn fn_clear_resolution(dimension: &DimensionConfig) -> proc_macro2::T
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
 
     #[test]
@@ -77,7 +79,7 @@ mod tests {
         let result_i = fn_clear_resolution(&dimension_i);
 
         let stmt_i = "TRUNCATE TABLE {schema_prefix}dimension_i;"; // Note: placing this string literal inside the quote! macro results in a `\n` instead of `\\n`, causing the test to fail.
-        let expected_i = quote! {
+        let expected_i: syn::ItemFn = parse_quote! {
             pub async fn clear_resolution_i(
                 client: operon::meta_storage::MetaClient<'_>,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
@@ -88,6 +90,9 @@ mod tests {
             }
         };
 
-        assert_eq!(result_i.to_string(), expected_i.to_string());
+        assert_eq!(
+            result_i.to_token_stream().to_string(),
+            expected_i.to_token_stream().to_string()
+        );
     }
 }

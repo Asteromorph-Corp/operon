@@ -1,4 +1,4 @@
-use quote::quote;
+use syn::parse_quote;
 
 use crate::{
     configs::JobConfig,
@@ -141,13 +141,13 @@ impl std::fmt::Display for TicketSummaryQuery<'_> {
 ///     Ok(())
 /// }
 /// ```
-pub(super) fn fn_init_ticket(job: &JobConfig) -> proc_macro2::TokenStream {
+pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_ident = init_ticket_ident(&job.id);
     let init_ticket_query = InitTicketQuery(job).to_string();
     let ticket_summary_query = TicketSummaryQuery(job).to_string();
 
-    quote! {
+    parse_quote! {
         pub async fn #fn_ident(
             client: #operon::meta_storage::MetaClient<'_>,
         ) -> Result<(), #operon::meta_storage::MetaStorageError> {
@@ -167,6 +167,7 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> proc_macro2::TokenStream {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use quote::ToTokens;
 
     use super::*;
 
@@ -248,7 +249,7 @@ mod tests {
             dims: vec!["i".to_string()],
         };
 
-        let result = fn_init_ticket(&job).to_string();
+        let result = fn_init_ticket(&job);
         let init_stmt = indoc! {"
             CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_beta (
                 i BIGINT,
@@ -291,7 +292,7 @@ mod tests {
                 EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');"
         };
 
-        let expected = quote! {
+        let expected: syn::ItemFn = parse_quote! {
             pub async fn init_ticket_beta(
                 client: operon::meta_storage::MetaClient<'_>,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
@@ -307,6 +308,9 @@ mod tests {
             }
         };
 
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_eq!(
+            result.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
     }
 }
