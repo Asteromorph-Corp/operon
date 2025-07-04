@@ -1,4 +1,4 @@
-use heck::ToPascalCase;
+use heck::{ToPascalCase, ToSnakeCase};
 use proc_macro_crate::{FoundCrate, crate_name};
 use quote::format_ident;
 
@@ -11,35 +11,47 @@ pub fn operon_ident() -> syn::Ident {
 }
 
 pub fn init_resolution_ident(dimension_id: &str) -> syn::Ident {
-    format_ident!("init_resolution_{dimension_id}")
+    format_ident!("init_resolution_{}", dimension_id.to_snake_case())
 }
 
 pub fn clear_resolution_ident(dimension_id: &str) -> syn::Ident {
-    format_ident!("clear_resolution_{dimension_id}")
+    format_ident!("clear_resolution_{}", dimension_id.to_snake_case())
 }
 
 pub fn get_resolution_ident(dimension_id: &str) -> syn::Ident {
-    format_ident!("get_resolution_{dimension_id}")
+    format_ident!("get_resolution_{}", dimension_id.to_snake_case())
 }
 
 pub fn put_resolution_ident(dimension_id: &str) -> syn::Ident {
-    format_ident!("put_resolution_{dimension_id}")
+    format_ident!("put_resolution_{}", dimension_id.to_snake_case())
 }
 
 pub fn init_ticket_ident(job_id: &str) -> syn::Ident {
-    format_ident!("init_ticket_{job_id}")
+    format_ident!("init_ticket_{}", job_id.to_snake_case())
 }
 
 pub fn clear_ticket_ident(job_id: &str) -> syn::Ident {
-    format_ident!("clear_ticket_{job_id}")
+    format_ident!("clear_ticket_{}", job_id.to_snake_case())
 }
 
-pub fn put_default_tickets_ident(job_id: &str) -> syn::Ident {
-    format_ident!("put_default_tickets_{job_id}")
+pub fn put_ticket_ident(job_id: &str) -> syn::Ident {
+    format_ident!("put_ticket_{}", job_id.to_snake_case())
+}
+
+pub fn get_all_ident(job_id: &str) -> syn::Ident {
+    format_ident!("get_all_{}", job_id.to_snake_case())
+}
+
+pub fn mark_done_ident(job_id: &str) -> syn::Ident {
+    format_ident!("mark_done_{}", job_id.to_snake_case())
 }
 
 pub fn dimension_ident(dimension_id: &str) -> syn::Ident {
     format_ident!("{}", dimension_id.to_pascal_case())
+}
+
+pub fn job_ident(job_id: &str) -> syn::Ident {
+    format_ident!("{}Job", job_id.to_pascal_case())
 }
 
 pub fn resolution_ident(dimension_id: &str) -> syn::Ident {
