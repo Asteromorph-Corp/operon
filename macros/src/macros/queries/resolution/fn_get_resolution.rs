@@ -41,7 +41,7 @@ impl std::fmt::Display for GetResolutionQuery<'_> {
 ///         return Ok(None);
 ///     };
 ///     Ok(Some(IResolution(
-///         usize::try_from(r.get::<_, i64>("i_ub"))?,
+///         usize::try_from(row.get::<_, i64>("i_ub"))?,
 ///     )))
 /// }
 /// ```
@@ -78,7 +78,7 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
                 return Ok(None);
             };
             Ok(Some(#res_ident(
-                usize::try_from(r.get::<_, i64>(#ub_id))?,
+                usize::try_from(row.get::<_, i64>(#ub_id))?,
                 #(#deps,)*
             )))
         }
@@ -140,7 +140,7 @@ mod tests {
                     return Ok(None);
                 };
                 Ok(Some(IResolution(
-                    usize::try_from(r.get::<_, i64>("i_ub"))?,
+                    usize::try_from(row.get::<_, i64>("i_ub"))?,
                 )))
             }
         };
@@ -169,7 +169,7 @@ mod tests {
                     return Ok(None);
                 };
                 Ok(Some(LResolution(
-                    usize::try_from(r.get::<_, i64>("l_ub"))?,
+                    usize::try_from(row.get::<_, i64>("l_ub"))?,
                     j,
                     k,
                 )))
