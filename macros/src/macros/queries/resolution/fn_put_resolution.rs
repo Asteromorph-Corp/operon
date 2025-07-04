@@ -42,7 +42,7 @@ impl std::fmt::Display for PutResolutionQuery<'_> {
 pub(super) fn fn_put_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = format_ident!("put_resolution_{}", dimension.id);
-    let resolution_ident = resolution_ident(&dimension.id);
+    let res_ident = resolution_ident(&dimension.id);
     let stmt = PutResolutionQuery(dimension).to_string();
 
     let indices = (1..=dimension.depends_on.len()).map(syn::Index::from);
@@ -50,7 +50,7 @@ pub(super) fn fn_put_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
     parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            resolution: &#resolution_ident,
+            resolution: &schema::#res_ident,
         ) -> Result<(), #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
@@ -110,7 +110,7 @@ mod tests {
         let expected_i: syn::ItemFn = parse_quote! {
             pub async fn put_resolution_i(
                 client: operon::meta_storage::MetaClient<'_>,
-                resolution: &IResolution,
+                resolution: &schema::IResolution,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt_i);
@@ -134,7 +134,7 @@ mod tests {
         let expected_l: syn::ItemFn = parse_quote! {
             pub async fn put_resolution_l(
                 client: operon::meta_storage::MetaClient<'_>,
-                resolution: &LResolution,
+                resolution: &schema::LResolution,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt_l);

@@ -1,3 +1,4 @@
+use heck::ToSnakeCase;
 use quote::{format_ident, quote};
 use syn::parse_quote;
 
@@ -47,7 +48,7 @@ impl std::fmt::Display for GetResolutionQuery<'_> {
 pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = get_resolution_ident(&dimension.id);
-    let resolution_ident = resolution_ident(&dimension.id);
+    let res_ident = resolution_ident(&dimension.id);
     let stmt = GetResolutionQuery(dimension).to_string();
 
     let deps = &dimension
@@ -59,9 +60,9 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
         .depends_on
         .iter()
         .map(|d| {
-            let arg = format_ident!("{d}");
-            let ty = dimension_ident(d);
-            quote! { #arg: &dimension::#ty }
+            let arg = format_ident!("{}", d.to_snake_case());
+            let dim_ident = dimension_ident(d);
+            quote! { #arg: schema::#dim_ident }
         })
         .collect::<Vec<_>>();
     let ub_id = format!("{}_ub", dimension.id);
@@ -70,13 +71,13 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             #(#args,)*
-        ) -> Result<Option<#resolution_ident>, #operon::meta_storage::MetaStorageError> {
+        ) -> Result<Option<schema::#res_ident>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
             let Some(row) = client.query_opt(&stmt, &[#(&i64::try_from(#deps)?),*]).await? else {
                 return Ok(None);
             };
-            Ok(#resolution_ident(
+            Ok(#res_ident(
                 usize::try_from(r.get::<_, i64>(#ub_id))?,
                 #(#deps,)*
             ))
@@ -132,7 +133,7 @@ mod tests {
         let expected_i: syn::ItemFn = parse_quote! {
             pub async fn get_resolution_i(
                 client: operon::meta_storage::MetaClient<'_>,
-            ) -> Result<Option<IResolution>, operon::meta_storage::MetaStorageError> {
+            ) -> Result<Option<schema::IResolution>, operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt_i);
                 let Some(row) = client.query_opt(&stmt, &[]).await? else {
@@ -159,9 +160,9 @@ mod tests {
         let expected_l: syn::ItemFn = parse_quote! {
             pub async fn get_resolution_l(
                 client: operon::meta_storage::MetaClient<'_>,
-                j: &dimension::J,
-                k: &dimension::K,
-            ) -> Result<Option<LResolution>, operon::meta_storage::MetaStorageError> {
+                j: schema::J,
+                k: schema::K,
+            ) -> Result<Option<schema::LResolution>, operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt_l);
                 let Some(row) = client.query_opt(&stmt, &[&i64::try_from(j)?, &i64::try_from(k)?]).await? else {

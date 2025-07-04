@@ -28,13 +28,13 @@ pub(super) fn fn_get_all(job: &JobConfig) -> syn::ItemFn {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             status: #operon::schema_base::TicketStatus,
-        ) -> Result<Vec<#ticket_ident>, #operon::meta_storage::MetaStorageError> {
+        ) -> Result<Vec<schema::#ticket_ident>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
             let rows = client.query(&stmt, &[&status]).await?;
             let jobs = rows.
                 iter()
-                .map(|row| <#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row(row))
+                .map(|row| <schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row(row))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(jobs)
         }
@@ -73,13 +73,13 @@ mod tests {
             pub async fn get_all_beta(
                 client: operon::meta_storage::MetaClient<'_>,
                 status: operon::schema_base::TicketStatus,
-            ) -> Result<Vec<BetaTicket>, operon::meta_storage::MetaStorageError> {
+            ) -> Result<Vec<schema::BetaTicket>, operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!("SELECT * FROM {schema_prefix}ticket_beta WHERE status = $1;");
                 let rows = client.query(&stmt, &[&status]).await?;
                 let jobs = rows
                     .iter()
-                    .map(|row| <BetaTicket as operon::schema_base::TicketSql>::from_sql_row(row))
+                    .map(|row| <schema::BetaTicket as operon::schema_base::TicketSql>::from_sql_row(row))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(jobs)
             }

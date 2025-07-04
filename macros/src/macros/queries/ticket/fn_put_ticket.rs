@@ -55,7 +55,7 @@ pub(super) fn fn_put_ticket(job: &JobConfig) -> syn::ItemFn {
     parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            ticket: &#ticket_ident,
+            ticket: &schema::#ticket_ident,
         ) -> Result<(), #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let stmt = format!(#stmt);
@@ -114,7 +114,7 @@ mod tests {
         let expected: syn::ItemFn = parse_quote! {
             pub async fn put_ticket_beta(
                 client: operon::meta_storage::MetaClient<'_>,
-                ticket: &BetaTicket,
+                ticket: &schema::BetaTicket,
             ) -> Result<(), operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt);
