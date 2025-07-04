@@ -36,15 +36,6 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> proc_macro2::TokenStream {
         .iter()
         .map(|d| format_ident!("{d}"))
         .collect::<Vec<_>>();
-    let args = job
-        .dims
-        .iter()
-        .map(|d| {
-            let arg = dimension_ident(d);
-            let ty = dimension_ident(d);
-            quote! { #arg: &dimension::#ty }
-        })
-        .collect::<Vec<_>>();
 
     quote! {
         pub async fn #fn_name(
