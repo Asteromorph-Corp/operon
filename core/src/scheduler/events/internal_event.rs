@@ -1,5 +1,5 @@
 use crate::{
-    misc::{Job, Resolution},
+    schema_base::{Job, Resolution},
     scheduler::SchedulerError,
 };
 

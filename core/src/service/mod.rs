@@ -1,4 +1,4 @@
-use crate::misc::{JobEnum, ResolutionEnum};
+use crate::schema_base::{JobEnum, ResolutionEnum};
 
 pub trait OperonService: Send + Sync + 'static {
     type JobEnum: JobEnum;

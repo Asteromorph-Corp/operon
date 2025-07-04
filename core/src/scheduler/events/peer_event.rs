@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 use async_trait::async_trait;
 
 use crate::{
-    misc::{JobEnum, ResolutionEnum},
+    schema_base::{JobEnum, ResolutionEnum},
     scheduler::SchedulerError,
 };
 

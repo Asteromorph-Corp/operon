@@ -2,8 +2,8 @@ use async_trait::async_trait;
 
 use crate::{
     meta_storage::MetaClient,
-    misc::{Job, Resolution, Ticket},
     scheduler::{JobRebuilder, PeerEventSenders, SchedulerError},
+    schema_base::{Job, Resolution, Ticket},
     service::OperonService,
     storage::OperonStorage,
 };

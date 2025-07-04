@@ -3,7 +3,7 @@ use postgres_types::ToSql;
 
 use crate::{
     meta_storage::{MetaClient, MetaStorageError},
-    misc::{Job, Resolution, TicketStatus},
+    schema_base::{Job, Resolution, TicketStatus},
 };
 
 /// Trait that represents tickets for the jobs.
