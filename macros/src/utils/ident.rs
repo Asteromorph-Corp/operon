@@ -50,6 +50,14 @@ pub fn dimension_ident(dimension_id: &str) -> syn::Ident {
     format_ident!("{}", dimension_id.to_pascal_case())
 }
 
+pub fn job_field_ident(dimension_id: &str) -> syn::Ident {
+    format_ident!("{}", dimension_id.to_snake_case())
+}
+
+pub fn variant_ident(dimension_id: &str) -> syn::Ident {
+    format_ident!("{}", dimension_id.to_pascal_case())
+}
+
 pub fn job_ident(job_id: &str) -> syn::Ident {
     format_ident!("{}Job", job_id.to_pascal_case())
 }
@@ -60,4 +68,8 @@ pub fn resolution_ident(dimension_id: &str) -> syn::Ident {
 
 pub fn ticket_ident(job_id: &str) -> syn::Ident {
     format_ident!("{}Ticket", job_id.to_pascal_case())
+}
+
+pub fn resolution_enum_ident() -> syn::Ident {
+    format_ident!("ResolutionEnum")
 }
