@@ -31,7 +31,7 @@ impl std::fmt::Display for GetResolutionQuery<'_> {
 /// Generates the `get_resolution_*` function for a given dimension.
 ///
 /// Example:
-/// ```ignore
+/// ```rust,ignore
 /// pub async fn get_resolution_i(
 ///    client: operon::meta_storage::MetaClient<'_>,
 /// ) -> Result<Option<IResolution>, operon::meta_storage::MetaStorageError> {

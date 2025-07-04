@@ -34,7 +34,7 @@ impl std::fmt::Display for PutTicketQuery<'_> {
 /// Generates the `clear_ticket_*` function for a given job.
 ///
 /// Example:
-/// ```ignore
+/// ```rust,ignore
 /// pub async fn put_default_tickets_beta(
 ///     client: operon::meta_storage::MetaClient<'_>,
 /// ) -> Result<(), operon::meta_storage::MetaStorageError> {

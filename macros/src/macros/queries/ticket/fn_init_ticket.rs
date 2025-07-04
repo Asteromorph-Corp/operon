@@ -88,7 +88,7 @@ impl std::fmt::Display for TicketSummaryQuery<'_> {
 /// Generates the `init_ticket_*` function for a given job.
 ///
 /// Example:
-/// ```ignore
+/// ```rust,ignore
 /// pub async fn init_tickets_beta(
 ///     client: operon::meta_storage::MetaClient<'_>
 /// ) -> Result<(), operon::meta_storage::MetaStorageError> {

@@ -21,7 +21,7 @@ impl std::fmt::Display for ClearResolutionQuery<'_> {
 /// Generates the `clear_resolution_*` function for a given dimension.
 ///
 /// Example:
-/// ```ignore
+/// ```rust,ignore
 /// pub async fn clear_resolution_i(
 ///   client: operon::meta_storage::MetaClient<'_>,
 /// ) -> Result<(), operon::meta_storage::MetaStorageError> {
