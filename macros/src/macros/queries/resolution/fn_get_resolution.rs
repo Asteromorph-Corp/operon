@@ -40,7 +40,7 @@ impl std::fmt::Display for GetResolutionQuery<'_> {
 ///     let Some(row) = client.query_opt(&stmt, &[]).await? else {
 ///         return Ok(None);
 ///     };
-///     Ok(Some(IResolution(
+///     Ok(Some(schema::IResolution(
 ///         usize::try_from(row.get::<_, i64>("i_ub"))?,
 ///     )))
 /// }
@@ -77,7 +77,7 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
             let Some(row) = client.query_opt(&stmt, &[#(&i64::try_from(#deps)?),*]).await? else {
                 return Ok(None);
             };
-            Ok(Some(#res_ident(
+            Ok(Some(schema::#res_ident(
                 usize::try_from(row.get::<_, i64>(#ub_id))?,
                 #(#deps,)*
             )))
@@ -139,7 +139,7 @@ mod tests {
                 let Some(row) = client.query_opt(&stmt, &[]).await? else {
                     return Ok(None);
                 };
-                Ok(Some(IResolution(
+                Ok(Some(schema::IResolution(
                     usize::try_from(row.get::<_, i64>("i_ub"))?,
                 )))
             }
@@ -168,7 +168,7 @@ mod tests {
                 let Some(row) = client.query_opt(&stmt, &[&i64::try_from(j)?, &i64::try_from(k)?]).await? else {
                     return Ok(None);
                 };
-                Ok(Some(LResolution(
+                Ok(Some(schema::LResolution(
                     usize::try_from(row.get::<_, i64>("l_ub"))?,
                     j,
                     k,
