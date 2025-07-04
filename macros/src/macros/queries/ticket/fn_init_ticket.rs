@@ -156,7 +156,7 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
             let init_stmt = format!(#init_ticket_query);
             let summary_stmt = format!(#ticket_summary_query);
 
-            client.execute(init_stmt, &[]).await?;
+            client.execute(&init_stmt, &[]).await?;
             client.execute(&summary_stmt, &[&job.id]).await?;
 
             Ok(())
@@ -301,7 +301,7 @@ mod tests {
                 let init_stmt = format!(#init_stmt);
                 let summary_stmt = format!(#summary_stmt);
 
-                client.execute(init_stmt, &[]).await?;
+                client.execute(&init_stmt, &[]).await?;
                 client.execute(&summary_stmt, &[&job.id]).await?;
 
                 Ok(())
