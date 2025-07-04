@@ -7,7 +7,7 @@ use tokio::sync::{RwLock, Semaphore};
 
 use crate::{
     meta_storage::{MetaClient, MetaStorage},
-    misc::{JobSql, ResolutionSql, TicketSql},
+    misc::{JobSql, ResolutionSql, TicketSql, TicketStatus},
     operon::RunningState,
     scheduler::{
         ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
@@ -50,7 +50,7 @@ where
     Sto: OperonStorage,
     J: JobSql,
     R: ResolutionSql,
-    T: TicketSql<Svc, Job = J, Resolution = R>,
+    T: TicketSql<Job = J, Resolution = R>,
     JS: JobSpec<Svc, Sto, Job = J, Resolution = R, Ticket = T>,
 {
     #[allow(clippy::too_many_arguments)]
@@ -159,7 +159,7 @@ where
         clean: bool,
     ) -> RunningState
     where
-        T: TicketSql<Svc>,
+        T: TicketSql,
     {
         // Create an internal channel for `InternalEvent`s.
         let mut peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
@@ -172,7 +172,7 @@ where
             let Ok(conn) = self.meta_storage.conn().await.map_err(SchedulerError::from) else {
                 return RunningState::Error;
             };
-            let Ok(tickets) = T::get_all_queued(conn.as_client()).await else {
+            let Ok(tickets) = T::get_all(conn.as_client(), TicketStatus::Queued).await else {
                 return RunningState::Error;
             };
             match self.check_initial_data(tickets) {

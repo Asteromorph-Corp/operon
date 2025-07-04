@@ -89,7 +89,7 @@ where
     Sto: OperonStorage,
     J: JobSql,
     R: ResolutionSql,
-    T: TicketSql<Svc, Job = J, Resolution = R>,
+    T: TicketSql<Job = J, Resolution = R>,
     JS: JobSpec<Svc, Sto, Job = J, Resolution = R, Ticket = T> + Clone,
 {
     fn job_id(&self) -> &'static str {
