@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::{
     configs::JobConfig,
-    utils::{init_ticket_ident, operon_ident},
+    utils::{init_ticket_ident, job_ident, operon_ident},
 };
 
 /// Helper struct to generate the SQL query for initializing a ticket table.
@@ -94,7 +94,7 @@ impl std::fmt::Display for TicketSummaryQuery<'_> {
 /// ) -> Result<(), operon::meta_storage::MetaStorageError> {
 ///     let schema_prefix = client.schema_prefix();
 ///     let ticket_status_type = client.ticket_status_type();
-///     let create_table = format!(
+///     let init_stmt = format!(
 ///         "CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_beta (
 ///             i BIGINT,
 ///             resolved BOOLEAN NOT NULL,
@@ -105,7 +105,7 @@ impl std::fmt::Display for TicketSummaryQuery<'_> {
 ///             PRIMARY KEY (i)
 ///         )"
 ///     ); // TODO: move this to `Ticket` trait and automate using derive macro
-///     let init_summary = format!(
+///     let summary_stmt = format!(
 ///         "INSERT INTO {schema_prefix}ticket_summary (job_id, waiting, queued, done)
 ///         VALUES ($1, 0, 0, 0)
 ///         ON CONFLICT DO NOTHING;
@@ -136,14 +136,15 @@ impl std::fmt::Display for TicketSummaryQuery<'_> {
 ///             FOR EACH STATEMENT
 ///             EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');"
 ///     );
-///     client.execute(&create_table, &[]).await?;
-///     client.execute(&init_summary, &[&BETA_ID]).await?;
+///     client.execute(&init_stmt, &[]).await?;
+///     client.execute(&summary_stmt, &[&<schema::BetaJob as operon::schema_base::Job>::id()]).await?;
 ///     Ok(())
 /// }
 /// ```
 pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_ident = init_ticket_ident(&job.id);
+    let job_ident = job_ident(&job.id);
     let init_ticket_query = InitTicketQuery(job).to_string();
     let ticket_summary_query = TicketSummaryQuery(job).to_string();
 
@@ -157,7 +158,7 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
             let summary_stmt = format!(#ticket_summary_query);
 
             client.execute(&init_stmt, &[]).await?;
-            client.execute(&summary_stmt, &[&job.id]).await?;
+            client.execute(&summary_stmt, &[&<schema::#job_ident as #operon::schema_base::Job>::id()]).await?;
 
             Ok(())
         }
@@ -302,7 +303,7 @@ mod tests {
                 let summary_stmt = format!(#summary_stmt);
 
                 client.execute(&init_stmt, &[]).await?;
-                client.execute(&summary_stmt, &[&job.id]).await?;
+                client.execute(&summary_stmt, &[&<schema::BetaJob as operon::schema_base::Job>::id()]).await?;
 
                 Ok(())
             }
