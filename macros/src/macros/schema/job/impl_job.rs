@@ -54,7 +54,7 @@ mod tests {
         let expected: syn::ItemImpl = parse_quote! {
             #[automatically_derived]
             impl operon::schema_base::Job for BetaJob {
-                fn id(&self) -> &str {
+                fn id() -> &str {
                     BETA_ID
                 }
 
@@ -96,7 +96,7 @@ mod tests {
         let expected: syn::ItemImpl = parse_quote! {
             #[automatically_derived]
             impl operon::schema_base::Job for EpsilonJob {
-                fn id(&self) -> &str {
+                fn id() -> &str {
                     EPSILON_ID
                 }
 
