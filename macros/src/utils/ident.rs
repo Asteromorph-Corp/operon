@@ -1,4 +1,4 @@
-use heck::{ToPascalCase, ToSnakeCase};
+use heck::{ToPascalCase, ToShoutySnakeCase, ToSnakeCase};
 use proc_macro_crate::{FoundCrate, crate_name};
 use quote::format_ident;
 
@@ -78,4 +78,12 @@ pub fn ticket_ident(job_id: &JobId) -> syn::Ident {
 
 pub fn resolution_enum_ident() -> syn::Ident {
     format_ident!("ResolutionEnum")
+}
+
+pub fn job_enum_ident() -> syn::Ident {
+    format_ident!("JobEnum")
+}
+
+pub fn job_id_ident(job_id: &JobId) -> syn::Ident {
+    format_ident!("{}_ID", job_id.to_shouty_snake_case())
 }
