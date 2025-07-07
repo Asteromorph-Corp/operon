@@ -9,7 +9,6 @@ pub mod storage;
 pub mod ui;
 
 mod utils;
-pub use utils::OptionExt;
 
 // Re-export the external crates used in the macro expansions
 pub extern crate anyhow;
