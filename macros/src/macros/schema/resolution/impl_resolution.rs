@@ -10,6 +10,7 @@ use crate::{
 /// Example:
 ///
 /// ```rust,ignore
+/// #[automatically_derived]
 /// impl operon::schema_base::Resolution for JResolution {
 ///     type PrimaryKey = (I,);
 ///
@@ -37,6 +38,7 @@ pub(super) fn impl_resolution(dimension: &DimensionConfig) -> syn::ItemImpl {
     let pkey_indices = (0..dep_dim_idents.len()).map(syn::Index::from);
 
     parse_quote! {
+        #[automatically_derived]
         impl #operon::schema_base::Resolution for #res_ident {
             type PrimaryKey = (#(#dep_dim_idents,)*);
 
@@ -75,6 +77,7 @@ mod tests {
 
         let result_i = impl_resolution(&dimension_i);
         let expected_i: syn::ItemImpl = parse_quote! {
+            #[automatically_derived]
             impl operon::schema_base::Resolution for IResolution {
                 type PrimaryKey = ();
 
@@ -105,6 +108,7 @@ mod tests {
         };
         let result = impl_resolution(&dimension_k);
         let expected: syn::ItemImpl = parse_quote! {
+            #[automatically_derived]
             impl operon::schema_base::Resolution for JResolution {
                 type PrimaryKey = (I,);
 

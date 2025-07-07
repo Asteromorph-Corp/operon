@@ -13,6 +13,7 @@ use crate::{
 /// Example:
 /// ```rust,ignore
 /// #[operon::async_trait::async_trait]
+/// #[automatically_derived]
 /// impl operon::schema_base::ResolutionSql for IResolution {
 ///     async fn init_table(
 ///         client: operon::meta_storage::MetaClient<'_>,
@@ -54,6 +55,7 @@ pub(super) fn impl_resolution_sql(dimension: &DimensionConfig) -> syn::ItemImpl 
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
+        #[automatically_derived]
         impl #operon::schema_base::ResolutionSql for #res_ident {
             async fn init_table(
                 client: #operon::meta_storage::MetaClient<'_>,
@@ -100,6 +102,7 @@ mod tests {
         let result_i = impl_resolution_sql(&dimension_i);
         let expected_i: syn::ItemImpl = parse_quote! {
             #[operon::async_trait::async_trait]
+            #[automatically_derived]
             impl operon::schema_base::ResolutionSql for IResolution {
                 async fn init_table(
                     client: operon::meta_storage::MetaClient<'_>,
