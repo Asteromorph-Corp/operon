@@ -76,6 +76,10 @@ pub fn variable_ident(id: &str) -> syn::Ident {
     format_ident!("{}", id.to_snake_case())
 }
 
+pub fn sender_ident(job_id: &JobId) -> syn::Ident {
+    format_ident!("to_{}", job_id.to_snake_case())
+}
+
 pub fn job_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}Job", job_id.to_pascal_case())
 }
@@ -86,6 +90,18 @@ pub fn resolution_ident(dimension_id: &DimensionId) -> syn::Ident {
 
 pub fn ticket_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}Ticket", job_id.to_pascal_case())
+}
+
+pub fn spec_ident(job_id: &JobId) -> syn::Ident {
+    format_ident!("{}Spec", job_id.to_pascal_case())
+}
+
+pub fn rebuilder_ident(job_id: &JobId) -> syn::Ident {
+    format_ident!("{}Rebuilder", job_id.to_pascal_case())
+}
+
+pub fn peer_txs_ident(job_id: &JobId) -> syn::Ident {
+    format_ident!("{}PeerTxs", job_id.to_pascal_case())
 }
 
 pub fn resolution_enum_ident() -> syn::Ident {
