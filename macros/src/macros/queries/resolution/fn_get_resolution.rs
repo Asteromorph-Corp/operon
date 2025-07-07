@@ -1,4 +1,3 @@
-use quote::quote;
 use syn::parse_quote;
 
 use crate::{
@@ -57,10 +56,10 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
         .iter()
         .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
-    let args = dimension.depends_on.iter().map(|d| {
+    let args = dimension.depends_on.iter().map(|d| -> syn::FnArg {
         let arg = variable_ident(d);
         let dim_ident = dimension_ident(d);
-        quote! { #arg: schema::#dim_ident }
+        parse_quote! { #arg: schema::#dim_ident }
     });
     let ub_id = format!("{}_ub", dimension.id);
 
