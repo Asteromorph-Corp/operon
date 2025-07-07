@@ -3,6 +3,12 @@ use syn::parse_quote;
 
 use crate::{configs::JobId, utils::job_id_ident};
 
+/// Generates a constant variable for the given job ID.
+///
+/// Example:
+/// ```rust,ignore
+/// const BETA_ID: &str = "beta";
+/// ```
 pub(super) fn const_job_id(job_id: &JobId) -> syn::ItemConst {
     let id_ident = job_id_ident(job_id);
     let id = job_id.to_snake_case();

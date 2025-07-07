@@ -6,6 +6,21 @@ use crate::{
     utils::{find_dependencies, job_id_ident, job_ident},
 };
 
+/// Generates an implementation of the `Job` trait for the given job configuration.
+/// 
+/// Example:
+/// ```rust,ignore
+/// #[automatically_derived]
+/// impl operon::schema_base::Job for BetaJob {
+///     fn id() -> &str {
+///         BETA_ID
+///     }
+/// 
+///     fn is_descendant_of(other: &str) -> bool {
+///         other == BETA_ID
+///     }
+/// }
+/// ```
 pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
     let operon = crate::utils::operon_ident();
     let job_ident = job_ident(&job.id);
