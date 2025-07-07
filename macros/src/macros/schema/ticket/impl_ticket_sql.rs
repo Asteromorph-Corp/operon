@@ -173,7 +173,7 @@ mod tests {
                 fn to_sql_copy_params(&self) -> Result<String, operon::meta_storage::MetaStorageError> {
                     Ok(format!(
                         "{},{},{},{},{},{}\n",
-                        self.i.to_sql()?, // TODO: remove unwrap
+                        self.i.to_sql()?,
                         operon::schema_base::Ticket::is_resolved(self),
                         self.deps_count,
                         self.deps_quota.map_or(String::new(), |q| q.to_string()),
