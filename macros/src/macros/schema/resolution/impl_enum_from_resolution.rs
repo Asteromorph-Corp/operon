@@ -9,6 +9,7 @@ use crate::{
 ///
 /// Example:
 /// ```rust,ignore
+/// #[automatically_derived]
 /// impl From<IResolution> for ResolutionEnum {
 ///     fn from(resolution: IResolution) -> Self {
 ///         Self::I(resolution)
@@ -21,6 +22,7 @@ pub(super) fn impl_enum_from_resolution(dimension: &DimensionConfig) -> syn::Ite
     let variant_ident = variant_ident(&dimension.id);
 
     parse_quote! {
+        #[automatically_derived]
         impl From<#res_ident> for #res_enum_ident {
             fn from(resolution: #res_ident) -> Self {
                 Self::#variant_ident(resolution)
@@ -44,6 +46,7 @@ mod tests {
 
         let result_i = impl_enum_from_resolution(&dimension_i);
         let expected_i: syn::ItemImpl = parse_quote! {
+            #[automatically_derived]
             impl From<IResolution> for ResolutionEnum {
                 fn from(resolution: IResolution) -> Self {
                     Self::I(resolution)

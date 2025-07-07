@@ -9,6 +9,7 @@ use crate::{
 ///
 /// Example:
 /// ```rust, ignore
+/// #[automatically_derived]
 /// impl operon::schema_base::ResolutionEnum for ResolutionEnum {
 ///     fn primary(resolution: usize) -> Self {
 ///         Self::I(IResolution(resolution))
