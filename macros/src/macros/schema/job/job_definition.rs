@@ -12,7 +12,7 @@ use crate::{
 /// #[doc = "A struct representing the job `beta`."]
 /// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// pub struct BetaJob {
-///     pub i: schema::IDim,
+///     pub i: IDim,
 /// }
 /// ```
 pub(super) fn job_definition(job: &JobConfig) -> syn::ItemStruct {
@@ -22,7 +22,7 @@ pub(super) fn job_definition(job: &JobConfig) -> syn::ItemStruct {
         let dim_ident = dimension_ident(dim);
 
         parse_quote! {
-            pub #arg: schema::#dim_ident
+            pub #arg: #dim_ident
         }
     });
 
@@ -58,7 +58,7 @@ mod tests {
             #[doc = "A struct representing the job `beta`."]
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct BetaJob {
-                pub i: schema::IDim,
+                pub i: IDim,
             }
         };
 
@@ -82,8 +82,8 @@ mod tests {
             #[doc = "A struct representing the job `epsilon`."]
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct EpsilonJob {
-                pub i: schema::IDim,
-                pub k: schema::KDim,
+                pub i: IDim,
+                pub k: KDim,
             }
         };
 
