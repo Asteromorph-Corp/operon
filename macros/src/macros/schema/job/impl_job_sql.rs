@@ -54,6 +54,7 @@ mod tests {
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
         };
         let item = impl_job_sql(&job);
         let expected: syn::ItemImpl = parse_quote! {

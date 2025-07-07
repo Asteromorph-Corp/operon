@@ -51,6 +51,7 @@ mod tests {
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
         };
         let item = job_definition(&job);
         let expected: syn::ItemStruct = parse_quote! {
@@ -70,18 +71,19 @@ mod tests {
     #[test]
     fn test_job_definition_multiple_dims() {
         let job = JobConfig {
-            id: "gamma".to_string(),
-            from: vec!["a".to_string()],
-            to: "c".to_string(),
-            dims: vec!["i".to_string(), "j".to_string()],
+            id: "epsilon".to_string(),
+            from: vec!["b".to_string(), "d".to_string()],
+            to: "e".to_string(),
+            dims: vec!["i".to_string(), "k".to_string()],
+            spawn_dim: None,
         };
         let item = job_definition(&job);
         let expected: syn::ItemStruct = parse_quote! {
-            #[doc = "A struct representing the job `gamma`."]
+            #[doc = "A struct representing the job `epsilon`."]
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-            pub struct GammaJob {
+            pub struct EpsilonJob {
                 pub i: schema::IDim,
-                pub j: schema::JDim,
+                pub k: schema::KDim,
             }
         };
 

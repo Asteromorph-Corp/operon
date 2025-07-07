@@ -179,6 +179,7 @@ mod tests {
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
         };
 
         let init_ticket = InitTicketQuery(&job).to_string();
@@ -204,6 +205,7 @@ mod tests {
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
         };
 
         let ticket_summary = TicketSummaryQuery(&job).to_string();
@@ -248,6 +250,7 @@ mod tests {
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
         };
 
         let result = fn_init_ticket(&job);

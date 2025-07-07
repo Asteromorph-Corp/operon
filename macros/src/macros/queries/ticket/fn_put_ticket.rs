@@ -89,6 +89,7 @@ mod tests {
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
         };
         let query = PutTicketQuery(&job).to_string();
         let expected = indoc! {"
@@ -106,6 +107,7 @@ mod tests {
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
         };
 
         let result = fn_put_ticket(&job);

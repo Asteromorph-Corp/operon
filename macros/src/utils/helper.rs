@@ -73,7 +73,8 @@ mod tests {
                     id: "beta".to_string(),
                     from: vec!["a".to_string()],
                     to: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
+                    dims: vec!["i".to_string()],
+                    spawn_dim: Some("j".to_string()),
                 },
             ),
             (
@@ -82,7 +83,8 @@ mod tests {
                     id: "gamma".to_string(),
                     from: vec!["a".to_string()],
                     to: "c".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
+                    dims: vec!["i".to_string()],
+                    spawn_dim: Some("k".to_string()),
                 },
             ),
             (
@@ -91,7 +93,8 @@ mod tests {
                     id: "delta".to_string(),
                     from: vec!["a".to_string(), "b".to_string(), "c".to_string()],
                     to: "d".to_string(),
-                    dims: vec!["i".to_string(), "k".to_string()],
+                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
+                    spawn_dim: None,
                 },
             ),
             (
@@ -100,7 +103,8 @@ mod tests {
                     id: "epsilon".to_string(),
                     from: vec!["b".to_string(), "d".to_string()],
                     to: "e".to_string(),
-                    dims: vec![],
+                    dims: vec!["i".to_string(), "k".to_string()],
+                    spawn_dim: None,
                 },
             ),
             (
@@ -110,6 +114,7 @@ mod tests {
                     from: vec!["c".to_string(), "e".to_string()],
                     to: "f".to_string(),
                     dims: vec!["i".to_string()],
+                    spawn_dim: None,
                 },
             ),
         ]);
