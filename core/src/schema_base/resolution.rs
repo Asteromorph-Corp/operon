@@ -28,6 +28,10 @@ pub trait ResolutionSql: Resolution {
     async fn put(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>;
 }
 
+pub trait ResolutionEnum: Debug + Clone + Send + Sync + 'static {
+    fn primary(resolution: usize) -> Self;
+}
+
 impl Resolution for () {
     type PrimaryKey = ();
 
@@ -40,6 +44,24 @@ impl Resolution for () {
     fn new(_ub: usize, _primary_key: Self::PrimaryKey) -> Self {}
 }
 
-pub trait ResolutionEnum: Debug + Clone + Send + Sync + 'static {
-    fn primary(resolution: usize) -> Self;
+#[async_trait]
+impl ResolutionSql for () {
+    async fn init_table(_client: MetaClient<'_>) -> Result<(), MetaStorageError> {
+        Ok(())
+    }
+
+    async fn clear_table(_client: MetaClient<'_>) -> Result<(), MetaStorageError> {
+        Ok(())
+    }
+
+    async fn get(
+        _client: MetaClient<'_>,
+        _primary_key: Self::PrimaryKey,
+    ) -> Result<Option<Self>, MetaStorageError> {
+        Ok(Some(()))
+    }
+
+    async fn put(&self, _client: MetaClient<'_>) -> Result<(), MetaStorageError> {
+        Ok(())
+    }
 }
