@@ -15,6 +15,8 @@ pub struct JobConfig {
     pub to: EntityId,
     /// Dimensions this job repeat on.
     pub dims: Vec<DimensionId>,
+    /// Dimension this job spawns.
+    pub spawn_dim: Option<DimensionId>,
 }
 
 pub type JobConfigMap = IndexMap<JobId, JobConfig>;
