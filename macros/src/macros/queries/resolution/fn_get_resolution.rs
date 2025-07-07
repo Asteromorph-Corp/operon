@@ -3,7 +3,9 @@ use syn::parse_quote;
 
 use crate::{
     configs::DimensionConfig,
-    utils::{arg_ident, dimension_ident, get_resolution_ident, operon_ident, resolution_ident},
+    utils::{
+        dimension_ident, get_resolution_ident, operon_ident, resolution_ident, variable_ident,
+    },
 };
 
 /// Helper struct to generate the SQL query for getting a dimension's resolution.
@@ -53,10 +55,10 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
     let deps = &dimension
         .depends_on
         .iter()
-        .map(|d| arg_ident(d))
+        .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
     let args = dimension.depends_on.iter().map(|d| {
-        let arg = arg_ident(d);
+        let arg = variable_ident(d);
         let dim_ident = dimension_ident(d);
         quote! { #arg: schema::#dim_ident }
     });
