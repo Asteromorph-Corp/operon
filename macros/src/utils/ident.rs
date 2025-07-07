@@ -49,7 +49,7 @@ pub fn mark_done_ident(job_id: &JobId) -> syn::Ident {
 }
 
 pub fn dimension_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("{}", dimension_id.to_pascal_case())
+    format_ident!("{}Dim", dimension_id.to_pascal_case())
 }
 
 pub fn job_field_ident(dimension_id: &DimensionId) -> syn::Ident {
