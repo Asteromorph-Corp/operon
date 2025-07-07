@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Generates an enum representing all jobs in the job configuration map.
-/// 
+///
 /// Example:
 /// ```rust,ignore
 /// #[doc = "An enum representing any job."]
@@ -55,6 +55,7 @@ mod tests {
                     from: vec!["a".to_string()],
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
+                    spawn_dim: Some("j".to_string()),
                 },
             ),
             (
@@ -63,7 +64,8 @@ mod tests {
                     id: "gamma".to_string(),
                     from: vec!["a".to_string()],
                     to: "c".to_string(),
-                    dims: vec!["j".to_string()],
+                    dims: vec!["i".to_string()],
+                    spawn_dim: Some("k".to_string()),
                 },
             ),
         ]);

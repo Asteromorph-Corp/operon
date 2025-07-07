@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// Generates an implementation of the `Job` trait for the given job configuration.
-/// 
+///
 /// Example:
 /// ```rust,ignore
 /// #[automatically_derived]
@@ -15,7 +15,7 @@ use crate::{
 ///     fn id() -> &str {
 ///         BETA_ID
 ///     }
-/// 
+///
 ///     fn is_descendant_of(other: &str) -> bool {
 ///         other == BETA_ID
 ///     }
@@ -62,6 +62,7 @@ mod tests {
             from: vec!["a".to_string()],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
         };
         let jobs = JobConfigMap::from_iter([("beta".to_string(), job.clone())]);
 
@@ -89,9 +90,10 @@ mod tests {
     fn test_impl_job_with_dependencies() {
         let job_epsilon = JobConfig {
             id: "epsilon".to_string(),
-            from: vec!["a".to_string(), "b".to_string()],
-            to: "c".to_string(),
-            dims: vec!["i".to_string(), "j".to_string()],
+            from: vec!["b".to_string(), "d".to_string()],
+            to: "e".to_string(),
+            dims: vec!["i".to_string(), "k".to_string()],
+            spawn_dim: None,
         };
 
         let jobs = JobConfigMap::from_iter([
@@ -102,6 +104,7 @@ mod tests {
                     from: vec!["a".to_string()],
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
+                    spawn_dim: Some("j".to_string()),
                 },
             ),
             ("epsilon".to_string(), job_epsilon.clone()),
