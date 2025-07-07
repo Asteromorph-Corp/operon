@@ -25,7 +25,7 @@ pub fn mod_queries(dimensions: Vec<DimensionConfig>, jobs: Vec<JobConfig>) -> sy
             }
 
             pub use resolution::*;
-            pub use resolution::*;
+            pub use ticket::*;
         }
     }
 }
