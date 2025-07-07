@@ -56,7 +56,7 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
-        pub trait #storage_ident: #operon::service::OperonService {
+        pub trait #storage_ident: #operon::storage::OperonStorage {
             #(#fns)*
         }
     }
@@ -92,7 +92,7 @@ mod tests {
         let item = trait_storage(&all_config);
         let expected: syn::ItemTrait = parse_quote! {
             #[operon::async_trait::async_trait]
-            pub trait CookingStorage: operon::service::OperonService {
+            pub trait CookingStorage: operon::storage::OperonStorage {
                 async fn get_a(&self, i: schema::IDim) -> Result<Option<A>, operon::storage::StorageError>;
                 async fn put_a(&self, i: schema::IDim, value: &A) -> Result<(), operon::storage::StorageError>;
 
