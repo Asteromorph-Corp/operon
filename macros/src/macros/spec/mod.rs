@@ -1,3 +1,4 @@
+mod individual;
 mod primary;
 
 mod mod_spec;
