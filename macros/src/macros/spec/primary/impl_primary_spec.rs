@@ -81,7 +81,10 @@ pub fn impl_primary_spec(
                 primary_ub: usize,
             ) -> Result<bool, #operon::scheduler::SchedulerError> {
                 // Pull the primary resolution from the metadata storage..
-                let Some(schema::#res_ident(i_ub)) = Self::Resolution::get(client, ()).await? else {
+                let Some(schema::#res_ident(i_ub)) =
+                    <schema::#res_ident as #operon::schema_base::ResolutionSql>::get(client, ())
+                    .await?
+                else {
                     // This is technically unreachable, because we check this same value
                     // in `check_recovery_state`.
                     #operon::log::info!("No primary resolution found in the metadata storage.");
@@ -135,7 +138,10 @@ mod tests {
                     primary_ub: usize,
                 ) -> Result<bool, operon::scheduler::SchedulerError> {
                     // Pull the primary resolution from the metadata storage..
-                    let Some(schema::IResolution(i_ub)) = Self::Resolution::get(client, ()).await? else {
+                    let Some(schema::IResolution(i_ub)) =
+                        <schema::IResolution as operon::schema_base::ResolutionSql>::get(client, ())
+                            .await?
+                    else {
                         // This is technically unreachable, because we check this same value
                         // in `check_recovery_state`.
                         operon::log::info!("No primary resolution found in the metadata storage.");
