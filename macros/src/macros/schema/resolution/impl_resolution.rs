@@ -12,7 +12,7 @@ use crate::{
 /// ```rust,ignore
 /// #[automatically_derived]
 /// impl operon::schema_base::Resolution for JResolution {
-///     type PrimaryKey = (I,);
+///     type PrimaryKey = (IDim,);
 ///
 ///     #[allow(clippy::unused_unit)]
 ///     fn primary_key(&self) -> Self::PrimaryKey {
@@ -110,7 +110,7 @@ mod tests {
         let expected: syn::ItemImpl = parse_quote! {
             #[automatically_derived]
             impl operon::schema_base::Resolution for JResolution {
-                type PrimaryKey = (I,);
+                type PrimaryKey = (IDim,);
 
                 #[allow(clippy::unused_unit)]
                 fn primary_key(&self) -> Self::PrimaryKey {
