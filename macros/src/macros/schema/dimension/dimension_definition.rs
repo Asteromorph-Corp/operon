@@ -6,7 +6,7 @@ use crate::{configs::DimensionId, utils::dimension_ident};
 ///
 /// Example:
 /// ```rust,ignore
-/// pub type I = usize;
+/// pub type IDim = usize;
 /// ```
 pub(super) fn dimension_definition(dimension_id: &DimensionId) -> syn::ItemType {
     let dim_ident = dimension_ident(dimension_id);
@@ -28,7 +28,7 @@ mod tests {
         let dimension_id = DimensionId::from("i");
         let item = dimension_definition(&dimension_id);
         let expected: syn::ItemType = parse_quote! {
-            pub type I = usize;
+            pub type IDim = usize;
         };
         assert_eq!(
             item.to_token_stream().to_string(),

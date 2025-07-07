@@ -157,8 +157,8 @@ mod tests {
         let expected_l: syn::ItemFn = parse_quote! {
             pub async fn get_resolution_l(
                 client: operon::meta_storage::MetaClient<'_>,
-                j: schema::J,
-                k: schema::K,
+                j: schema::JDim,
+                k: schema::KDim,
             ) -> Result<Option<schema::LResolution>, operon::meta_storage::MetaStorageError> {
                 let schema_prefix = client.schema_prefix();
                 let stmt = format!(#stmt_l);

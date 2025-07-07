@@ -12,7 +12,7 @@ use crate::{
 /// #[doc = "A struct representing the job `beta`."]
 /// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// pub struct BetaJob {
-///     pub i: schema::I,
+///     pub i: schema::IDim,
 /// }
 /// ```
 pub(super) fn job_definition(job: &JobConfig) -> syn::ItemStruct {
@@ -57,7 +57,7 @@ mod tests {
             #[doc = "A struct representing the job `beta`."]
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct BetaJob {
-                pub i: schema::I,
+                pub i: schema::IDim,
             }
         };
 
@@ -80,8 +80,8 @@ mod tests {
             #[doc = "A struct representing the job `gamma`."]
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct GammaJob {
-                pub i: schema::I,
-                pub j: schema::J,
+                pub i: schema::IDim,
+                pub j: schema::JDim,
             }
         };
 

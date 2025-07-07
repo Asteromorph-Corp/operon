@@ -11,7 +11,7 @@ use crate::{
 /// ```rust,ignore
 /// #[doc = "A struct representing the resolution of dimension i"]
 /// #[derive(Debug, Clone, Copy)]
-/// pub struct IResolution(pub I, pub J, pub K);
+/// pub struct IResolution(pub IDim, pub JDim, pub KDim);
 /// ```
 pub(super) fn resolution_definition(dimension: &DimensionConfig) -> syn::ItemStruct {
     let res_ident = resolution_ident(&dimension.id);
@@ -45,7 +45,7 @@ mod tests {
         let expected: syn::ItemStruct = parse_quote! {
             #[doc = "A struct representing the resolution of dimension i"]
             #[derive(Debug, Clone, Copy)]
-            pub struct IResolution(pub I, pub J, pub K);
+            pub struct IResolution(pub IDim, pub JDim, pub KDim);
         };
         assert_eq!(
             result.to_token_stream().to_string(),
