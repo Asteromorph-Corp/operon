@@ -12,6 +12,22 @@ pub fn operon_ident() -> syn::Ident {
     }
 }
 
+pub fn service_trait_ident(service_id: &str) -> syn::Ident {
+    format_ident!("{}Service", service_id.to_pascal_case())
+}
+
+pub fn storage_trait_ident(service_id: &str) -> syn::Ident {
+    format_ident!("{}Storage", service_id.to_pascal_case())
+}
+
+pub fn get_entity_ident(entity_id: &str) -> syn::Ident {
+    format_ident!("get_{}", entity_id.to_snake_case())
+}
+
+pub fn put_entity_ident(entity_id: &str) -> syn::Ident {
+    format_ident!("put_{}", entity_id.to_snake_case())
+}
+
 pub fn init_resolution_ident(dimension_id: &DimensionId) -> syn::Ident {
     format_ident!("init_resolution_{}", dimension_id.to_snake_case())
 }
