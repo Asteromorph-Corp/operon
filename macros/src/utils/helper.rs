@@ -1,4 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+
+use indexmap::IndexSet;
 
 use crate::configs::{EntityId, JobConfigMap, JobId};
 
@@ -20,12 +22,11 @@ fn build_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, &JobId> {
     index
 }
 
-/// Return the full set of operation-IDs that `start_id` depends on.
+/// Return the full set of job ids that `target_id` depends on.
 ///
-/// If you would rather get `&Operation` references back, change the
-/// `HashSet<String>` to `HashSet<&'a Operation>` and adapt the pushes.
-pub fn find_dependencies<'a>(target_id: &'a JobId, jobs: &'a JobConfigMap) -> HashSet<&'a JobId> {
-    let mut visited = HashSet::new();
+/// The order of the returned ids is sorted lexicographically.
+pub fn find_dependencies<'a>(target_id: &'a JobId, jobs: &'a JobConfigMap) -> IndexSet<&'a JobId> {
+    let mut visited = IndexSet::new();
     let mut stack = vec![target_id];
     let inverted_index = build_inverted_index(jobs);
 
@@ -51,6 +52,8 @@ pub fn find_dependencies<'a>(target_id: &'a JobId, jobs: &'a JobConfigMap) -> Ha
             }
         }
     }
+
+    visited.sort_unstable(); // Unstable sort because duplicates are not allowed in IndexSet
 
     visited
 }
@@ -113,17 +116,17 @@ mod tests {
 
         assert_eq!(
             find_dependencies(&"beta".to_string(), &jobs),
-            HashSet::from([&"beta".to_string()])
+            IndexSet::from([&"beta".to_string()])
         );
 
         assert_eq!(
             find_dependencies(&"gamma".to_string(), &jobs),
-            HashSet::from([&"gamma".to_string()])
+            IndexSet::from([&"gamma".to_string()])
         );
 
         assert_eq!(
             find_dependencies(&"delta".to_string(), &jobs),
-            HashSet::from([
+            IndexSet::from([
                 &"beta".to_string(),
                 &"gamma".to_string(),
                 &"delta".to_string()
@@ -132,7 +135,7 @@ mod tests {
 
         assert_eq!(
             find_dependencies(&"epsilon".to_string(), &jobs),
-            HashSet::from([
+            IndexSet::from([
                 &"beta".to_string(),
                 &"gamma".to_string(),
                 &"delta".to_string(),
@@ -142,7 +145,7 @@ mod tests {
 
         assert_eq!(
             find_dependencies(&"zeta".to_string(), &jobs),
-            HashSet::from([
+            IndexSet::from([
                 &"beta".to_string(),
                 &"gamma".to_string(),
                 &"delta".to_string(),
