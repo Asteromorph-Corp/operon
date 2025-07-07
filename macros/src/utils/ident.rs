@@ -56,8 +56,12 @@ pub fn job_field_ident(dimension_id: &DimensionId) -> syn::Ident {
     format_ident!("{}", dimension_id.to_snake_case())
 }
 
-pub fn variant_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("{}", dimension_id.to_pascal_case())
+pub fn variant_ident(id: &str) -> syn::Ident {
+    format_ident!("{}", id.to_pascal_case())
+}
+
+pub fn arg_ident(id: &str) -> syn::Ident {
+    format_ident!("{}", id.to_snake_case())
 }
 
 pub fn job_ident(job_id: &JobId) -> syn::Ident {
