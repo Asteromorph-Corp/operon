@@ -46,8 +46,6 @@ pub(super) fn fn_clear_ticket(job: &JobConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     #[test]
@@ -83,9 +81,6 @@ mod tests {
                 Ok(())
             }
         };
-        assert_eq!(
-            tokens.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(tokens, expected);
     }
 }

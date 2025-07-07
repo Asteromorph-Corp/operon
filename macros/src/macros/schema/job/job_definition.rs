@@ -39,7 +39,6 @@ pub(super) fn job_definition(job: &JobConfig) -> syn::ItemStruct {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
     use syn::parse_quote;
 
     use super::*;
@@ -62,10 +61,7 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            item.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(item, expected);
     }
 
     #[test]
@@ -87,9 +83,6 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            item.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(item, expected);
     }
 }

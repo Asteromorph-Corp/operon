@@ -33,8 +33,6 @@ pub(super) fn impl_enum_from_resolution(dimension: &DimensionConfig) -> syn::Ite
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     #[test]
@@ -54,9 +52,6 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            result_i.to_token_stream().to_string(),
-            expected_i.to_token_stream().to_string()
-        );
+        assert_eq!(result_i, expected_i);
     }
 }

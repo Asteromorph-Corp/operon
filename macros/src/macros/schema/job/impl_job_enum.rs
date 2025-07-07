@@ -21,8 +21,6 @@ pub(super) fn impl_job_enum() -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     #[test]
@@ -32,9 +30,6 @@ mod tests {
             #[automatically_derived]
             impl operon::schema_base::JobEnum for JobEnum {}
         };
-        assert_eq!(
-            result.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(result, expected);
     }
 }

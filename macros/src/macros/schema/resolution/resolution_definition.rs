@@ -33,7 +33,6 @@ pub(super) fn resolution_definition(dimension: &DimensionConfig) -> syn::ItemStr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use quote::ToTokens;
 
     #[test]
     fn test_resolution_definition() {
@@ -47,9 +46,6 @@ mod tests {
             #[derive(Debug, Clone, Copy)]
             pub struct IResolution(pub IDim, pub JDim, pub KDim);
         };
-        assert_eq!(
-            result.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(result, expected);
     }
 }

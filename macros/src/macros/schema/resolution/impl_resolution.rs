@@ -64,8 +64,6 @@ pub(super) fn impl_resolution(dimension: &DimensionConfig) -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     #[test]
@@ -97,10 +95,7 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            result_i.to_token_stream().to_string(),
-            expected_i.to_token_stream().to_string()
-        );
+        assert_eq!(result_i, expected_i);
 
         let dimension_k = DimensionConfig {
             id: "j".to_string(),
@@ -127,9 +122,6 @@ mod tests {
                 }
             }
         };
-        assert_eq!(
-            result.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(result, expected);
     }
 }
