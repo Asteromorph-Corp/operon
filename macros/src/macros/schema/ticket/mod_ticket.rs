@@ -1,0 +1,32 @@
+use quote::quote;
+use syn::parse_quote;
+
+use crate::{
+    configs::JobConfigMap,
+    macros::schema::ticket::{
+        impl_ticket::impl_ticket, impl_ticket_sql::impl_ticket_sql,
+        ticket_definition::ticket_definition,
+    },
+};
+
+pub fn mod_ticket(jobs: &JobConfigMap) -> syn::ItemMod {
+    let jobs = jobs.values().map(|job| {
+        let def = ticket_definition(job);
+        let impl_ticket = impl_ticket(job);
+        let impl_ticket_sql = impl_ticket_sql(job);
+
+        quote! {
+            #def
+            #impl_ticket
+            #impl_ticket_sql
+        }
+    });
+
+    parse_quote! {
+        mod ticket {
+            use super::*;
+
+            #(#jobs)*
+        }
+    }
+}

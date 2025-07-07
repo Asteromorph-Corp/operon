@@ -1,0 +1,64 @@
+use syn::parse_quote;
+
+use crate::{
+    JobConfig,
+    utils::{dimension_ident, operon_ident, ticket_ident, variable_ident},
+};
+
+pub(super) fn ticket_definition(job: &JobConfig) -> syn::ItemStruct {
+    let operon = operon_ident();
+    let ticket_ident = ticket_ident(&job.id);
+    let dim_fields = job.dims.iter().map(|dim| -> syn::Field {
+        let field_ident = variable_ident(dim);
+        let dim_ident = dimension_ident(dim);
+
+        parse_quote!(
+            pub #field_ident: operon::schema_base::TicketDepCount<#dim_ident>
+        )
+    });
+
+    parse_quote! {
+        #[derive(Debug, Clone, Default)]
+        pub struct #ticket_ident {
+            #(#dim_fields,)*
+            deps_count: usize,
+            deps_quota: Option<usize>,
+            deps_done: bool,
+            pub status: #operon::schema_base::TicketStatus,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::ToTokens;
+    use syn::parse_quote;
+
+    use super::*;
+
+    #[test]
+    fn test_ticket_definition() {
+        let job = JobConfig {
+            id: "beta".to_string(),
+            from: vec!["a".to_string()],
+            to: "b".to_string(),
+            dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
+        };
+        let item = ticket_definition(&job);
+        let expected: syn::ItemStruct = parse_quote! {
+            #[derive(Debug, Clone, Default)]
+            pub struct BetaTicket {
+                pub i: operon::schema_base::TicketDepCount<IDim>,
+                deps_count: usize,
+                deps_quota: Option<usize>,
+                deps_done: bool,
+                pub status: operon::schema_base::TicketStatus,
+            }
+        };
+        assert_eq!(
+            item.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
+    }
+}
