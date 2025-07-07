@@ -1,14 +1,15 @@
 pub use operon_macros::*;
 
 pub mod meta_storage;
-pub mod schema_base;
 pub mod operon;
 pub mod scheduler;
+pub mod schema_base;
 pub mod service;
 pub mod storage;
 pub mod ui;
 
 mod utils;
+pub use utils::OptionExt;
 
 // Re-export the external crates used in the macro expansions
 pub extern crate anyhow;
