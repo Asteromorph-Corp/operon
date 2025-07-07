@@ -33,8 +33,6 @@ pub(super) fn impl_resolution_enum(primary_dimension: &DimensionId) -> syn::Item
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     #[test]
@@ -48,9 +46,6 @@ mod tests {
                 }
             }
         };
-        assert_eq!(
-            result.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(result, expected);
     }
 }

@@ -88,8 +88,6 @@ pub(super) fn impl_resolution_sql(dimension: &DimensionConfig) -> syn::ItemImpl 
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     #[test]
@@ -132,9 +130,6 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            result_i.to_token_stream().to_string(),
-            expected_i.to_token_stream().to_string()
-        );
+        assert_eq!(result_i, expected_i);
     }
 }

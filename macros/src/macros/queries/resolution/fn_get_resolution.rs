@@ -83,8 +83,6 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     #[test]
@@ -141,10 +139,7 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            result_i.to_token_stream().to_string(),
-            expected_i.to_token_stream().to_string()
-        );
+        assert_eq!(result_i, expected_i);
 
         let dimension_l = DimensionConfig {
             id: "l".to_string(),
@@ -172,9 +167,6 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            result_l.to_token_stream().to_string(),
-            expected_l.to_token_stream().to_string()
-        );
+        assert_eq!(result_l, expected_l);
     }
 }

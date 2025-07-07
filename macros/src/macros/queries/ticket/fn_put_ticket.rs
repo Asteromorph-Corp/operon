@@ -78,7 +78,6 @@ pub(super) fn fn_put_ticket(job: &JobConfig) -> syn::ItemFn {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use quote::ToTokens;
 
     use super::*;
 
@@ -135,9 +134,6 @@ mod tests {
                 Ok(())
             }
         };
-        assert_eq!(
-            result.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(result, expected);
     }
 }

@@ -18,9 +18,6 @@ pub(super) fn dimension_definition(dimension_id: &DimensionId) -> syn::ItemType 
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-    use syn::parse_quote;
-
     use super::*;
 
     #[test]
@@ -30,9 +27,6 @@ mod tests {
         let expected: syn::ItemType = parse_quote! {
             pub type IDim = usize;
         };
-        assert_eq!(
-            item.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(item, expected);
     }
 }

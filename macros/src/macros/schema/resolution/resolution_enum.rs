@@ -39,8 +39,6 @@ pub(super) fn resolution_enum(dimensions: &DimensionConfigMap) -> syn::ItemEnum 
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use crate::DimensionConfig;
 
     use super::*;
@@ -74,9 +72,6 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            result.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(result, expected);
     }
 }

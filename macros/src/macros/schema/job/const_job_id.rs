@@ -20,8 +20,6 @@ pub(super) fn const_job_id(job_id: &JobId) -> syn::ItemConst {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     #[test]
@@ -33,9 +31,6 @@ mod tests {
             const BETA_ID: &str = "beta";
         };
 
-        assert_eq!(
-            item.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(item, expected);
     }
 }
