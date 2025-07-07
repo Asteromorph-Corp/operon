@@ -26,7 +26,7 @@ pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
     let job_ident = job_ident(&job.id);
 
     let id_ident = job_id_ident(&job.id);
-    let deps = get_upstream_jobs(&job.id, jobs)
+    let upstream_jobs = get_upstream_jobs(&job.id, jobs)
         .into_iter()
         .map(job_id_ident);
 
@@ -39,7 +39,7 @@ pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
 
             fn is_descendant_of(other: &str) -> bool {
                 #(
-                    other == #deps
+                    other == #upstream_jobs
                 )||*
             }
         }
