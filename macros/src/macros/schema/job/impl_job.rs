@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::{
     JobConfig,
     configs::JobConfigMap,
-    utils::{find_dependencies, job_id_ident, job_ident},
+    utils::{get_upstream_jobs, job_id_ident, job_ident},
 };
 
 /// Generates an implementation of the `Job` trait for the given job configuration.
@@ -26,7 +26,7 @@ pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
     let job_ident = job_ident(&job.id);
 
     let id_ident = job_id_ident(&job.id);
-    let deps = find_dependencies(&job.id, jobs)
+    let deps = get_upstream_jobs(&job.id, jobs)
         .into_iter()
         .map(job_id_ident);
 
