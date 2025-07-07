@@ -1,10 +1,9 @@
-use heck::ToSnakeCase;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::parse_quote;
 
 use crate::{
     configs::DimensionConfig,
-    utils::{dimension_ident, get_resolution_ident, operon_ident, resolution_ident},
+    utils::{arg_ident, dimension_ident, get_resolution_ident, operon_ident, resolution_ident},
 };
 
 /// Helper struct to generate the SQL query for getting a dimension's resolution.
@@ -54,17 +53,13 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
     let deps = &dimension
         .depends_on
         .iter()
-        .map(|d| format_ident!("{d}"))
+        .map(|d| arg_ident(d))
         .collect::<Vec<_>>();
-    let args = &dimension
-        .depends_on
-        .iter()
-        .map(|d| {
-            let arg = format_ident!("{}", d.to_snake_case());
-            let dim_ident = dimension_ident(d);
-            quote! { #arg: schema::#dim_ident }
-        })
-        .collect::<Vec<_>>();
+    let args = dimension.depends_on.iter().map(|d| {
+        let arg = arg_ident(d);
+        let dim_ident = dimension_ident(d);
+        quote! { #arg: schema::#dim_ident }
+    });
     let ub_id = format!("{}_ub", dimension.id);
 
     parse_quote! {
