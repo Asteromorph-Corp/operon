@@ -12,7 +12,7 @@ use crate::{
 /// ```rust,ignore
 /// #[automatically_derived]
 /// impl operon::schema_base::Job for BetaJob {
-///     fn id() -> &str {
+///     fn id() -> &'static str {
 ///         BETA_ID
 ///     }
 ///
@@ -33,7 +33,7 @@ pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
     parse_quote! {
         #[automatically_derived]
         impl #operon::schema_base::Job for #job_ident {
-            fn id() -> &str {
+            fn id() -> &'static str {
                 #id_ident
             }
 
@@ -70,7 +70,7 @@ mod tests {
         let expected: syn::ItemImpl = parse_quote! {
             #[automatically_derived]
             impl operon::schema_base::Job for BetaJob {
-                fn id() -> &str {
+                fn id() -> &'static str {
                     BETA_ID
                 }
 
@@ -114,7 +114,7 @@ mod tests {
         let expected: syn::ItemImpl = parse_quote! {
             #[automatically_derived]
             impl operon::schema_base::Job for EpsilonJob {
-                fn id() -> &str {
+                fn id() -> &'static str {
                     EPSILON_ID
                 }
 
