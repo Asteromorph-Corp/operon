@@ -10,6 +10,7 @@ use crate::{
     },
 };
 
+/// Generates the `mod job` module with all job-related items.
 pub fn mod_job(jobs: &JobConfigMap) -> syn::ItemMod {
     let const_job_ids = jobs.keys().map(const_job_id);
 

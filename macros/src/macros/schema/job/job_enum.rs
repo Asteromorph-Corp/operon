@@ -5,6 +5,17 @@ use crate::{
     utils::{job_enum_ident, job_ident, variant_ident},
 };
 
+/// Generates an enum representing all jobs in the job configuration map.
+/// 
+/// Example:
+/// ```rust,ignore
+/// #[doc = "An enum representing any job."]
+/// #[derive(Debug, Clone)]
+/// pub enum JobEnum {
+///     Beta(BetaJob),
+///     Gamma(GammaJob),
+/// }
+/// ```
 pub(super) fn job_enum(jobs: &JobConfigMap) -> syn::ItemEnum {
     let job_enum_ident = job_enum_ident();
     let variants = jobs.keys().map(|job| -> syn::Variant {

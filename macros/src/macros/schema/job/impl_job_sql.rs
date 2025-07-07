@@ -5,6 +5,21 @@ use crate::{
     utils::{job_ident, mark_done_ident, operon_ident},
 };
 
+/// Generates an implementation of the `JobSql` trait for the given job.
+///
+/// Example:
+/// ```rust,ignore
+/// #[operon::async_trait::async_trait]
+/// #[automatically_derived]
+/// impl operon::schema_base::JobSql for BetaJob {
+///     async fn mark_done(
+///        &self,
+///        client: operon::meta_storage::MetaClient<'_>,
+///     ) -> Result<(), operon::meta_storage::MetaStorageError> {
+///         queries::mark_done_beta(client, self).await
+///     }
+/// }
+/// ```
 pub(super) fn impl_job_sql(job: &JobConfig) -> syn::ItemImpl {
     let operon = operon_ident();
     let job_ident = job_ident(&job.id);
@@ -13,6 +28,7 @@ pub(super) fn impl_job_sql(job: &JobConfig) -> syn::ItemImpl {
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
+        #[automatically_derived]
         impl #operon::schema_base::JobSql for #job_ident {
             async fn mark_done(
                 &self,
@@ -42,6 +58,7 @@ mod tests {
         let item = impl_job_sql(&job);
         let expected: syn::ItemImpl = parse_quote! {
             #[operon::async_trait::async_trait]
+            #[automatically_derived]
             impl operon::schema_base::JobSql for BetaJob {
                 async fn mark_done(
                     &self,

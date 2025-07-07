@@ -5,6 +5,16 @@ use crate::{
     utils::{arg_ident, dimension_ident, job_ident},
 };
 
+/// Generates a struct definition for the job, which includes fields for each dimension.
+/// 
+/// Example:
+/// ```rust,ignore
+/// #[doc = "A struct representing the job `beta`."]
+/// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// pub struct BetaJob {
+///     pub i: schema::I,
+/// }
+/// ```
 pub(super) fn job_definition(job: &JobConfig) -> syn::ItemStruct {
     let job_ident = job_ident(&job.id);
     let dims = job.dims.iter().map(|dim| -> syn::Field {
