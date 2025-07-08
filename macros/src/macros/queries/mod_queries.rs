@@ -1,14 +1,14 @@
 use syn::parse_quote;
 
 use crate::{
-    DimensionConfig, JobConfig,
+    AllConfig,
     macros::queries::{resolution::resolution_queries, ticket::ticket_queries},
 };
 
 /// Generates the `mod queries` module with all query-related items.
-pub fn mod_queries(dimensions: Vec<DimensionConfig>, jobs: Vec<JobConfig>) -> syn::ItemMod {
-    let resolution_queries = dimensions.iter().map(resolution_queries);
-    let ticket_queries = jobs.iter().map(ticket_queries);
+pub fn mod_queries(all_configs: &AllConfig) -> syn::ItemMod {
+    let resolution_queries = all_configs.dimensions.values().map(resolution_queries);
+    let ticket_queries = all_configs.jobs.values().map(ticket_queries);
 
     parse_quote! {
         mod queries {
