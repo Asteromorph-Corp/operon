@@ -35,13 +35,18 @@ pub(super) fn impl_enum_from_job(job: &JobConfig) -> syn::ItemImpl {
 mod tests {
     use syn::parse_quote;
 
+    use crate::configs::JobArg;
+
     use super::*;
 
     #[test]
     fn test_impl_enum_from_job() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),

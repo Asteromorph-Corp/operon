@@ -169,13 +169,18 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
 mod tests {
     use indoc::indoc;
 
+    use crate::configs::JobArg;
+
     use super::*;
 
     #[test]
     fn test_init_ticket_query() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
@@ -201,7 +206,10 @@ mod tests {
     fn test_ticket_summary_query() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
@@ -246,7 +254,10 @@ mod tests {
     fn test_fn_init_ticket() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),

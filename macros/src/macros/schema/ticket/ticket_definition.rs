@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Generates a struct definition for a ticket for a given job.
-/// 
+///
 /// Example:
 /// ```rust,ignore
 /// #[derive(Debug, Clone, Default)]
@@ -46,13 +46,18 @@ pub(super) fn ticket_definition(job: &JobConfig) -> syn::ItemStruct {
 mod tests {
     use syn::parse_quote;
 
+    use crate::configs::JobArg;
+
     use super::*;
 
     #[test]
     fn test_ticket_definition() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),

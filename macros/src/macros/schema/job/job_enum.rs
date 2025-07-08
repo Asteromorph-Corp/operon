@@ -40,7 +40,7 @@ pub(super) fn job_enum(jobs: &JobConfigMap) -> syn::ItemEnum {
 mod tests {
     use syn::parse_quote;
 
-    use crate::JobConfig;
+    use crate::{JobConfig, configs::JobArg};
 
     use super::*;
 
@@ -51,7 +51,10 @@ mod tests {
                 "beta".to_string(),
                 JobConfig {
                     id: "beta".to_string(),
-                    from: vec!["a".to_string()],
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
@@ -61,7 +64,10 @@ mod tests {
                 "gamma".to_string(),
                 JobConfig {
                     id: "gamma".to_string(),
-                    from: vec!["a".to_string()],
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
                     to: "c".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("k".to_string()),

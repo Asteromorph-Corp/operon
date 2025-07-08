@@ -47,13 +47,18 @@ pub(super) fn impl_with_fns(job: &JobConfig) -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
+    use crate::configs::JobArg;
+
     use super::*;
 
     #[test]
     fn test_fn_with() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
@@ -79,7 +84,10 @@ mod tests {
     fn test_impl_with_fns() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),

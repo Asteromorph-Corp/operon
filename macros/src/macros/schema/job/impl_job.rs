@@ -50,7 +50,10 @@ pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
 mod tests {
     use syn::parse_quote;
 
-    use crate::{JobConfig, configs::JobConfigMap};
+    use crate::{
+        JobConfig,
+        configs::{JobArg, JobConfigMap},
+    };
 
     use super::*;
 
@@ -58,7 +61,10 @@ mod tests {
     fn test_impl_job() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
@@ -86,7 +92,16 @@ mod tests {
     fn test_impl_job_with_dependencies() {
         let job_epsilon = JobConfig {
             id: "epsilon".to_string(),
-            from: vec!["b".to_string(), "d".to_string()],
+            from: vec![
+                JobArg {
+                    id: "b".to_string(),
+                    over: vec!["j".to_string()],
+                },
+                JobArg {
+                    id: "d".to_string(),
+                    over: vec!["j".to_string()],
+                },
+            ],
             to: "e".to_string(),
             dims: vec!["i".to_string(), "k".to_string()],
             spawn_dim: None,
@@ -97,7 +112,10 @@ mod tests {
                 "beta".to_string(),
                 JobConfig {
                     id: "beta".to_string(),
-                    from: vec!["a".to_string()],
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
