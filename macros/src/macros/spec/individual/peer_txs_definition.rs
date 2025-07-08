@@ -16,13 +16,18 @@ use crate::{
 ///     pub to_epsilon: operon::scheduler::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
 /// }
 /// ```
-pub fn peer_txs_definition(job_id: &JobId, downstream_jobs: &IndexSet<&JobId>) -> syn::ItemStruct {
+pub fn peer_txs_definition(
+    job_id: &JobId,
+    downstream_job_ids: &IndexSet<&JobId>,
+) -> syn::ItemStruct {
     let operon = operon_ident();
     let peer_txs_ident = peer_txs_ident(job_id);
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
 
-    let senders = downstream_jobs.iter().map(|j| sender_ident(j));
+    let senders = downstream_job_ids
+        .iter()
+        .map(|downstream_job_id| sender_ident(downstream_job_id));
 
     parse_quote! {
         #[derive(Debug)]
@@ -41,9 +46,9 @@ mod tests {
         let beta = JobId::from("beta");
         let delta = JobId::from("delta");
         let epsilon = JobId::from("epsilon");
-        let downstream_jobs = IndexSet::from_iter([&delta, &epsilon]);
+        let downstream_job_ids = IndexSet::from_iter([&delta, &epsilon]);
 
-        let result = peer_txs_definition(&beta, &downstream_jobs);
+        let result = peer_txs_definition(&beta, &downstream_job_ids);
         let expected: syn::ItemStruct = parse_quote! {
             #[derive(Debug)]
             pub struct BetaPeerTxs {

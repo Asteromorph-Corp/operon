@@ -26,9 +26,9 @@ pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
     let job_ident = job_ident(&job.id);
 
     let id_ident = job_id_ident(&job.id);
-    let upstream_jobs = get_upstream_jobs(&job.id, jobs)
+    let upstream_jobs = get_upstream_jobs(job, jobs)
         .into_iter()
-        .map(job_id_ident);
+        .map(|upstream_job| job_id_ident(&upstream_job.id));
 
     parse_quote! {
         #[automatically_derived]
