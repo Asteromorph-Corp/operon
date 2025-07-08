@@ -5,6 +5,7 @@ use crate::{
     utils::{job_ident, operon_ident, spawn_resolution, ticket_ident, variable_ident},
 };
 
+/// Generates the implementation of the `Ticket` trait for a given job's ticket.
 // TODO: Implement `get_dependency_quota` and `raise_dependency_count`
 pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
     let operon = operon_ident();
