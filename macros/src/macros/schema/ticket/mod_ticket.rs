@@ -9,6 +9,7 @@ use crate::{
     },
 };
 
+/// Generates the `mod ticket` module with all ticket-related items.
 pub fn mod_ticket(jobs: &JobConfigMap) -> syn::ItemMod {
     let jobs = jobs.values().map(|job| {
         let def = ticket_definition(job);
