@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::{
     JobConfig,
-    utils::{job_ident, rebuilder_ident, resolution_ident},
+    utils::{job_ident, rebuilder_ident, spawn_resolution},
 };
 
 /// Generates a struct definition for a job rebuilder.
@@ -15,13 +15,7 @@ use crate::{
 pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
     let rebuilder_ident = rebuilder_ident(&job.id);
     let job_ident = job_ident(&job.id);
-    let res_ident: syn::Type = match &job.spawn_dim {
-        Some(dim) => {
-            let res_ident = resolution_ident(dim);
-            parse_quote! { schema::#res_ident }
-        }
-        None => parse_quote! { () },
-    };
+    let res_ident = spawn_resolution(job.spawn_dim.as_ref());
 
     parse_quote! {
         #[derive(Debug)]

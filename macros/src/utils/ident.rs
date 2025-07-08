@@ -1,6 +1,7 @@
 use heck::{ToPascalCase, ToShoutySnakeCase, ToSnakeCase};
 use proc_macro_crate::{FoundCrate, crate_name};
 use quote::format_ident;
+use syn::parse_quote;
 
 use crate::configs::{DimensionId, JobId};
 
@@ -102,6 +103,16 @@ pub fn rebuilder_ident(job_id: &JobId) -> syn::Ident {
 
 pub fn peer_txs_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}PeerTxs", job_id.to_pascal_case())
+}
+
+pub fn spawn_resolution(spawn_dim: Option<&DimensionId>) -> syn::Type {
+    match spawn_dim {
+        Some(dim) => {
+            let res_ident = resolution_ident(dim);
+            parse_quote! { schema::#res_ident }
+        }
+        None => parse_quote! { () },
+    }
 }
 
 pub fn resolution_enum_ident() -> syn::Ident {
