@@ -1,6 +1,6 @@
 use crate::{
-    schema_base::{Job, Resolution},
     scheduler::SchedulerError,
+    schema_base::{Job, Resolution},
 };
 
 pub type IntEventSender<J, R> = tokio::sync::mpsc::UnboundedSender<InternalEvent<J, R>>;

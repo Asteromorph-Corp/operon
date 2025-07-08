@@ -5,12 +5,12 @@ use tokio::sync::RwLock;
 
 use crate::{
     meta_storage::{MetaClient, MetaStorage},
-    schema_base::{JobSql, ResolutionSql, TicketSql},
     operon::RunningState,
     scheduler::{
         ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, PeerEventReceiver,
         PeerEventSenderMap, SchedulerError,
     },
+    schema_base::{JobSql, ResolutionSql, TicketSql},
     service::OperonService,
     storage::OperonStorage,
     ui::UiState,

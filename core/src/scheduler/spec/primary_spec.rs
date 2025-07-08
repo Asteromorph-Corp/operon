@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    meta_storage::MetaClient, schema_base::Resolution, scheduler::SchedulerError, service::OperonService,
-    storage::OperonStorage,
+    meta_storage::MetaClient, scheduler::SchedulerError, schema_base::Resolution,
+    service::OperonService, storage::OperonStorage,
 };
 
 #[async_trait]
