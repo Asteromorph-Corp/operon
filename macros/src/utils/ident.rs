@@ -65,6 +65,14 @@ pub fn mark_done_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("mark_done_{}", job_id.to_snake_case())
 }
 
+pub fn explode_ident(job_id: &JobId, dimension_id: &DimensionId) -> syn::Ident {
+    format_ident!(
+        "explode_{}_{}",
+        job_id.to_snake_case(),
+        dimension_id.to_snake_case()
+    )
+}
+
 pub fn dimension_ident(dimension_id: &DimensionId) -> syn::Ident {
     format_ident!("{}Dim", dimension_id.to_pascal_case())
 }
@@ -79,6 +87,10 @@ pub fn variable_ident(id: &str) -> syn::Ident {
 
 pub fn sender_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("to_{}", job_id.to_snake_case())
+}
+
+pub fn with_ident(dimension_id: &DimensionId) -> syn::Ident {
+    format_ident!("with_{}", dimension_id.to_snake_case())
 }
 
 pub fn job_ident(job_id: &JobId) -> syn::Ident {

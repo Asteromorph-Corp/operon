@@ -8,7 +8,14 @@ use crate::{
 /// Generates the `mod queries` module with all query-related items.
 pub fn mod_queries(all_configs: &AllConfig) -> syn::ItemMod {
     let resolution_queries = all_configs.dimensions.values().map(resolution_queries);
-    let ticket_queries = all_configs.jobs.values().map(ticket_queries);
+    let ticket_queries = all_configs.jobs.values().map(|job| {
+        let dims = job
+            .dims
+            .iter()
+            .filter_map(|dim_id| all_configs.dimensions.get(dim_id))
+            .collect::<Vec<_>>();
+        ticket_queries(job, &dims)
+    });
 
     parse_quote! {
         mod queries {
