@@ -36,7 +36,12 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
                 &mut self,
                 client: #operon::meta_storage::MetaClient<'_>,
             ) -> Result<(), #operon::meta_storage::MetaStorageError> {
-                todo!();
+                self.deps_count += 1;
+                if self.deps_quota.is_none() {
+                    self.deps_quota = self.get_dependency_quota(client).await?;
+                }
+                self.deps_done = self.deps_quota.is_some_and(|quota| self.deps_count >= quota);
+                Ok(())
             }
 
             fn is_ready(&self) -> bool {
