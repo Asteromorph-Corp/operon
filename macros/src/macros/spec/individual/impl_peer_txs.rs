@@ -3,11 +3,14 @@ use syn::parse_quote;
 
 use crate::{
     configs::JobId,
-    utils::{job_enum_ident, job_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident},
+    utils::{
+        job_enum_ident, job_ident, operon_ident, peer_txs_ident, resolution_enum_ident,
+        sender_ident,
+    },
 };
 
 /// Generates an implementation of `PeerEventSenders` for a job's peer event senders.
-/// 
+///
 /// Example:
 /// ```rust,ignore
 /// #[operon::async_trait::async_trait]
@@ -32,18 +35,15 @@ use crate::{
 ///     }
 /// }
 /// ```
-pub fn impl_peer_txs(
-    job_id: &JobId,
-    downstream_jobs: &IndexSet<&JobId>,
-) -> syn::ItemImpl {
+pub fn impl_peer_txs(job_id: &JobId, downstream_job_ids: &IndexSet<&JobId>) -> syn::ItemImpl {
     let operon = operon_ident();
     let peer_txs_ident = peer_txs_ident(job_id);
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
 
-    let sender_value = downstream_jobs.iter().map(|j| -> syn::FieldValue {
-        let sender_ident = sender_ident(j);
-        let job_ident = job_ident(j);
+    let sender_value = downstream_job_ids.iter().map(|downstream_job_id| -> syn::FieldValue {
+        let sender_ident = sender_ident(downstream_job_id);
+        let job_ident = job_ident(downstream_job_id);
 
         parse_quote! {
             #sender_ident: senders
@@ -54,7 +54,9 @@ pub fn impl_peer_txs(
         }
     });
 
-    let senders = downstream_jobs.iter().map(|j| sender_ident(j));
+    let senders = downstream_job_ids
+        .iter()
+        .map(|downstream_job_id| sender_ident(downstream_job_id));
 
     parse_quote! {
         #[#operon::async_trait::async_trait]

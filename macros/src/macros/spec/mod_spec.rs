@@ -1,3 +1,4 @@
+use indexmap::IndexSet;
 use quote::quote;
 use syn::parse_quote;
 
@@ -22,7 +23,11 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
     );
 
     let job_specs = all_configs.jobs.values().map(|job| {
-        let downstream_jobs = get_downstream_jobs(&job.id, &all_configs.jobs);
+        let downstream_jobs = get_downstream_jobs(job, &all_configs.jobs);
+        let downstream_job_ids = downstream_jobs
+            .iter()
+            .map(|downstream_job| &downstream_job.id)
+            .collect::<IndexSet<_>>();
 
         let job_spec_def = job_spec_definition(&job.id);
         let impl_job_spec = impl_job_spec(&all_configs.service_id, job, &all_configs.jobs);
@@ -30,8 +35,8 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
         let job_rebuilder_def = job_rebuilder_definition(job);
         let impl_job_rebuilder = impl_job_rebuilder(job);
 
-        let peer_txs_def = peer_txs_definition(&job.id, &downstream_jobs);
-        let impl_peer_txs = impl_peer_txs(&job.id, &downstream_jobs);
+        let peer_txs_def = peer_txs_definition(&job.id, &downstream_job_ids);
+        let impl_peer_txs = impl_peer_txs(&job.id, &downstream_job_ids);
 
         quote! {
             #job_spec_def

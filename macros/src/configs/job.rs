@@ -4,14 +4,14 @@ use crate::configs::{DimensionId, EntityId};
 
 pub type JobId = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JobArg {
     pub id: EntityId,
     pub over: Vec<DimensionId>,
 }
 
 /// An Operon job, which defines a transformation from one entity to another.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JobConfig {
     /// Unique identifier for the job.
     pub id: JobId,
