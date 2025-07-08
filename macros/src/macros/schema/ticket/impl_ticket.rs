@@ -64,6 +64,8 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
 mod tests {
     use syn::parse_quote;
 
+    use crate::configs::JobArg;
+
     use super::*;
 
     #[test]
@@ -71,7 +73,10 @@ mod tests {
     fn test_impl_ticket() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
@@ -123,7 +128,16 @@ mod tests {
     fn test_impl_ticket_with_dependency() {
         let job = JobConfig {
             id: "epsilon".to_string(),
-            from: vec!["b".to_string(), "d".to_string()],
+            from: vec![
+                JobArg {
+                    id: "b".to_string(),
+                    over: vec!["j".to_string()],
+                },
+                JobArg {
+                    id: "d".to_string(),
+                    over: vec!["j".to_string()],
+                },
+            ],
             to: "e".to_string(),
             dims: vec!["i".to_string(), "k".to_string()],
             spawn_dim: None,

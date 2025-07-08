@@ -43,7 +43,7 @@ pub fn get_upstream_jobs<'a>(target_id: &'a JobId, jobs: &'a JobConfigMap) -> In
         };
 
         for entity in &next_job.from {
-            let Some(dep_job) = inverted_index.get(entity) else {
+            let Some(dep_job) = inverted_index.get(&entity.id) else {
                 continue;
             };
 
@@ -63,7 +63,7 @@ fn build_downstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, Ve
 
     for job in jobs.values() {
         for dep in &job.from {
-            index.entry(dep).or_default().push(&job.id);
+            index.entry(&dep.id).or_default().push(&job.id);
         }
     }
 
@@ -109,7 +109,7 @@ pub fn get_downstream_jobs<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::JobConfig;
+    use crate::{JobConfig, configs::JobArg};
 
     use super::*;
 
@@ -120,7 +120,10 @@ mod tests {
                 "beta".to_string(),
                 JobConfig {
                     id: "beta".to_string(),
-                    from: vec!["a".to_string()],
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
@@ -130,7 +133,10 @@ mod tests {
                 "gamma".to_string(),
                 JobConfig {
                     id: "gamma".to_string(),
-                    from: vec!["a".to_string()],
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
                     to: "c".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("k".to_string()),
@@ -140,7 +146,20 @@ mod tests {
                 "delta".to_string(),
                 JobConfig {
                     id: "delta".to_string(),
-                    from: vec!["a".to_string(), "b".to_string(), "c".to_string()],
+                    from: vec![
+                        JobArg {
+                            id: "a".to_string(),
+                            over: vec![],
+                        },
+                        JobArg {
+                            id: "b".to_string(),
+                            over: vec![],
+                        },
+                        JobArg {
+                            id: "c".to_string(),
+                            over: vec![],
+                        },
+                    ],
                     to: "d".to_string(),
                     dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
                     spawn_dim: None,
@@ -150,7 +169,16 @@ mod tests {
                 "epsilon".to_string(),
                 JobConfig {
                     id: "epsilon".to_string(),
-                    from: vec!["b".to_string(), "d".to_string()],
+                    from: vec![
+                        JobArg {
+                            id: "b".to_string(),
+                            over: vec!["j".to_string()],
+                        },
+                        JobArg {
+                            id: "d".to_string(),
+                            over: vec!["j".to_string()],
+                        },
+                    ],
                     to: "e".to_string(),
                     dims: vec!["i".to_string(), "k".to_string()],
                     spawn_dim: None,
@@ -160,7 +188,16 @@ mod tests {
                 "zeta".to_string(),
                 JobConfig {
                     id: "zeta".to_string(),
-                    from: vec!["c".to_string(), "e".to_string()],
+                    from: vec![
+                        JobArg {
+                            id: "c".to_string(),
+                            over: vec!["k".to_string()],
+                        },
+                        JobArg {
+                            id: "e".to_string(),
+                            over: vec!["k".to_string()],
+                        },
+                    ],
                     to: "f".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: None,
@@ -216,7 +253,10 @@ mod tests {
                 "beta".to_string(),
                 JobConfig {
                     id: "beta".to_string(),
-                    from: vec!["a".to_string()],
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
@@ -226,7 +266,10 @@ mod tests {
                 "gamma".to_string(),
                 JobConfig {
                     id: "gamma".to_string(),
-                    from: vec!["a".to_string()],
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
                     to: "c".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("k".to_string()),
@@ -236,7 +279,20 @@ mod tests {
                 "delta".to_string(),
                 JobConfig {
                     id: "delta".to_string(),
-                    from: vec!["a".to_string(), "b".to_string(), "c".to_string()],
+                    from: vec![
+                        JobArg {
+                            id: "a".to_string(),
+                            over: vec![],
+                        },
+                        JobArg {
+                            id: "b".to_string(),
+                            over: vec![],
+                        },
+                        JobArg {
+                            id: "c".to_string(),
+                            over: vec![],
+                        },
+                    ],
                     to: "d".to_string(),
                     dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
                     spawn_dim: None,
@@ -246,7 +302,16 @@ mod tests {
                 "epsilon".to_string(),
                 JobConfig {
                     id: "epsilon".to_string(),
-                    from: vec!["b".to_string(), "d".to_string()],
+                    from: vec![
+                        JobArg {
+                            id: "b".to_string(),
+                            over: vec!["j".to_string()],
+                        },
+                        JobArg {
+                            id: "d".to_string(),
+                            over: vec!["j".to_string()],
+                        },
+                    ],
                     to: "e".to_string(),
                     dims: vec!["i".to_string(), "k".to_string()],
                     spawn_dim: None,
@@ -256,7 +321,16 @@ mod tests {
                 "zeta".to_string(),
                 JobConfig {
                     id: "zeta".to_string(),
-                    from: vec!["c".to_string(), "e".to_string()],
+                    from: vec![
+                        JobArg {
+                            id: "c".to_string(),
+                            over: vec!["k".to_string()],
+                        },
+                        JobArg {
+                            id: "e".to_string(),
+                            over: vec!["k".to_string()],
+                        },
+                    ],
                     to: "f".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: None,

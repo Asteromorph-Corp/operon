@@ -25,13 +25,18 @@ pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
 
 #[cfg(test)]
 mod tests {
+    use crate::configs::JobArg;
+
     use super::*;
 
     #[test]
     fn test_job_rebuilder_definition() {
         let job = JobConfig {
             id: "beta".to_string(),
-            from: vec!["a".to_string()],
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
