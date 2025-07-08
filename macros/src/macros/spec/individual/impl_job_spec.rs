@@ -5,7 +5,7 @@ use crate::{
     configs::JobConfigMap,
     utils::{
         job_enum_ident, job_ident, operon_ident, peer_txs_ident, resolution_enum_ident,
-        resolution_ident, service_trait_ident, spec_ident, storage_trait_ident, ticket_ident,
+        service_trait_ident, spawn_resolution, spec_ident, storage_trait_ident, ticket_ident,
     },
 };
 
@@ -14,13 +14,7 @@ pub fn impl_job_spec(service_id: &str, job: &JobConfig, _jobs: &JobConfigMap) ->
     let operon = operon_ident();
     let spec_ident = spec_ident(&job.id);
     let job_ident = job_ident(&job.id);
-    let res_ident: syn::Type = match &job.spawn_dim {
-        Some(dim) => {
-            let res_ident = resolution_ident(dim);
-            parse_quote! { schema::#res_ident }
-        }
-        None => parse_quote! { () },
-    };
+    let res_ident: syn::Type = spawn_resolution(job.spawn_dim.as_ref());
     let ticket_ident = ticket_ident(&job.id);
     let peer_txs_ident = peer_txs_ident(&job.id);
     let job_enum_ident = job_enum_ident();

@@ -2,20 +2,14 @@ use syn::parse_quote;
 
 use crate::{
     JobConfig,
-    utils::{job_ident, operon_ident, resolution_ident, ticket_ident, variable_ident},
+    utils::{job_ident, operon_ident, spawn_resolution, ticket_ident, variable_ident},
 };
 
 // TODO: Implement `get_dependency_quota` and `raise_dependency_count`
 pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
     let operon = operon_ident();
     let job_ident = job_ident(&job.id);
-    let res_ident: syn::Type = match &job.spawn_dim {
-        Some(dim) => {
-            let res_ident = resolution_ident(dim);
-            parse_quote! { schema::#res_ident }
-        }
-        None => parse_quote! { () },
-    };
+    let res_ident = spawn_resolution(job.spawn_dim.as_ref());
     let ticket_ident = ticket_ident(&job.id);
     let dim_fields = job
         .dims
