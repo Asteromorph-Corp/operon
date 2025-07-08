@@ -10,14 +10,14 @@ use crate::{
 };
 
 /// Generates a trait for the storage required for the service.
-/// 
+///
 /// Example:
 /// ```rust,ignore
 /// #[operon::async_trait::async_trait]
 /// pub trait CookingStorage: operon::service::OperonService {
 ///     async fn get_a(&self, i: schema::IDim) -> Result<Option<A>, operon::storage::StorageError>;
 ///     async fn put_a(&self, i: schema::IDim, value: A) -> Result<(), operon::storage::StorageError>;
-/// 
+///
 ///     async fn get_b(&self, i: schema::IDim, j: schema::JDim) -> Result<Option<B>, operon::storage::StorageError>;
 ///     async fn put_b(&self, i: schema::IDim, j: schema::JDim, value: B) -> Result<(), operon::storage::StorageError>;
 /// }
@@ -64,7 +64,7 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
 
 #[cfg(test)]
 mod tests {
-    use crate::{configs::EntityConfigMap, EntityConfig};
+    use crate::{EntityConfig, configs::EntityConfigMap};
 
     use super::*;
 
@@ -76,16 +76,22 @@ mod tests {
             primary_entity: "A".to_string(),
             dimensions: Default::default(),
             entities: EntityConfigMap::from_iter([
-                ("A".to_string(), EntityConfig {
-                    id: "A".to_string(),
-                    dims: vec!["i".to_string()],
-                    body: String::new(),
-                }),
-                ("B".to_string(), EntityConfig {
-                    id: "B".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    body: String::new(),
-                }),
+                (
+                    "A".to_string(),
+                    EntityConfig {
+                        id: "A".to_string(),
+                        dims: vec!["i".to_string()],
+                        body: String::new(),
+                    },
+                ),
+                (
+                    "B".to_string(),
+                    EntityConfig {
+                        id: "B".to_string(),
+                        dims: vec!["i".to_string(), "j".to_string()],
+                        body: String::new(),
+                    },
+                ),
             ]),
             jobs: Default::default(),
         };

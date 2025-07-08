@@ -6,12 +6,12 @@ use crate::{
     meta_storage::{
         MetaClient, MetaStorage, MetaStorageError, clear_footprint, get_footprint, put_footprint,
     },
-    schema_base::ResolutionEnum,
     operon::RunningState,
     scheduler::{
         ControlEvent, ControlEventReceiver, PeerEvent, RecoveryState, RecoveryStateSender, RunMode,
         SchedulerError, SchedulerHandler, SchedulerOptions,
     },
+    schema_base::ResolutionEnum,
     service::OperonService,
     storage::OperonStorage,
     ui::UiState,

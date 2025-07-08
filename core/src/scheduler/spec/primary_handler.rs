@@ -2,8 +2,8 @@ use async_trait::async_trait;
 
 use crate::{
     meta_storage::MetaClient,
-    schema_base::ResolutionSql,
     scheduler::{PrimarySpec, SchedulerError},
+    schema_base::ResolutionSql,
     service::OperonService,
     storage::OperonStorage,
 };

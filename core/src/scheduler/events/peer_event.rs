@@ -3,8 +3,8 @@ use std::{collections::HashMap, fmt::Debug};
 use async_trait::async_trait;
 
 use crate::{
-    schema_base::{JobEnum, ResolutionEnum},
     scheduler::SchedulerError,
+    schema_base::{JobEnum, ResolutionEnum},
 };
 
 /// `IndividualScheduler`-`IndividualScheduler` communication events.
