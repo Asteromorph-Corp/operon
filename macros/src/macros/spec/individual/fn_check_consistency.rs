@@ -3,18 +3,18 @@ use syn::parse_quote;
 
 use crate::{
     JobConfig,
-    utils::{get_entity_ident, operon_ident, resolution_ident, ticket_ident, variable_ident},
+    utils::{get_all_ident, get_entity_ident, get_resolution_ident, operon_ident, variable_ident},
 };
 
 pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
-    let ticket_ident = ticket_ident(&job.id);
 
     let field_vars = job
         .dims
         .iter()
         .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
+    let get_all_fn_name = get_all_ident(&job.id);
     let get_fn_name = get_entity_ident(&job.to);
     let corrupt_msg = format!(
         "Some `{}` tickets are corrupt in the metadata storage.",
@@ -23,8 +23,8 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
 
     let check_res_and_entity = match job.spawn_dim.as_ref() {
         Some(dim) => {
-            let spawn_dim_res = resolution_ident(dim);
             let dim_var = variable_ident(dim);
+            let get_resolution_fn_name = get_resolution_ident(dim);
             let missing_res_msg = format!(
                 "No `{}` resolution found for `{}{}` in the metadata storage.",
                 dim,
@@ -41,7 +41,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
                 let mut tags = Vec::new();
                 for job in jobs {
                     let Some(res) =
-                        <schema::#spawn_dim_res as operon::schema_base::ResolutionSql>::get(client, (#(job.#field_vars,)*)).await?
+                        queries::#get_resolution_fn_name(client, #(job.#field_vars,)*).await?
                     else {
                         #operon::log::info!(#missing_res_msg, #(job.#field_vars,)*);
                         return Ok(false);
@@ -81,7 +81,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             storage: &Sto,
             client: #operon::meta_storage::MetaClient<'_>,
         ) -> Result<bool, #operon::scheduler::SchedulerError> {
-            let Some(jobs) = <schema::#ticket_ident as #operon::schema_base::TicketSql>::get_all(
+            let Some(jobs) = queries::#get_all_fn_name(
                 client,
                 #operon::schema_base::TicketStatus::Done,
             )
@@ -129,7 +129,7 @@ mod tests {
                 client: operon::meta_storage::MetaClient<'_>,
             ) -> Result<bool, operon::scheduler::SchedulerError> {
                 // Pull the "done" beta jobs from the metadata storage...
-                let Some(jobs) = <schema::BetaTicket as operon::schema_base::TicketSql>::get_all(
+                let Some(jobs) = queries::get_all_beta(
                     client,
                     operon::schema_base::TicketStatus::Done,
                 )
@@ -143,10 +143,7 @@ mod tests {
                 // ...and map them with the dimensions they spawned...
                 let mut tags = Vec::new();
                 for job in jobs {
-                    let Some(res) =
-                        <schema::JResolution as operon::schema_base::ResolutionSql>::get(client, (job.i,))
-                            .await?
-                    else {
+                    let Some(res) = queries::get_resolution_j(client, job.i,).await? else {
                         operon::log::info!(
                             "No `j` resolution found for `beta_{}` in the metadata storage.",
                             job.i,
@@ -202,7 +199,7 @@ mod tests {
                 client: operon::meta_storage::MetaClient<'_>,
             ) -> Result<bool, operon::scheduler::SchedulerError> {
                 // Pull the "done" beta jobs from the metadata storage...
-                let Some(jobs) = <schema::EpsilonTicket as operon::schema_base::TicketSql>::get_all(
+                let Some(jobs) = queries::get_all_epsilon(
                     client,
                     operon::schema_base::TicketStatus::Done,
                 )
