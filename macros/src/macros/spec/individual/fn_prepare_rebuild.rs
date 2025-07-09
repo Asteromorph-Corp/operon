@@ -104,14 +104,14 @@ mod tests {
                             operon::scheduler::SchedulerError::Other(
                                 "Failed to resolve a beta ticket".into()
                             )
-                        });
+                        })?;
                         let resolution = queries::get_resolution_j(client, job.i,).await?
                             .ok_or_else(|| {
                                 operon::scheduler::SchedulerError::Other(format!(
                                     "No resolution found for j_{}",
                                     job.i,
                                 ))
-                            });
+                            })?;
 
                         Ok::<_, operon::scheduler::SchedulerError>((job, resolution))
                     }
