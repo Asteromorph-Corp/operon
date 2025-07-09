@@ -59,48 +59,21 @@ pub fn get_upstream_jobs<'a>(
     visited
 }
 
-fn build_downstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, Vec<&JobConfig>> {
-    let mut index: HashMap<&String, Vec<&JobConfig>> = HashMap::new();
-
-    for job in jobs.values() {
-        for dep in &job.from {
-            index.entry(&dep.id).or_default().push(job);
-        }
-    }
-
-    index
-}
-
-/// Return the full set of job ids that depend on `target_id`.
+/// Return the full set of job ids that directly depend on `target_id`.
 ///
 /// The order of the returned ids is sorted lexicographically.
-pub fn get_downstream_jobs<'a>(
+pub fn get_direct_downstream_jobs<'a>(
     target_job: &'a JobConfig,
     jobs: &'a JobConfigMap,
 ) -> IndexSet<&'a JobConfig> {
-    let mut visited = IndexSet::new();
-    let mut stack = vec![target_job];
-    let inverted_index = build_downstream_inverted_index(jobs);
+    let mut downstream_jobs = jobs
+        .values()
+        .filter(|job| job.from.iter().any(|dep| dep.id == target_job.to))
+        .collect::<IndexSet<_>>();
 
-    // depth-first traversal
-    while let Some(next) = stack.pop() {
-        // skip if we've already processed this job
-        if !visited.insert(next) {
-            continue;
-        }
+    downstream_jobs.sort_by(|a, b| a.id.cmp(&b.id)); // Unstable sort because duplicates are not allowed in IndexSet
 
-        if let Some(deps) = inverted_index.get(&next.to) {
-            for dep_job in deps {
-                if !visited.contains(dep_job) {
-                    stack.push(dep_job);
-                }
-            }
-        }
-    }
-
-    visited.sort_by(|a, b| a.id.cmp(&b.id)); // Unstable sort because duplicates are not allowed in IndexSet
-
-    visited
+    downstream_jobs
 }
 
 /// Returns a set of job ids that are repeating jobs for the given target dimension.
@@ -332,22 +305,22 @@ mod tests {
         let zeta = jobs.get("zeta").unwrap();
 
         assert_eq!(
-            get_downstream_jobs(beta, &jobs),
-            IndexSet::from([beta, delta, epsilon, zeta])
+            get_direct_downstream_jobs(beta, &jobs),
+            IndexSet::from([delta, epsilon])
         );
         assert_eq!(
-            get_downstream_jobs(gamma, &jobs),
-            IndexSet::from([gamma, delta, epsilon, zeta])
+            get_direct_downstream_jobs(gamma, &jobs),
+            IndexSet::from([delta, zeta])
         );
         assert_eq!(
-            get_downstream_jobs(delta, &jobs),
-            IndexSet::from([delta, epsilon, zeta])
+            get_direct_downstream_jobs(delta, &jobs),
+            IndexSet::from([epsilon])
         );
         assert_eq!(
-            get_downstream_jobs(epsilon, &jobs),
-            IndexSet::from([epsilon, zeta])
+            get_direct_downstream_jobs(epsilon, &jobs),
+            IndexSet::from([zeta])
         );
-        assert_eq!(get_downstream_jobs(zeta, &jobs), IndexSet::from([zeta]));
+        assert_eq!(get_direct_downstream_jobs(zeta, &jobs), IndexSet::from([]));
     }
 
     #[test]
