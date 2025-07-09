@@ -11,7 +11,7 @@ use crate::{
         },
         primary::{impl_primary_spec, primary_spec_definition},
     },
-    utils::{get_direct_downstream_jobs, get_jobs_repeating_on},
+    utils::{get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on},
 };
 
 pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
@@ -23,6 +23,7 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
     );
 
     let job_specs = all_configs.jobs.values().map(|job| {
+        let upstream_jobs = get_direct_upstream_jobs(job, &all_configs.jobs);
         let downstream_jobs = get_direct_downstream_jobs(job, &all_configs.jobs);
         let spawn_dim_repeating_jobs = job
             .spawn_dim
@@ -40,6 +41,7 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             &all_configs.service_id,
             job,
             &spawn_dim_repeating_jobs,
+            &upstream_jobs,
             &downstream_jobs,
         );
 
