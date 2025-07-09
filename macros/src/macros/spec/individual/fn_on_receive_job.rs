@@ -16,7 +16,7 @@ pub(super) fn fn_on_receive_job(
 
     let raise_dep_fn_name = raise_dep_ident(&job.id);
 
-    let raise_deps = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
+    let job_arms = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
         let variant_ident = variant_ident(&upstream_job.id);
 
         let args = job.dims.iter().map(|d| -> syn::Expr {
@@ -43,7 +43,7 @@ pub(super) fn fn_on_receive_job(
             job: schema::#job_enum_ident,
         ) -> Result<Vec<Self::Ticket>, #operon::scheduler::SchedulerError> {
             match job {
-                #(#raise_deps)*
+                #(#job_arms)*
                 _ => Err(#operon::scheduler::SchedulerError::InvalidPeerEventReceived("job", #job_id)),
             }
         }
