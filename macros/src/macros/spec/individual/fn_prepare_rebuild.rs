@@ -36,7 +36,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
                             #missing_resolution_msg,
                             #(job.#dim_vars,)*
                         ))
-                    })
+                    })?
             }
         }
         None => parse_quote! { () },
@@ -57,7 +57,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
                         #operon::scheduler::SchedulerError::Other(
                             #resolve_fail_msg.into()
                         )
-                    });
+                    })?;
                     let resolution = #resolution_expr;
 
                     Ok::<_, #operon::scheduler::SchedulerError>((job, resolution))
