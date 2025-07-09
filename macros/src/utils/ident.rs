@@ -3,7 +3,7 @@ use proc_macro_crate::{FoundCrate, crate_name};
 use quote::format_ident;
 use syn::parse_quote;
 
-use crate::configs::{DimensionId, JobId};
+use crate::configs::{DimensionId, EntityId, JobId};
 
 pub fn operon_ident() -> syn::Ident {
     match crate_name("operon") {
@@ -21,11 +21,11 @@ pub fn storage_trait_ident(service_id: &str) -> syn::Ident {
     format_ident!("{}Storage", service_id.to_pascal_case())
 }
 
-pub fn get_entity_ident(entity_id: &str) -> syn::Ident {
+pub fn get_entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("get_{}", entity_id.to_snake_case())
 }
 
-pub fn put_entity_ident(entity_id: &str) -> syn::Ident {
+pub fn put_entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("put_{}", entity_id.to_snake_case())
 }
 
@@ -77,6 +77,20 @@ pub fn raise_dep_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("raise_dep_{}", job_id.to_snake_case())
 }
 
+pub fn job_fn_ident(job_id: &JobId) -> syn::Ident {
+    format_ident!("{}", job_id.to_snake_case())
+}
+
+pub fn job_fn_arg_ident(arg_id: &EntityId, over: &[DimensionId]) -> syn::Ident {
+    format_ident!(
+        "{}{}",
+        arg_id.to_snake_case(),
+        over.iter()
+            .map(|d| format!("_{}", d.to_snake_case()))
+            .collect::<String>()
+    )
+}
+
 pub fn dimension_ident(dimension_id: &DimensionId) -> syn::Ident {
     format_ident!("{}Dim", dimension_id.to_pascal_case())
 }
@@ -95,6 +109,10 @@ pub fn sender_ident(job_id: &JobId) -> syn::Ident {
 
 pub fn with_ident(dimension_id: &DimensionId) -> syn::Ident {
     format_ident!("with_{}", dimension_id.to_snake_case())
+}
+
+pub fn entity_ident(entity_id: &EntityId) -> syn::Ident {
+    format_ident!("{}", entity_id.to_pascal_case())
 }
 
 pub fn job_ident(job_id: &JobId) -> syn::Ident {
