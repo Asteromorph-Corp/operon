@@ -29,6 +29,18 @@ pub fn put_entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("put_{}", entity_id.to_snake_case())
 }
 
+pub fn batch_get_entity_ident(entity_id: &EntityId, over: &[DimensionId]) -> syn::Ident {
+    format_ident!(
+        "get_all_{}_over_{}",
+        entity_id.to_snake_case(),
+        over.iter().map(|d| d.to_snake_case()).collect::<String>()
+    )
+}
+
+pub fn batch_put_entity_ident(entity_id: &EntityId) -> syn::Ident {
+    format_ident!("put_all_{}", entity_id.to_snake_case())
+}
+
 pub fn init_resolution_ident(dimension_id: &DimensionId) -> syn::Ident {
     format_ident!("init_resolution_{}", dimension_id.to_snake_case())
 }
