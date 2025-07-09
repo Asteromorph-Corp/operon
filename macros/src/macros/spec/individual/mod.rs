@@ -1,5 +1,6 @@
 mod fn_check_consistency;
 mod fn_prepare_rebuild;
+mod fn_send_on_finish;
 
 mod job_spec_definition;
 pub(super) use job_spec_definition::*;

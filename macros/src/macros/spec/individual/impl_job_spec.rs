@@ -1,10 +1,11 @@
+use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::{
     JobConfig,
-    configs::JobConfigMap,
     macros::spec::individual::{
         fn_check_consistency::fn_check_consistency, fn_prepare_rebuild::fn_prepare_rebuild,
+        fn_send_on_finish::fn_send_on_finish,
     },
     utils::{
         job_enum_ident, job_ident, operon_ident, peer_txs_ident, resolution_enum_ident,
@@ -13,7 +14,12 @@ use crate::{
 };
 
 // TODO: Implement the actual logic for the methods in this trait.
-pub fn impl_job_spec(service_id: &str, job: &JobConfig, _jobs: &JobConfigMap) -> syn::ItemImpl {
+pub fn impl_job_spec(
+    service_id: &str,
+    job: &JobConfig,
+    spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
+    downstream_jobs: &IndexSet<&JobConfig>,
+) -> syn::ItemImpl {
     let operon = operon_ident();
     let spec_ident = spec_ident(&job.id);
     let job_ident = job_ident(&job.id);
@@ -28,6 +34,7 @@ pub fn impl_job_spec(service_id: &str, job: &JobConfig, _jobs: &JobConfigMap) ->
 
     let fn_check_consistency = fn_check_consistency(job);
     let fn_prepare_rebuild = fn_prepare_rebuild(job);
+    let fn_send_on_finish = fn_send_on_finish(job, spawn_dim_repeating_jobs, downstream_jobs);
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -51,14 +58,7 @@ pub fn impl_job_spec(service_id: &str, job: &JobConfig, _jobs: &JobConfigMap) ->
                 todo!();
             }
 
-            async fn send_event(
-                &self,
-                peer_txs: &Self::PeerEventSenders,
-                job: Self::Job,
-                resolution: Self::Resolution,
-            ) -> Result<(), #operon::scheduler::SchedulerError> {
-                todo!();
-            }
+            #fn_send_on_finish
 
             async fn on_job_ready_tickets(
                 &self,
