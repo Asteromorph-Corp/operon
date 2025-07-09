@@ -45,20 +45,20 @@ where
         job: &Self::Job,
     ) -> Result<Self::Resolution, SchedulerError>;
 
-    async fn send_event(
+    async fn send_on_finish(
         &self,
         peer_txs: &Self::PeerEventSenders,
         job: Self::Job,
         resolution: Self::Resolution,
     ) -> Result<(), SchedulerError>;
 
-    async fn on_job_ready_tickets(
+    async fn on_receive_job(
         &self,
         client: MetaClient<'_>,
         job: Svc::JobEnum,
     ) -> Result<Vec<Self::Ticket>, SchedulerError>;
 
-    async fn on_resolution_ready_tickets(
+    async fn on_receive_resolution(
         &self,
         client: MetaClient<'_>,
         resolution: Svc::ResolutionEnum,

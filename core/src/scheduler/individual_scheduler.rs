@@ -117,10 +117,10 @@ where
         let mut conn = self.meta_storage.conn_static().await?;
         let tx = conn.transaction().await?;
         let ready_tickets = match event {
-            PeerEvent::Job(job) => self.spec.on_job_ready_tickets(tx.as_client(), job).await?,
+            PeerEvent::Job(job) => self.spec.on_receive_job(tx.as_client(), job).await?,
             PeerEvent::Resolution(resolution) => {
                 self.spec
-                    .on_resolution_ready_tickets(tx.as_client(), resolution)
+                    .on_receive_resolution(tx.as_client(), resolution)
                     .await?
             }
         };
@@ -314,7 +314,7 @@ where
                             );
 
                             // Broadcast the job result events
-                            self.spec.send_event(peer_txs, job, resolution).await?;
+                            self.spec.send_on_finish(peer_txs, job, resolution).await?;
                             // If all the tickets are finished
                             // AND the scheduler's internal events are drained,
                             // exit the loop.
