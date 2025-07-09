@@ -3,7 +3,9 @@ use syn::parse_quote;
 use crate::{
     JobConfig,
     configs::JobConfigMap,
-    macros::spec::individual::fn_check_consistency::fn_check_consistency,
+    macros::spec::individual::{
+        fn_check_consistency::fn_check_consistency, fn_prepare_rebuild::fn_prepare_rebuild,
+    },
     utils::{
         job_enum_ident, job_ident, operon_ident, peer_txs_ident, resolution_enum_ident,
         service_trait_ident, spawn_resolution, spec_ident, storage_trait_ident, ticket_ident,
@@ -25,6 +27,7 @@ pub fn impl_job_spec(service_id: &str, job: &JobConfig, _jobs: &JobConfigMap) ->
     let sto_ident = storage_trait_ident(service_id);
 
     let fn_check_consistency = fn_check_consistency(job);
+    let fn_prepare_rebuild = fn_prepare_rebuild(job);
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -36,14 +39,7 @@ pub fn impl_job_spec(service_id: &str, job: &JobConfig, _jobs: &JobConfigMap) ->
             type PeerEventSenders = #peer_txs_ident;
 
             #fn_check_consistency
-
-            async fn prepare_rebuild(
-                &self,
-                storage: &Sto,
-                client: #operon::meta_storage::MetaClient<'_>,
-            ) -> Result<Box<dyn #operon::scheduler::JobRebuilder>, #operon::scheduler::SchedulerError> {
-                todo!();
-            }
+            #fn_prepare_rebuild
 
             async fn run_job(
                 &self,
