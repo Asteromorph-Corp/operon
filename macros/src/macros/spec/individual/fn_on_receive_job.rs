@@ -49,3 +49,98 @@ pub(super) fn fn_on_receive_job(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use quote::ToTokens;
+
+    use crate::JobArg;
+
+    use super::*;
+
+    #[test]
+    fn test_fn_on_receive_job() {
+        let job = JobConfig {
+            id: "epsilon".to_string(),
+            from: vec![
+                JobArg {
+                    id: "b".to_string(),
+                    over: vec!["j".to_string()],
+                },
+                JobArg {
+                    id: "d".to_string(),
+                    over: vec!["j".to_string()],
+                },
+            ],
+            to: "e".to_string(),
+            dims: vec!["i".to_string(), "k".to_string()],
+            spawn_dim: None,
+        };
+        let beta = JobConfig {
+            id: "beta".to_string(),
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
+            to: "b".to_string(),
+            dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
+        };
+        let delta = JobConfig {
+            id: "delta".to_string(),
+            from: vec![
+                JobArg {
+                    id: "a".to_string(),
+                    over: vec![],
+                },
+                JobArg {
+                    id: "b".to_string(),
+                    over: vec![],
+                },
+                JobArg {
+                    id: "c".to_string(),
+                    over: vec![],
+                },
+            ],
+            to: "d".to_string(),
+            dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
+            spawn_dim: None,
+        };
+
+        let upstream_jobs = IndexSet::from_iter(vec![&beta, &delta]);
+
+        let item = fn_on_receive_job(&job, &upstream_jobs);
+        let expected: syn::ImplItemFn = parse_quote! {
+            #[allow(unused_variables, clippy::match_single_binding)]
+            async fn on_receive_job(
+                &self,
+                client: operon::meta_storage::MetaClient<'_>,
+                job: schema::JobEnum,
+            ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+                match job {
+                    schema::JobEnum::Beta(job) => Ok(
+                        queries::raise_dep_epsilon(
+                            client,
+                            &operon::schema_base::TicketDepCount::some(job.i),
+                            &operon::schema_base::TicketDepCount::none(),
+                        )
+                        .await?
+                    ),
+                    schema::JobEnum::Delta(job) => Ok(
+                        queries::raise_dep_epsilon(
+                            client,
+                            &operon::schema_base::TicketDepCount::some(job.i),
+                            &operon::schema_base::TicketDepCount::some(job.k),
+                        )
+                        .await?
+                    ),
+                    _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived("job", "epsilon")),
+                }
+            }
+        };
+        assert_eq!(
+            item.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
+    }
+}
