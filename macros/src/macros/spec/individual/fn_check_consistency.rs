@@ -1,0 +1,233 @@
+use quote::quote;
+use syn::parse_quote;
+
+use crate::{
+    JobConfig,
+    utils::{get_entity_ident, operon_ident, resolution_ident, ticket_ident, variable_ident},
+};
+
+pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
+    let operon = operon_ident();
+    let ticket_ident = ticket_ident(&job.id);
+
+    let field_vars = job
+        .dims
+        .iter()
+        .map(|d| variable_ident(d))
+        .collect::<Vec<_>>();
+    let get_fn_name = get_entity_ident(&job.to);
+    let corrupt_msg = format!(
+        "Some `{}` tickets are corrupt in the metadata storage.",
+        job.id
+    );
+
+    let check_res_and_entity = match job.spawn_dim.as_ref() {
+        Some(dim) => {
+            let spawn_dim_res = resolution_ident(dim);
+            let dim_var = variable_ident(dim);
+            let missing_res_msg = format!(
+                "No `{}` resolution found for `{}{}` in the metadata storage.",
+                dim,
+                job.id,
+                "_{}".repeat(job.dims.len()),
+            );
+            let missing_entity_msg = format!(
+                "Data storage does not hold `{}_{}`.",
+                job.to,
+                "{},".repeat(job.dims.len() + 1).trim_end_matches(","),
+            );
+
+            quote! {
+                let mut tags = Vec::new();
+                for job in jobs {
+                    let Some(res) =
+                        <schema::#spawn_dim_res as operon::schema_base::ResolutionSql>::get(client, (#(job.#field_vars,)*)).await?
+                    else {
+                        #operon::log::info!(#missing_res_msg, #(job.#field_vars,)*);
+                        return Ok(false);
+                    };
+                    for #dim_var in 0..(res.0) {
+                        tags.push((#(job.#field_vars,)* #dim_var,));
+                    }
+                }
+                for(#(#field_vars,)* #dim_var,) in tags {
+                    if storage.#get_fn_name(#(#field_vars,)* #dim_var,).await?.is_none() {
+                        #operon::log::info!(#missing_entity_msg, #(#field_vars,)* #dim_var,);
+                        return Ok(false);
+                    }
+                }
+            }
+        }
+        None => {
+            let missing_entity_msg = format!(
+                "Data storage does not hold `{}_{}`.",
+                job.to,
+                "{},".repeat(job.dims.len()).trim_end_matches(","),
+            );
+            quote! {
+                for job in jobs {
+                    if storage.#get_fn_name(#(job.#field_vars),*).await?.is_none() {
+                        #operon::log::info!(#missing_entity_msg, #(job.#field_vars,)*);
+                        return Ok(false);
+                    }
+                }
+            }
+        }
+    };
+
+    parse_quote! {
+        async fn check_consistency(
+            &self,
+            storage: &Sto,
+            client: #operon::meta_storage::MetaClient<'_>,
+        ) -> Result<bool, #operon::scheduler::SchedulerError> {
+            let Some(jobs) = <schema::#ticket_ident as #operon::schema_base::TicketSql>::get_all(
+                client,
+                #operon::schema_base::TicketStatus::Done,
+            )
+            .await?
+            .iter()
+            .map(|t| #operon::schema_base::Ticket::resolve(t))
+            .collect::<Option<Vec<_>>>() else {
+                #operon::log::info!(#corrupt_msg);
+                return Ok(false);
+            };
+
+            #check_res_and_entity
+
+            Ok(true)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::ToTokens;
+
+    use crate::JobArg;
+
+    use super::*;
+
+    #[test]
+    fn test_fn_check_consistency() {
+        let job = JobConfig {
+            id: "beta".to_string(),
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
+            to: "b".to_string(),
+            dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
+        };
+
+        let item = fn_check_consistency(&job);
+        let expected: syn::ImplItemFn = parse_quote! {
+            async fn check_consistency(
+                &self,
+                storage: &Sto,
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<bool, operon::scheduler::SchedulerError> {
+                // Pull the "done" beta jobs from the metadata storage...
+                let Some(jobs) = <schema::BetaTicket as operon::schema_base::TicketSql>::get_all(
+                    client,
+                    operon::schema_base::TicketStatus::Done,
+                )
+                .await?
+                .iter()
+                .map(|t| operon::schema_base::Ticket::resolve(t))
+                .collect::<Option<Vec<_>>>() else {
+                    operon::log::info!("Some `beta` tickets are corrupt in the metadata storage.");
+                    return Ok(false);
+                };
+                // ...and map them with the dimensions they spawned...
+                let mut tags = Vec::new();
+                for job in jobs {
+                    let Some(res) =
+                        <schema::JResolution as operon::schema_base::ResolutionSql>::get(client, (job.i,))
+                            .await?
+                    else {
+                        operon::log::info!(
+                            "No `j` resolution found for `beta_{}` in the metadata storage.",
+                            job.i,
+                        );
+                        return Ok(false);
+                    };
+                    for j in 0..(res.0) {
+                        tags.push((job.i, j,));
+                    }
+                }
+                // ...and check if the data storage holds all the data for them.
+                for (i, j,) in tags {
+                    if storage.get_b(i, j,).await?.is_none() {
+                        operon::log::info!("Data storage does not hold `b_{},{}`.", i, j,);
+                        return Ok(false);
+                    }
+                }
+
+                Ok(true)
+            }
+        };
+
+        assert_eq!(
+            item.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        )
+    }
+
+    #[test]
+    fn test_fn_check_consistency_no_spawn_dim() {
+        let job = JobConfig {
+            id: "epsilon".to_string(),
+            from: vec![
+                JobArg {
+                    id: "b".to_string(),
+                    over: vec!["j".to_string()],
+                },
+                JobArg {
+                    id: "d".to_string(),
+                    over: vec!["j".to_string()],
+                },
+            ],
+            to: "e".to_string(),
+            dims: vec!["i".to_string(), "k".to_string()],
+            spawn_dim: None,
+        };
+
+        let item = fn_check_consistency(&job);
+        let expected: syn::ImplItemFn = parse_quote! {
+            async fn check_consistency(
+                &self,
+                storage: &Sto,
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<bool, operon::scheduler::SchedulerError> {
+                // Pull the "done" beta jobs from the metadata storage...
+                let Some(jobs) = <schema::EpsilonTicket as operon::schema_base::TicketSql>::get_all(
+                    client,
+                    operon::schema_base::TicketStatus::Done,
+                )
+                .await?
+                .iter()
+                .map(|t| operon::schema_base::Ticket::resolve(t))
+                .collect::<Option<Vec<_>>>() else {
+                    operon::log::info!("Some `epsilon` tickets are corrupt in the metadata storage.");
+                    return Ok(false);
+                };
+                // ...and check if the data storage holds all the data for them.
+                for job in jobs {
+                    if storage.get_e(job.i, job.k).await?.is_none() {
+                        operon::log::info!("Data storage does not hold `e_{},{}`.", job.i, job.k,);
+                        return Ok(false);
+                    }
+                }
+
+                Ok(true)
+            }
+        };
+
+        assert_eq!(
+            item.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        )
+    }
+}
