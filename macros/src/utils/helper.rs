@@ -25,9 +25,9 @@ fn build_upstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, &Job
     index
 }
 
-/// Return the full set of job ids that `target_id` depends on.
+/// Return the full set of jobs that `target_job` depends on.
 ///
-/// The order of the returned ids is sorted lexicographically.
+/// The returned jobs are sorted lexicographically by id.
 pub fn get_upstream_jobs<'a>(
     target_job: &'a JobConfig,
     jobs: &'a JobConfigMap,
@@ -59,9 +59,26 @@ pub fn get_upstream_jobs<'a>(
     visited
 }
 
-/// Return the full set of job ids that directly depend on `target_id`.
+/// Return the full set of jobs that `target_job` directly depends on.
 ///
-/// The order of the returned ids is sorted lexicographically.
+/// The returned jobs are sorted lexicographically by id.
+pub fn get_direct_upstream_jobs<'a>(
+    target_job: &'a JobConfig,
+    jobs: &'a JobConfigMap,
+) -> IndexSet<&'a JobConfig> {
+    let mut upstream_jobs = jobs
+        .values()
+        .filter(|job| target_job.from.iter().any(|dep| dep.id == job.to))
+        .collect::<IndexSet<_>>();
+
+    upstream_jobs.sort_by(|a, b| a.id.cmp(&b.id)); // Unstable sort because duplicates are not allowed in IndexSet
+
+    upstream_jobs
+}
+
+/// Return the full set of jobs that directly depend on `target_job`.
+///
+/// The returned jobs are sorted lexicographically by id.
 pub fn get_direct_downstream_jobs<'a>(
     target_job: &'a JobConfig,
     jobs: &'a JobConfigMap,
@@ -207,7 +224,121 @@ mod tests {
     }
 
     #[test]
-    fn test_get_downstream_jobs() {
+    fn test_get_direct_upstream_jobs() {
+        let jobs = JobConfigMap::from_iter([
+            (
+                "beta".to_string(),
+                JobConfig {
+                    id: "beta".to_string(),
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
+                    to: "b".to_string(),
+                    dims: vec!["i".to_string()],
+                    spawn_dim: Some("j".to_string()),
+                },
+            ),
+            (
+                "gamma".to_string(),
+                JobConfig {
+                    id: "gamma".to_string(),
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
+                    to: "c".to_string(),
+                    dims: vec!["i".to_string()],
+                    spawn_dim: Some("k".to_string()),
+                },
+            ),
+            (
+                "delta".to_string(),
+                JobConfig {
+                    id: "delta".to_string(),
+                    from: vec![
+                        JobArg {
+                            id: "a".to_string(),
+                            over: vec![],
+                        },
+                        JobArg {
+                            id: "b".to_string(),
+                            over: vec![],
+                        },
+                        JobArg {
+                            id: "c".to_string(),
+                            over: vec![],
+                        },
+                    ],
+                    to: "d".to_string(),
+                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
+                    spawn_dim: None,
+                },
+            ),
+            (
+                "epsilon".to_string(),
+                JobConfig {
+                    id: "epsilon".to_string(),
+                    from: vec![
+                        JobArg {
+                            id: "b".to_string(),
+                            over: vec!["j".to_string()],
+                        },
+                        JobArg {
+                            id: "d".to_string(),
+                            over: vec!["j".to_string()],
+                        },
+                    ],
+                    to: "e".to_string(),
+                    dims: vec!["i".to_string(), "k".to_string()],
+                    spawn_dim: None,
+                },
+            ),
+            (
+                "zeta".to_string(),
+                JobConfig {
+                    id: "zeta".to_string(),
+                    from: vec![
+                        JobArg {
+                            id: "c".to_string(),
+                            over: vec!["k".to_string()],
+                        },
+                        JobArg {
+                            id: "e".to_string(),
+                            over: vec!["k".to_string()],
+                        },
+                    ],
+                    to: "f".to_string(),
+                    dims: vec!["i".to_string()],
+                    spawn_dim: None,
+                },
+            ),
+        ]);
+
+        let beta = jobs.get("beta").unwrap();
+        let gamma = jobs.get("gamma").unwrap();
+        let delta = jobs.get("delta").unwrap();
+        let epsilon = jobs.get("epsilon").unwrap();
+        let zeta = jobs.get("zeta").unwrap();
+
+        assert_eq!(get_direct_upstream_jobs(beta, &jobs), IndexSet::from([]));
+        assert_eq!(get_direct_upstream_jobs(gamma, &jobs), IndexSet::from([]));
+        assert_eq!(
+            get_direct_upstream_jobs(delta, &jobs),
+            IndexSet::from([beta, gamma])
+        );
+        assert_eq!(
+            get_direct_upstream_jobs(epsilon, &jobs),
+            IndexSet::from([beta, delta])
+        );
+        assert_eq!(
+            get_direct_upstream_jobs(zeta, &jobs),
+            IndexSet::from([gamma, epsilon])
+        );
+    }
+
+    #[test]
+    fn test_get_direct_downstream_jobs() {
         let jobs = JobConfigMap::from_iter([
             (
                 "beta".to_string(),
