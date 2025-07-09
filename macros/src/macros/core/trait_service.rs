@@ -17,34 +17,11 @@ use crate::{
 /// pub trait CookingService:
 ///     operon::service::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum>
 /// {
-///     async fn beta(
-///         &self,
-///         a: schema::A,
-///     ) -> Result<Vec<schema::B>, Box<dyn std::error::Error + Send + Sync>>;
-///
-///     async fn gamma(
-///         &self,
-///         a: schema::A,
-///     ) -> Result<Vec<schema::C>, Box<dyn std::error::Error + Send + Sync>>;
-///
-///     async fn delta(
-///         &self,
-///         a: schema::A,
-///         b: schema::B,
-///         c: schema::C,
-///     ) -> Result<schema::D, Box<dyn std::error::Error + Send + Sync>>;
-///
-///     async fn epsilon(
-///         &self,
-///         b_j: Vec<schema::B>,
-///         d_j: Vec<schema::D>,
-///     ) -> Result<schema::E, Box<dyn std::error::Error + Send + Sync>>;
-///
-///     async fn zeta(
-///         &self,
-///         c_k: Vec<schema::C>,
-///         e_k: Vec<schema::E>,
-///     ) -> Result<schema::F, Box<dyn std::error::Error + Send + Sync>>;
+///     async fn beta(&self, a: A,) -> Result<Vec<B>, Box<dyn std::error::Error + Send + Sync>>;
+///     async fn gamma(&self, a: A,) -> Result<Vec<C>, Box<dyn std::error::Error + Send + Sync>>;
+///     async fn delta(&self, a: A,b: B, c: C,) -> Result<D, Box<dyn std::error::Error + Send + Sync>>;
+///     async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>,) -> Result<E, Box<dyn std::error::Error + Send + Sync>>;
+///     async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>,) -> Result<F, Box<dyn std::error::Error + Send + Sync>>;
 /// }
 /// ```
 pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
@@ -59,7 +36,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
             let arg_ident = job_fn_arg_ident(&arg.id, &arg.over);
             let entity_ident = entity_ident(&arg.id);
             let ty: syn::Type = arg.over.iter().fold(
-                parse_quote! { schema::#entity_ident },
+                parse_quote! { #entity_ident },
                 |acc, _| parse_quote! { Vec<#acc> },
             );
 
@@ -67,8 +44,8 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
         });
         let entity_ident = entity_ident(&job.to);
         let return_ty: syn::Type = job.spawn_dim.as_ref().map_or_else(
-            || parse_quote! { schema::#entity_ident },
-            |_| parse_quote! { Vec<schema::#entity_ident> },
+            || parse_quote! { #entity_ident },
+            |_| parse_quote! { Vec<#entity_ident> },
         );
 
         parse_quote! {
@@ -99,7 +76,7 @@ mod tests {
         let all_configs = AllConfig {
             service_id: "Cooking".to_string(),
             primary_dimension: "i".to_string(),
-            primary_entity: "A".to_string(),
+            primary_entity: "a".to_string(),
             dimensions: DimensionConfigMap::new(),
             entities: EntityConfigMap::new(),
             jobs: JobConfigMap::from_iter([
@@ -198,34 +175,11 @@ mod tests {
             #[operon::async_trait::async_trait]
             #[automatically_derived]
             pub trait CookingService: operon::service::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum> {
-                async fn beta(
-                    &self,
-                    a: schema::A,
-                ) -> Result<Vec<schema::B>, Box<dyn std::error::Error + Send + Sync>>;
-
-                async fn gamma(
-                    &self,
-                    a: schema::A,
-                ) -> Result<Vec<schema::C>, Box<dyn std::error::Error + Send + Sync>>;
-
-                async fn delta(
-                    &self,
-                    a: schema::A,
-                    b: schema::B,
-                    c: schema::C,
-                ) -> Result<schema::D, Box<dyn std::error::Error + Send + Sync>>;
-
-                async fn epsilon(
-                    &self,
-                    b_j: Vec<schema::B>,
-                    d_j: Vec<schema::D>,
-                ) -> Result<schema::E, Box<dyn std::error::Error + Send + Sync>>;
-
-                async fn zeta(
-                    &self,
-                    c_k: Vec<schema::C>,
-                    e_k: Vec<schema::E>,
-                ) -> Result<schema::F, Box<dyn std::error::Error + Send + Sync>>;
+                async fn beta(&self, a: A,) -> Result<Vec<B>, Box<dyn std::error::Error + Send + Sync>>;
+                async fn gamma(&self, a: A,) -> Result<Vec<C>, Box<dyn std::error::Error + Send + Sync>>;
+                async fn delta(&self, a: A, b: B, c: C,) -> Result<D, Box<dyn std::error::Error + Send + Sync>>;
+                async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>,) -> Result<E, Box<dyn std::error::Error + Send + Sync>>;
+                async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>,) -> Result<F, Box<dyn std::error::Error + Send + Sync>>;
             }
         };
 
