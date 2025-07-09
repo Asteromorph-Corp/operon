@@ -91,8 +91,6 @@ pub fn impl_job_rebuilder(
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use crate::JobArg;
 
     use super::*;
@@ -199,9 +197,6 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            item.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(item, expected);
     }
 }
