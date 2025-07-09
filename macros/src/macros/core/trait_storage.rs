@@ -1,12 +1,9 @@
-use quote::format_ident;
 use syn::parse_quote;
 
 use crate::{
-    AllConfig,
     utils::{
-        dimension_ident, get_entity_ident, operon_ident, put_entity_ident, storage_trait_ident,
-        variable_ident,
-    },
+        dimension_ident, entity_ident, get_entity_ident, operon_ident, put_entity_ident, storage_trait_ident, variable_ident
+    }, AllConfig
 };
 
 /// Generates a trait for the storage required for the service.
@@ -32,7 +29,7 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
         .flat_map(|entity| -> [syn::TraitItemFn; 2] {
             let get_fn_name = get_entity_ident(&entity.id);
             let put_fn_name = put_entity_ident(&entity.id);
-            let entity_ident = format_ident!("{}", entity.id);
+            let entity_ident = entity_ident(&entity.id);
             let dim_args = entity
                 .dims
                 .iter()
@@ -73,21 +70,21 @@ mod tests {
         let all_config = AllConfig {
             service_id: "Cooking".to_string(),
             primary_dimension: "i".to_string(),
-            primary_entity: "A".to_string(),
+            primary_entity: "a".to_string(),
             dimensions: Default::default(),
             entities: EntityConfigMap::from_iter([
                 (
-                    "A".to_string(),
+                    "a".to_string(),
                     EntityConfig {
-                        id: "A".to_string(),
+                        id: "a".to_string(),
                         dims: vec!["i".to_string()],
                         body: String::new(),
                     },
                 ),
                 (
-                    "B".to_string(),
+                    "b".to_string(),
                     EntityConfig {
-                        id: "B".to_string(),
+                        id: "b".to_string(),
                         dims: vec!["i".to_string(), "j".to_string()],
                         body: String::new(),
                     },
