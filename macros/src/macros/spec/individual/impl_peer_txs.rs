@@ -35,13 +35,13 @@ use crate::{
 ///     }
 /// }
 /// ```
-pub fn impl_peer_txs(job_id: &JobId, downstream_job_ids: &IndexSet<&JobId>) -> syn::ItemImpl {
+pub fn impl_peer_txs(job_id: &JobId, event_receiving_job_ids: &IndexSet<&JobId>) -> syn::ItemImpl {
     let operon = operon_ident();
     let peer_txs_ident = peer_txs_ident(job_id);
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
 
-    let sender_value = downstream_job_ids.iter().map(|downstream_job_id| -> syn::FieldValue {
+    let sender_value = event_receiving_job_ids.iter().map(|downstream_job_id| -> syn::FieldValue {
         let sender_ident = sender_ident(downstream_job_id);
         let job_ident = job_ident(downstream_job_id);
 
@@ -54,7 +54,7 @@ pub fn impl_peer_txs(job_id: &JobId, downstream_job_ids: &IndexSet<&JobId>) -> s
         }
     });
 
-    let senders = downstream_job_ids
+    let senders = event_receiving_job_ids
         .iter()
         .map(|downstream_job_id| sender_ident(downstream_job_id));
 

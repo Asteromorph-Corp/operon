@@ -24,15 +24,16 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
 
     let job_specs = all_configs.jobs.values().map(|job| {
         let downstream_jobs = get_direct_downstream_jobs(job, &all_configs.jobs);
-        let downstream_job_ids = downstream_jobs
-            .iter()
-            .map(|downstream_job| &downstream_job.id)
-            .collect::<IndexSet<_>>();
         let spawn_dim_repeating_jobs = job
             .spawn_dim
             .as_ref()
             .map(|spawn_dim| get_jobs_repeating_on(spawn_dim, &all_configs.jobs))
             .unwrap_or_default();
+        let event_receiving_job_ids = downstream_jobs
+            .iter()
+            .chain(spawn_dim_repeating_jobs.iter())
+            .map(|job| &job.id)
+            .collect::<IndexSet<_>>();
 
         let job_spec_def = job_spec_definition(&job.id);
         let impl_job_spec = impl_job_spec(
@@ -50,8 +51,8 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             &downstream_jobs,
         );
 
-        let peer_txs_def = peer_txs_definition(&job.id, &downstream_job_ids);
-        let impl_peer_txs = impl_peer_txs(&job.id, &downstream_job_ids);
+        let peer_txs_def = peer_txs_definition(&job.id, &event_receiving_job_ids);
+        let impl_peer_txs = impl_peer_txs(&job.id, &event_receiving_job_ids);
 
         quote! {
             #job_spec_def
