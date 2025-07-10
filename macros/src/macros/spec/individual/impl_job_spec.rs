@@ -15,6 +15,7 @@ use crate::{
     },
 };
 
+/// Generates the implementation of the `JobSpec` trait for a given job.
 pub fn impl_job_spec(
     service_id: &str,
     job: &JobConfig,

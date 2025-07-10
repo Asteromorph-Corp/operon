@@ -10,6 +10,50 @@ use crate::{
     },
 };
 
+/// Generates the implementation of the `JobRebuilder` trait for a given job.
+///
+/// Example:
+/// ```rust,ignore
+/// #[operon::async_trait::async_trait]
+/// #[automatically_derived]
+/// impl operon::scheduler::JobRebuilder for BetaRebuilder {
+///     async fn explode(
+///         &self,
+///         client: operon::meta_storage::MetaClient<'_>,
+///         primary_ub: usize,
+///     ) -> Result<(), operon::scheduler::SchedulerError> {
+///         queries::explode_beta_i(client, &schema::IResolution(primary_ub)).await?;
+///         Ok(())
+///     }
+///
+///     async fn rebuild(
+///         &self,
+///         client: operon::meta_storage::MetaClient<'_>,
+///     ) -> Result<(), operon::scheduler::SchedulerError> {
+///         for (job, resolution) in &self.0 {
+///             queries::put_resolution_j(client, resolution).await?;
+///             queries::mark_done_beta(client, job).await?;
+///
+///             queries::explode_delta_j(client, resolution).await?;
+///             queries::raise_dep_delta(
+///                 client,
+///                 &operon::schema_base::TicketDepCount::some(job.i),
+///                 &operon::schema_base::TicketDepCount::none(),
+///                 &operon::schema_base::TicketDepCount::none(),
+///             )
+///             .await?;
+///             queries::raise_dep_epsilon(
+///                 client,
+///                 &operon::schema_base::TicketDepCount::some(job.i),
+///                 &operon::schema_base::TicketDepCount::none(),
+///             )
+///             .await?;
+///         }
+///
+///         Ok(())
+///     }
+/// }
+/// ```
 pub fn impl_job_rebuilder(
     job: &JobConfig,
     primary_dimension: &DimensionId,

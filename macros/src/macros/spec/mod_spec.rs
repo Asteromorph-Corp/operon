@@ -14,6 +14,7 @@ use crate::{
     utils::{get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on},
 };
 
+/// Generates the `mod spec` module containing the primary spec and job specs.
 pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
     let primary_spec = primary_spec_definition();
     let impl_primary_spec = impl_primary_spec(

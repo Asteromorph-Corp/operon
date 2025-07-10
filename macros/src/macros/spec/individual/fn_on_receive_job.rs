@@ -6,6 +6,37 @@ use crate::{
     utils::{job_enum_ident, operon_ident, raise_dep_ident, variable_ident, variant_ident},
 };
 
+/// Generates the `on_receive_job` function for the implementation of the trait `JobSpec`.
+///
+/// Example:
+/// ```rust,ignore
+/// #[allow(unused_variables, clippy::match_single_binding)]
+/// async fn on_receive_job(
+///     &self,
+///     client: operon::meta_storage::MetaClient<'_>,
+///     job: schema::JobEnum,
+/// ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+///     match job {
+///         schema::JobEnum::Beta(job) => Ok(
+///             queries::raise_dep_epsilon(
+///                 client,
+///                 &operon::schema_base::TicketDepCount::some(job.i),
+///                 &operon::schema_base::TicketDepCount::none(),
+///             )
+///             .await?
+///         ),
+///         schema::JobEnum::Delta(job) => Ok(
+///             queries::raise_dep_epsilon(
+///                 client,
+///                 &operon::schema_base::TicketDepCount::some(job.i),
+///                 &operon::schema_base::TicketDepCount::some(job.k),
+///             )
+///             .await?
+///         ),
+///         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived("job", "epsilon")),
+///     }
+/// }
+/// ```
 pub(super) fn fn_on_receive_job(
     job: &JobConfig,
     upstream_jobs: &IndexSet<&JobConfig>,
