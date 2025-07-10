@@ -14,8 +14,10 @@ pub enum MetaStorageError {
     DatabaseUriParseError(String),
     #[error("Integer conversion error: {0}")]
     IntegerConversionError(#[from] TryFromIntError),
-    #[error("Invalid resolution: {0}")]
-    InvalidResolution(String),
+    #[error("Invalid explosion: {0}")]
+    InvalidExplosion(String),
+    #[error("Missing resolution: {0}")]
+    MissingResolution(String),
     #[error("Not found: {0}")]
     NotFound(String),
     #[error("Other error: {0}")]

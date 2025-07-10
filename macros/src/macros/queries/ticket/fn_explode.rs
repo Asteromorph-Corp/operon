@@ -77,7 +77,7 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
                 .collect::<Result<Vec<_>, _>>()?;
 
             if tickets.iter().any(|ticket| ticket.#field_ident.is_some()) {
-                return Err(#operon::meta_storage::MetaStorageError::InvalidResolution(
+                return Err(#operon::meta_storage::MetaStorageError::InvalidExplosion(
                     #err_msg.into(),
                 ));
             }
@@ -235,7 +235,7 @@ mod tests {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 if tickets.iter().any(|ticket| ticket.i.is_some()) {
-                    return Err(operon::meta_storage::MetaStorageError::InvalidResolution(
+                    return Err(operon::meta_storage::MetaStorageError::InvalidExplosion(
                         "Called `explode(i)` on `beta`, but `i` was resolved".into(),
                     ));
                 }
