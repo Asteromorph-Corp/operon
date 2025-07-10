@@ -43,7 +43,7 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
                 }
                 ticket.deps_done = ticket.deps_quota.is_some_and(|quota| self.deps_count >= quota);
                 if ticket.is_ready() {
-                    ticket.status = operon::schema_base::TicketStatus::Ready;
+                    ticket.status = operon::schema_base::TicketStatus::Queued;
                 }
                 Ok(ticket)
             }
