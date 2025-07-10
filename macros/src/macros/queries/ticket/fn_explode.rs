@@ -87,9 +87,7 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
                 .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);
-            let sink = client
-                .copy_in::<_, #operon::bytes::Bytes>(&copy_stmt)
-                .await?;
+            let sink = client.copy_in::<_, #operon::bytes::Bytes>(&copy_stmt).await?;
             let mut sink = Box::pin(sink);
             for ticket in &new_tickets {
                 #operon::futures::SinkExt::feed(

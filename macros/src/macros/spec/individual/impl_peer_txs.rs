@@ -48,7 +48,7 @@ pub fn impl_peer_txs(job_id: &JobId, event_receiving_job_ids: &IndexSet<&JobId>)
         parse_quote! {
             #sender_ident: senders
                 .remove(<schema::#job_ident as #operon::schema_base::Job>::id())
-                .unwrap_or_else(|| { 
+                .unwrap_or_else(|| {
                     panic!("No sender for job `{}` found", <schema::#job_ident as #operon::schema_base::Job>::id())
                 })
         }
