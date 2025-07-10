@@ -31,7 +31,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItem
             async fn #get_fn_name(&self, #(#dim_args),*) -> Result<Option<#entity_ident>, operon::storage::StorageError>;
         };
         let put_fn = parse_quote! {
-            async fn #put_fn_name(&self, #(#dim_args,)* value: &#entity_ident) -> Result<(), operon::storage::StorageError>;
+            async fn #put_fn_name(&self, #(#dim_args,)* value: #entity_ident) -> Result<(), operon::storage::StorageError>;
         };
 
         [get_fn, put_fn]
@@ -205,13 +205,13 @@ mod tests {
                 async fn get_a(&self, i: schema::IDim) -> Result<Option<A>, operon::storage::StorageError>;
             },
             parse_quote! {
-                async fn put_a(&self, i: schema::IDim, value: &A) -> Result<(), operon::storage::StorageError>;
+                async fn put_a(&self, i: schema::IDim, value: A) -> Result<(), operon::storage::StorageError>;
             },
             parse_quote! {
                 async fn get_b(&self, i: schema::IDim, j: schema::JDim) -> Result<Option<B>, operon::storage::StorageError>;
             },
             parse_quote! {
-                async fn put_b(&self, i: schema::IDim, j: schema::JDim, value: &B) -> Result<(), operon::storage::StorageError>;
+                async fn put_b(&self, i: schema::IDim, j: schema::JDim, value: B) -> Result<(), operon::storage::StorageError>;
             },
         ];
 
