@@ -93,7 +93,7 @@ fn batch_gets(
                 quote! {
                     {
                         let mut #results_ident = Vec::new();
-                        let mut #over_var = 0;
+                        let mut #over_var = 0usize;
                         while let Some(value) = #acc {
                             #results_ident.push(value);
                             #over_var += 1;
@@ -272,7 +272,7 @@ mod tests {
                 async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::storage::StorageError> {
                     let final_results = {
                         let mut results_0 = Vec::new();
-                        let mut j = 0;
+                        let mut j = 0usize;
                         while let Some(value) = self.get_b(i, j.into()).await? {
                             results_0.push(value);
                             j += 1;
@@ -286,7 +286,7 @@ mod tests {
                 async fn get_all_d_over_j(&self, i: schema::IDim, k: schema::KDim) -> Result<Vec<D>, operon::storage::StorageError> {
                     let final_results = {
                         let mut results_0 = Vec::new();
-                        let mut j = 0;
+                        let mut j = 0usize;
                         while let Some(value) = self.get_d(i, j.into(), k).await? {
                             results_0.push(value);
                             j += 1;
