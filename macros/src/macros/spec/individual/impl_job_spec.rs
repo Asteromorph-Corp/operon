@@ -3,10 +3,11 @@ use syn::parse_quote;
 
 use crate::{
     JobConfig,
+    configs::{DimensionConfigMap, EntityConfigMap},
     macros::spec::individual::{
         fn_check_consistency::fn_check_consistency, fn_on_receive_job::fn_on_receive_job,
         fn_on_receive_resolution::fn_on_receive_resolution, fn_prepare_rebuild::fn_prepare_rebuild,
-        fn_send_on_finish::fn_send_on_finish,
+        fn_run_job::fn_run_job, fn_send_on_finish::fn_send_on_finish,
     },
     utils::{
         job_ident, operon_ident, peer_txs_ident, service_trait_ident, spawn_resolution, spec_ident,
@@ -14,13 +15,14 @@ use crate::{
     },
 };
 
-// TODO: Implement the actual logic for the methods in this trait.
 pub fn impl_job_spec(
     service_id: &str,
     job: &JobConfig,
     spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
     upstream_jobs: &IndexSet<&JobConfig>,
     downstream_jobs: &IndexSet<&JobConfig>,
+    entities: &EntityConfigMap,
+    dimensions: &DimensionConfigMap,
 ) -> syn::ItemImpl {
     let operon = operon_ident();
     let spec_ident = spec_ident(&job.id);
@@ -34,6 +36,7 @@ pub fn impl_job_spec(
 
     let fn_check_consistency = fn_check_consistency(job);
     let fn_prepare_rebuild = fn_prepare_rebuild(job);
+    let fn_run_job = fn_run_job(job, entities, dimensions);
     let fn_send_on_finish = fn_send_on_finish(job, spawn_dim_repeating_jobs, downstream_jobs);
     let fn_on_receive_job = fn_on_receive_job(job, upstream_jobs);
     let fn_on_receive_resolution = fn_on_receive_resolution(job);
@@ -49,17 +52,7 @@ pub fn impl_job_spec(
 
             #fn_check_consistency
             #fn_prepare_rebuild
-
-            async fn run_job(
-                &self,
-                service: &Svc,
-                storage: &Sto,
-                client: #operon::meta_storage::MetaClient<'_>,
-                job: &Self::Job,
-            ) -> Result<Self::Resolution, #operon::scheduler::SchedulerError> {
-                todo!();
-            }
-
+            #fn_run_job
             #fn_send_on_finish
             #fn_on_receive_job
             #fn_on_receive_resolution

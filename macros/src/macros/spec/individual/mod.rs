@@ -2,6 +2,7 @@ mod fn_check_consistency;
 mod fn_on_receive_job;
 mod fn_on_receive_resolution;
 mod fn_prepare_rebuild;
+mod fn_run_job;
 mod fn_send_on_finish;
 
 mod job_spec_definition;
