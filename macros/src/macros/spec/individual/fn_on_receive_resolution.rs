@@ -5,6 +5,30 @@ use crate::{
     utils::{explode_ident, operon_ident, resolution_enum_ident, variant_ident},
 };
 
+/// Generates the `on_receive_resolution` function for the implementation of the trait `JobSpec`.
+///
+/// Example:
+/// ```rust, ignore
+/// #[allow(unused_variables, clippy::match_single_binding)]
+/// async fn on_receive_resolution(
+///     &self,
+///     client: operon::meta_storage::MetaClient<'_>,
+///     resolution: schema::ResolutionEnum,
+/// ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+///     match resolution {
+///         schema::ResolutionEnum::I(res) => Ok(
+///             queries::explode_delta_i(client, &res).await?
+///         ),
+///         schema::ResolutionEnum::J(res) => Ok(
+///             queries::explode_delta_j(client, &res).await?
+///         ),
+///         schema::ResolutionEnum::K(res) => Ok(
+///             queries::explode_delta_k(client, &res).await?
+///         ),
+///         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived("resolution", "delta")),
+///     }
+/// }
+/// ```
 pub(super) fn fn_on_receive_resolution(job: &JobConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
