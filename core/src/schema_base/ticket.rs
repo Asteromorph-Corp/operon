@@ -54,10 +54,8 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
     /// `deps_done` is made true if and only if:
     /// * the dependency quota has become known,
     /// * and the dependency count is equal to the required dependency count.
-    async fn raise_dependency_count(
-        &mut self,
-        client: MetaClient<'_>,
-    ) -> Result<(), MetaStorageError>;
+    async fn raise_dependency_count(self, client: MetaClient<'_>)
+    -> Result<Self, MetaStorageError>;
 
     /// Whether this ticket is ready to run,
     /// i.e. whether all dependencies are done and the job is fully resolved.

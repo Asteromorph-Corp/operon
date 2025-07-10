@@ -33,15 +33,19 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
             }
 
             async fn raise_dependency_count(
-                &mut self,
+                self,
                 client: #operon::meta_storage::MetaClient<'_>,
-            ) -> Result<(), #operon::meta_storage::MetaStorageError> {
-                self.deps_count += 1;
-                if self.deps_quota.is_none() {
-                    self.deps_quota = self.get_dependency_quota(client).await?;
+            ) -> Result<Self, #operon::meta_storage::MetaStorageError> {
+                let mut ticket = self;
+                ticket.deps_count += 1;
+                if ticket.deps_quota.is_none() {
+                    ticket.deps_quota = ticket.get_dependency_quota(client).await?;
                 }
-                self.deps_done = self.deps_quota.is_some_and(|quota| self.deps_count >= quota);
-                Ok(())
+                ticket.deps_done = ticket.deps_quota.is_some_and(|quota| self.deps_count >= quota);
+                if ticket.is_ready() {
+                    ticket.status = operon::schema_base::TicketStatus::Ready;
+                }
+                Ok(ticket)
             }
 
             fn is_ready(&self) -> bool {
