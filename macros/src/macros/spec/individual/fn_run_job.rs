@@ -73,23 +73,43 @@ pub(super) fn fn_run_job(
         }
     });
 
-    let resolution_inserts = resolution_index.iter().map(|(dim, help)| {
-        let res_map = resolution_map_ident(dim);
-        let get_resolution_fn_name = get_resolution_ident(dim);
-        let get_resolution_args = help.config.depends_on.iter().map(|dep| -> syn::Expr {
-            let dep_var = variable_ident(dep);
-            if job_dim_set.contains(dep) {
-                parse_quote! { job.#dep_var }
-            } else {
-                parse_quote! { #dep_var }
-            }
-        });
-        let dep_vars = help.mapped_over.iter().map(|dep| variable_ident(dep));
+    let resolution_inserts =
+        resolution_index.iter().map(|(dim, help)| {
+            let res_map = resolution_map_ident(dim);
+            let get_resolution_fn_name = get_resolution_ident(dim);
+            let get_resolution_args = help
+                .config
+                .depends_on
+                .iter()
+                .map(|dep| -> syn::Expr {
+                    let dep_var = variable_ident(dep);
+                    if job_dim_set.contains(dep) {
+                        parse_quote! { job.#dep_var }
+                    } else {
+                        parse_quote! { #dep_var }
+                    }
+                })
+                .collect::<Vec<_>>();
+            let dep_vars = help.mapped_over.iter().map(|dep| variable_ident(dep));
 
-        help.mapped_over.iter().rfold(
+            let missing_msg = format!(
+                "{}_{}",
+                dim,
+                "{},"
+                    .repeat(help.config.depends_on.len())
+                    .trim_end_matches(",")
+            );
+
+            help.mapped_over.iter().rfold(
             quote! {
-                let resolution = queries::#get_resolution_fn_name(client, #(#get_resolution_args),*).await?;
-                #res_map.insert((#(#dep_vars,)*), resolution);
+                let resolution = queries::#get_resolution_fn_name(client, #(#get_resolution_args),*)
+                    .await?
+                    .ok_or_else(|| {
+                        #operon::meta_storage::MetaStorageError::MissingResolution(
+                            format!(#missing_msg, #(#get_resolution_args),*)
+                        )
+                    })?;
+                #res_map.insert((#(#dep_vars,)*), resolution.0);
             },
             |acc, dep| {
                 let dep_var = variable_ident(dep);
@@ -105,7 +125,7 @@ pub(super) fn fn_run_job(
                 }
             },
         )
-    });
+        });
 
     let arg_defs = job.from.iter().map(|arg| -> syn::Stmt {
         let entity = entities.get(&arg.id).expect("Entity not found in config");
@@ -116,40 +136,82 @@ pub(super) fn fn_run_job(
             .dims
             .iter()
             .filter(|dim| !arg.over.contains(dim))
-            .map(|dim| variable_ident(dim));
+            .map(|dim| variable_ident(dim))
+            .collect::<Vec<_>>();
 
         if arg.over.is_empty() {
             let get_ident = get_entity_ident(&arg.id);
+            let not_found_msg = format!(
+                "{}_{}",
+                arg.id,
+                "{},".repeat(entity.dims.len()).trim_end_matches(",")
+            );
             return parse_quote! {
                 let #arg_ident = storage
                     .#get_ident(#(job.#get_args),*)
                     .await?
-                    .ok_or(#operon::storage::StorageError::NotFound)?;
+                    .ok_or_else(|| {
+                        #operon::storage::StorageError::NotFound(
+                            format!(#not_found_msg, #(job.#get_args),*),
+                        )
+                })?;
             };
         }
 
         let get_ident = batch_get_entity_ident(&arg.id, &arg.over);
-        let elem_cut_ub = arg.over.iter().rfold(quote! { Ok(elem) }, |acc, dim| {
-            let dep_var = variable_ident(dim);
-            let res_map_ident = resolution_map_ident(dim);
-            let res_map_key = resolution_index
-                .get(dim)
-                .expect("Dimension not found in resolution index")
-                .mapped_over
+        let elem_cut_ub =
+            arg.over
                 .iter()
-                .map(|d| variable_ident(d));
-            quote! {
-                let ub = #res_map_ident.get(&(#(#res_map_key,)*)).unwrap_or(&0); // TODO: Handle this better
-                if elem.len() < *ub {
-                    return Err(#operon::storage::StorageError::NotFound);
-                }
-                elem.into_iter()
-                    .take(*ub)
-                    .enumerate()
-                    .map(|(#dep_var, elem)| { #acc })
-                    .collect::<Result<Vec<_>, _>>()
-            }
-        });
+                .enumerate()
+                .rfold(quote! { Ok(elem) }, |acc, (i, dim)| {
+                    let dep_var = variable_ident(dim);
+                    let res_map_ident = resolution_map_ident(dim);
+                    let res_map_key = resolution_index
+                        .get(dim)
+                        .expect("Dimension not found in resolution index")
+                        .mapped_over
+                        .iter()
+                        .map(|d| variable_ident(d));
+                    let mut cnt = 0;
+
+                    let mut msg_dims = Vec::new();
+                    let mut msg_params: Vec<syn::Expr> = Vec::new();
+                    for d in &entity.dims {
+                        let var_ident = variable_ident(d);
+                        if job_dim_set.contains(d) {
+                            msg_dims.push(format!("{d} = {{}}"));
+                            msg_params.push(parse_quote! { job.#var_ident });
+                            continue;
+                        }
+                        if cnt < i {
+                            msg_dims.push(format!("{d} = {{}}"));
+                            msg_params.push(parse_quote! { #var_ident });
+                        } else if cnt == i {
+                            msg_dims.push(format!("{d} = *"))
+                        } else {
+                            msg_dims.push(format!("{d} = _"));
+                        }
+                        cnt += 1;
+                    }
+                    let not_found_msg = format!(
+                        "{} ({}) expects {{}} elements, but only {{}} were found",
+                        arg.id,
+                        msg_dims.join(", ")
+                    );
+                    quote! {
+                        let ub = #res_map_ident.get(&(#(#res_map_key,)*)).unwrap_or(&0); // TODO: Handle this better
+                        if elem.len() < *ub {
+                            return Err(#operon::storage::StorageError::NotFound(
+                                format!(#not_found_msg, #(#msg_params,)* ub, elem.len())
+                            ).into());
+                        }
+                        elem.into_iter()
+                            .take(*ub)
+                            .enumerate()
+                            .map(|(#dep_var, elem)| { #acc })
+                            .collect::<Result<Vec<_>, #operon::scheduler::SchedulerError>>()
+                    }
+                });
 
         parse_quote! {
             let #arg_ident = {
@@ -270,7 +332,11 @@ mod tests {
                 let a = storage
                     .get_a(job.i)
                     .await?
-                    .ok_or(operon::storage::StorageError::NotFound)?;
+                    .ok_or_else(|| {
+                        operon::storage::StorageError::NotFound(
+                            format!("a_{}", job.i),
+                        )
+                    })?;
                 let b_j = service
                     .beta(a)
                     .await
@@ -365,32 +431,42 @@ mod tests {
                 job: &Self::Job,
             ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
                 let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
-                let resolution = queries::get_resolution_j(client, job.i).await?;
-                resolution_j.insert((), resolution);
+                let resolution = queries::get_resolution_j(client, job.i)
+                    .await?
+                    .ok_or_else(|| {
+                        operon::meta_storage::MetaStorageError::MissingResolution(
+                            format!("j_{}", job.i)
+                        )
+                    })?;
+                resolution_j.insert((), resolution.0);
 
                 let b_j = {
                     let elem = storage.get_all_b_over_j(job.i).await?;
                     let ub = resolution_j.get(&()).unwrap_or(&0);
                     if elem.len() < *ub {
-                        return Err(operon::storage::StorageError::NotFound); // TODO: Use different error
+                        return Err(operon::storage::StorageError::NotFound(
+                            format!("b (i = {}, j = *) expects {} elements, but only {} were found", job.i, ub, elem.len()
+                        )).into());
                     }
                     elem.into_iter()
                         .take(*ub)
                         .enumerate()
                         .map(|(j, elem)| { Ok(elem) })
-                        .collect::<Result<Vec<_>, _>>()
+                        .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
                 }?;
                 let d_j = {
                     let elem = storage.get_all_d_over_j(job.i, job.k).await?;
                     let ub = resolution_j.get(&()).unwrap_or(&0);
                     if elem.len() < *ub {
-                        return Err(operon::storage::StorageError::NotFound); // TODO: Use different error
+                        return Err(operon::storage::StorageError::NotFound(
+                            format!("d (i = {}, j = *, k = {}) expects {} elements, but only {} were found", job.i, job.k, ub, elem.len())
+                        ).into());
                     }
                     elem.into_iter()
                         .take(*ub)
                         .enumerate()
                         .map(|(j, elem)| { Ok(elem) })
-                        .collect::<Result<Vec<_>, _>>()
+                        .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
                 }?;
 
                 let e = service
@@ -495,31 +571,47 @@ mod tests {
                 let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
                 let mut resolution_k: std::collections::HashMap<(schema::JDim,), usize> = Default::default();
 
-                let resolution = queries::get_resolution_j(client, job.i).await?;
-                resolution_j.insert((), resolution);
+                let resolution = queries::get_resolution_j(client, job.i)
+                    .await?
+                    .ok_or_else(|| {
+                        operon::meta_storage::MetaStorageError::MissingResolution(
+                            format!("j_{}", job.i)
+                        )
+                    })?;
+                resolution_j.insert((), resolution.0);
 
                 for j in 0..(*resolution_j.get(&()).unwrap_or(&0)) { // TODO: Remove unwrap
-                    let resolution = queries::get_resolution_k(client, job.i, j).await?;
-                    resolution_k.insert((j,), resolution);
+                    let resolution = queries::get_resolution_k(client, job.i, j)
+                    .await?
+                        .ok_or_else(|| {
+                            operon::meta_storage::MetaStorageError::MissingResolution(
+                                format!("k_{},{}", job.i, j)
+                            )
+                        })?;
+                    resolution_k.insert((j,), resolution.0);
                 }
 
                 let b_j = {
                     let elem = storage.get_all_b_over_j(job.i).await?;
                     let ub = resolution_j.get(&()).unwrap_or(&0);
                     if elem.len() < *ub {
-                        return Err(operon::storage::StorageError::NotFound); // TODO: Use different error
+                        return Err(operon::storage::StorageError::NotFound(
+                            format!("b (i = {}, j = *) expects {} elements, but only {} were found", job.i, ub, elem.len())
+                        ).into());
                     }
                     elem.into_iter()
                         .take(*ub)
                         .enumerate()
                         .map(|(j, elem)| { Ok(elem) })
-                        .collect::<Result<Vec<_>, _>>()
+                        .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
                 }?;
                 let d_j_k = {
                     let elem = storage.get_all_d_over_jk(job.i).await?;
                     let ub = resolution_j.get(&()).unwrap_or(&0);
                     if elem.len() < *ub {
-                        return Err(operon::storage::StorageError::NotFound); // TODO: Use different error
+                        return Err(operon::storage::StorageError::NotFound(
+                            format!("d (i = {}, j = *, k = _) expects {} elements, but only {} were found", job.i, ub, elem.len())
+                        ).into());
                     }
                     elem.into_iter()
                         .take(*ub)
@@ -527,15 +619,17 @@ mod tests {
                         .map(|(j, elem)| {
                             let ub = resolution_k.get(&(j,)).unwrap_or(&0);
                             if elem.len() < *ub {
-                                return Err(operon::storage::StorageError::NotFound); // TODO: Use different error
+                                return Err(operon::storage::StorageError::NotFound(
+                                    format!("d (i = {}, j = {}, k = *) expects {} elements, but only {} were found", job.i, j, ub, elem.len())
+                                ).into());
                             }
                             elem.into_iter()
                                 .take(*ub)
                                 .enumerate()
                                 .map(|(k, elem)| { Ok(elem) })
-                                .collect::<Result<Vec<_>, _>>()
+                                .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
                         })
-                        .collect::<Result<Vec<_>, _>>()
+                        .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
                 }?;
 
                 let e_l = service
