@@ -43,6 +43,8 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             &spawn_dim_repeating_jobs,
             &upstream_jobs,
             &downstream_jobs,
+            &all_configs.entities,
+            &all_configs.dimensions,
         );
 
         let job_rebuilder_def = job_rebuilder_definition(job);

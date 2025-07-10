@@ -93,10 +93,10 @@ pub fn job_fn_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}", job_id.to_snake_case())
 }
 
-pub fn job_fn_arg_ident(arg_id: &EntityId, over: &[DimensionId]) -> syn::Ident {
+pub fn entity_over_dim_ident(entity_id: &EntityId, over: &[DimensionId]) -> syn::Ident {
     format_ident!(
         "{}{}",
-        arg_id.to_snake_case(),
+        entity_id.to_snake_case(),
         over.iter()
             .map(|d| format!("_{}", d.to_snake_case()))
             .collect::<String>()

@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::{
     AllConfig,
     utils::{
-        entity_ident, job_enum_ident, job_fn_arg_ident, job_fn_ident, operon_ident,
+        entity_ident, job_enum_ident, entity_over_dim_ident, job_fn_ident, operon_ident,
         resolution_enum_ident, service_trait_ident,
     },
 };
@@ -33,7 +33,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let job_fns = all_configs.jobs.values().map(|job| -> syn::TraitItemFn {
         let fn_name = job_fn_ident(&job.id);
         let args = job.from.iter().map(|arg| -> syn::FnArg {
-            let arg_ident = job_fn_arg_ident(&arg.id, &arg.over);
+            let arg_ident = entity_over_dim_ident(&arg.id, &arg.over);
             let entity_ident = entity_ident(&arg.id);
             let ty: syn::Type = arg.over.iter().fold(
                 parse_quote! { #entity_ident },
