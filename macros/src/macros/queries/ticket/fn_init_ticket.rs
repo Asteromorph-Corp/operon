@@ -23,7 +23,14 @@ impl std::fmt::Display for InitTicketQuery<'_> {
         writeln!(f, "    deps_quota BIGINT,")?;
         writeln!(f, "    deps_done BOOLEAN NOT NULL,")?;
         writeln!(f, "    status {{ticket_status_type}} NOT NULL,")?;
-        writeln!(f, "    PRIMARY KEY (i)")?;
+        write!(f, "    PRIMARY KEY (")?;
+        for (i, dim) in self.0.dims.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{dim}")?;
+        }
+        writeln!(f, ")")?;
         write!(f, ");")
     }
 }
