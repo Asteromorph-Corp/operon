@@ -58,7 +58,7 @@ where
         // Set up the logger
         UiLogger::new(log_tx, log_options.level, log_options.dump)
             .setup(::log::LevelFilter::Trace)?;
-        let ui_state = Arc::new(RwLock::new(UiState::default()));
+        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(&handler.job_handlers)));
 
         // Create the scheduler
         let scheduler = Scheduler::<Svc, Sto>::new(

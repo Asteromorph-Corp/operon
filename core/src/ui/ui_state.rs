@@ -2,7 +2,9 @@ use indexmap::IndexMap;
 
 use crate::{
     operon::RunningState,
-    scheduler::ControlEvent,
+    scheduler::{ControlEvent, JobHandler},
+    service::OperonService,
+    storage::OperonStorage,
     ui::{LogBuffer, ShellPrompt, UiError, UiStateUpdate},
 };
 
@@ -24,6 +26,24 @@ pub struct UiState {
 }
 
 impl UiState {
+    pub fn from_jobs<Svc: OperonService, Sto: OperonStorage>(
+        jobs: &[Box<dyn JobHandler<Svc, Sto>>],
+    ) -> Self {
+        let progress = jobs
+            .iter()
+            .map(|job| {
+                (
+                    job.job_id().to_string(),
+                    (0, 0, 0, RunningState::Running, false),
+                )
+            })
+            .collect();
+        Self {
+            progress,
+            ..Default::default()
+        }
+    }
+
     pub fn progress_iter(&self) -> impl Iterator<Item = &Progress> {
         self.progress.values()
     }
