@@ -92,7 +92,6 @@ pub(super) fn impl_ticket(
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
     use syn::parse_quote;
 
     use crate::{
@@ -180,9 +179,6 @@ mod tests {
                 }
             }
         };
-        assert_eq!(
-            item.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(item, expected);
     }
 }

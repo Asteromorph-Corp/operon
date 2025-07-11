@@ -110,7 +110,7 @@ fn resolution_inserts(
             .map(|dep| variable_ident(dep))
             .collect::<Vec<_>>();
         let dep_vars = entry.fetched_over.iter().map(|dep| variable_ident(dep));
-        
+
         entry.fetched_over.iter().rfold(
             parse_quote! {
                 if let Some(resolution) = queries::#get_resolution_fn_name(client, #(#get_resolution_args),*).await? {
@@ -200,8 +200,6 @@ pub(super) fn fn_get_dependency_quota(
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use crate::JobArg;
 
     use super::*;
@@ -242,10 +240,7 @@ mod tests {
             }
         };
 
-        assert_eq!(
-            item.to_token_stream().to_string(),
-            expected.to_token_stream().to_string()
-        );
+        assert_eq!(item, expected);
     }
 
     #[test]
