@@ -7,8 +7,7 @@ pub mod schema_base;
 pub mod service;
 pub mod storage;
 pub mod ui;
-
-mod utils;
+pub mod utils;
 
 // Re-export the external crates used in the macro expansions
 pub use anyhow;
