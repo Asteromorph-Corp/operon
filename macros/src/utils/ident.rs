@@ -1,12 +1,16 @@
 use heck::{ToPascalCase, ToShoutySnakeCase, ToSnakeCase};
+use once_cell::sync::Lazy;
 use proc_macro_crate::{FoundCrate, crate_name};
 use quote::format_ident;
 use syn::parse_quote;
 
 use crate::configs::{DimensionId, EntityId, JobId};
 
+static CRATE_NAME: Lazy<Result<FoundCrate, proc_macro_crate::Error>> =
+    Lazy::new(|| crate_name("operon"));
+
 pub fn operon_ident() -> syn::Ident {
-    match crate_name("operon") {
+    match CRATE_NAME.as_ref() {
         Ok(FoundCrate::Name(name)) => format_ident!("{name}"),
         Ok(FoundCrate::Itself) => format_ident!("crate"),
         Err(_) => format_ident!("operon"),
