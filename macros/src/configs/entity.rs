@@ -11,8 +11,6 @@ pub struct EntityConfig {
     pub id: EntityId,
     /// Dimensions this entity repeat on.
     pub dims: Vec<DimensionId>,
-    /// The Rust definition of this entity.
-    pub body: String,
 }
 
 pub type EntityConfigMap = IndexMap<EntityId, EntityConfig>;
