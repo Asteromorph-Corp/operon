@@ -29,19 +29,17 @@ impl std::fmt::Display for InitTicketQuery<'_> {
 }
 
 /// Helper struct to generate the SQL query for ticket summary triggers.
-struct TicketSummaryQuery<'a>(&'a JobConfig);
+const TICKET_SUMMARY_INSERT_QUERY: &str =
+    "INSERT INTO {schema_prefix}ticket_summary (job_id, waiting, queued, done)
+VALUES ($1, 0, 0, 0)
+ON CONFLICT DO NOTHING;";
 
-impl std::fmt::Display for TicketSummaryQuery<'_> {
+/// Helper struct to generate the SQL queries for ticket summary triggers.
+struct TicketSummaryTriggerQuery<'a>(&'a JobConfig);
+
+impl std::fmt::Display for TicketSummaryTriggerQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let id = &self.0.id;
-
-        writeln!(
-            f,
-            "INSERT INTO {{schema_prefix}}ticket_summary (job_id, waiting, queued, done)"
-        )?;
-        writeln!(f, "VALUES ($1, 0, 0, 0)")?;
-        writeln!(f, "ON CONFLICT DO NOTHING;")?;
-        writeln!(f)?;
 
         writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_ins_trg")?;
         writeln!(f, "    AFTER INSERT ON {{schema_prefix}}ticket_{id}")?;
@@ -108,9 +106,10 @@ impl std::fmt::Display for TicketSummaryQuery<'_> {
 ///     let summary_stmt = format!(
 ///         "INSERT INTO {schema_prefix}ticket_summary (job_id, waiting, queued, done)
 ///         VALUES ($1, 0, 0, 0)
-///         ON CONFLICT DO NOTHING;
-///
-///         CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
+///         ON CONFLICT DO NOTHING;"
+///     );
+///     let trigger_stmts = format!(
+///         "CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
 ///             AFTER INSERT ON {schema_prefix}ticket_beta
 ///             REFERENCING NEW TABLE AS NEW_TABLE
 ///             FOR EACH STATEMENT
@@ -138,6 +137,7 @@ impl std::fmt::Display for TicketSummaryQuery<'_> {
 ///     );
 ///     client.execute(&init_stmt, &[]).await?;
 ///     client.execute(&summary_stmt, &[&<schema::BetaJob as operon::schema_base::Job>::id()]).await?;
+///     client.batch_execute(&trigger_stmts).await?;
 ///     Ok(())
 /// }
 /// ```
@@ -146,7 +146,8 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
     let fn_ident = init_ticket_ident(&job.id);
     let job_ident = job_ident(&job.id);
     let init_ticket_query = InitTicketQuery(job).to_string();
-    let ticket_summary_query = TicketSummaryQuery(job).to_string();
+    let ticket_summary_query = TICKET_SUMMARY_INSERT_QUERY;
+    let ticket_trigger_query = TicketSummaryTriggerQuery(job).to_string();
 
     parse_quote! {
         pub async fn #fn_ident(
@@ -156,9 +157,11 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
             let ticket_status_type = client.ticket_status_type();
             let init_stmt = format!(#init_ticket_query);
             let summary_stmt = format!(#ticket_summary_query);
+            let trigger_stmts = format!(#ticket_trigger_query);
 
             client.execute(&init_stmt, &[]).await?;
             client.execute(&summary_stmt, &[&<schema::#job_ident as #operon::schema_base::Job>::id()]).await?;
+            client.batch_execute(&trigger_stmts).await?;
 
             Ok(())
         }
@@ -215,12 +218,8 @@ mod tests {
             spawn_dim: Some("j".to_string()),
         };
 
-        let ticket_summary = TicketSummaryQuery(&job).to_string();
+        let ticket_summary = TicketSummaryTriggerQuery(&job).to_string();
         let expected = indoc! {"
-            INSERT INTO {schema_prefix}ticket_summary (job_id, waiting, queued, done)
-            VALUES ($1, 0, 0, 0)
-            ON CONFLICT DO NOTHING;
-
             CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
                 AFTER INSERT ON {schema_prefix}ticket_beta
                 REFERENCING NEW TABLE AS NEW_TABLE
@@ -275,11 +274,8 @@ mod tests {
                 PRIMARY KEY (i)
             );"
         };
-        let summary_stmt = indoc! {"
-            INSERT INTO {schema_prefix}ticket_summary (job_id, waiting, queued, done)
-            VALUES ($1, 0, 0, 0)
-            ON CONFLICT DO NOTHING;
-
+        let summary_stmt = TICKET_SUMMARY_INSERT_QUERY;
+        let trigger_stmts = indoc! {"
             CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
                 AFTER INSERT ON {schema_prefix}ticket_beta
                 REFERENCING NEW TABLE AS NEW_TABLE
@@ -314,9 +310,11 @@ mod tests {
                 let ticket_status_type = client.ticket_status_type();
                 let init_stmt = format!(#init_stmt);
                 let summary_stmt = format!(#summary_stmt);
+                let trigger_stmts = format!(#trigger_stmts);
 
                 client.execute(&init_stmt, &[]).await?;
                 client.execute(&summary_stmt, &[&<schema::BetaJob as operon::schema_base::Job>::id()]).await?;
+                client.batch_execute(&trigger_stmts).await?;
 
                 Ok(())
             }
