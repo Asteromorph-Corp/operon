@@ -1,5 +1,7 @@
+use secrecy::SecretString;
+
 pub struct StorageOptions {
-    pub database_uri: String,
+    pub database_uri: SecretString,
     pub pool_size: usize,
     pub keepalives_idle: std::time::Duration,
     pub keepalives_interval: std::time::Duration,
@@ -7,9 +9,9 @@ pub struct StorageOptions {
 }
 
 impl StorageOptions {
-    pub fn new(database_uri: String) -> Self {
+    pub fn new(database_uri: impl Into<String>) -> Self {
         Self {
-            database_uri,
+            database_uri: SecretString::from(database_uri.into()),
             pool_size: 16,
             keepalives_idle: std::time::Duration::from_secs(60),
             keepalives_interval: std::time::Duration::from_secs(30),
