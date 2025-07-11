@@ -83,7 +83,8 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
                     "WHERE {}",
                     params
                         .iter()
-                        .map(|(name, param)| format!("{name} = {param}"))
+                        .enumerate()
+                        .map(|(i, (name, _))| format!("{} = ${}", name, i + 1))
                         .collect::<Vec<_>>()
                         .join(" AND "),
                 )
@@ -166,7 +167,8 @@ mod tests {
                         "WHERE {}",
                         params
                             .iter()
-                            .map(|(name, param)| format!("{name} = {param}"))
+                            .enumerate()
+                            .map(|(i, (name, _))| format!("{} = ${}", name, i + 1))
                             .collect::<Vec<_>>()
                             .join(" AND "),
                     )
@@ -208,9 +210,6 @@ mod tests {
                 Ok(ready_tickets)
             }
         };
-        assert_eq!(
-            prettyplease::unparse(&parse_quote! { #item }),
-            prettyplease::unparse(&parse_quote! { #expected })
-        );
+        assert_eq!(item, expected);
     }
 }
