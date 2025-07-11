@@ -1,6 +1,7 @@
 pub struct MetaStorageOptions {
-    pub database_uri: String,
-    pub pool_size: usize,
-    pub connection_timeout: std::time::Duration,
-    pub schema: Option<String>,
+    pub(crate) database_uri: String,
+    pub(crate) pool_size: usize,
+    pub(crate) keepalives_idle: std::time::Duration,
+    pub(crate) keepalives_interval: std::time::Duration,
+    pub(crate) schema: Option<String>,
 }

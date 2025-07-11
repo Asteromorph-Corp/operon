@@ -8,10 +8,8 @@ pub struct MetaStorage {
 
 impl MetaStorage {
     pub fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
-        let schema = options.schema;
-
         // Might want to make these hardcoded config values configurable.
-        let pg_config: tokio_postgres::Config = Self::build_config(&options.database_uri)?;
+        let pg_config: tokio_postgres::Config = Self::build_config(&options)?;
         let manager_config = deadpool_postgres::ManagerConfig {
             recycling_method: deadpool_postgres::RecyclingMethod::Clean,
         };
@@ -23,18 +21,23 @@ impl MetaStorage {
         let pool = deadpool_postgres::Pool::builder(manager)
             .max_size(options.pool_size)
             .build()?;
+        let schema = options.schema;
         Ok(MetaStorage { pool, schema })
     }
 
-    fn build_config(database_uri: &str) -> Result<tokio_postgres::Config, MetaStorageError> {
-        let mut config: ::tokio_postgres::Config =
-            database_uri.parse().map_err(|e: tokio_postgres::Error| {
+    fn build_config(
+        options: &MetaStorageOptions,
+    ) -> Result<tokio_postgres::Config, MetaStorageError> {
+        let mut config = options
+            .database_uri
+            .parse::<tokio_postgres::Config>()
+            .map_err(|e: tokio_postgres::Error| {
                 MetaStorageError::DatabaseUriParseError(e.to_string())
             })?;
         config
             .keepalives(true)
-            .keepalives_idle(::std::time::Duration::from_secs(60))
-            .keepalives_interval(::std::time::Duration::from_secs(30)); // TODO: Make this configurable.
+            .keepalives_idle(options.keepalives_idle)
+            .keepalives_interval(options.keepalives_interval); // TODO: Make this configurable.
         Ok(config)
     }
 
