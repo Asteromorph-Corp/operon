@@ -36,7 +36,7 @@ use crate::storage::StorageError;
 ///
 /// The functions were parsed as follows:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use anyhow::Result;
 /// use async_trait::async_trait;
 /// use operon::dimension::*;
