@@ -8,15 +8,16 @@ pub async fn init_ticket_summary(client: MetaClient<'_>) -> Result<(), MetaStora
             waiting BIGINT NOT NULL DEFAULT 0,
             queued BIGINT NOT NULL DEFAULT 0,
             done BIGINT NOT NULL DEFAULT 0,
-            PRIMARY KEY (job_id)
+            PRIMARY KEY (job_id),
             CHECK (
                 waiting >= 0 AND
                 queued >= 0 AND
                 done >= 0
             )
-        );
-
-        CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_summary() RETURNS TRIGGER AS $$
+        );"
+    );
+    let func_stmt = format!(
+        "CREATE OR REPLACE FUNCTION {schema_prefix}trg_ticket_summary() RETURNS TRIGGER AS $$
         BEGIN
             IF TG_OP = 'INSERT' THEN
                 UPDATE {schema_prefix}ticket_summary s
@@ -59,5 +60,6 @@ pub async fn init_ticket_summary(client: MetaClient<'_>) -> Result<(), MetaStora
         $$ LANGUAGE plpgsql;"
     );
     client.execute(&stmt, &[]).await?;
+    client.execute(&func_stmt, &[]).await?;
     Ok(())
 }
