@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::{
     AllConfig,
     utils::{
-        entity_ident, job_enum_ident, entity_over_dim_ident, job_fn_ident, operon_ident,
+        entity_ident, entity_over_dim_ident, job_enum_ident, job_fn_ident, operon_ident,
         resolution_enum_ident, service_trait_ident,
     },
 };
