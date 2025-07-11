@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use bytes::Buf;
 use tokio_postgres::{CopyInSink, ToStatement};
 
-use crate::meta_storage::MetaStorageError;
+use crate::{meta_storage::MetaStorageError, utils::SchemaPrefix};
 
 macro_rules! impl_meta_client {
     (
@@ -78,18 +78,6 @@ impl<'a> TransactionWithSchema<'a> {
 pub enum MetaClient<'a> {
     Object(&'a ConnectionWithSchema<'a>),
     Transaction(&'a TransactionWithSchema<'a>),
-}
-
-pub struct SchemaPrefix<'a>(Option<&'a str>);
-
-impl std::fmt::Display for SchemaPrefix<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(schema) = self.0 {
-            write!(f, "{schema}.")
-        } else {
-            Ok(())
-        }
-    }
 }
 
 pub struct TicketStatusType<'a>(Option<&'a str>);
