@@ -25,6 +25,10 @@ pub fn storage_trait_ident(service_id: &str) -> syn::Ident {
     format_ident!("{}Storage", service_id.to_pascal_case())
 }
 
+pub fn sql_storage_ident(service_id: &str) -> syn::Ident {
+    format_ident!("Psql{}Storage", service_id.to_pascal_case())
+}
+
 pub fn get_entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("get_{}", entity_id.to_snake_case())
 }

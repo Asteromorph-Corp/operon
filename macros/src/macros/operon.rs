@@ -7,6 +7,7 @@ use crate::{
         queries::mod_queries,
         schema::mod_schema,
         spec::mod_spec,
+        storage::mod_storage,
     },
 };
 
@@ -14,6 +15,7 @@ pub fn operon(all_configs: &AllConfig) -> syn::File {
     let mod_queries = mod_queries(all_configs);
     let mod_schema = mod_schema(all_configs);
     let mod_spec = mod_spec(all_configs);
+    let mod_storage = mod_storage(all_configs);
 
     let svc_trait = trait_service(all_configs);
     let sto_trait = trait_storage(all_configs);
@@ -22,6 +24,7 @@ pub fn operon(all_configs: &AllConfig) -> syn::File {
         #mod_queries
         #mod_schema
         #mod_spec
+        #mod_storage
 
         #svc_trait
         #sto_trait
