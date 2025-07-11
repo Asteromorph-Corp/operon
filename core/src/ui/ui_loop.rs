@@ -203,11 +203,8 @@ impl UiLoop {
                     match command.action {
                         Action::Run { fresh, rebuild } => match exec_snapshot.last_control_event {
                             ControlEvent::Start => match rec_state {
-                                RecoveryState::Unknown => {
-                                    log::warn!("Scheduler was not initialized yet.")
-                                }
-                                RecoveryState::Fresh
-                                | RecoveryState::Finished => {
+                                RecoveryState::Unknown => log::warn!("Scheduler was not initialized yet."),
+                                RecoveryState::Fresh | RecoveryState::Finished => {
                                     if rebuild {
                                         log::error!("Cannot rebuild.")
                                     } else {
