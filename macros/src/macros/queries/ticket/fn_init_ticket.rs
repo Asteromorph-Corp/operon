@@ -35,7 +35,6 @@ impl std::fmt::Display for InitTicketQuery<'_> {
     }
 }
 
-/// Helper struct to generate the SQL query for ticket summary triggers.
 const TICKET_SUMMARY_INSERT_QUERY: &str =
     "INSERT INTO {schema_prefix}ticket_summary (job_id, waiting, queued, done)
 VALUES ($1, 0, 0, 0)
