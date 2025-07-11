@@ -19,7 +19,12 @@ fn resolution_map_ident(dim: &DimensionId) -> syn::Ident {
 
 struct ResolutionIndexEntry<'a> {
     config: &'a DimensionConfig,
-    mapped_over: Vec<&'a DimensionId>,
+    /// The dimensions that this resolution is fetched over.
+    ///
+    /// Note that this is a subset of, but not identical to `config.depends_on`,
+    /// as dimensions not included here are already part of the job dimensions
+    /// so we need to only fetch the resolution for the specific value of that dimension.
+    fetched_over: Vec<&'a DimensionId>,
 }
 
 /// Builds an index map that contains the resolution entries which needs to be fetched from a metadata storage
@@ -35,25 +40,25 @@ fn build_resolution_index<'a>(
     job.from
         .iter()
         .flat_map(|arg| {
-            arg.over.iter().map(|dim_id| {
-                let dim = dimensions.get(dim_id).unwrap_or_else(|| {
-                    panic!("Dimension `{dim_id}` not found in config");
+            arg.over.iter().map(|dim| {
+                let config = dimensions.get(dim).unwrap_or_else(|| {
+                    panic!("Dimension `{dim}` not found in config");
                 });
 
                 // Collect dependencies that are not part of the job dimensions
                 // In the generated code, the tuple of these dimensions are used as keys in the resolution map
-                let mapped_over = dim
+                let fetched_over = config
                     .depends_on
                     .iter()
                     .filter(|dep_dim| !job_dim_set.contains(dep_dim))
                     .collect::<Vec<_>>();
 
                 let entry = ResolutionIndexEntry {
-                    config: dim,
-                    mapped_over,
+                    config,
+                    fetched_over,
                 };
 
-                (dim_id, entry)
+                (dim, entry)
             })
         })
         .collect()
@@ -64,11 +69,11 @@ fn resolution_inserts(
     resolution_index: &IndexMap<&DimensionId, ResolutionIndexEntry>,
     job_dim_set: &IndexSet<&DimensionId>,
 ) -> impl Iterator<Item = proc_macro2::TokenStream> {
-    resolution_index.iter().map(|(dim, help)| {
+    resolution_index.iter().map(|(dim, entry)| {
         let operon = operon_ident();
         let res_map = resolution_map_ident(dim);
         let get_resolution_fn_name = get_resolution_ident(dim);
-        let get_resolution_args = help
+        let get_resolution_args = entry
             .config
             .depends_on
             .iter()
@@ -81,17 +86,17 @@ fn resolution_inserts(
                 }
             })
             .collect::<Vec<_>>();
-        let dep_vars = help.mapped_over.iter().map(|dep| variable_ident(dep));
+        let dep_vars = entry.fetched_over.iter().map(|dep| variable_ident(dep));
 
         let missing_msg = format!(
             "{}_{}",
             dim,
             "{},"
-                .repeat(help.config.depends_on.len())
+                .repeat(entry.config.depends_on.len())
                 .trim_end_matches(",")
         );
 
-        help.mapped_over.iter().rfold(
+        entry.fetched_over.iter().rfold(
             quote! {
                 let resolution = queries::#get_resolution_fn_name(client, #(#get_resolution_args),*)
                     .await?
@@ -110,7 +115,7 @@ fn resolution_inserts(
                     .unwrap_or_else(|| {
                         panic!("Dimension `{dep}` not found in resolution index");
                     })
-                    .mapped_over
+                    .fetched_over
                     .iter()
                     .map(|d| variable_ident(d));
 
@@ -185,7 +190,7 @@ fn arg_def_collected(
             let res_map_key = resolution_index
                 .get(dim)
                 .expect("Dimension not found in resolution index")
-                .mapped_over
+                .fetched_over
                 .iter()
                 .map(|d| variable_ident(d));
 
@@ -310,7 +315,7 @@ pub(super) fn fn_run_job(
 
     let resolution_defs = resolution_index.iter().map(|(dim, entry)| -> syn::Stmt {
         let res_map_var = resolution_map_ident(dim);
-        let key_ty = entry.mapped_over.iter().map(|dep| dimension_ident(dep));
+        let key_ty = entry.fetched_over.iter().map(|dep| dimension_ident(dep));
         let ty: syn::Type = parse_quote! {
             std::collections::HashMap<(#(schema::#key_ty,)*), usize>
         };
