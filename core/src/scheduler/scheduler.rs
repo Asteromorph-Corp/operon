@@ -73,6 +73,7 @@ where
 
     /// Main entry point for the scheduler.
     pub async fn work(mut self) -> Result<(), SchedulerError> {
+        self.storage.init().await?;
         self.init_meta_storage().await?;
 
         // First, check the recovery state.
