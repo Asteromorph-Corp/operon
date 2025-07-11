@@ -27,9 +27,10 @@ impl MetaStorage {
     }
 
     fn build_config(database_uri: &str) -> Result<tokio_postgres::Config, MetaStorageError> {
-        let mut config: ::tokio_postgres::Config = database_uri
-            .parse()
-            .map_err(|_| MetaStorageError::DatabaseUriParseError(database_uri.into()))?;
+        let mut config: ::tokio_postgres::Config =
+            database_uri.parse().map_err(|e: tokio_postgres::Error| {
+                MetaStorageError::DatabaseUriParseError(e.to_string())
+            })?;
         config
             .keepalives(true)
             .keepalives_idle(::std::time::Duration::from_secs(60))
