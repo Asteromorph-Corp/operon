@@ -2,7 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::{
-    configs::JobConfigMap,
+    configs::{DimensionConfigMap, DimensionId, JobConfigMap},
     macros::schema::ticket::{
         impl_ticket::impl_ticket, impl_ticket_sql::impl_ticket_sql, impl_with::impl_with_fns,
         ticket_definition::ticket_definition,
@@ -10,11 +10,15 @@ use crate::{
 };
 
 /// Generates the `mod ticket` module with all ticket-related items.
-pub fn mod_ticket(jobs: &JobConfigMap) -> syn::ItemMod {
+pub fn mod_ticket(
+    jobs: &JobConfigMap,
+    primary_entity: &DimensionId,
+    dimensions: &DimensionConfigMap,
+) -> syn::ItemMod {
     let jobs = jobs.values().map(|job| {
         let def = ticket_definition(job);
         let impl_with_fns = impl_with_fns(job);
-        let impl_ticket = impl_ticket(job);
+        let impl_ticket = impl_ticket(job, primary_entity, dimensions, jobs);
         let impl_ticket_sql = impl_ticket_sql(job);
 
         quote! {
