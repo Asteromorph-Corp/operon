@@ -1,12 +1,14 @@
 use std::borrow::Cow;
 
+use secrecy::SecretString;
+
 use crate::{scheduler::SchedulerOptions, ui::LogOptions};
 
 pub struct OperonOptions {
     // Scheduler options
     pub(crate) internal_channel_size: usize,
     // Meta storage options
-    pub(crate) meta_storage_uri: String,
+    pub(crate) meta_storage_uri: SecretString,
     pub(crate) meta_storage_pool_size: u32,
     pub(crate) meta_storage_schema: Option<String>,
     pub(crate) meta_storage_keepalives_idle: std::time::Duration,
@@ -21,7 +23,7 @@ impl OperonOptions {
     pub fn new(meta_storage_uri: impl Into<String>) -> Self {
         Self {
             internal_channel_size: 1024,
-            meta_storage_uri: meta_storage_uri.into(),
+            meta_storage_uri: SecretString::from(meta_storage_uri.into()),
             meta_storage_pool_size: 16,
             meta_storage_schema: Some("metadata".to_string()),
             meta_storage_keepalives_idle: std::time::Duration::from_secs(60),

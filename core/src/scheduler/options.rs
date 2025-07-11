@@ -1,8 +1,10 @@
+use secrecy::SecretString;
+
 use crate::meta_storage::MetaStorageOptions;
 
 pub struct SchedulerOptions {
     pub(crate) internal_channel_size: usize,
-    pub(crate) database_uri: String,
+    pub(crate) database_uri: SecretString,
     pub(crate) pool_size: usize,
     pub(crate) schema: Option<String>,
     pub(crate) keepalives_idle: std::time::Duration,

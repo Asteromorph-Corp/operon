@@ -1,3 +1,5 @@
+use secrecy::ExposeSecret;
+
 use crate::meta_storage::{ConnectionWithSchema, MetaStorageError, MetaStorageOptions};
 
 #[derive(Debug, Clone)]
@@ -30,6 +32,7 @@ impl MetaStorage {
     ) -> Result<tokio_postgres::Config, MetaStorageError> {
         let mut config = options
             .database_uri
+            .expose_secret()
             .parse::<tokio_postgres::Config>()
             .map_err(|e: tokio_postgres::Error| {
                 MetaStorageError::DatabaseUriParseError(e.to_string())
