@@ -25,6 +25,22 @@ pub(super) fn impl_ticket(
         .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
 
+    let fn_new: Option<syn::ImplItemFn> = job
+        .from
+        .iter()
+        .all(|arg| arg.id == *primary_entity)
+        .then(|| {
+            parse_quote! {
+                fn new() -> Self {
+                    Self {
+                        deps_quota: Some(0),
+                        deps_done: true,
+                        ..Default::default()
+                    }
+                }
+            }
+        });
+
     let fn_get_dependency_quota = fn_get_dependency_quota(job, primary_entity, dimensions, jobs);
 
     parse_quote! {
@@ -34,6 +50,7 @@ pub(super) fn impl_ticket(
             type Job = schema::#job_ident;
             type Resolution = #res_ident;
 
+            #fn_new
             #fn_get_dependency_quota
 
             async fn raise_dependency_count(
@@ -118,6 +135,15 @@ mod tests {
             impl operon::schema_base::Ticket for BetaTicket {
                 type Job = schema::BetaJob;
                 type Resolution = schema::JResolution;
+
+                fn new() -> Self {
+                    Self {
+                        deps_quota: Some(0),
+                        deps_done: true,
+                        ..Default::default()
+                    }
+                }
+
 
                 #fn_get_dependency_quota
 
