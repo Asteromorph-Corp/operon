@@ -34,9 +34,7 @@ impl MetaStorage {
             .database_uri
             .expose_secret()
             .parse::<tokio_postgres::Config>()
-            .map_err(|e: tokio_postgres::Error| {
-                MetaStorageError::DatabaseUriParseError(e.to_string())
-            })?;
+            .map_err(|e| MetaStorageError::DatabaseUriParseError(e.to_string()))?;
         config
             .keepalives(true)
             .keepalives_idle(options.keepalives_idle)
