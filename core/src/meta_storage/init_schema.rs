@@ -14,7 +14,7 @@ pub async fn init_ticket_status_type(client: MetaClient<'_>) -> Result<(), MetaS
     let ticket_status_type = client.ticket_status_type();
     let create_status_type = format!(
         "DO $$ BEGIN
-            CREATE TYPE {ticket_status_type}ticket_status AS ENUM (
+            CREATE TYPE {ticket_status_type} AS ENUM (
                 'waiting',
                 'queued',
                 'done'
