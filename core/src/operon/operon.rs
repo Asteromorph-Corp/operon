@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use futures::future::try_join;
 use tokio::sync::RwLock;
 
 use crate::{
@@ -75,11 +76,17 @@ where
         // Spawn the scheduler thread
         let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };
 
-        // Main UI loop
-        ui_loop.run().await?;
-
-        // By the time the UI exits, the scheduler should have finished
-        scheduler_handle.await??;
+        try_join(
+            async {
+                ui_loop.run().await?;
+                Ok::<_, OperonError>(())
+            },
+            async {
+                scheduler_handle.await??;
+                Ok(())
+            },
+        )
+        .await?;
 
         Ok(())
     }
