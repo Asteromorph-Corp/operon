@@ -19,7 +19,7 @@ pub fn mod_schema(all_configs: &AllConfig) -> syn::ItemMod {
     );
 
     parse_quote! {
-        mod schema {
+        pub mod schema {
             use super::*;
 
             #mod_dimension
