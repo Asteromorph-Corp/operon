@@ -41,7 +41,7 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
                 if ticket.deps_quota.is_none() {
                     ticket.deps_quota = ticket.get_dependency_quota(client).await?;
                 }
-                ticket.deps_done = ticket.deps_quota.is_some_and(|quota| self.deps_count >= quota);
+                ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
                 if ticket.is_ready() {
                     ticket.status = operon::schema_base::TicketStatus::Queued;
                 }
