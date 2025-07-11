@@ -185,13 +185,30 @@ where
         let meta_footprint = get_footprint(meta_conn.as_client(), "global").await?;
         // Early return if the state can be inferred through the footprints.
         match (&data_footprint, &meta_footprint) {
-            (Some(df), Some(mf)) if df == mf && df.starts_with("F@") => {
-                // Both storages have the same footprint, and it is a "finished" one.
-                return Ok(RecoveryState::Finished);
+            (Some(df), Some(mf)) if df == mf => {
+                if df.starts_with("F@") {
+                    // Both storages have the same footprint, and it is a "finished" one.
+                    return Ok(RecoveryState::Finished);
+                } else if df.starts_with("S@") {
+                    // Both storages have the same footprint, and it is a "stopped" one.
+                    return Ok(RecoveryState::GracefullyStopped);
+                } else {
+                    // Both storages have the same footprint, but it is neither "finished" nor "stopped".
+                    log::warn!("Unexpected footprint found: {df}, treating the run as aborted.");
+                }
             }
-            (Some(df), Some(mf)) if df == mf && df.starts_with("S@") => {
-                // Both storages have the same footprint, and it is a "stopped" one.
-                return Ok(RecoveryState::GracefullyStopped);
+            (Some(df), Some(mf)) if df != mf => {
+                log::warn!(
+                    "Inconsistent footprints between data and metadata storage: \
+                    data footprint: {df}, metadata footprint: {mf}. \
+                    treating the run as aborted."
+                );
+            }
+            (None, Some(_)) => {
+                log::info!(
+                    "Footprint found in metadata storage, but not in data storage, treating the run as fresh."
+                );
+                return Ok(RecoveryState::Fresh);
             }
             _ => (),
         }
