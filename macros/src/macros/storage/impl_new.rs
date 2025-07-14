@@ -52,9 +52,7 @@ mod tests {
             impl PsqlCookingStorage {
                 pub fn new(options: operon::storage::StorageOptions) -> Result<Self, operon::storage::StorageError> {
                     let pg_config: operon::tokio_postgres::Config = {
-                        let mut config = options
-                            .uri
-                            .expose_secret()
+                        let mut config = operon::secrecy::ExposeSecret::expose_secret(&options.database_uri)
                             .parse::<operon::tokio_postgres::Config>()
                             .map_err(|e| operon::storage::StorageError::DatabaseUriParseError(e.to_string()))?;
                         config
