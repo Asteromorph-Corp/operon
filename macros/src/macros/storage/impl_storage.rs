@@ -2,6 +2,7 @@ use syn::parse_quote;
 
 use crate::{
     configs::{EntityConfigMap, EntityId},
+    macros::storage::generic_constraints,
     utils::{operon_ident, sql_storage_ident},
 };
 
@@ -60,9 +61,18 @@ pub(super) fn impl_storage(
     let create_tables_query = CreateTablesQuery(entities).to_string();
     let truncate_tables_query = TruncateTablesQuery(primary_entity, entities).to_string();
 
+    let generics = entities
+        .values()
+        .map(|entity| &entity.generic)
+        .collect::<Vec<_>>();
+    let generic_constraints = generic_constraints(entities);
+
     parse_quote! {
         #[#operon::async_trait::async_trait]
-        impl #operon::storage::OperonStorage for #sql_storage_ident {
+        impl<#(#generics),*> #operon::storage::OperonStorage for #sql_storage_ident<#(#generics),*>
+        where
+            #(#generic_constraints,)*
+        {
             async fn init(&self) -> Result<(), #operon::storage::StorageError> {
                 let client = self.pool.get().await?;
                 let schema_prefix = #operon::utils::SchemaPrefix(self.schema.as_deref());
@@ -141,7 +151,7 @@ mod tests {
                 EntityConfig {
                     id: "a".to_string(),
                     dims: vec!["i".to_string()],
-                    generic: format_ident!("A_")
+                    generic: format_ident!("A_"),
                 },
             ),
             (
