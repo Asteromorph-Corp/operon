@@ -11,7 +11,7 @@ pub struct LogBuffer {
 }
 impl Default for LogBuffer {
     fn default() -> Self {
-        Self::new(1024) // TODO: Good?
+        Self::new(1024)
     }
 }
 impl LogBuffer {

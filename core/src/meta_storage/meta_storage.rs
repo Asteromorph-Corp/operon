@@ -38,11 +38,11 @@ impl MetaStorage {
         config
             .keepalives(true)
             .keepalives_idle(options.keepalives_idle)
-            .keepalives_interval(options.keepalives_interval); // TODO: Make this configurable.
+            .keepalives_interval(options.keepalives_interval);
         Ok(config)
     }
 
-    pub async fn conn(&self) -> Result<ConnectionWithSchema, MetaStorageError> {
+    pub async fn conn(&self) -> Result<ConnectionWithSchema<'_>, MetaStorageError> {
         let client = self.pool.get().await?;
         let schema = self.schema.as_deref();
 

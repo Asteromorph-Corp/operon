@@ -49,7 +49,7 @@ impl<'a> ConnectionWithSchema<'a> {
         Ok(TransactionWithSchema { tx, schema })
     }
 
-    pub fn as_client(&self) -> MetaClient {
+    pub fn as_client(&self) -> MetaClient<'_> {
         MetaClient::Object(self)
     }
 }
@@ -69,7 +69,7 @@ impl<'a> TransactionWithSchema<'a> {
         self.tx.rollback().await.map_err(Into::into)
     }
 
-    pub fn as_client(&self) -> MetaClient {
+    pub fn as_client(&self) -> MetaClient<'_> {
         MetaClient::Transaction(self)
     }
 }

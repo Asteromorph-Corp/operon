@@ -207,9 +207,9 @@ fn arg_def_collected(
                     if cnt <= i {
                         (format!("{d} = {{}}"), Some(parse_quote! { #var_ident }))
                     } else if cnt == i + 1 {
-                        return (format!("{d} = *"), None);
+                        (format!("{d} = *"), None)
                     } else {
-                        return (format!("{d} = _"), None);
+                        (format!("{d} = _"), None)
                     }
                 })
                 .unzip();

@@ -69,8 +69,6 @@ where
     /// Constructs a new `PeerEventSenders` instance from the given senders.
     ///
     /// Remove the senders from the map.
-    ///
-    /// TODO: tx channels probably close when dropped, so taking owned `HashMap` should work. But I don't want to break anything, will refactor later.
     fn gather_from(senders: HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self;
 
     fn downgrade_all(&mut self);
