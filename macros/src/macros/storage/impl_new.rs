@@ -1,13 +1,21 @@
 use syn::parse_quote;
 
-use crate::utils::{operon_ident, sql_storage_ident};
+use crate::{
+    configs::EntityConfigMap,
+    utils::{operon_ident, sql_storage_ident},
+};
 
-pub(super) fn impl_new(service_id: &str) -> syn::ItemImpl {
+pub(super) fn impl_new(service_id: &str, entities: &EntityConfigMap) -> syn::ItemImpl {
     let operon = operon_ident();
     let sql_storage_ident = sql_storage_ident(service_id);
 
+    let generics = entities
+        .values()
+        .map(|entity| &entity.generic)
+        .collect::<Vec<_>>();
+
     parse_quote! {
-        impl #sql_storage_ident {
+        impl<#(#generics),*> #sql_storage_ident<#(#generics),*> {
             pub fn new(options: #operon::storage::StorageOptions) -> Result<Self, #operon::storage::StorageError> {
                 let pg_config: #operon::tokio_postgres::Config = {
                     let mut config = #operon::secrecy::ExposeSecret::expose_secret(&options.database_uri)
@@ -34,6 +42,7 @@ pub(super) fn impl_new(service_id: &str) -> syn::ItemImpl {
                 Ok(Self {
                     pool,
                     schema: options.schema,
+                    _phantom: std::marker::PhantomData,
                 })
             }
         }
@@ -47,9 +56,11 @@ mod tests {
     #[test]
     fn test_impl_new() {
         let service_id = "cooking";
-        let impl_item = impl_new(service_id);
+        let entities = EntityConfigMap::default(); // Assuming a default or mock EntityConfigMap
+
+        let impl_item = impl_new(service_id, &entities);
         let expected: syn::ItemImpl = parse_quote! {
-            impl PsqlCookingStorage {
+            impl<> PsqlCookingStorage<> {
                 pub fn new(options: operon::storage::StorageOptions) -> Result<Self, operon::storage::StorageError> {
                     let pg_config: operon::tokio_postgres::Config = {
                         let mut config = operon::secrecy::ExposeSecret::expose_secret(&options.database_uri)
@@ -76,6 +87,7 @@ mod tests {
                     Ok(Self {
                         pool,
                         schema: options.schema,
+                        _phantom: std::marker::PhantomData,
                     })
                 }
             }
