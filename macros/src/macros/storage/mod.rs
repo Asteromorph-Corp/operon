@@ -1,7 +1,11 @@
 mod data_storage_definition;
 
 mod impl_new;
+mod impl_service_storage;
 mod impl_storage;
+
+mod single_ops;
+
 mod generic_constraints;
 use generic_constraints::*;
 
