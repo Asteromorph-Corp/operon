@@ -5,6 +5,7 @@ mod impl_service_storage;
 mod impl_storage;
 
 mod batch_gets;
+mod batch_puts;
 mod single_ops;
 
 mod generic_constraints;
