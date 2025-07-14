@@ -357,7 +357,9 @@ where
         self.update_ui(tx.as_client()).await?;
 
         for rebuilder in rebuilders {
-            rebuilder.rebuild(tx.as_client()).await?;
+            rebuilder
+                .rebuild(tx.as_client(), self.ui_state.as_ref())
+                .await?;
             self.update_ui(tx.as_client()).await?;
         }
         tx.commit().await?;
