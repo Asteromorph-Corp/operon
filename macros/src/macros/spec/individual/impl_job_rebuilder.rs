@@ -6,7 +6,7 @@ use crate::{
     configs::DimensionId,
     utils::{
         explode_ident, mark_done_ident, operon_ident, put_resolution_ident, raise_dep_ident,
-        rebuilder_ident, resolution_ident, variable_ident,
+        rebuilder_ident, resolution_ident, ticket_ident, variable_ident,
     },
 };
 
@@ -63,6 +63,8 @@ pub fn impl_job_rebuilder(
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
     let primary_res_ident = resolution_ident(primary_dimension);
+    let ticket_ident = ticket_ident(&job.id);
+    let job_id = &job.id;
 
     let explode_fn_name = explode_ident(&job.id, primary_dimension);
 
@@ -119,6 +121,7 @@ pub fn impl_job_rebuilder(
             async fn rebuild(
                 &self,
                 client: #operon::meta_storage::MetaClient<'_>,
+                ui_state: &#operon::tokio::sync::RwLock<#operon::ui::UiState>,
             ) -> Result<(), #operon::scheduler::SchedulerError> {
                 for (job, resolution) in &self.0 {
                     #maybe_put_resolution
@@ -126,6 +129,19 @@ pub fn impl_job_rebuilder(
 
                     #(#explode_exprs)*
                     #(#raise_dep_exprs)*
+
+                    // FIXME: I would rather not do this, but every other way of doing this would require massive update of the UI logic
+                    let mut ui_state = ui_state.write().await;
+                    let (done, queued, waiting) = <schema::#ticket_ident as #operon::schema_base::TicketSql>::get_status(client).await?;
+                    let state = if queued + waiting == 0 {
+                        #operon::operon::RunningState::Finished
+                    } else {
+                        #operon::operon::RunningState::Running
+                    };
+                    ui_state.update_ui_state(#operon::ui::UiStateUpdate::ProgressUpdate(
+                        #job_id.to_string(),
+                        (done, queued, waiting, state, false),
+                    ))?;
                 }
                 Ok(())
             }
@@ -215,6 +231,7 @@ mod tests {
                 async fn rebuild(
                     &self,
                     client: operon::meta_storage::MetaClient<'_>,
+                    ui_state: &operon::tokio::sync::RwLock<operon::ui::UiState>,
                 ) -> Result<(), operon::scheduler::SchedulerError> {
                     for (job, resolution) in &self.0 {
                         queries::put_resolution_j(client, resolution).await?;
@@ -234,6 +251,9 @@ mod tests {
                             &operon::schema_base::TicketDepCount::none(),
                         )
                         .await?;
+
+                        let mut ui_state = ui_state.write().await;
+                        operon::scheduler::JobHandler::update_ui(&self.1, client, &mut ui_state).await?;
                     }
 
                     Ok(())
