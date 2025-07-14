@@ -24,6 +24,9 @@ pub fn prelude(all_configs: &AllConfig) -> syn::ItemMod {
 
             pub use traits::{#service_trait, #storage_trait};
 
+            /// The SQL storage that can be used with the service.
+            ///
+            /// This can only be used when all entities implement `Serialize` and `DeserializeOwned`.
             pub type #sql_storage = storage::#sql_storage<#(#generics),*>;
 
             pub fn #handler_ident<Svc: #service_trait, Sto: #storage_trait>() -> #operon::scheduler::SchedulerHandler<Svc, Sto> {
