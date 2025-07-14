@@ -72,7 +72,7 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
     });
 
     parse_quote! {
-        pub mod spec {
+        mod spec {
             use super::*;
 
             #primary_spec
