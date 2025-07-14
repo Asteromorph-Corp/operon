@@ -4,6 +4,7 @@ mod impl_new;
 mod impl_service_storage;
 mod impl_storage;
 
+mod batch_gets;
 mod single_ops;
 
 mod generic_constraints;

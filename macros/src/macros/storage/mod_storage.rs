@@ -17,7 +17,11 @@ pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
         &all_configs.primary_entity,
         &all_configs.entities,
     );
-    let impl_service_storage = impl_service_storage(&all_configs.service_id, &all_configs.entities);
+    let impl_service_storage = impl_service_storage(
+        &all_configs.service_id,
+        &all_configs.jobs,
+        &all_configs.entities,
+    );
 
     parse_quote! {
         mod storage {
