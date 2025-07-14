@@ -1,64 +1,41 @@
-use operon::{
-    async_trait::async_trait,
-    futures::{SinkExt, future::try_join_all},
-    meta_storage::{MetaClient, MetaStorage, MetaStorageError},
-    misc::{Job, OptionExt, Resolution, Ticket, TicketStatus},
-    operon::OperonError,
-    scheduler::{
-        IndividualSchedule, IndividualSchedulerOps, InternalEvent, JobManager, JobRebuilder,
-        SchedulerError,
-    },
-    service::OperonService,
-    storage::{OperonStorage, StorageError},
-};
+/// `A`: primary data, repeats on: `i`
+#[derive(Debug, Clone, operon::serde::Serialize, operon::serde::Deserialize)]
+#[serde(crate = "operon::serde")]
+pub struct A(pub String);
 
-// generate_operon!();
-mod dimension {
-    pub type I = usize;
-    pub type J = usize;
+/// `B`: derived from: `beta|i (A)`, repeats on: `i`, `j`
+#[derive(Debug, Clone, operon::serde::Serialize, operon::serde::Deserialize)]
+#[serde(crate = "operon::serde")]
+pub struct B(pub A, pub usize);
+
+#[operon::async_trait::async_trait]
+pub trait MyOperonService: operon::service::OperonService {
+    async fn beta(&self, a: &A) -> Result<Vec<B>, Box<dyn std::error::Error + Send + Sync>>;
 }
 
-mod entity {
-    use operon::serde::{Deserialize, Serialize};
-
-    /// `A`: primary data, repeats on: `i`
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    #[serde(crate = "operon::serde")]
-    pub struct A(pub String);
-
-    /// `B`: derived from: `beta|i (A)`, repeats on: `i`, `j`
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    #[serde(crate = "operon::serde")]
-    pub struct B(pub A, pub usize);
-}
-
-#[async_trait]
-pub trait MyOperonService: OperonService {
-    async fn beta(
-        &self,
-        a: &entity::A,
-    ) -> Result<Vec<entity::B>, Box<dyn std::error::Error + Send + Sync>>;
-}
-
-#[async_trait]
-pub trait MyOperonStorage: OperonStorage {
-    async fn put_a(&self, i: dimension::I, value: &entity::A) -> Result<(), StorageError>;
-    async fn get_a(&self, i: dimension::I) -> Result<Option<entity::A>, StorageError>;
+#[operon::async_trait::async_trait]
+pub trait MyOperonStorage: operon::storage::OperonStorage {
+    async fn put_a(&self, i: schema::IDim, value: &A) -> Result<(), operon::storage::StorageError>;
+    async fn get_a(&self, i: schema::IDim) -> Result<Option<A>, operon::storage::StorageError>;
 
     async fn put_b(
         &self,
-        i: dimension::I,
-        j: dimension::J,
-        value: &entity::B,
-    ) -> Result<(), StorageError>;
+        i: schema::IDim,
+        j: schema::JDim,
+        value: &B,
+    ) -> Result<(), operon::storage::StorageError>;
     async fn get_b(
         &self,
-        i: dimension::I,
-        j: dimension::J,
-    ) -> Result<Option<entity::B>, StorageError>;
+        i: schema::IDim,
+        j: schema::JDim,
+    ) -> Result<Option<B>, operon::storage::StorageError>;
 
     // Batch operations (only for the operations that are needed in the OperonService trait).
-    async fn put_all_b(&self, i: dimension::I, values: &[entity::B]) -> Result<(), StorageError> {
+    async fn put_all_b(
+        &self,
+        i: schema::IDim,
+        values: &[B],
+    ) -> Result<(), operon::storage::StorageError> {
         // Default implementation: put each value individually.
         for (j, value) in values.iter().enumerate() {
             self.put_b(i, j, value).await?;
@@ -67,513 +44,1060 @@ pub trait MyOperonStorage: OperonStorage {
     }
 }
 
-#[async_trait]
-pub trait MyMetaStorage: MetaStorage {
-    async fn get_resolution_i(
-        &self,
-        client: MetaClient<'_>,
-    ) -> Result<Option<IResolution>, MetaStorageError> {
-        let schema_prefix = client.schema_prefix();
-        let stmt = format!("SELECT i_ub FROM {schema_prefix}resolution");
-        let row = client.query_opt(&stmt, &[]).await?;
-        Ok(row.map(|row| IResolution(row.get::<_, i64>("i_ub") as usize)))
+mod queries {
+    #[allow(unused_imports)]
+    use super::*;
+    mod facts {
+        #[allow(unused_imports)]
+        use super::*;
+
+        pub async fn init_resolution_i(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!(
+                "CREATE TABLE IF NOT EXISTS {schema_prefix}dimension_i (
+                    i_ub BIGINT NOT NULL
+                );"
+            );
+            client.execute(&stmt, &[]).await?;
+            Ok(())
+        }
+
+        pub async fn clear_resolution_i(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!("TRUNCATE TABLE {schema_prefix}dimension_i");
+            client.execute(&stmt, &[]).await?;
+            Ok(())
+        }
+
+        pub async fn get_resolution_i(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<Option<schema::IResolution>, operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!("SELECT i_ub FROM {schema_prefix}resolution");
+            let row = client.query_opt(&stmt, &[]).await?;
+            Ok(row.map(|row| schema::IResolution(row.get::<_, i64>("i_ub") as usize)))
+        }
+
+        pub async fn put_resolution_i(
+            client: operon::meta_storage::MetaClient<'_>,
+            resolution: &schema::IResolution,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!(
+                "INSERT INTO {schema_prefix}dimension_i (i_ub) VALUES ($1) ON CONFLICT DO NOTHING"
+            );
+            client.execute(&stmt, &[&(resolution.0 as i64)]).await?;
+            Ok(())
+        }
+
+        pub async fn init_resolution_j(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!(
+                "CREATE TABLE IF NOT EXISTS {schema_prefix}dimension_j (
+                    i BIGINT,
+                    j_ub BIGINT NOT NULL,
+                    PRIMARY KEY (i)
+                );"
+            );
+            client.execute(&stmt, &[]).await?;
+            Ok(())
+        }
+
+        pub async fn clear_resolution_j(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!("TRUNCATE TABLE {schema_prefix}dimension_i");
+            client.execute(&stmt, &[]).await?;
+            Ok(())
+        }
+
+        pub async fn get_resolution_j(
+            client: operon::meta_storage::MetaClient<'_>,
+            i: usize,
+        ) -> Result<Option<schema::JResolution>, operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!("SELECT j_ub FROM {schema_prefix}dimension_j WHERE i = $1");
+            let row = client.query_opt(&stmt, &[&i64::try_from(i)?]).await?;
+            Ok(row.map(|row| schema::JResolution(row.get::<_, i64>("j_ub") as usize, i)))
+        }
+
+        pub async fn put_resolution_j(
+            client: operon::meta_storage::MetaClient<'_>,
+            resolution: &schema::JResolution,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!(
+                "INSERT INTO {schema_prefix}dimension_j (i, j_ub) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+            );
+            client
+                .execute(&stmt, &[&(resolution.1 as i64), &(resolution.0 as i64)])
+                .await?;
+            Ok(())
+        }
+
+        pub async fn init_resolution_k(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!(
+                "CREATE TABLE IF NOT EXISTS {schema_prefix}dimension_k (
+                    i BIGINT,
+                    k_ub BIGINT NOT NULL,
+                    PRIMARY KEY (i)
+                );"
+            );
+            client.execute(&stmt, &[]).await?;
+            Ok(())
+        }
+
+        pub async fn clear_resolution_k(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!("TRUNCATE TABLE {schema_prefix}dimension_k");
+            client.execute(&stmt, &[]).await?;
+            Ok(())
+        }
+
+        pub async fn get_resolution_k(
+            client: operon::meta_storage::MetaClient<'_>,
+            i: usize,
+        ) -> Result<Option<schema::KResolution>, operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!("SELECT k_ub FROM {schema_prefix}dimension_k WHERE i = $1");
+            let row = client.query_opt(&stmt, &[&(i as i64)]).await?;
+            Ok(row.map(|row| schema::KResolution(row.get::<_, i64>("k_ub") as usize, i)))
+        }
+
+        pub async fn put_resolution_k(
+            client: operon::meta_storage::MetaClient<'_>,
+            resolution: &schema::KResolution,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!(
+                "INSERT INTO {schema_prefix}dimension_k (i, k_ub) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+            );
+            client
+                .execute(&stmt, &[&(resolution.1 as i64), &(resolution.0 as i64)])
+                .await?;
+            Ok(())
+        }
     }
 
-    async fn put_resolution_i(
-        &self,
-        client: MetaClient<'_>,
-        resolution: &IResolution,
-    ) -> Result<(), MetaStorageError> {
-        let schema_prefix = client.schema_prefix();
-        let stmt = format!(
-            "INSERT INTO {schema_prefix}dimension_i (i_ub) VALUES ($1) ON CONFLICT DO NOTHING"
-        );
-        client.execute(&stmt, &[&(resolution.0 as i64)]).await?;
-        Ok(())
-    }
+    mod tickets {
+        use super::*;
 
-    async fn get_resolution_j(
-        &self,
-        client: MetaClient<'_>,
-        i: usize,
-    ) -> Result<Option<JResolution>, MetaStorageError> {
-        let schema_prefix = client.schema_prefix();
-        let stmt = format!("SELECT j_ub FROM {schema_prefix}resolution WHERE i = $1");
-        let row = client.query_opt(&stmt, &[&(i as i64)]).await?;
-        Ok(row.map(|row| JResolution(row.get::<_, i64>("j_ub") as usize, i)))
-    }
+        pub async fn init_tickets_beta(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let ticket_status_type = client.ticket_status_type();
+            let create_table = format!(
+                "CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_beta (
+                    i BIGINT,
+                    resolved BOOLEAN NOT NULL,
+                    deps_count BIGINT NOT NULL,
+                    deps_quota BIGINT,
+                    deps_done BOOLEAN NOT NULL,
+                    status {ticket_status_type} NOT NULL,
+                    PRIMARY KEY (i)
+                );"
+            ); // TODO: move this to `Ticket` trait and automate using derive macro
+            let init_summary = format!(
+                "INSERT INTO {schema_prefix}ticket_summary (job_id, waiting, queued, done)
+                VALUES ($1, 0, 0, 0)
+                ON CONFLICT DO NOTHING;
 
-    async fn put_resolution_j(
-        &self,
-        client: MetaClient<'_>,
-        resolution: &JResolution,
-    ) -> Result<(), MetaStorageError> {
-        let schema_prefix = client.schema_prefix();
-        let stmt = format!(
-            "INSERT INTO {schema_prefix}dimension_j (i, j_ub) VALUES ($1, $2) ON CONFLICT DO NOTHING"
-        );
-        client
-            .execute(&stmt, &[&(resolution.1 as i64), &(resolution.0 as i64)])
-            .await?;
-        Ok(())
-    }
+                CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
+                    AFTER INSERT ON {schema_prefix}ticket_beta
+                    REFERENCING NEW TABLE AS NEW_TABLE
+                    FOR EACH STATEMENT
+                    EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');
+                    
+                CREATE OR REPLACE TRIGGER ticket_beta_summary_upd_trg
+                    AFTER UPDATE ON {schema_prefix}ticket_beta
+                    REFERENCING
+                        NEW TABLE AS NEW_TABLE
+                        OLD TABLE AS OLD_TABLE
+                    FOR EACH STATEMENT
+                    EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');
+                    
+                CREATE OR REPLACE TRIGGER ticket_beta_summary_del_trg
+                    AFTER DELETE ON {schema_prefix}ticket_beta
+                    REFERENCING OLD TABLE AS OLD_TABLE
+                    FOR EACH STATEMENT
+                    EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');
 
-    async fn explode_beta(
-        &self,
-        client: MetaClient<'_>,
-        resolution: &ResolutionEnum,
-    ) -> Result<Vec<BetaTicket>, MetaStorageError> {
-        let schema_prefix = client.schema_prefix();
-        match resolution {
-            ResolutionEnum::I(i) => {
-                // Statement to select all tickets that match the *parent dimensions* in the resolution.
-                // (In this case, there are none.)
-                let stmt: String = format!(
-                    "WITH target AS (SELECT * FROM {schema_prefix}ticket_beta),
-                    popped AS (
-                        DELETE FROM {schema_prefix}ticket_beta
-                        USING target
-                        WHERE ticket_beta.i = target.i
-                        RETURNING ticket_beta.*
-                    )
-                    SELECT * FROM popped"
-                );
-                let rows = client.query(&stmt, &[]).await?;
-                let tickets = rows
-                    .into_iter()
-                    .map(|row| BetaTicket::from_sql_row(&row))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let stmt = format!(
-                            "COPY {schema_prefix}ticket_beta (i, resolved, deps_count, deps_quota, deps_done, status)
-                            FROM STDIN WITH (FORMAT csv)"
-                        );
-                let sink: ::tokio_postgres::CopyInSink<operon::bytes::Bytes> =
-                    client.copy_in(&stmt).await?;
-                let mut sink = Box::pin(sink);
-                let ready_tickets = {
-                    // We can feed to the sink directly,
-                    // since we don't need the connection inside the loop
-                    // in the explode operation.
-                    let mut ready_tickets = Vec::new();
-                    for ticket in tickets {
-                        let just_exploded = ticket.explode_i(*i)?;
-                        for mut exploded_ticket in just_exploded {
-                            if exploded_ticket.is_ready() {
-                                exploded_ticket.status = TicketStatus::Queued;
-                            }
-                            sink.feed(exploded_ticket.to_sql_copy_params()?.into())
-                                .await?;
-                            if exploded_ticket.is_ready() {
-                                ready_tickets.push(exploded_ticket);
-                            }
-                        }
-                    }
-                    ready_tickets
-                };
-                sink.close().await;
-                Ok(ready_tickets)
+                CREATE OR REPLACE TRIGGER ticket_beta_summary_trunc_trg
+                    AFTER TRUNCATE ON {schema_prefix}ticket_beta
+                    FOR EACH STATEMENT
+                    EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');"
+            );
+            client.execute(&create_table, &[]).await?;
+            client
+                .execute(
+                    &init_summary,
+                    &[&<schema::BetaJob as operon::schema_base::Job>::id()],
+                )
+                .await?;
+            Ok(())
+        }
+
+        pub async fn clear_tickets_beta(
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!("TRUNCATE TABLE {schema_prefix}ticket_beta");
+            client.execute(&stmt, &[]).await?;
+            Ok(())
+        }
+
+        pub async fn put_tickets_beta(
+            client: operon::meta_storage::MetaClient<'_>,
+            ticket: &schema::BetaTicket,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!(
+                "INSERT INTO {schema_prefix}ticket_beta (i, resolved, deps_count, deps_quota, deps_done, status)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT DO NOTHING",
+            );
+            let params = operon::schema_base::TicketSql::to_sql_insert_params(ticket)?;
+            let params = params
+                .iter()
+                .map(|p| p.as_ref() as &(dyn operon::postgres_types::ToSql + Sync))
+                .collect::<Vec<_>>();
+
+            client.execute(&stmt, &params).await?;
+            Ok(())
+        }
+
+        pub async fn get_all_beta(
+            client: operon::meta_storage::MetaClient<'_>,
+            status: operon::schema_base::TicketStatus,
+        ) -> Result<Vec<schema::BetaTicket>, operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            let stmt = format!("SELECT * FROM {schema_prefix}ticket_beta WHERE status = $1");
+            let rows = client.query(&stmt, &[&status]).await?;
+            let jobs = rows
+                .iter()
+                .map(|row| {
+                    <schema::BetaTicket as operon::schema_base::TicketSql>::from_sql_row(row)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(jobs)
+        }
+
+        pub async fn explode_beta_i(
+            client: operon::meta_storage::MetaClient<'_>,
+            resolution: schema::IResolution,
+        ) -> Result<Vec<schema::BetaTicket>, operon::meta_storage::MetaStorageError> {
+            let schema_prefix = client.schema_prefix();
+            // Statement to select all tickets that match the *parent dimensions* in the resolution.
+            // (In this case, there are none.)
+            let pop_stmt: String = format!(
+                "WITH target AS (SELECT * FROM {schema_prefix}ticket_beta),
+                popped AS (
+                    DELETE FROM {schema_prefix}ticket_beta
+                    USING target
+                    WHERE ticket_beta.i = target.i
+                    RETURNING ticket_beta.*
+                )
+                SELECT * FROM popped"
+            );
+
+            let rows = client.query(&pop_stmt, &[]).await?;
+            let tickets = rows
+                .iter()
+                .map(<schema::BetaTicket as operon::schema_base::TicketSql>::from_sql_row)
+                .collect::<Result<Vec<_>, _>>()?;
+
+            if tickets.iter().any(|ticket| ticket.i.is_some()) {
+                return Err(operon::meta_storage::MetaStorageError::InvalidResolution(
+                    "Called `explode(i)` on `beta`, but `i` was resolved".into(),
+                ));
             }
-            _ => Err(MetaStorageError::InvalidResolution(
-                "Called irrelevant explode on beta_i".to_string(),
-            )),
+            let new_tickets = tickets
+                .iter()
+                .flat_map(|ticket| (0..resolution.0).map(|i| ticket.clone().with_i(i)))
+                .collect::<Vec<_>>();
+
+            let copy_stmt = format!(
+                "COPY {schema_prefix}ticket_beta (i, resolved, deps_count, deps_quota, deps_done, status)
+                FROM STDIN WITH (FORMAT csv)"
+            );
+            let sink = client
+                .copy_in::<_, operon::bytes::Bytes>(&copy_stmt)
+                .await?;
+            let mut sink = Box::pin(sink);
+            for ticket in &new_tickets {
+                operon::futures::SinkExt::feed(
+                    &mut sink,
+                    operon::schema_base::TicketSql::to_sql_copy_params(ticket)?.into(),
+                )
+                .await?;
+            }
+            operon::futures::SinkExt::close(&mut sink).await?;
+
+            let ready_tickets = new_tickets
+                .into_iter()
+                .filter(operon::schema_base::Ticket::is_ready)
+                .collect::<Vec<_>>();
+            Ok(ready_tickets)
+        }
+
+        /// Mark a beta ticket as done.
+        pub async fn mark_done_beta(
+            conn: operon::meta_storage::MetaClient<'_>,
+            job: &schema::BetaJob,
+        ) -> Result<(), operon::meta_storage::MetaStorageError> {
+            let schema_prefix = conn.schema_prefix();
+            let stmt =
+                format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1");
+            conn.execute(&stmt, &[&(job.i as i64)]).await?;
+            Ok(())
         }
     }
 
-    /// Mark a beta ticket as done.
-    async fn mark_done_beta(
-        &self,
-        conn: MetaClient<'_>,
-        job: &BetaJob,
-    ) -> Result<(), SchedulerError> {
-        let schema_prefix = conn.schema_prefix();
-        let stmt = format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1");
-        conn.execute(&stmt, &[&(job.i as i64)]).await?;
-        Ok(())
+    pub use facts::*;
+    pub use tickets::*;
+}
+
+mod schema {
+    use super::*;
+
+    // generate_operon!();
+    mod dimension {
+        pub type IDim = usize;
+        pub type JDim = usize;
     }
-}
 
-pub enum JobEnum {
-    Beta(BetaJob),
-}
+    mod jobs {
+        use super::*;
 
-#[derive(Debug, Clone, Copy)]
-pub struct IResolution(pub dimension::I);
+        const BETA_ID: &str = "beta";
+        const DELTA_ID: &str = "delta";
+        const EPSILON_ID: &str = "epsilon";
 
-pub enum ResolutionEnum {
-    I(IResolution),
-    J(JResolution),
-}
-
-impl From<BetaJob> for JobEnum {
-    fn from(job: BetaJob) -> Self {
-        JobEnum::Beta(job)
-    }
-}
-
-impl From<JResolution> for ResolutionEnum {
-    fn from(resolution: JResolution) -> Self {
-        ResolutionEnum::J(resolution)
-    }
-}
-
-pub struct UserStorage;
-
-pub struct UserService;
-
-pub struct UserMetaStorage;
-
-impl MetaStorage for UserMetaStorage {}
-
-impl MyMetaStorage for UserMetaStorage {}
-
-// generate_schedules!(MyStorage, MyService);
-const BETA_ID: &str = "beta";
-
-#[derive(Debug, Clone, Default)]
-pub struct BetaTicket {
-    i: Option<dimension::I>,
-    deps_count: usize,
-    deps_quota: Option<usize>,
-    deps_done: bool,
-    pub status: TicketStatus,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct BetaJob {
-    pub i: usize,
-}
-
-impl Job for BetaJob {}
-
-#[derive(Debug, Clone, Copy)]
-pub struct JResolution(pub dimension::J, pub dimension::I);
-
-impl Resolution for JResolution {}
-
-impl BetaTicket {
-    fn explode_i(self, resolution: IResolution) -> Result<Vec<Self>, MetaStorageError> {
-        if self.is_resolved() {
-            return Err(MetaStorageError::InvalidResolution(
-                "Called explode on a fully resolved beta_i".into(),
-            ));
+        #[derive(Debug, Clone)]
+        pub enum MyJobEnum {
+            Beta(BetaJob),
         }
 
-        if !self.i.is_none() {
-            return Err(MetaStorageError::InvalidResolution(
-                "Called explode(i) on beta, but i was resolved".to_string(),
-            ));
+        impl operon::schema_base::JobEnum for MyJobEnum {}
+
+        impl From<BetaJob> for MyJobEnum {
+            fn from(job: BetaJob) -> Self {
+                MyJobEnum::Beta(job)
+            }
         }
 
-        let out_tickets = (0..resolution.0)
-            .map(|i| BetaTicket {
-                i: Some(i),
-                ..self.clone()
-            })
-            .collect();
-        Ok(out_tickets)
-    }
-}
-
-#[async_trait]
-impl Ticket for BetaTicket {
-    type Job = BetaJob;
-    type Resolution = JResolution;
-
-    async fn get_dependency_quota(
-        &self,
-        _client: MetaClient<'_>,
-    ) -> Result<Option<usize>, MetaStorageError> {
-        // beta_i dependencies: none
-        debug_assert!(false, "Called get_dependency_quota on beta_i");
-        Ok(Some(0))
-    }
-
-    async fn raise_dependency_count(
-        &mut self,
-        client: MetaClient<'_>,
-    ) -> Result<(), MetaStorageError> {
-        debug_assert!(false, "Called raise_dependency_count on beta_i");
-        self.deps_count += 1;
-        if self.deps_quota.is_none() {
-            self.deps_quota = self.get_dependency_quota(client).await?;
+        #[derive(Debug, Clone, Copy)]
+        pub struct BetaJob {
+            pub i: usize,
         }
-        self.deps_done = match self.deps_quota {
-            Some(quota) => self.deps_count >= quota,
-            None => false,
-        };
-        Ok(())
+
+        impl operon::schema_base::Job for BetaJob {
+            fn id() -> &'static str {
+                BETA_ID
+            }
+
+            fn is_descendant_of(other: &str) -> bool {
+                other == BETA_ID
+            }
+        }
+
+        #[operon::async_trait::async_trait]
+        impl operon::schema_base::JobSql for BetaJob {
+            async fn mark_done(
+                &self,
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::mark_done_beta(client, self).await
+            }
+        }
     }
 
-    fn is_ready(&self) -> bool {
-        self.is_resolved() && self.deps_done
+    mod resolution {
+        use super::*;
+
+        #[derive(Debug, Clone)]
+        pub enum ResolutionEnum {
+            I(IResolution),
+            J(JResolution),
+            K(KResolution),
+        }
+
+        impl operon::schema_base::ResolutionEnum for ResolutionEnum {
+            fn primary(resolution: usize) -> Self {
+                Self::I(IResolution(resolution))
+            }
+        }
+
+        impl From<IResolution> for ResolutionEnum {
+            fn from(resolution: IResolution) -> Self {
+                Self::I(resolution)
+            }
+        }
+
+        impl From<JResolution> for ResolutionEnum {
+            fn from(resolution: JResolution) -> Self {
+                Self::J(resolution)
+            }
+        }
+
+        impl From<KResolution> for ResolutionEnum {
+            fn from(resolution: KResolution) -> Self {
+                Self::K(resolution)
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct IResolution(pub IDim);
+
+        impl operon::schema_base::Resolution for IResolution {
+            type PrimaryKey = ();
+
+            #[allow(clippy::unused_unit)]
+            fn primary_key(&self) -> Self::PrimaryKey {
+                ()
+            }
+
+            fn ub(&self) -> usize {
+                self.0
+            }
+
+            #[allow(unused_variables)]
+            fn new(ub: usize, primary_key: Self::PrimaryKey) -> Self {
+                IResolution(ub)
+            }
+        }
+
+        #[operon::async_trait::async_trait]
+        impl operon::schema_base::ResolutionSql for IResolution {
+            async fn init_table(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::init_resolution_i(client).await
+            }
+
+            async fn clear_table(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::clear_resolution_i(client).await
+            }
+
+            #[allow(unused_variables)]
+            async fn get(
+                client: operon::meta_storage::MetaClient<'_>,
+                primary_key: Self::PrimaryKey,
+            ) -> Result<Option<Self>, operon::meta_storage::MetaStorageError> {
+                queries::get_resolution_i(client).await
+            }
+
+            async fn put(
+                &self,
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::put_resolution_i(client, self).await
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct JResolution(pub JDim, pub IDim);
+
+        impl operon::schema_base::Resolution for JResolution {
+            type PrimaryKey = (IDim,);
+
+            fn primary_key(&self) -> Self::PrimaryKey {
+                (self.1,)
+            }
+
+            fn ub(&self) -> usize {
+                self.0
+            }
+
+            #[allow(unused_variables)]
+            fn new(ub: usize, primary_key: Self::PrimaryKey) -> Self {
+                JResolution(ub, primary_key.0)
+            }
+        }
+
+        #[operon::async_trait::async_trait]
+        impl operon::schema_base::ResolutionSql for JResolution {
+            async fn init_table(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::init_resolution_j(client).await
+            }
+
+            async fn clear_table(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::clear_resolution_j(client).await
+            }
+
+            #[allow(unused_variables)]
+            async fn get(
+                client: operon::meta_storage::MetaClient<'_>,
+                primary_key: Self::PrimaryKey,
+            ) -> Result<Option<Self>, operon::meta_storage::MetaStorageError> {
+                queries::get_resolution_j(client, primary_key.0).await
+            }
+
+            async fn put(
+                &self,
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::put_resolution_j(client, self).await
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct KResolution(pub JDim, pub IDim);
+
+        impl operon::schema_base::Resolution for KResolution {
+            type PrimaryKey = IDim;
+
+            fn primary_key(&self) -> Self::PrimaryKey {
+                self.1
+            }
+
+            fn ub(&self) -> usize {
+                self.0
+            }
+
+            #[allow(unused_variables)]
+            fn new(ub: usize, primary_key: Self::PrimaryKey) -> Self {
+                KResolution(ub, primary_key)
+            }
+        }
+
+        #[operon::async_trait::async_trait]
+        impl operon::schema_base::ResolutionSql for KResolution {
+            async fn init_table(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::init_resolution_k(client).await
+            }
+
+            async fn clear_table(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::clear_resolution_k(client).await
+            }
+
+            #[allow(unused_variables)]
+            async fn get(
+                client: operon::meta_storage::MetaClient<'_>,
+                primary_key: Self::PrimaryKey,
+            ) -> Result<Option<Self>, operon::meta_storage::MetaStorageError> {
+                queries::get_resolution_k(client, primary_key).await
+            }
+
+            async fn put(
+                &self,
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::put_resolution_k(client, self).await
+            }
+        }
     }
 
-    fn is_resolved(&self) -> bool {
-        self.i.is_some()
+    mod tickets {
+        use super::*;
+
+        #[derive(Debug, Clone, Default)]
+        pub struct BetaTicket {
+            pub i: operon::schema_base::TicketDepCount<IDim>,
+            deps_count: usize,
+            deps_quota: Option<usize>,
+            deps_done: bool,
+            status: operon::schema_base::TicketStatus,
+        }
+
+        impl BetaTicket {
+            pub fn with_i(self, i: IDim) -> Self {
+                let mut new = BetaTicket {
+                    i: i.into(),
+                    ..self
+                };
+
+                if operon::schema_base::Ticket::is_ready(&new) {
+                    new.status = operon::schema_base::TicketStatus::Queued;
+                }
+
+                new
+            }
+        }
+
+        #[operon::async_trait::async_trait]
+        impl operon::schema_base::Ticket for BetaTicket {
+            type Job = BetaJob;
+            type Resolution = JResolution;
+
+            async fn get_dependency_quota(
+                &self,
+                _client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<Option<usize>, operon::meta_storage::MetaStorageError> {
+                // beta_i dependencies: none
+                debug_assert!(false, "Called get_dependency_quota on beta_i");
+                Ok(Some(0))
+            }
+
+            async fn raise_dependency_count(
+                &mut self,
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                debug_assert!(false, "Called raise_dependency_count on beta_i");
+                self.deps_count += 1;
+                if self.deps_quota.is_none() {
+                    self.deps_quota = self.get_dependency_quota(client).await?;
+                }
+                self.deps_done = match self.deps_quota {
+                    Some(quota) => self.deps_count >= quota,
+                    None => false,
+                };
+                Ok(())
+            }
+
+            fn is_ready(&self) -> bool {
+                self.is_resolved() && self.deps_done
+            }
+
+            fn is_resolved(&self) -> bool {
+                self.i.is_some()
+            }
+
+            fn resolve(&self) -> Option<BetaJob> {
+                self.is_ready()
+                    .then(|| Some(BetaJob { i: self.i.0? }))
+                    .flatten()
+            }
+        }
+
+        #[operon::async_trait::async_trait]
+        impl operon::schema_base::TicketSql for BetaTicket {
+            fn to_sql_insert_params(
+                &self,
+            ) -> Result<
+                Vec<Box<dyn operon::postgres_types::ToSql + Send + Sync>>,
+                operon::meta_storage::MetaStorageError,
+            > {
+                let i = self.i.to_sql()?;
+                let resolved = operon::schema_base::Ticket::is_resolved(self);
+                let deps_count = i64::try_from(self.deps_count)?;
+                let deps_quota = self.deps_quota.map(i64::try_from).transpose()?;
+                let deps_done = self.deps_done;
+                let status = self.status;
+
+                Ok(vec![
+                    Box::new(i),
+                    Box::new(resolved),
+                    Box::new(deps_count),
+                    Box::new(deps_quota),
+                    Box::new(deps_done),
+                    Box::new(status),
+                ])
+            }
+
+            fn to_sql_copy_params(&self) -> Result<String, operon::meta_storage::MetaStorageError> {
+                Ok(format!(
+                    "{},{},{},{},{},{}\n",
+                    self.i.to_sql()?, // TODO: remove unwrap
+                    operon::schema_base::Ticket::is_resolved(self),
+                    self.deps_count,
+                    self.deps_quota.map_or(String::new(), |q| q.to_string()),
+                    self.deps_done,
+                    self.status,
+                ))
+            }
+
+            fn from_sql_row(
+                row: &operon::tokio_postgres::Row,
+            ) -> Result<Self, operon::meta_storage::MetaStorageError> {
+                let i = operon::schema_base::TicketDepCount::from_sql(row.get("i"))?;
+                // let resolved: bool = row.get("resolved");
+                let deps_count = usize::try_from(row.get::<_, i64>("deps_count"))?;
+                let deps_quota = row
+                    .get::<_, Option<i64>>("deps_quota")
+                    .map(usize::try_from)
+                    .transpose()?;
+                let deps_done: bool = row.get("deps_done");
+                let status: operon::schema_base::TicketStatus = row.get("status");
+
+                Ok(BetaTicket {
+                    i,
+                    // resolved,
+                    deps_count,
+                    deps_quota,
+                    deps_done,
+                    status,
+                })
+            }
+
+            async fn init_table(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::init_tickets_beta(client).await
+            }
+
+            async fn clear_table(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::clear_tickets_beta(client).await
+            }
+
+            async fn put(
+                &self,
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(), operon::meta_storage::MetaStorageError> {
+                queries::put_tickets_beta(client, self).await
+            }
+
+            async fn get_all(
+                client: operon::meta_storage::MetaClient<'_>,
+                status: operon::schema_base::TicketStatus,
+            ) -> Result<Vec<Self>, operon::meta_storage::MetaStorageError> {
+                queries::get_all_beta(client, status).await
+            }
+
+            async fn get_status(
+                client: operon::meta_storage::MetaClient<'_>,
+            ) -> Result<(i64, i64, i64), operon::meta_storage::MetaStorageError> {
+                operon::meta_storage::get_ticket_summary::<BetaJob>(client).await
+            }
+        }
     }
 
-    fn resolve(&self) -> Option<BetaJob> {
-        self.is_ready()
-            .then(|| Some(BetaJob { i: self.i? }))
-            .flatten()
-    }
-
-    fn to_sql_insert_params(&self) -> Result<String, MetaStorageError> {
-        Ok(format!(
-            "({},{},{},{},{},'{}')",
-            self.i.to_sql()?, // TODO: remove unwrap
-            self.is_resolved(),
-            self.deps_count,
-            match self.deps_quota {
-                Some(quota) => quota.to_string(),
-                None => "NULL".to_string(),
-            },
-            self.deps_done,
-            self.status
-        ))
-    }
-
-    fn to_sql_copy_params(&self) -> Result<String, MetaStorageError> {
-        Ok(format!(
-            "{},{},{},{},{},{}\n",
-            self.i.to_sql()?, // TODO: remove unwrap
-            self.is_resolved(),
-            self.deps_count,
-            match self.deps_quota {
-                Some(quota) => quota.to_string(),
-                None => String::new(),
-            },
-            self.deps_done,
-            self.status
-        ))
-    }
-
-    fn from_sql_row(row: &tokio_postgres::Row) -> Result<Self, MetaStorageError> {
-        let i: i64 = row.get("i");
-        // let resolved: bool = row.get("resolved");
-        let deps_count: i64 = row.get("deps_count");
-        let deps_quota: Option<i64> = row.get("deps_quota");
-        let deps_done: bool = row.get("deps_done");
-        let status: TicketStatus = row.get("status");
-
-        let i = match i {
-            -1 => None,
-            _ => Some(usize::try_from(i)?),
-        };
-        let deps_quota: Option<usize> = deps_quota.map(|q| q as usize);
-        Ok(BetaTicket {
-            i,
-            // resolved,
-            deps_count: deps_count as usize,
-            deps_quota,
-            deps_done,
-            status,
-        })
-    }
+    pub use dimension::*;
+    pub use jobs::*;
+    pub use resolution::*;
+    pub use tickets::*;
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct BetaManager;
+mod spec {
+    use crate::queries::get_all_beta;
 
-#[derive(Debug)]
-pub struct BetaRebuilder(BetaManager, Vec<(BetaJob, JResolution)>);
+    use super::*;
 
-impl BetaManager {
-    async fn get_all_done(&self, conn: MetaClient<'_>) -> Result<Vec<BetaTicket>, SchedulerError> {
-        let schema_prefix = conn.schema_prefix();
-        let stmt = format!("SELECT * FROM {schema_prefix}ticket_beta WHERE status = 'done'");
-        let rows = conn.query(&stmt, &[]).await?;
-        let jobs = rows
-            .iter()
-            .map(|row| BetaTicket::from_sql_row(row))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(jobs)
-    }
-}
+    #[derive(Debug, Clone, Copy)]
+    pub struct AlphaSpec;
 
-#[async_trait]
-impl<Svc, Sto> IndividualSchedule<Svc, Sto, UserMetaStorage> for BetaManager
-where
-    Svc: MyOperonService,
-    Sto: MyOperonStorage,
-{
-    fn id(&self) -> &'static str {
-        BETA_ID
-    }
+    #[operon::async_trait::async_trait]
+    impl<Svc, Sto> operon::scheduler::PrimarySpec<Svc, Sto> for AlphaSpec
+    where
+        Svc: MyOperonService<JobEnum = schema::MyJobEnum, ResolutionEnum = schema::ResolutionEnum>,
+        Sto: MyOperonStorage,
+    {
+        type Resolution = schema::IResolution;
 
-    async fn check_consistency(
-        &self,
-        storage: &Sto,
-        meta_storage: &UserMetaStorage,
-        _primary_ub: usize,
-    ) -> Result<bool, SchedulerError> {
-        let conn: operon::meta_storage::ConnectionWithSchema<'_> = meta_storage.conn().await?;
-        // Pull the "done" beta jobs from the metadata storage...
-        let Some(beta_jobs) = self
-            .get_all_done(conn.as_client())
-            .await?
-            .iter()
-            .map(|t| t.resolve().and_then(|job| Some((job.i,))))
-            .collect::<Option<Vec<_>>>()
-        else {
-            operon::log::info!("Some `beta` tickets are corrupt in the metadata storage.");
-            return Ok(false);
-        };
-        // ...and map them with the dimensions they spawned...
-        let mut b_tags = vec![];
-        for (i,) in beta_jobs {
-            let Some(JResolution(j_ub, _)) =
-                meta_storage.get_resolution_j(conn.as_client(), i).await?
+        async fn check_consistency(
+            &self,
+            storage: &Sto,
+            client: operon::meta_storage::MetaClient<'_>,
+            primary_ub: usize,
+        ) -> Result<bool, operon::scheduler::SchedulerError> {
+            // Pull the primary resolution from the metadata storage..
+            let Some(schema::IResolution(i_ub)) =
+                <schema::IResolution as operon::schema_base::ResolutionSql>::get(client, ())
+                    .await?
             else {
-                operon::log::info!(
-                    "No `j` resolution found for `beta_{i}` in the metadata storage."
-                );
+                // This is technically unreachable, because we check this same value
+                // in `check_recovery_state`.
+                operon::log::info!("No primary resolution found in the metadata storage.");
                 return Ok(false);
             };
-            for j in 0..j_ub {
-                b_tags.push((i, j));
+            // ...and check if the data storage holds all the data for it.
+            for i in 0..i_ub.max(primary_ub) {
+                if storage.get_a(i).await?.is_none() {
+                    operon::log::info!("Data storage does not hold `A_{i}`.");
+                    return Ok(false);
+                }
+            }
+            // Additionally check if the primary resolution agrees with the given upper bound.
+            if i_ub != primary_ub {
+                operon::log::warn!(
+                    "Previous run's upper bound `{i_ub}` is different from the current run's upper bound `{primary_ub}`. \n\
+                    If you overwrote the primary data, consider running `run --fresh` to overwrite the existing data, \
+                    otherwise the resulting data may be inconsistent. \n\
+                    If you want to keep the existing data, and intendedly set the upper bound to `{primary_ub}`, \
+                    you may ignore this warning."
+                );
+            }
+
+            return Ok(true);
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct BetaRebuilder(Vec<(schema::BetaJob, schema::JResolution)>);
+
+    #[derive(Debug)]
+    pub struct BetaPeerTxs {
+        pub to_delta: operon::scheduler::PeerEventSender<schema::MyJobEnum, schema::ResolutionEnum>,
+        pub to_epsilon:
+            operon::scheduler::PeerEventSender<schema::MyJobEnum, schema::ResolutionEnum>,
+    }
+
+    #[operon::async_trait::async_trait]
+    impl operon::scheduler::PeerEventSenders<schema::MyJobEnum, schema::ResolutionEnum>
+        for BetaPeerTxs
+    {
+        fn gather_from(
+            mut senders: operon::scheduler::PeerEventSenderMap<
+                schema::MyJobEnum,
+                schema::ResolutionEnum,
+            >,
+        ) -> Self {
+            BetaPeerTxs {
+                to_delta: senders
+                    // .remove(<schema::DeltaJob as operon::schema_base::Job>::id())
+                    .remove("delta")
+                    .unwrap_or_else(|| panic!("No delta sender found")),
+                to_epsilon: senders
+                    // .remove(<schema::EpsilonJob as operon::schema_base::Job>::id())
+                    .remove("epsilon")
+                    .unwrap_or_else(|| panic!("No epsilon sender found")),
             }
         }
-        // ...and check if the data storage holds all the data for them.
-        for (i, j) in b_tags {
-            if storage.get_b(i, j).await?.is_none() {
-                operon::log::info!("Data storage does not hold `B_{i},{j}`.");
+
+        fn downgrade_all(&mut self) {
+            self.to_delta.downgrade();
+            self.to_epsilon.downgrade();
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct BetaSpec;
+
+    #[operon::async_trait::async_trait]
+    impl<Svc, Sto> operon::scheduler::JobSpec<Svc, Sto> for BetaSpec
+    where
+        Svc: MyOperonService<JobEnum = schema::MyJobEnum, ResolutionEnum = schema::ResolutionEnum>,
+        Sto: MyOperonStorage,
+    {
+        type Job = schema::BetaJob;
+        type Resolution = schema::JResolution;
+        type Ticket = schema::BetaTicket;
+        type PeerEventSenders = BetaPeerTxs;
+
+        async fn check_consistency(
+            &self,
+            storage: &Sto,
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<bool, operon::scheduler::SchedulerError> {
+            // Pull the "done" beta jobs from the metadata storage...
+            let Some(jobs) = <schema::BetaTicket as operon::schema_base::TicketSql>::get_all(
+                client,
+                operon::schema_base::TicketStatus::Done,
+            )
+            .await?
+            .iter()
+            .map(operon::schema_base::Ticket::resolve)
+            .collect::<Option<Vec<_>>>() else {
+                operon::log::info!("Some `beta` tickets are corrupt in the metadata storage.");
                 return Ok(false);
+            };
+            // ...and map them with the dimensions they spawned...
+            let mut tags = vec![];
+            for job in jobs {
+                let Some(res) = queries::get_resolution_j(client, job.i).await? else {
+                    operon::log::info!(
+                        "No `j` resolution found for `beta_{}` in the metadata storage.",
+                        job.i
+                    );
+                    return Ok(false);
+                };
+                for j in 0..(res.0) {
+                    tags.push((job.i, j));
+                }
+            }
+            // ...and check if the data storage holds all the data for them.
+            for (i, j) in tags {
+                if storage.get_b(i, j).await?.is_none() {
+                    operon::log::info!("Data storage does not hold `B_{i},{j}`.");
+                    return Ok(false);
+                }
+            }
+
+            Ok(true)
+        }
+
+        async fn prepare_rebuild(
+            &self,
+            _storage: &Sto,
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<Box<dyn operon::scheduler::JobRebuilder>, operon::scheduler::SchedulerError>
+        {
+            let tickets =
+                queries::get_all_beta(client, operon::schema_base::TicketStatus::Done).await?;
+            let successes = operon::futures::future::try_join_all(tickets.into_iter().map(
+                |ticket| async move {
+                    let job = operon::schema_base::Ticket::resolve(&ticket).ok_or_else(|| {
+                        operon::scheduler::SchedulerError::Other(
+                            "Failed to resolve a beta ticket".into(),
+                        )
+                    })?;
+                    let resolution =
+                        queries::get_resolution_j(client, job.i)
+                            .await?
+                            .ok_or_else(|| {
+                                operon::scheduler::SchedulerError::Other(format!(
+                                    "No resolution found for `J_{}`",
+                                    job.i
+                                ))
+                            })?;
+
+                    Ok::<_, operon::scheduler::SchedulerError>((job, resolution))
+                },
+            ))
+            .await?;
+            Ok(Box::new(BetaRebuilder(successes)))
+        }
+
+        async fn run_job(
+            &self,
+            service: &Svc,
+            storage: &Sto,
+            _client: operon::meta_storage::MetaClient<'_>,
+            job: &Self::Job,
+        ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
+            let a = storage
+                .get_a(job.i)
+                .await?
+                .ok_or(operon::storage::StorageError::NotFound)?;
+            let b_j = service
+                .beta(&a)
+                .await
+                .map_err(operon::scheduler::SchedulerError::UserError)?;
+            storage.put_all_b(job.i, &b_j).await?;
+
+            Ok(schema::JResolution(b_j.len(), job.i))
+        }
+
+        async fn send_on_finish(
+            &self,
+            peer_txs: &Self::PeerEventSenders,
+            job: Self::Job,
+            resolution: Self::Resolution,
+        ) -> Result<(), operon::scheduler::SchedulerError> {
+            match peer_txs
+                .to_delta
+                .send(operon::scheduler::PeerEvent::Resolution(resolution.into()))
+                .await
+            {
+                Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
+                // Verbosity should be low here, since this can happen
+                // an arbitrary number of times
+                // if a descendant scheduler errored out.
+                Err(_) => operon::log::trace!(
+                    "`delta`'s peer channel closed before handling `beta`'s {resolution:?}"
+                ),
+            }
+            // out-dependencies (delta, epsilon)
+            match peer_txs
+                .to_delta
+                .send(operon::scheduler::PeerEvent::Job(job.into()))
+                .await
+            {
+                Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {job:?}"),
+                Err(_) => operon::log::trace!(
+                    "`delta`'s peer channel closed before handling `beta`'s {job:?}"
+                ),
+            }
+            match peer_txs
+                .to_epsilon
+                .send(operon::scheduler::PeerEvent::Job(job.into()))
+                .await
+            {
+                Ok(_) => operon::log::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
+                Err(_) => operon::log::trace!(
+                    "`epsilon`'s peer channel closed before handling `beta`'s {job:?}"
+                ),
+            }
+            Ok(())
+        }
+
+        #[allow(unused_variables, clippy::match_single_binding)]
+        async fn on_receive_job(
+            &self,
+            client: operon::meta_storage::MetaClient<'_>,
+            job: schema::MyJobEnum,
+        ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+            // Beta jobs don't have dependencies.
+            match job {
+                _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+                    "job",
+                    <Self::Job as operon::schema_base::Job>::id(),
+                )),
             }
         }
 
-        Ok(true)
+        async fn on_receive_resolution(
+            &self,
+            client: operon::meta_storage::MetaClient<'_>,
+            resolution: schema::ResolutionEnum,
+        ) -> Result<Vec<schema::BetaTicket>, operon::scheduler::SchedulerError> {
+            match resolution {
+                schema::ResolutionEnum::I(resolution) => {
+                    // TODO: Maybe resolution doesn't need to be an enum?
+                    let tickets = queries::explode_beta_i(client, resolution).await?;
+                    Ok(tickets)
+                }
+                _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+                    "resolution",
+                    <Self::Job as operon::schema_base::Job>::id(),
+                )),
+            }
+        }
     }
 
-    async fn prepare_rebuild(
-        &self,
-        _storage: &Sto,
-        meta_storage: &UserMetaStorage,
-        tx: MetaClient<'_>,
-    ) -> Result<Box<dyn JobRebuilder>, SchedulerError> {
-        let beta_tickets = self.get_all_done(tx).await?;
-        let beta_successes = try_join_all(beta_tickets.into_iter().map(|ticket| async move {
-            let job = ticket
-                .resolve()
-                .ok_or_else(|| SchedulerError::Other("Failed to resolve a beta ticket".into()))?;
-            let resolution = meta_storage
-                .get_resolution_j(tx, job.i)
-                .await?
-                .ok_or_else(|| {
-                    SchedulerError::Other(format!("No resolution found for `J_{}`", job.i).into())
-                })?;
-
-            Ok::<_, SchedulerError>((job, resolution))
-        }))
-        .await?;
-        Ok(Box::new(BetaRebuilder(self.clone(), beta_successes)))
-    }
-}
-
-#[async_trait]
-impl<Svc, Sto, MSto> JobManager<Svc, Sto, MSto> for BetaManager
-where
-    Sto: MyOperonStorage,
-    Svc: MyOperonService,
-{
-    type Job = BetaJob;
-    type Resolution = JResolution;
-    type Ticket = BetaTicket;
-    type PeerEventSenders = ();
-
-    fn job_type() -> &'static str {
-        BETA_ID
-    }
-
-    fn is_descendant_of(job_type: &str) -> bool {
-        job_type == BETA_ID
-    }
-
-    async fn run_job(
-        &self,
-        service: &Svc,
-        storage: &Sto,
-        _conn: MetaClient<'_>,
-        job: &BetaJob,
-    ) -> Result<JResolution, SchedulerError> {
-        let a = storage.get_a(job.i).await?.ok_or(StorageError::NotFound)?;
-        let b_j = service.beta(&a).await.map_err(SchedulerError::UserError)?;
-        let j_resolution = b_j.len();
-        storage.put_all_b(job.i, &b_j).await?;
-
-        Ok(JResolution(j_resolution, job.i))
-    }
-
-    /// Mark a beta ticket as done.
-    async fn mark_done(
-        &self,
-        meta_storage: &MSto,
-        conn: MetaClient<'_>,
-        job: &BetaJob,
-    ) -> Result<(), SchedulerError> {
-        let schema_prefix = conn.schema_prefix();
-        let stmt = format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1");
-        conn.execute(&stmt, &[&(job.i as i64)]).await?;
-        Ok(())
-    }
-
-    async fn put_resolution(
-        &self,
-        conn: MetaClient<'_>,
-        schema_prefix: &str,
-        resolution: &JResolution,
-    ) -> Result<(), SchedulerError> {
-        let stmt = format!(
-            "INSERT INTO {schema_prefix}resolution_j (i, j) VALUES ($1, $2) ON CONFLICT DO NOTHING"
-        );
-        conn.execute(&stmt, &[&(resolution.1 as i64), &(resolution.0 as i64)])
-            .await?;
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl JobRebuilder<UserMetaStorage> for BetaRebuilder {
-    async fn explode(
-        &self,
-        meta_storage: &UserMetaStorage,
-        client: MetaClient<'_>,
-        primary_ub: usize,
-    ) -> Result<(), SchedulerError> {
-        meta_storage
-            .explode_beta(client, &ResolutionEnum::I(IResolution(primary_ub)))
-            .await?;
-        Ok(())
-    }
-
-    async fn rebuild(
-        &self,
-        meta_storage: &UserMetaStorage,
-        client: MetaClient<'_>,
-    ) -> Result<(), SchedulerError> {
-        for (job, resolution) in &self.1 {
-            // What we would do at a job success:
-            meta_storage.put_resolution_j(client, resolution).await?;
-            meta_storage.mark_done_beta(client, job).await?;
-            meta_storage.explode_delta(client, resolution).await?;
-
-            // Roll them out to its dependencies:
-            tickets_psql::explode_delta(conn, &resolution).await?;
-            tickets_psql::raise_dep_delta(
-                conn,
-                &masked_dimension::I::One(i),
-                &masked_dimension::J::All(masked_dimension::I::One(i)),
-                &masked_dimension::K::All(masked_dimension::I::One(i)),
-            )
-            .await?;
-            tickets_psql::raise_dep_epsilon(
-                conn,
-                &masked_dimension::I::One(i),
-                &masked_dimension::K::All(masked_dimension::I::One(i)),
-            )
-            .await?;
+    #[operon::async_trait::async_trait]
+    impl operon::scheduler::JobRebuilder for BetaRebuilder {
+        async fn explode(
+            &self,
+            client: operon::meta_storage::MetaClient<'_>,
+            primary_ub: usize,
+        ) -> Result<(), operon::scheduler::SchedulerError> {
+            queries::explode_beta_i(client, schema::IResolution(primary_ub)).await?;
+            Ok(())
         }
 
-        Ok(())
+        async fn rebuild(
+            &self,
+            client: operon::meta_storage::MetaClient<'_>,
+        ) -> Result<(), operon::scheduler::SchedulerError> {
+            for (job, resolution) in &self.0 {
+                // What we would do at a job success:
+                queries::put_resolution_j(client, resolution).await?;
+                queries::mark_done_beta(client, job).await?;
+
+                // // Roll them out to its dependencies:
+                // queries::explode_delta(client, &resolution).await?;
+                // queries::raise_dep_delta(
+                //     client,
+                //     &masked_dimension::I::One(i),
+                //     &masked_dimension::J::All(masked_dimension::I::One(i)),
+                //     &masked_dimension::K::All(masked_dimension::I::One(i)),
+                // )
+                // .await?;
+                // queries::raise_dep_epsilon(
+                //     client,
+                //     &masked_dimension::I::One(i),
+                //     &masked_dimension::K::All(masked_dimension::I::One(i)),
+                // )
+                // .await?;
+            }
+
+            Ok(())
+        }
     }
 }
