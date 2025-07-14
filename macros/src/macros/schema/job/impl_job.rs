@@ -1,0 +1,143 @@
+use syn::parse_quote;
+
+use crate::{
+    JobConfig,
+    configs::JobConfigMap,
+    utils::{get_upstream_jobs, job_id_ident, job_ident},
+};
+
+/// Generates an implementation of the `Job` trait for the given job configuration.
+///
+/// Example:
+/// ```rust,ignore
+/// #[automatically_derived]
+/// impl operon::schema_base::Job for BetaJob {
+///     fn id() -> &'static str {
+///         BETA_ID
+///     }
+///
+///     fn is_descendant_of(other: &str) -> bool {
+///         other == BETA_ID
+///     }
+/// }
+/// ```
+pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
+    let operon = crate::utils::operon_ident();
+    let job_ident = job_ident(&job.id);
+
+    let id_ident = job_id_ident(&job.id);
+    let upstream_jobs = get_upstream_jobs(job, jobs)
+        .into_iter()
+        .map(|upstream_job| job_id_ident(&upstream_job.id));
+
+    parse_quote! {
+        #[automatically_derived]
+        impl #operon::schema_base::Job for #job_ident {
+            fn id() -> &'static str {
+                #id_ident
+            }
+
+            fn is_descendant_of(other: &str) -> bool {
+                #(
+                    other == #upstream_jobs
+                )||*
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use syn::parse_quote;
+
+    use crate::{
+        JobConfig,
+        configs::{JobArg, JobConfigMap},
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_impl_job() {
+        let job = JobConfig {
+            id: "beta".to_string(),
+            from: vec![JobArg {
+                id: "a".to_string(),
+                over: vec![],
+            }],
+            to: "b".to_string(),
+            dims: vec!["i".to_string()],
+            spawn_dim: Some("j".to_string()),
+        };
+        let jobs = JobConfigMap::from_iter([("beta".to_string(), job.clone())]);
+
+        let item = impl_job(&job, &jobs);
+        let expected: syn::ItemImpl = parse_quote! {
+            #[automatically_derived]
+            impl operon::schema_base::Job for BetaJob {
+                fn id() -> &'static str {
+                    BETA_ID
+                }
+
+                fn is_descendant_of(other: &str) -> bool {
+                    other == BETA_ID
+                }
+            }
+        };
+
+        assert_eq!(item, expected);
+    }
+
+    #[test]
+    fn test_impl_job_with_dependencies() {
+        let job_epsilon = JobConfig {
+            id: "epsilon".to_string(),
+            from: vec![
+                JobArg {
+                    id: "b".to_string(),
+                    over: vec!["j".to_string()],
+                },
+                JobArg {
+                    id: "d".to_string(),
+                    over: vec!["j".to_string()],
+                },
+            ],
+            to: "e".to_string(),
+            dims: vec!["i".to_string(), "k".to_string()],
+            spawn_dim: None,
+        };
+
+        let jobs = JobConfigMap::from_iter([
+            (
+                "beta".to_string(),
+                JobConfig {
+                    id: "beta".to_string(),
+                    from: vec![JobArg {
+                        id: "a".to_string(),
+                        over: vec![],
+                    }],
+                    to: "b".to_string(),
+                    dims: vec!["i".to_string()],
+                    spawn_dim: Some("j".to_string()),
+                },
+            ),
+            ("epsilon".to_string(), job_epsilon.clone()),
+        ]);
+
+        let item = impl_job(&job_epsilon, &jobs);
+        let expected: syn::ItemImpl = parse_quote! {
+            #[automatically_derived]
+            impl operon::schema_base::Job for EpsilonJob {
+                fn id() -> &'static str {
+                    EPSILON_ID
+                }
+
+                fn is_descendant_of(other: &str) -> bool {
+                    other == BETA_ID || other == EPSILON_ID
+                }
+            }
+        };
+
+        assert_eq!(item, expected);
+    }
+}

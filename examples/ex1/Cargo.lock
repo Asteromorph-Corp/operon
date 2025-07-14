@@ -507,7 +507,10 @@ dependencies = [
 name = "ex1"
 version = "0.1.0"
 dependencies = [
- "operon-macros",
+ "log",
+ "operon",
+ "rand",
+ "tokio",
 ]
 
 [[package]]
@@ -728,6 +731,7 @@ checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
 dependencies = [
  "equivalent",
  "hashbrown",
+ "serde",
 ]
 
 [[package]]
@@ -907,7 +911,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
-name = "operon-macros"
+name = "operon"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -919,10 +923,12 @@ dependencies = [
  "csv",
  "deadpool-postgres",
  "futures",
+ "indexmap",
  "log",
- "operon-macros-internal",
+ "operon-macros",
  "postgres-types",
  "ratatui",
+ "secrecy",
  "serde",
  "serde_json",
  "textwrap",
@@ -932,12 +938,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "operon-macros-internal"
+name = "operon-macros"
 version = "0.1.0"
 dependencies = [
+ "heck",
+ "indexmap",
+ "indoc",
+ "once_cell",
+ "proc-macro-crate",
  "proc-macro-error",
  "proc-macro2",
  "quote",
+ "serde",
  "syn 2.0.103",
  "toml",
 ]
@@ -1058,6 +1070,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "proc-macro-crate"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edce586971a4dfaa28950c6f18ed55e0406c1ab88bbce2c6f6293a7aaba73d35"
+dependencies = [
+ "toml_edit",
 ]
 
 [[package]]
@@ -1216,6 +1237,15 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "zeroize",
+]
 
 [[package]]
 name = "serde"
@@ -1977,3 +2007,9 @@ dependencies = [
  "quote",
  "syn 2.0.103",
 ]
+
+[[package]]
+name = "zeroize"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ced3678a2879b30306d323f4542626697a464a97c0a07c9aebf7ebca65cd4dde"

@@ -1,0 +1,32 @@
+use quote::quote;
+
+use crate::{
+    DimensionConfig,
+    configs::JobConfig,
+    macros::queries::ticket::{
+        fn_clear_ticket::fn_clear_ticket, fn_explode::fn_explode, fn_get_all::fn_get_all,
+        fn_init_ticket::fn_init_ticket, fn_mark_done::fn_mark_done, fn_put_ticket::fn_put_ticket,
+        fn_raise_dep::fn_raise_dep,
+    },
+};
+
+/// Generates all resolution-related queries for a given dimension.
+pub fn ticket_queries(job: &JobConfig, dims: &[&DimensionConfig]) -> proc_macro2::TokenStream {
+    let init_fn = fn_init_ticket(job);
+    let clear_fn = fn_clear_ticket(job);
+    let put_fn = fn_put_ticket(job);
+    let get_all_fn = fn_get_all(job);
+    let mark_done_fn = fn_mark_done(job);
+    let raise_dep_fn = fn_raise_dep(job);
+    let explode_fns = dims.iter().map(|dim| fn_explode(job, dim));
+
+    quote! {
+        #init_fn
+        #clear_fn
+        #put_fn
+        #get_all_fn
+        #mark_done_fn
+        #raise_dep_fn
+        #(#explode_fns)*
+    }
+}

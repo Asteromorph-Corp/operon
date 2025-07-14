@@ -1,0 +1,112 @@
+use indexmap::IndexMap;
+
+use crate::{
+    operon::RunningState,
+    scheduler::{ControlEvent, JobHandler},
+    service::OperonService,
+    storage::OperonStorage,
+    ui::{LogBuffer, ShellPrompt, UiError, UiStateUpdate},
+};
+
+pub type Progress = (i64, i64, i64, RunningState, bool);
+
+/// Minimal state that holds the information needed to render the UI.
+#[derive(Default, Debug, Clone)]
+pub struct UiState {
+    // Done, queued, waiting, state, returned.
+    pub(super) progress: IndexMap<String, Progress>,
+    pub(super) log_buffer: LogBuffer,
+    /// Corresponds to how many bottom lines to skip
+    pub(super) cursor: usize,
+    pub(super) unread_logs: usize,
+    pub(super) shell: ShellPrompt,
+    pub(super) exit_on_finish: bool,
+    /// Last sent control event.
+    pub(super) last_control_event: ControlEvent,
+}
+
+impl UiState {
+    pub fn from_jobs<Svc: OperonService, Sto: OperonStorage>(
+        jobs: &[Box<dyn JobHandler<Svc, Sto>>],
+    ) -> Self {
+        let progress = jobs
+            .iter()
+            .map(|job| {
+                (
+                    job.job_id().to_string(),
+                    (0, 0, 0, RunningState::Running, false),
+                )
+            })
+            .collect();
+        Self {
+            progress,
+            ..Default::default()
+        }
+    }
+
+    pub fn progress_iter(&self) -> impl Iterator<Item = &Progress> {
+        self.progress.values()
+    }
+
+    pub fn state_iter(&self) -> impl Iterator<Item = RunningState> {
+        self.progress_iter().map(|s| s.3)
+    }
+
+    pub fn any_alive(&self) -> bool {
+        self.progress_iter().any(|s| !s.4)
+    }
+
+    pub fn overall_state(&self) -> RunningState {
+        if self.state_iter().any(|s| s == RunningState::Error) {
+            RunningState::Error
+        } else if self.state_iter().all(|s| s == RunningState::Finished) {
+            RunningState::Finished
+        } else if self
+            .state_iter()
+            .all(|s| s == RunningState::Paused || s == RunningState::Finished)
+        {
+            RunningState::Paused
+        } else if self
+            .state_iter()
+            .all(|s| s == RunningState::Stopped || s == RunningState::Finished)
+        {
+            RunningState::Stopped
+        } else {
+            RunningState::Running
+        }
+    }
+
+    pub fn update_ui_state(&mut self, update: impl Into<UiStateUpdate>) -> Result<(), UiError> {
+        let update: UiStateUpdate = update.into();
+        match update {
+            UiStateUpdate::ProgressUpdate(id, progress) => {
+                let Some(v) = self.progress.get_mut(&id) else {
+                    return Err(UiError::ProgressNotFound(id));
+                };
+                *v = progress;
+            }
+            UiStateUpdate::NewLog(record, width) => {
+                // Follow the cursor if it is not at 0
+                if self.cursor != 0 {
+                    self.cursor = self.cursor.saturating_add(record.format(width).len());
+                    self.unread_logs += 1;
+                }
+                self.log_buffer.push(record);
+            }
+            UiStateUpdate::SetCursor(cursor) => {
+                self.cursor = cursor;
+                if cursor == 0 {
+                    self.unread_logs = 0;
+                }
+            }
+            UiStateUpdate::ExitOnFinish(yes) => {
+                self.exit_on_finish = yes;
+            }
+            UiStateUpdate::LastControlEvent(event) => {
+                self.last_control_event = event;
+            }
+        }
+
+        Ok(())
+    }
+}

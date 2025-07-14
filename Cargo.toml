@@ -1,3 +1,4 @@
 [workspace]
-members = ["core", "macros", "examples/ex1", "examples/ex1_expanded"]
+members = ["core", "macros"]
+exclude = ["examples"]
 resolver = "2"
