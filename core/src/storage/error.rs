@@ -16,8 +16,18 @@ pub enum StorageError {
     IntegerConversionError(#[from] TryFromIntError),
     #[error("Error serializing/deserializing json: {0}")]
     JsonError(#[from] serde_json::Error),
+    #[error("CSV error: {0}")]
+    CsvError(#[from] csv::Error),
+    #[error("Writer into inner error: {0}")]
+    WriterError(Box<csv::IntoInnerError<csv::Writer<Vec<u8>>>>),
     #[error("Not found: {0}")]
     NotFound(String),
     #[error("Other error: {0}")]
     Other(String),
+}
+
+impl From<csv::IntoInnerError<csv::Writer<Vec<u8>>>> for StorageError {
+    fn from(err: csv::IntoInnerError<csv::Writer<Vec<u8>>>) -> Self {
+        StorageError::WriterError(Box::new(err))
+    }
 }

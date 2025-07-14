@@ -1,12 +1,19 @@
 use syn::parse_quote;
 
 use crate::{
+    JobConfigMap,
     configs::EntityConfigMap,
-    macros::storage::{batch_get::batch_gets, generic_constraints, single_ops::single_ops},
-    utils::{operon_ident, storage_trait_ident}, JobConfigMap,
+    macros::storage::{
+        batch_gets::batch_gets, batch_puts::batch_puts, generic_constraints, single_ops::single_ops,
+    },
+    utils::{operon_ident, storage_trait_ident},
 };
 
-pub(super) fn impl_service_storage(service_id: &str, jobs: &JobConfigMap, entities: &EntityConfigMap) -> syn::ItemImpl {
+pub(super) fn impl_service_storage(
+    service_id: &str,
+    jobs: &JobConfigMap,
+    entities: &EntityConfigMap,
+) -> syn::ItemImpl {
     let operon = operon_ident();
     let sql_storage_ident = crate::utils::sql_storage_ident(service_id);
     let storage_ident = storage_trait_ident(service_id);
@@ -18,6 +25,7 @@ pub(super) fn impl_service_storage(service_id: &str, jobs: &JobConfigMap, entiti
     let generic_constraints = generic_constraints(entities);
     let single_ops = single_ops(entities);
     let batch_gets = batch_gets(jobs, entities);
+    let batch_puts = batch_puts(jobs);
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -27,6 +35,7 @@ pub(super) fn impl_service_storage(service_id: &str, jobs: &JobConfigMap, entiti
         {
             #(#single_ops)*
             #(#batch_gets)*
+            #(#batch_puts)*
         }
     }
 }
