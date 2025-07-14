@@ -113,7 +113,7 @@ pub(super) fn impl_storage(
                     .execute(
                         &format!(
                             "INSERT INTO {schema_prefix}_data_footprint (key, value) VALUES ('global', $1)
-                            ON CONFLICT (key) DO UPDATE SET EXCLUDED.value = $1"
+                            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                         ),
                         &[&value],
                     )
