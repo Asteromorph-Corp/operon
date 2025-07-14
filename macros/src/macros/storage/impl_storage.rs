@@ -127,6 +127,7 @@ pub(super) fn impl_storage(
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use quote::format_ident;
 
     use crate::EntityConfig;
 
@@ -140,6 +141,7 @@ mod tests {
                 EntityConfig {
                     id: "a".to_string(),
                     dims: vec!["i".to_string()],
+                    generic: format_ident!("A_")
                 },
             ),
             (
@@ -147,6 +149,7 @@ mod tests {
                 EntityConfig {
                     id: "b".to_string(),
                     dims: vec!["i".to_string(), "j".to_string()],
+                    generic: format_ident!("B_"),
                 },
             ),
         ]);
@@ -181,6 +184,7 @@ mod tests {
                 EntityConfig {
                     id: "a".to_string(),
                     dims: vec!["i".to_string()],
+                    generic: format_ident!("A_"),
                 },
             ),
             (
@@ -188,6 +192,7 @@ mod tests {
                 EntityConfig {
                     id: "b".to_string(),
                     dims: vec!["i".to_string(), "j".to_string()],
+                    generic: format_ident!("B_"),
                 },
             ),
         ]);
