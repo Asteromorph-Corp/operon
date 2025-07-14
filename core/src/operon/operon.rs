@@ -23,6 +23,7 @@ where
 {
     service: Arc<Svc>,
     storage: Arc<Sto>,
+    options: OperonOptions,
 }
 
 impl<Svc, Sto> Operon<Svc, Sto>
@@ -31,8 +32,16 @@ where
     Sto: OperonStorage,
 {
     /// Create a new Operon instance with the given storage and service.
-    pub fn new(service: ::std::sync::Arc<Svc>, storage: ::std::sync::Arc<Sto>) -> Self {
-        Self { service, storage }
+    pub fn new(
+        service: ::std::sync::Arc<Svc>,
+        storage: ::std::sync::Arc<Sto>,
+        options: OperonOptions,
+    ) -> Self {
+        Self {
+            service,
+            storage,
+            options,
+        }
     }
 
     /// Run the Operon instance with the given primary upper bound.
@@ -45,9 +54,8 @@ where
         self,
         handler: SchedulerHandler<Svc, Sto>,
         primary_ub: usize,
-        options: OperonOptions,
     ) -> Result<(), OperonError> {
-        let (scheduler_options, log_options) = options.split();
+        let (scheduler_options, log_options) = self.options.split();
 
         // Initialize the logger
         let (log_tx, log_rx) = ::tokio::sync::broadcast::channel(log_options.buffer_size);
