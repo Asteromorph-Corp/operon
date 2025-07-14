@@ -11,6 +11,8 @@ pub struct EntityConfig {
     pub id: EntityId,
     /// Dimensions this entity repeat on.
     pub dims: Vec<DimensionId>,
+    /// Generic type parameter for the entity.
+    pub generic: syn::Ident,
 }
 
 pub type EntityConfigMap = IndexMap<EntityId, EntityConfig>;
