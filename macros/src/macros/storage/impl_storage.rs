@@ -163,7 +163,7 @@ mod tests {
                 value JSONB,
                 PRIMARY KEY (i, j)
             );
-            CREATE TABLE IF NOT EXISTS {schema_prefix}footprint (
+            CREATE TABLE IF NOT EXISTS {schema_prefix}_data_footprint (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );"
