@@ -18,7 +18,7 @@ pub fn mod_queries(all_configs: &AllConfig) -> syn::ItemMod {
     });
 
     parse_quote! {
-        pub mod queries {
+        mod queries {
             use super::*;
 
             mod resolution {

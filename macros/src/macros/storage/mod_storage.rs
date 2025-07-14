@@ -20,7 +20,7 @@ pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
     let impl_service_storage = impl_service_storage(&all_configs.service_id, &all_configs.entities);
 
     parse_quote! {
-        pub mod storage {
+        mod storage {
             use super::*;
 
             #data_storage_definition
