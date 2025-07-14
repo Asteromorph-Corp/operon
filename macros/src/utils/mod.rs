@@ -1,4 +1,3 @@
-pub mod config_types;
 pub mod parse;
 
 mod ident;
