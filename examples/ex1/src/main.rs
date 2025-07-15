@@ -69,12 +69,6 @@ impl CookingService for ExampleService {
             b: b.clone(),
             c: c.clone(),
         };
-        // // Printing logs should be done using the macros `operon` provides.
-        // // For example:
-        // let mut rng = rand::rng();
-        // if rng.random_bool(0.001) {
-        //     operon::info!("Sample delta: {d:?}");
-        // }
         log::trace!("Delta computed: {d:?}");
         Ok(d)
     }
