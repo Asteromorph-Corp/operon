@@ -253,7 +253,16 @@ mod tests {
                         .await?;
 
                         let mut ui_state = ui_state.write().await;
-                        operon::scheduler::JobHandler::update_ui(&self.1, client, &mut ui_state).await?;
+                        let (done, queued, waiting) = <schema::BetaTicket as operon::schema_base::TicketSql>::get_status(client).await?;
+                        let state = if queued + waiting == 0 {
+                            operon::operon::RunningState::Finished
+                        } else {
+                            operon::operon::RunningState::Running
+                        };
+                        ui_state.update_ui_state(operon::ui::UiStateUpdate::ProgressUpdate(
+                            "beta".to_string(),
+                            (done, queued, waiting, state, false),
+                        ))?;
                     }
 
                     Ok(())
