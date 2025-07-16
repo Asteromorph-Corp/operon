@@ -122,18 +122,19 @@ impl CookingService for ExampleService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
-    let primary_ub = 50;
-
-    let operon_options = OperonOptions::new(&database_uri);
-    let storage_options = StorageOptions::new(database_uri);
+    let primary_ub = 1000;
 
     let service = Arc::new(ExampleService);
-    let storage = Arc::new(PsqlCookingStorage::new(storage_options)?);
+
+    let storage = Arc::new(PsqlCookingStorage::new(
+        StorageOptions::new(&database_uri).with_schema(Some("data".to_string())),
+    )?);
+
+    let operon_options = OperonOptions::new(&database_uri);
 
     storage.init().await?;
     for i in 0..primary_ub {
-        let a = A(format!("A ({i})"));
-        storage.put_a(i, a.clone()).await?;
+        storage.put_a(i, A(format!("A ({i})"))).await?;
     }
 
     Operon::new(service, storage, operon_options)

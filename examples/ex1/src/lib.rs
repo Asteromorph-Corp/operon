@@ -37,9 +37,9 @@ pub enum F {
 use operon::sample_operon;
 
 sample_operon! {
-    Cooking = |A<i>| {
+    cooking = |A<i>| {
         B<j> = beta(A) for(8) i;
-        C<k> = gamma(A) for(8) i;
+        C<k> = gamma(A) for(8) j;
         D    = delta(A, B, C) for(4) i, j, k;
         E    = epsilon(B<j>, D<j>) for(4) i, k;
         F    = zeta(C<k>, E<k>) for i;

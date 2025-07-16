@@ -12,6 +12,7 @@ use quote::{format_ident, quote};
 use crate::{
     configs::{AllConfig, DimensionConfig, EntityConfig, JobArg, JobConfig, JobConfigMap},
     macros::operon,
+    utils::parse::parse_config,
 };
 
 // use utils::{config_types::*, parse::*};
@@ -33,9 +34,9 @@ use crate::{
 // }
 
 #[proc_macro]
-pub fn sample_operon(_input: TokenStream) -> TokenStream {
+pub fn sample_operon(input: TokenStream) -> TokenStream {
     let all_configs = AllConfig {
-        service_id: "Cooking".to_string(),
+        service_id: "cooking".to_string(),
         primary_dimension: "i".to_string(),
         primary_entity: "a".to_string(),
         dimensions: IndexMap::from_iter([
@@ -206,7 +207,10 @@ pub fn sample_operon(_input: TokenStream) -> TokenStream {
             ),
         ]),
     };
-
+    let _all_configs = match parse_config(input) {
+        Ok(config) => config,
+        Err(e) => return e.to_compile_error().into(),
+    };
     let operon = operon(&all_configs);
 
     quote! {
