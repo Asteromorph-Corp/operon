@@ -193,6 +193,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
 
         let init_ticket = InitTicketQuery(&job).to_string();
@@ -222,6 +223,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
 
         let ticket_summary = TicketSummaryTriggerQuery(&job).to_string();
@@ -266,6 +268,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
 
         let result = fn_init_ticket(&job);

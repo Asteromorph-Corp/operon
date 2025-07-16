@@ -23,6 +23,8 @@ pub struct JobConfig {
     pub dims: Vec<DimensionId>,
     /// Dimension this job spawns.
     pub spawn_dim: Option<DimensionId>,
+    /// The pool size for this job.
+    pub pool_size: usize,
 }
 
 pub type JobConfigMap = IndexMap<JobId, JobConfig>;

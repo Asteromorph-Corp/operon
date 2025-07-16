@@ -139,6 +139,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let delta = JobConfig {
             id: "delta".to_string(),
@@ -159,6 +160,7 @@ mod tests {
             to: "d".to_string(),
             dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
             spawn_dim: None,
+            pool_size: 4,
         };
         let epsilon = JobConfig {
             id: "epsilon".to_string(),
@@ -175,6 +177,7 @@ mod tests {
             to: "e".to_string(),
             dims: vec!["i".to_string(), "k".to_string()],
             spawn_dim: None,
+            pool_size: 4,
         };
         let spawn_dim_repeating_jobs = IndexSet::from_iter([&delta]);
         let downstream_jobs = IndexSet::from_iter([&delta, &epsilon]);

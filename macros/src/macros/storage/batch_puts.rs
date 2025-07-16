@@ -135,6 +135,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let query = BatchPutTempTableQuery(&job).to_string();
         let expected =
@@ -154,6 +155,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let query = BatchPutCopyQuery(&job).to_string();
         let expected = "COPY temp (i, j, value) FROM STDIN WITH (FORMAT csv);";
@@ -171,6 +173,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let query = BatchPutInsertQuery(&job).to_string();
         let expected = indoc! {"
@@ -194,6 +197,7 @@ mod tests {
                 to: "b".to_string(),
                 dims: vec!["i".to_string()],
                 spawn_dim: Some("j".to_string()),
+                pool_size: 8,
             },
         )]);
 

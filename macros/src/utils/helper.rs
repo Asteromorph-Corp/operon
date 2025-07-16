@@ -123,6 +123,7 @@ mod tests {
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -136,6 +137,7 @@ mod tests {
                     to: "c".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("k".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -159,6 +161,7 @@ mod tests {
                     to: "d".to_string(),
                     dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -178,6 +181,7 @@ mod tests {
                     to: "e".to_string(),
                     dims: vec!["i".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -197,6 +201,7 @@ mod tests {
                     to: "f".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: None,
+                    pool_size: 1,
                 },
             ),
         ]);
@@ -237,6 +242,7 @@ mod tests {
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -250,6 +256,7 @@ mod tests {
                     to: "c".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("k".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -273,6 +280,7 @@ mod tests {
                     to: "d".to_string(),
                     dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -292,6 +300,7 @@ mod tests {
                     to: "e".to_string(),
                     dims: vec!["i".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -311,6 +320,7 @@ mod tests {
                     to: "f".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: None,
+                    pool_size: 1,
                 },
             ),
         ]);
@@ -351,6 +361,7 @@ mod tests {
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -364,6 +375,7 @@ mod tests {
                     to: "c".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("k".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -387,6 +399,7 @@ mod tests {
                     to: "d".to_string(),
                     dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -406,6 +419,7 @@ mod tests {
                     to: "e".to_string(),
                     dims: vec!["i".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -425,6 +439,7 @@ mod tests {
                     to: "f".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: None,
+                    pool_size: 1,
                 },
             ),
         ]);
@@ -468,6 +483,7 @@ mod tests {
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -481,6 +497,7 @@ mod tests {
                     to: "c".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("k".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -504,6 +521,7 @@ mod tests {
                     to: "d".to_string(),
                     dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -523,6 +541,7 @@ mod tests {
                     to: "e".to_string(),
                     dims: vec!["i".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -542,6 +561,7 @@ mod tests {
                     to: "f".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: None,
+                    pool_size: 1,
                 },
             ),
         ]);

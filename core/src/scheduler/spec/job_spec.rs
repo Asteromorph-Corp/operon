@@ -19,6 +19,8 @@ where
     type Ticket: Ticket<Job = Self::Job, Resolution = Self::Resolution>;
     type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;
 
+    fn pool_size(&self) -> usize;
+
     /// Run a check on the data consistency between the data storage and the metadata storage.
     /// Return `true` if the data storage holds all needed data to restore, `false` if it does not.
     async fn check_consistency(

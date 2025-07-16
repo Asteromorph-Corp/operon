@@ -28,6 +28,10 @@ where
 {
     fn job_id(&self) -> &'static str;
 
+    fn pool_size(&self) -> usize {
+        1 // Default pool size, can be overridden by the job configuration
+    }
+
     /// Initialize the PSQL fact storage for the primary resolution.
     ///
     /// This function should be idempotent,
@@ -96,6 +100,10 @@ where
         J::id()
     }
 
+    fn pool_size(&self) -> usize {
+        JobSpec::pool_size(self)
+    }
+
     async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
         R::init_table(client).await?;
         Ok(())
@@ -154,8 +162,14 @@ where
         ctrl_rx: ControlEventReceiver,
         clean: bool,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>> {
-        let individual_scheduler =
-            IndividualScheduler::new(self.clone(), service, storage, meta_storage, 8, ui_state);
+        let individual_scheduler = IndividualScheduler::new(
+            self.clone(),
+            service,
+            storage,
+            meta_storage,
+            self.pool_size(),
+            ui_state,
+        );
         Box::pin(individual_scheduler.run(peer_txs, peer_rx, ctrl_rx, clean))
     }
 }

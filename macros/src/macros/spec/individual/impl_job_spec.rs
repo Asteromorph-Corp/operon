@@ -6,8 +6,9 @@ use crate::{
     configs::{DimensionConfigMap, EntityConfigMap},
     macros::spec::individual::{
         fn_check_consistency::fn_check_consistency, fn_on_receive_job::fn_on_receive_job,
-        fn_on_receive_resolution::fn_on_receive_resolution, fn_prepare_rebuild::fn_prepare_rebuild,
-        fn_run_job::fn_run_job, fn_send_on_finish::fn_send_on_finish,
+        fn_on_receive_resolution::fn_on_receive_resolution, fn_pool_size::fn_pool_size,
+        fn_prepare_rebuild::fn_prepare_rebuild, fn_run_job::fn_run_job,
+        fn_send_on_finish::fn_send_on_finish,
     },
     utils::{
         job_ident, operon_ident, peer_txs_ident, service_trait_ident, spawn_resolution, spec_ident,
@@ -41,6 +42,7 @@ pub fn impl_job_spec(
     let fn_send_on_finish = fn_send_on_finish(job, spawn_dim_repeating_jobs, downstream_jobs);
     let fn_on_receive_job = fn_on_receive_job(job, upstream_jobs);
     let fn_on_receive_resolution = fn_on_receive_resolution(job);
+    let fn_pool_size = fn_pool_size(job);
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -51,6 +53,7 @@ pub fn impl_job_spec(
             type Ticket = schema::#ticket_ident;
             type PeerEventSenders = #peer_txs_ident;
 
+            #fn_pool_size
             #fn_check_consistency
             #fn_prepare_rebuild
             #fn_run_job

@@ -76,6 +76,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let query = GetAllTicketQuery(&job).to_string();
         let expected = "SELECT * FROM {schema_prefix}ticket_beta WHERE status = $1;";
@@ -93,6 +94,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let tokens = fn_get_all(&job);
         let expected: syn::ItemFn = parse_quote! {

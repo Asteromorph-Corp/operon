@@ -77,6 +77,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let query = MarkDoneQuery(&job).to_string();
         assert_eq!(
@@ -96,6 +97,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let tokens = fn_mark_done(&job);
         let expected: syn::ItemFn = parse_quote! {
@@ -129,6 +131,7 @@ mod tests {
             to: "e".to_string(),
             dims: vec!["i".to_string(), "k".to_string()],
             spawn_dim: None,
+            pool_size: 4,
         };
         let tokens = fn_mark_done(&job);
         let expected: syn::ItemFn = parse_quote! {

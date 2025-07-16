@@ -61,6 +61,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let query = ClearTicketQuery(&job_beta).to_string();
         assert_eq!(query, "TRUNCATE TABLE {schema_prefix}ticket_beta;");
@@ -77,6 +78,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
         let tokens = fn_clear_ticket(&job_beta);
         let expected: syn::ItemFn = parse_quote! {

@@ -163,6 +163,7 @@ mod tests {
             to: "b".to_string(),
             dims: vec!["i".to_string()],
             spawn_dim: Some("j".to_string()),
+            pool_size: 8,
         };
 
         let item = fn_check_consistency(&job);
@@ -230,6 +231,7 @@ mod tests {
             to: "e".to_string(),
             dims: vec!["i".to_string(), "k".to_string()],
             spawn_dim: None,
+            pool_size: 4,
         };
 
         let item = fn_check_consistency(&job);

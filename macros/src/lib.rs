@@ -123,6 +123,7 @@ pub fn sample_operon(_input: TokenStream) -> TokenStream {
                     to: "b".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("j".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -136,6 +137,7 @@ pub fn sample_operon(_input: TokenStream) -> TokenStream {
                     to: "c".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: Some("k".to_string()),
+                    pool_size: 8,
                 },
             ),
             (
@@ -159,6 +161,7 @@ pub fn sample_operon(_input: TokenStream) -> TokenStream {
                     to: "d".to_string(),
                     dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -178,6 +181,7 @@ pub fn sample_operon(_input: TokenStream) -> TokenStream {
                     to: "e".to_string(),
                     dims: vec!["i".to_string(), "k".to_string()],
                     spawn_dim: None,
+                    pool_size: 4,
                 },
             ),
             (
@@ -197,6 +201,7 @@ pub fn sample_operon(_input: TokenStream) -> TokenStream {
                     to: "f".to_string(),
                     dims: vec!["i".to_string()],
                     spawn_dim: None,
+                    pool_size: 1,
                 },
             ),
         ]),

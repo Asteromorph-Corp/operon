@@ -86,6 +86,7 @@ mod tests {
             to: "d".to_string(),
             dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
             spawn_dim: None,
+            pool_size: 4,
         };
 
         let item = fn_on_receive_resolution(&job);
