@@ -24,7 +24,6 @@ impl OperonService for ExampleService {
 #[async_trait]
 impl CookingService for ExampleService {
     async fn beta(&self, a: A) -> Result<Vec<B>, Box<dyn std::error::Error + Send + Sync>> {
-        // Simulate some processing
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -40,7 +39,6 @@ impl CookingService for ExampleService {
     }
 
     async fn gamma(&self, a: A) -> Result<Vec<C>, Box<dyn std::error::Error + Send + Sync>> {
-        // Simulate some processing
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -57,7 +55,6 @@ impl CookingService for ExampleService {
     }
 
     async fn delta(&self, a: A, b: B, c: C) -> Result<D, Box<dyn std::error::Error + Send + Sync>> {
-        // // Simulate some processing
         // // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -69,6 +66,7 @@ impl CookingService for ExampleService {
             b: b.clone(),
             c: c.clone(),
         };
+        // Use the `log` crate inside jobs
         log::trace!("Delta computed: {d:?}");
         Ok(d)
     }
@@ -78,7 +76,6 @@ impl CookingService for ExampleService {
         b_j: Vec<B>,
         d_j: Vec<D>,
     ) -> Result<E, Box<dyn std::error::Error + Send + Sync>> {
-        // Simulate some processing
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -96,7 +93,6 @@ impl CookingService for ExampleService {
         c_k: Vec<C>,
         e_k: Vec<E>,
     ) -> Result<F, Box<dyn std::error::Error + Send + Sync>> {
-        // Simulate some processing
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {

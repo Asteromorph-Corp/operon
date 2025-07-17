@@ -1,4 +1,4 @@
-use operon::serde::{Deserialize, Serialize};
+use operon::{serde::{Deserialize, Serialize}, define_operon};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(crate = "operon::serde")]
@@ -34,12 +34,10 @@ pub enum F {
     Failure(String, Option<C>, Option<E>),
 }
 
-use operon::sample_operon;
-
-sample_operon! {
+define_operon! {
     cooking = |A<i>| {
         B<j> = beta(A) for(8) i;
-        C<k> = gamma(A) for(8) j;
+        C<k> = gamma(A) for(8) i;
         D    = delta(A, B, C) for(4) i, j, k;
         E    = epsilon(B<j>, D<j>) for(4) i, k;
         F    = zeta(C<k>, E<k>) for i;

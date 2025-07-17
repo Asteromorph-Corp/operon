@@ -1,31 +1,257 @@
-use indexmap::IndexMap;
-
 use super::config_decl::ConfigDecl;
-use crate::AllConfig;
+use crate::{
+    AllConfig, DimensionConfig, EntityConfig, JobArg, JobConfig, configs::DimensionConfigMap,
+    utils::DedupHasher,
+};
+use heck::{ToPascalCase, ToSnakeCase};
+use indexmap::IndexMap;
+use std::{collections::HashSet, hash::RandomState};
+
+fn create_generic_ident(id: &str, hasher: &mut DedupHasher) -> proc_macro2::Ident {
+    proc_macro2::Ident::new(
+        &format!("{}_{:0>11}", id, base62::encode(hasher.hash(id)),),
+        proc_macro2::Span::call_site(),
+    )
+}
+
+fn validate_downwards_closed(dims: &[String], configs: &DimensionConfigMap) -> Result<(), String> {
+    let dims_set: HashSet<_, RandomState> = HashSet::from_iter(dims.iter());
+    for dim in dims {
+        let Some(config) = configs.get(dim) else {
+            return Err(format!("Dimension '{dim}' is not defined"));
+        };
+        for dep in &config.depends_on {
+            if !dims_set.contains(dep) {
+                return Err(format!(
+                    "Cannot iterate over '{dim}' without iterating over '{dep}'"
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
 
 pub fn parse_config(input: proc_macro::TokenStream) -> syn::Result<AllConfig> {
     let config_decl: ConfigDecl = syn::parse(input)?;
     let service_id = config_decl.service_id.to_string();
-    let primary_entity = config_decl.primary_entity.id.to_string();
-    let primary_dimension = config_decl
+    let primary_entity_id = config_decl.primary_entity.id.to_string().to_pascal_case();
+    let primary_dimension_id = config_decl
         .primary_entity
         .dims
         .first()
-        .map(|d| d.to_string())
+        .map(|d| d.to_string().to_snake_case())
         .ok_or_else(|| {
             syn::Error::new(
                 config_decl.primary_entity._span,
                 "Primary entity must have a dimension",
             )
         })?;
+    let mut dimensions = IndexMap::new();
+    let mut entities = IndexMap::new();
+    let mut jobs = IndexMap::new();
+    let mut hasher = DedupHasher::new();
+    dimensions.insert(
+        primary_dimension_id.clone(),
+        DimensionConfig {
+            id: primary_dimension_id.clone(),
+            depends_on: vec![],
+        },
+    );
+    entities.insert(
+        primary_entity_id.clone(),
+        EntityConfig {
+            id: primary_entity_id.clone(),
+            dims: vec![primary_dimension_id.clone()],
+            generic: create_generic_ident(&primary_entity_id, &mut hasher),
+        },
+    );
+    for job in config_decl.jobs {
+        let new_entity = job.spawned_entity;
+        let job_id = job.id.to_string().to_snake_case();
+        let args = job.args;
+        let pool = job
+            .pool
+            .map(|lit| {
+                lit.base10_parse::<usize>().map_err(|_| {
+                    syn::Error::new(lit.span(), format!("Invalid pool value: '{lit}'"))
+                })
+            })
+            .transpose()?
+            .unwrap_or(1);
+        let dims = job.dims;
+
+        // Deduplicate and verify
+        // Constraint 1: Defining entity must not conflict with existing entities
+        if entities.contains_key(&new_entity.id.to_string()) {
+            return Err(syn::Error::new(
+                new_entity._span,
+                format!("Entity '{}' is already defined", new_entity.id),
+            ));
+        }
+        // Constraint 2: Spawned dimension must not conflict with existing dimensions
+        if let Some(new_dim) = new_entity.dims.first()
+            && dimensions.contains_key(&new_dim.to_string())
+        {
+            return Err(syn::Error::new(
+                new_entity._span,
+                format!("Cannot define dimension '{new_dim}' again"),
+            ));
+        }
+        // Constraint 3: Job name must be unique as a snake_case identifier
+        if jobs.contains_key(&job_id) {
+            return Err(syn::Error::new(
+                job._span,
+                format!("Job '{job_id}' is already defined"),
+            ));
+        }
+        // Constraint 4: Arguments must be already-defined, valid entities
+        for arg_entity in &args {
+            let arg_entity_id = arg_entity.id.to_string().to_pascal_case();
+            // Constraint 4a: Argument entity must be defined
+            let Some(arg_entity_config) = entities.get(&arg_entity_id) else {
+                return Err(syn::Error::new(
+                    arg_entity._span,
+                    format!("Undefined entity '{arg_entity_id}'"),
+                ));
+            };
+            // Constraint 4b–d. Let A = arg_entity_config.dims, B = arg_entity.dims, C = job.dims.
+            // Use HashSet for set operations.
+            let a_set: HashSet<String, RandomState> =
+                HashSet::from_iter(arg_entity_config.dims.iter().cloned());
+            let b_set: HashSet<String, RandomState> = HashSet::from_iter(
+                arg_entity
+                    .dims
+                    .iter()
+                    .map(|d| d.to_string().to_snake_case()),
+            );
+            let c_set: HashSet<String, RandomState> =
+                HashSet::from_iter(dims.iter().map(|d| d.to_string().to_snake_case()));
+            // Constraint 4b: B ⊆ A.
+            for dim in &arg_entity.dims {
+                if !a_set.contains(&dim.to_string().to_snake_case()) {
+                    return Err(syn::Error::new(
+                        dim.span(),
+                        format!("Dimension '{dim}' is not part of entity '{arg_entity_id}'"),
+                    ));
+                }
+            }
+            // Constraint 4c: A \ B ⊆ C (or, equivalently, A ⊆ B ∪ C).
+            let b_u_c = b_set.union(&c_set).cloned().collect::<HashSet<_>>();
+            if !a_set.is_subset(&b_u_c) {
+                let hanging_dims = a_set.difference(&b_u_c).collect::<Vec<_>>();
+                return Err(syn::Error::new(
+                    arg_entity._span,
+                    format!("Entity '{arg_entity_id}' has hanging dimensions: {hanging_dims:?}"),
+                ));
+            }
+            // Constraint 4d: A \ B must be downwards closed.
+            if let Err(err) = validate_downwards_closed(
+                &a_set
+                    .difference(&b_set)
+                    .map(|d| d.to_string())
+                    .collect::<Vec<_>>(),
+                &dimensions,
+            ) {
+                return Err(syn::Error::new(arg_entity._span, err));
+            }
+        }
+        // Constraint 5: Dimensions must be predefined and downwards closed.
+        for dim in &dims {
+            let dim_id = dim.to_string().to_snake_case();
+            if !dimensions.contains_key(&dim_id) {
+                return Err(syn::Error::new(
+                    dim.span(),
+                    format!("Dimension '{dim_id}' is not defined"),
+                ));
+            }
+        }
+        if let Err(err) = validate_downwards_closed(
+            &dims
+                .iter()
+                .map(|d| d.to_string().to_snake_case())
+                .collect::<Vec<_>>(),
+            &dimensions,
+        ) {
+            return Err(syn::Error::new(job._span, err));
+        }
+
+        // Add the new configs
+        let new_entity_id = new_entity.id.to_string().to_pascal_case();
+        let new_entity_dims = dims
+            .iter()
+            .chain(new_entity.dims.iter())
+            .map(|d| d.to_string().to_snake_case())
+            .collect::<Vec<_>>();
+        let new_entity_config = EntityConfig {
+            id: new_entity_id.clone(),
+            dims: new_entity_dims,
+            generic: create_generic_ident(&new_entity_id, &mut hasher),
+        };
+        entities.insert(new_entity_id.clone(), new_entity_config);
+        if let Some(dim) = new_entity.dims.first() {
+            let new_dim_id = dim.to_string().to_snake_case();
+            let new_dim_config = DimensionConfig {
+                id: new_dim_id.clone(),
+                depends_on: dims
+                    .iter()
+                    .map(|d| d.to_string().to_snake_case())
+                    .collect::<Vec<_>>(),
+            };
+            dimensions.insert(new_dim_id, new_dim_config);
+        }
+        let job_config = JobConfig {
+            id: job_id.clone(),
+            from: args
+                .iter()
+                .map(|e| JobArg {
+                    id: e.id.to_string().to_pascal_case(),
+                    over: e
+                        .dims
+                        .iter()
+                        .map(|d| d.to_string().to_snake_case())
+                        .collect::<Vec<_>>(),
+                })
+                .collect::<Vec<_>>(),
+            to: new_entity_id,
+            dims: dims
+                .iter()
+                .map(|d| d.to_string().to_snake_case())
+                .collect::<Vec<_>>(),
+            spawn_dim: new_entity
+                .dims
+                .first()
+                .map(|d| d.to_string().to_snake_case()),
+            pool_size: pool,
+        };
+        jobs.insert(job_id, job_config);
+    }
 
     Ok(AllConfig {
         service_id,
-        primary_entity,
-        primary_dimension,
-        // TODO: Parse these fields properly
-        dimensions: IndexMap::new(),
-        entities: IndexMap::new(),
-        jobs: IndexMap::new(),
+        primary_entity: primary_entity_id,
+        primary_dimension: primary_dimension_id,
+        dimensions,
+        entities,
+        jobs,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_generic_ident() {
+        let mut hasher = DedupHasher::new();
+        let ids = vec!["a", "b", "c"];
+        let mut generic_ids = Vec::new();
+        for id in ids {
+            generic_ids.push(create_generic_ident(id, &mut hasher));
+        }
+        assert_eq!(generic_ids.len(), 3);
+        // for generic_id in generic_ids {
+        //     println!("{generic_id}");
+        // }
+    }
 }

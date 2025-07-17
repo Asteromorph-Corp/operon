@@ -1,5 +1,6 @@
 use crate::configs::{DimensionConfigMap, DimensionId, EntityConfigMap, EntityId, JobConfigMap};
 
+#[derive(Debug)]
 pub struct AllConfig {
     pub service_id: String,
     pub primary_dimension: DimensionId,
