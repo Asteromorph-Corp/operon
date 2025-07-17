@@ -93,8 +93,8 @@ impl ShellPrompt {
         color: Color,
     ) {
         let line = Line::from(vec![
-            // This reads "operon@<package.name>$ ".
-            Span::styled("operon@ex1$ ", Style::new().fg(color)),
+            // This reads "operon$ ".
+            Span::styled("operon$ ", Style::new().fg(color)),
             Span::raw(self.input.clone()),
             Span::raw("█"),
         ])

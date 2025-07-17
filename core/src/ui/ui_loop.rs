@@ -1,5 +1,9 @@
-use std::sync::Arc;
-
+use crate::{
+    operon::RunningState,
+    scheduler::{ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver},
+    ui::{Action, LogRecordReceiver, Progress, UiError, UiState, UiStateUpdate},
+    utils::SplitFirstOwned,
+};
 use crossterm::{
     event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers, MouseEventKind},
     execute,
@@ -7,14 +11,8 @@ use crossterm::{
 };
 use futures::StreamExt;
 use ratatui::{prelude::*, widgets::*};
+use std::sync::Arc;
 use tokio::sync::RwLock;
-
-use crate::{
-    operon::RunningState,
-    scheduler::{ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver},
-    ui::{Action, LogRecordReceiver, Progress, UiError, UiState, UiStateUpdate},
-    utils::SplitFirstOwned,
-};
 
 const SEVENTY_SIX: u16 = 76;
 const HELP_TEXT: &str = r#"Operon TUI.
@@ -516,7 +514,14 @@ impl UiLoop {
 
     async fn draw(&self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
         let draw_snapshot = self.state.read().await.clone();
-        // Draw the major pane(s)
+        let max_len = draw_snapshot
+            .progress
+            .keys()
+            .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
+            .max()
+            .expect("At least one job name exists")
+            .clamp(3, 20);
+
         let mut cursor = draw_snapshot.cursor;
         terminal.draw(|frame| {
             let [
@@ -529,7 +534,7 @@ impl UiLoop {
                 input_area,
             ] = Layout::vertical([
                 Constraint::Length(1),
-                Constraint::Length(6),
+                Constraint::Length((draw_snapshot.progress.len() + 1) as u16),
                 Constraint::Length(1),
                 Constraint::Length(1),
                 Constraint::Fill(1),
@@ -560,17 +565,10 @@ impl UiLoop {
                 .split_first_owned()
                 .expect("Progress area must have at least one bar");
 
-            let max_len = draw_snapshot
-                .progress
-                .keys()
-                .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
-                .max()
-                .unwrap_or(0);
-
             frame.render_widget(
                 Line::from(if progress_description.width >= SEVENTY_SIX + max_len {
                     vec![
-                        Span::raw(format!("{:4}", "")),
+                        Span::raw(format!("{:width$}", "", width = (max_len.saturating_sub(3)) as usize)),
                         Span::raw("job").underlined(),
                         Span::raw("   "),
                         Span::raw("done").underlined(),
@@ -591,7 +589,7 @@ impl UiLoop {
                     ]
                 } else {
                     vec![
-                        Span::raw(format!("{:4}", "")),
+                        Span::raw(format!("{:width$}", "", width = (max_len.saturating_sub(3)) as usize)),
                         Span::raw("job").underlined(),
                         Span::raw("   "),
                         Span::raw("done").underlined(),
@@ -609,7 +607,7 @@ impl UiLoop {
                 .iter()
                 .zip(progress_bars)
                 .for_each(|((name, progress), bar)| {
-                    draw_progress_gauge(frame, bar, name, progress);
+                    draw_progress_gauge(frame, bar, name, progress, max_len);
                 });
             frame.render_widget(Block::new().borders(Borders::BOTTOM), progress_foot);
             frame.render_widget(
@@ -694,10 +692,18 @@ fn five_format(count: i64) -> String {
     }
 }
 
+fn clamp_name(name: &str, max_len: u16) -> String {
+    if name.len() > max_len as usize {
+        format!("{}…", &name[..max_len as usize - 1])
+    } else {
+        format!("{name:>width$}", width = max_len as usize)
+    }
+}
+
 /// Draws a progress gauge with a text label and a manual gauge.
-fn draw_progress_gauge(frame: &mut Frame<'_>, area: Rect, name: &str, progress: &Progress) {
+fn draw_progress_gauge(frame: &mut Frame<'_>, area: Rect, name: &str, progress: &Progress, max_len: u16) {
     // Text area: "epsilon [ done/queue/ wait] "
-    let text_length = 21 + 7; // 7 stands for the longest job name length
+    let text_length = 21 + max_len;
     let horizontal = Layout::horizontal([
         Constraint::Length(text_length),
         Constraint::Length(1),
@@ -708,7 +714,7 @@ fn draw_progress_gauge(frame: &mut Frame<'_>, area: Rect, name: &str, progress: 
     let (done, queued, waiting) = (progress.0, progress.1, progress.2);
     frame.render_widget(
         Line::from(vec![
-            Span::styled(format!("{name:>7}"), Style::new().fg(progress.3.color())),
+            Span::styled(clamp_name(name, max_len), Style::new().fg(progress.3.color())),
             Span::raw(format!(
                 " [{}/{}/{}] ",
                 five_format(done),
