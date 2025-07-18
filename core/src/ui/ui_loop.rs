@@ -568,7 +568,11 @@ impl UiLoop {
             frame.render_widget(
                 Line::from(if progress_description.width >= SEVENTY_SIX + max_len {
                     vec![
-                        Span::raw(format!("{:width$}", "", width = (max_len.saturating_sub(3)) as usize)),
+                        Span::raw(format!(
+                            "{:width$}",
+                            "",
+                            width = (max_len.saturating_sub(3)) as usize
+                        )),
                         Span::raw("job").underlined(),
                         Span::raw("   "),
                         Span::raw("done").underlined(),
@@ -589,7 +593,11 @@ impl UiLoop {
                     ]
                 } else {
                     vec![
-                        Span::raw(format!("{:width$}", "", width = (max_len.saturating_sub(3)) as usize)),
+                        Span::raw(format!(
+                            "{:width$}",
+                            "",
+                            width = (max_len.saturating_sub(3)) as usize
+                        )),
                         Span::raw("job").underlined(),
                         Span::raw("   "),
                         Span::raw("done").underlined(),
@@ -701,7 +709,13 @@ fn clamp_name(name: &str, max_len: u16) -> String {
 }
 
 /// Draws a progress gauge with a text label and a manual gauge.
-fn draw_progress_gauge(frame: &mut Frame<'_>, area: Rect, name: &str, progress: &Progress, max_len: u16) {
+fn draw_progress_gauge(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    name: &str,
+    progress: &Progress,
+    max_len: u16,
+) {
     // Text area: "epsilon [ done/queue/ wait] "
     let text_length = 21 + max_len;
     let horizontal = Layout::horizontal([
@@ -714,7 +728,10 @@ fn draw_progress_gauge(frame: &mut Frame<'_>, area: Rect, name: &str, progress: 
     let (done, queued, waiting) = (progress.0, progress.1, progress.2);
     frame.render_widget(
         Line::from(vec![
-            Span::styled(clamp_name(name, max_len), Style::new().fg(progress.3.color())),
+            Span::styled(
+                clamp_name(name, max_len),
+                Style::new().fg(progress.3.color()),
+            ),
             Span::raw(format!(
                 " [{}/{}/{}] ",
                 five_format(done),

@@ -1,8 +1,8 @@
+use rand::Rng;
 use std::{
     collections::HashSet,
     hash::{DefaultHasher, Hash, Hasher},
 };
-use rand::Rng;
 
 pub struct DedupHasher {
     used: HashSet<u64>,
