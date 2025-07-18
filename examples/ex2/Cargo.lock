@@ -513,7 +513,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ex1"
+name = "ex2"
 version = "0.1.0"
 dependencies = [
  "log",

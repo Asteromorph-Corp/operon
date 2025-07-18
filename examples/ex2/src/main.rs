@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use ex1::{
+use ex2::{
     A, B, C, CookingService, CookingStorage, D, E, F, PsqlCookingStorage, cooking_handler, schema,
 };
 use operon::{
@@ -10,11 +8,10 @@ use operon::{
     storage::{OperonStorage, StorageOptions},
 };
 use rand::Rng;
+use std::sync::Arc;
 
-// Example minimal random service implementation
+// Example service implementation
 struct ExampleService;
-// Implement the OperonService trait
-// This must always be implemented by the user.
 #[async_trait]
 impl OperonService for ExampleService {
     type JobEnum = schema::JobEnum;
@@ -123,10 +120,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let service = Arc::new(ExampleService);
 
     let storage = Arc::new(PsqlCookingStorage::new(
-        StorageOptions::new(&database_uri).with_schema(Some("data".to_string())),
+        StorageOptions::new(&database_uri).with_schema(Some("ex2_data".to_string())),
     )?);
 
-    let operon_options = OperonOptions::new(&database_uri);
+    let operon_options = OperonOptions::new(&database_uri)
+        .with_meta_storage_schema(Some("ex2_meta".to_string()))
+        .with_log_dump(Some("./logs".to_string()))
+        .with_log_level(log::Level::Debug);
 
     storage.init().await?;
     for i in 0..primary_ub {

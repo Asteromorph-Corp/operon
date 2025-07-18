@@ -30,7 +30,7 @@ impl OperonOptions {
             meta_storage_keepalives_interval: std::time::Duration::from_secs(30),
             log_level: log::Level::Info,
             log_buffer_size: 1024,
-            log_dump: Some("./logs".to_string()),
+            log_dump: None,
         }
     }
 
