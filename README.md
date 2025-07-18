@@ -7,10 +7,11 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 
 1. [Key Features](#key-features)
 2. [Prerequisites](#prerequisites)
-3. [Usage](#usage)
-4. [Examples & Demo](#examples--demo)
-5. [Roadmap](#roadmap)
-6. [License](#license)
+3. [Quick Start](#quick-start)
+4. [Usage](#usage)
+5. [Examples & Demo](#examples--demo)
+6. [Roadmap](#roadmap)
+7. [License](#license)
 
 ## Key Features
 
@@ -57,7 +58,23 @@ This is particularly useful for tasks that benefit from internal parallel execut
 You will need the following to run Operon:
 
 * [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.75+)
-* A [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
+* A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
+  * A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
+
+We also recommend having [`tokio`](https://crates.io/crates/tokio) in your `Cargo.toml` dependencies.
+
+## Quick Start
+
+If you want to try out Operon, you can clone the repository and run the provided examples:
+
+```bash
+git clone https://github.com/Asteromorph-Corp/operon
+cd operon/examples/ex1
+# Make sure the URI points to a running PostgreSQL database.
+POSTGRES_URI=<your_postgres_uri> cargo run --release
+```
+
+We recommend reading the source code of [ex1](examples/ex1/src/main.rs) to get a hang of how everything works.
 
 ## Usage
 
@@ -66,8 +83,8 @@ You will need the following to run Operon:
 <!-- TODO: Provide instructions for installing Operon. -->
 
 ### Configuration
+<!-- FIXME: Rewrite this whole section, this information is out of date. -->
 
-<!-- FIXME: The macro name and configuration syntax may have changed. -->
 In your crate root (`src/main.rs` or `src/lib.rs`), you can configure Operon using the `operon_macros::include_operon!` macro.
 An example configuration might look like this (from the [ex1](examples/ex1/src/lib.rs) example):
 
@@ -111,6 +128,7 @@ Below is a reference table of the configuration options (values marked with `*` 
 | `log.dump_path` | `String` | The path to the directory where logs will be dumped. (Default: `logs`) |
 
 ### Defining Entities and Tasks
+<!-- FIXME: Rewrite this whole section, this information is out of date. -->
 
 In the `types = {};` block of the `include_operon!` macro, you can define the entities and tasks that Operon will manage.
 An example definition set might look like this (from the [ex1](examples/ex1/src/lib.rs) example):
@@ -234,6 +252,7 @@ There are several rules that the above definition must follow for Operon to work
   * If the associated entity is supposed to be a source without dependencies, use `[]` as the `from` value.
 
 ### Running Operon
+<!-- FIXME: Rewrite this whole section, this information is out of date. -->
 
 Once you have configured Operon via the `include_operon!` macro, you can run the Operon engine using the `operon::Operon` struct's `run` method.
 Operon is meant to be run as a binary application, so you will have a `main` function that initializes the engine and starts it most of the time.
@@ -242,7 +261,7 @@ _Warning_: Using `println!` or other routines that write to `stdout` or `stderr`
 Use the `log` crate or the logging macros provided by Operon to log messages instead.
 
 A typical usage might look like this:
-<!-- FIXME: The scoping and struct naming here is probably outdated. -->
+
 ```rust
 // src/main.rs
 operon_macros::include_operon! {
@@ -314,8 +333,7 @@ Commands:
 
 ## Examples & Demo
 
-<!-- TODO: Provide a very basic example of running Operon. -->
-<!-- TODO: Provide a demo of Operon in action. -->
+<!-- TODO: Provide a GIF/video demo of Operon in action. -->
 
 You can find more examples in the [examples](examples/) directory of this repository.
 
@@ -323,7 +341,8 @@ You can find more examples in the [examples](examples/) directory of this reposi
 
 Operon is under active development. Planned features and improvements include:
 
-* Improving the documentation and examples to make it easier for new users to get started.
+* Having this README up to date with the latest changes.
+* Adding documentation for the dimension system and the macro DSL.
 * Updating the UI to scale better with larger workflows.
 * Implementing alternative backends for the entity storage and the metadata storage.
 
