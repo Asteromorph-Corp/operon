@@ -73,7 +73,7 @@ pub(super) fn impl_resolution_sql(dimension: &DimensionConfig) -> syn::ItemImpl 
                 client: #operon::meta_storage::MetaClient<'_>,
                 primary_key: Self::PrimaryKey,
             ) -> Result<Option<Self>, #operon::meta_storage::MetaStorageError> {
-                queries::#get_fn_name(client, #(primary_key.#indices)*).await
+                queries::#get_fn_name(client, #(primary_key.#indices),*).await
             }
 
             async fn put(
