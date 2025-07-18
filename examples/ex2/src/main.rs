@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 // Example service implementation
 struct ExampleService;
-#[async_trait]
 impl OperonService for ExampleService {
     type JobEnum = schema::JobEnum;
     type ResolutionEnum = schema::ResolutionEnum;
