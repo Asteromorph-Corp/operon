@@ -57,7 +57,7 @@ This is particularly useful for tasks that benefit from internal parallel execut
 
 You will need the following to run Operon:
 
-* [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.75+)
+* [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.88+)
 * A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
   * A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
 
