@@ -20,7 +20,7 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 Operon's primary use case is best described as _a known pipeline of an unknown number of tasks_.
 It executes these tasks in parallel until all possible tasks have completed.
 
-Here, a _task_ is a discrete unit of work that run in parallel, where each task's outputs (_entities_) can serve as inputs for other tasks.
+Here, a _task_ is a discrete unit of work that run in parallel, where each task's outputs ([_entities_](#defining-entities)) can serve as inputs for other tasks.
 Tasks and their dependencies must be predefined, forming a directed acyclic graph (DAG).
 This DAG's validity is checked at macro-expansion time.
 
@@ -29,7 +29,7 @@ This DAG's validity is checked at macro-expansion time.
 Tasks in Operon are _multiplex_, meaning that one task may produce multiple entities of the same type (as a Rust `Vec`).
 From another perspective, allowing multiplexing means that a task of a single type may be run multiple times, each using different input entities.
 In this sense, a single node in the DAG represents a unique task _type_ that can be run repeatedly, where the number of individual tasks of that type cannot be known until upstream tasks produce the necessary entities.
-Due to this, the number of tasks are quantified using an abstraction called [_dimensions_](#dimensions-and-multiplexing) instead of a simple count.
+Due to this, the number of tasks are quantified using an abstraction called [_named dimensions_](docs/dimension_system.md) instead of a simple count.
 
 ### Incremental Scheduling
 
@@ -79,222 +79,124 @@ We recommend reading the source code of [ex1](examples/ex1/src/main.rs) to get a
 ## Usage
 
 ### Installation
+<!-- [x] Operon is not published in crates.io, so we can only provide manual installation methods for now. -->
 
-<!-- TODO: Provide instructions for installing Operon. -->
+To use Operon in your Rust project, clone this repository:
 
-### Configuration
-<!-- FIXME: Rewrite this whole section, this information is out of date. -->
+```bash
+git clone https://github.com/Asteromorph-Corp/operon
+```
 
-In your crate root (`src/main.rs` or `src/lib.rs`), you can configure Operon using the `operon_macros::include_operon!` macro.
-An example configuration might look like this (from the [ex1](examples/ex1/src/lib.rs) example):
+Once that's done, add the following to your project's `Cargo.toml`:
+
+```toml
+[dependencies]
+# Assuming you cloned the repository to your home directory:
+operon = { path = "~/operon/core" }
+```
+
+<!-- TODO: Fill the following sections using `ex1` -->
+### Defining Entities
+
+_Entities_ are typed values that are produced and consumed by tasks in Operon.
+Any valid Rust type with a `PascalCase` name can be used as an entity, given that it implements the `Debug` and `Clone` traits.
+For persistent database use, it is also recommended that the type implements `serde::Serialize` and `serde::Deserialize`.
 
 ```rust
-operon_macros::include_operon! {
-    config = {
-        // storage.data: configurations for the default entity storage impelementation
-        storage.data.uri = "postgres://user:password@hostname:port/operon-db",
-        storage.data.pool_size = 16,
-        storage.data.schema = "data",
-        // storage.metadata: configurations for the metadata backend
-        storage.metadata.uri = "postgres://user:password@hostname:port/operon-db",
-        storage.metadata.schema = "metadata",
-        // log: configurations for the logging system
-        log.level = "debug",
-        log.buffer_size = 1024,
-        log.dump = true,
-        log.dump_path = "logs",
-    };
-    types = {
-        // The type definitions of entities go here.
-    };
-    // Name of the default entity storage implementation, if any.
-    use_psql_storage = DataStorage;
+// In examples/ex1/src/main.rs:
+
+use operon::serde::{Serialize, Deserialize};
+
+// Strings already implement all the necessary traits,
+// so using a type alias of `String` is sufficient for our `Input` type.
+type Input = String;
+
+// For composite types, we need to implement or derive the necessary traits.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+// The following attribute can be omitted
+// if you use `serde::{Serialize, Deserialize}`
+// instead of `operon::serde::{Serialize, Deserialize}`.
+#[serde(crate = "operon::serde")]
+struct Intermediate(String);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(crate = "operon::serde")]
+struct Output(char);
+```
+
+_Note 1_. These entity types must be directly accessible (without module scoping) in the scope where the [pipeline definition](#defining-the-pipeline) `define_operon!` macro is used.
+
+_Note 2_. The engine can only recognize type names that are in `PascalCase` (a.k.a. `UpperCamelCase`) as defined in the [`heck` crate](https://docs.rs/heck/latest/heck).
+Here are some examples of valid and invalid entity names:
+
+| Invalid Name | Valid Name |
+|--|--|
+| `a` | `A` |
+| `lowerCamel` | `UpperCamel` |
+| `APIResponse` | `ApiResponse` |
+| `XYCoordinates` | `XyCoordinates` / `XAndYCoordinates` |
+| `_String` / `String_` | `StringEntity` |
+
+### Defining the Pipeline
+
+The _pipeline_ is the skeleton of the Operon workflow, defining _how_ the entities will be produced and consumed.
+More specifically, the pipeline consists of the following components:
+
+* **Name**: A unique identifier for the pipeline.
+* **Primary entity type**: The type of the entity that will be used as the input to the pipeline.
+* **Tasks**: A listing of tasks that will be executed in the pipeline.
+Each task introduces a new type of entity to the pipeline, which can be used as input for subsequent tasks.
+
+```rust
+// In examples/ex1/src/main.rs:
+
+// This example pipeline is called "splitter", and it defines a simple flow:
+// ┌─────────────────────────────────────────────────────────────┐
+// │ Input  ——get_words——>  Intermediate  ——get_chars——>  Output │
+// └─────────────────────────────────────────────────────────────┘
+// where `Input`s are indexed by `[input_no]`,
+// `Intermediate`s are indexed by `[input_no][word_no]`,
+// and `Output`s are indexed by `[input_no][word_no][char_no]`.
+
+operon::define_operon! {
+    splitter = |Input<input_no>| {
+        Intermediate<word_no> = get_words(Input) for input_no;
+        Output<char_no> = get_chars(Intermediate) for input_no, word_no;
+    }
 }
 ```
 
-Below is a reference table of the configuration options (values marked with `*` are required):
+Entities in Operon are paired with _named dimensions_ that represent the way you can iterate over the entities.
+Simply put, these dimensions can be understood as _directions_ the entities repeat in.
+For example, if you have an `Intermediate` entity that has two dimensions, `input_no` and `word_no`, you can think of it as a 2D grid where each cell is an `Intermediate` entity.
 
-| Key | Value Type | Description |
-|:--|:--|:--|
-| `storage.data.uri` | `String` | The PostgreSQL [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) for the default entity storage implementation. <br> Only used when `use_psql_storage` is set. |
-| `storage.data.pool_size` | `usize` | The size of the connection pool for the default entity storage implementation. (Default: 16) <br> Only used when `use_psql_storage` is set. |
-| `storage.data.schema` | `String` | The schema name for the default entity storage implementation. Uses the default schema if not specified. <br> Only used when `use_psql_storage` is set. |
-| `storage.metadata.uri` | `String`* | The PostgreSQL [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) for the metadata backend. |
-| `storage.metadata.pool_size` | `usize` | The size of the connection pool for the metadata backend. (Default: 16) |
-| `storage.metadata.schema` | `String` | The schema name for the metadata backend. Uses the default schema if not specified. |
-| `log.level` | `String` | The minimum logging level the UI will show. <br> (Default: `info`, possible values: `trace`, `debug`, `info`, `warn`, `error`) |
-| `log.buffer_size` | `usize` | The size of the UI log buffer. (Default: 1024) |
-| `log.dump` | `bool` | Whether to dump all logs to files. (Default: `false`) |
-| `log.dump_path` | `String` | The path to the directory where logs will be dumped. (Default: `logs`) |
+![Figure 1](docs/figures/figure1.svg)
 
-### Defining Entities and Tasks
-<!-- FIXME: Rewrite this whole section, this information is out of date. -->
+The pipeline follows a few rules:
 
-In the `types = {};` block of the `include_operon!` macro, you can define the entities and tasks that Operon will manage.
-An example definition set might look like this (from the [ex1](examples/ex1/src/lib.rs) example):
+* The primary entity must be paired with exactly one dimension, the _primary dimension_.
+* Each task must return one of the following two options:
+  * A single entity.
+  * A 1D vector of entities.
+  In this case, the length of the returned vector will represent a new dimension that can be used to index the entities later in the pipeline.
+* The dimension specifications must "make sense."
+  <!-- TODO: Expand on what "make sense" means. -->
 
-```rust
-types = {
-    #[entity(primary, dims = ["i"])]
-    pub struct A(pub String);
+Invoking the `define_operon!` macro brings several utilities into scope:
 
-    #[entity(dims = ["i", "j"], def = "beta|i", from = ["A"], pool = 8)]
-    pub struct B(pub A, pub usize);
+* a `schema` module that contains the metadata of the pipeline;
+* a `{PipelineName}Service` trait that provides the parsed tasks you would need to implement;
+* a `{PipelineName}Storage` trait that exposes the storage interface for the entities;
+* a `Psql{PipelineName}Storage` struct that serves as a default implementation of the storage interface using PostgreSQL;
+* a helper `{pipeline_name}_handler()` function for launching the engine later.
 
-    #[entity(dims = ["i", "k"], def = "gamma|i", from = ["A"], pool = 8)]
-    pub struct C(pub usize);
+Refer to the [`define_operon!` documentation](docs/define_operon_dsl.md) for more details on how to use the macro.
 
-    #[entity(
-        dims = ["i", "j", "k"],
-        def = "delta | i, j, k",
-        from = ["A", "B", "C"],
-        pool = 4
-    )]
-    pub struct D {
-        pub a: A,
-        pub b: B,
-        pub c: C,
-    }
+### Implementing the Service
 
-    #[entity(dims = ["i", "k"], def = "epsilon | i, k", from = ["B | j", "D|j"], pool = 4)]
-    pub struct E {
-        pub b: Vec<B>,
-        pub d: Vec<D>,
-    }
-
-    #[entity(dims = ["i"], def = "zeta|i", from = ["C|k", "E|k"])]
-    pub enum F {
-        Success {
-            c: Vec<C>,
-            e: Vec<E>,
-        },
-        Failure(String, Option<C>, Option<E>),
-    }
-};
-```
-
-Each entity is a `struct` or an `enum` defined with a set of attributes:
-
-| Attribute | Description |
-|:--|:--|
-| `primary` | Marks the entity as a primary entity — the source data. |
-| `dims` | Specifies the dimensions of the entity. |
-| `def` | The task function that defines this entity. |
-| `from` | The input entities that `def` depends on. (_The parameters of the_ `def` _function_.) |
-| `pool` | The number of parallel instances of `def` that can run concurrently. <br> If unspecified, defaults to 1. |
-
-Once the entities and tasks are defined and adheres to the [rules](#entity-definition-rules), the tasks will be available for implementation in the `operon::OperonService` trait.
-In the example above, the `def` functions for each entity would be parsed as follows:
-
-```rust
-use anyhow::Result;
-use async_trait::async_trait;
-use operon::entity::*;
-#[async_trait]
-pub trait OperonService {
-    async fn beta(&self, a: &A) -> Result<Vec<B>>;
-    async fn gamma(&self, a: &A) -> Result<Vec<C>>;
-    async fn delta(&self, a: &A, b: &B, c: &C) -> Result<D>;
-    async fn epsilon(&self, b_j: &[B], d_j: &[D]) -> Result<E>;
-    async fn zeta(&self, c_k: &[C], e_k: &[E]) -> Result<F>;
-}
-```
-
-Please consult the internal documentation of `OperonService` for more details on how to implement these functions.
-
-<!-- FIXME: The following two sections are overly complex and should be simplified, rewritten, or moved to a separate document. While these are essential details, they are overwhelming for a first-time user. -->
-#### Dimensions and Multiplexing
-
-In the above example, the `dims` attribute specifies the dimensions of each entity.
-These dimensions are also used to define the multiplexing behaviour of tasks and entities — for example, in the `E` entity's attributes, the `def` "`epsilon`" refers to the dimensions `i` and `k`, while `from` names entities `B` and `D`, who refer to the dimension `j`.
-
-Dimensions always take a range that looks like `[0, U)`, where `U` is the upper bound of that dimension.
-`U` is determined by the output of the task that _spawned_ this dimension (i.e. the task that first introduced this dimension).
-Whenever an entity or task refers to a dimension, it means that it _repeats_ on that dimension:
-
-* `A` having `dims = ["i"]` means that `A` repeats on a single dimension `i`, so there are `U(i)` entities of type `A`.
-* `D` having `dims = ["i", "j", "k"]` means that `D` repeats on three dimensions: `i`, `j`, and `k`, so there will be as many entities of type `D` as there are combinations of "coordinates" in the three dimensions.
-* `beta|i` means that the `beta` task will run for all values of `i` in the range `[0, U(i))`.
-* `D|j` as a parameter of `epsilon|i, k` means that the `epsilon` task will be run for all values of `i` and `k`, and that `D` will be collected over the dimension `j` (i.e. all entities of type `D` with the same `i` and `k` will be collected into a single `Vec<D>`).
-
-Note that some dimensions depend on other dimensions, like `j` in the example above.
-This is because the task that spawns the dimension `j` is `beta`, which itself repeats on the dimension `i`.
-For different values of `i`, the result of `beta` may yield different values of `U(j)`, which is why `j` is _dependent_ on `i`.
-When an entity has multiple dimensions, the dimensions are always ordered by their dependencies, so if we were to represent the `D` entities as a `Vec<Vec<Vec<D>>>` or a `&[[[D]]]`, it would be indexed as `D[i][j][k]`.
-
-<!-- TODO: Separate some of the following to a document file -->
-#### Entity Definition Rules
-
-There are several rules that the above definition must follow for Operon to work correctly:
-
-* Each entity, dimension and task must have a unique name.
-* Definitions are order-sensitive.
-* All entities must be a `struct` or an `enum`.
-  * The entities must be `#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]`-able.
-  * All entities and their fields must be `pub`.
-  * You may use previously defined entities when defining other entities.
-  * Simple type aliases (like `pub type A = String;`) are not allowed; using a tuple struct (like `pub struct A(pub String);`) is recommended.
-* The first entity must have the `primary` attribute, and other entities must not have it.
-  * If you don't need a primary entity that acts as the source data, use an empty struct with the `primary` attribute.
-* All entities must have the `dims` attribute.
-  * The primary entity must have exactly one dimension, which we call the "primary dimension", representing how many times the whole workflow will run.
-  Again, if you want to run the workflow only once, have the primary dimension's upper bound be 1.
-  * Each entity may introduce _up to one_ new dimension, other dimensions must be already defined beforehand.
-* All entities _except_ the primary entity must have the `def` attribute.
-  * The `def` attribute must be a _dimension-annotated function name_: a combination of a valid Rust function name and a list of dimensions, separated by a pipe (`|`).
-  * Dimensions listed in the `def` attribute must be precisely the dimensions in `dims` except the dimension this entity introduces.
-  * If this entity introduces a new dimension, `def` returns a `Vec` of the entity type, otherwise it returns a single instance of the entity type.
-* All entities with the `def` attribute must have the `from` attribute.
-  * The `from` attribute must be a list of dimension-annotated entity names.
-  * Entities and dimensions listed in the `from` attribute must have been defined strictly before this entity.
-  * For each entity listed in `from`, taking the union of the repeating-on dimensions and the task's `def` dimensions must yield a superset of the entity's `dims`.
-  For example, in `epsilon | i, k` whose `from` is `["B | j", "D|j"]`, `["i", "k"] U ["j"]` is a superset of both `["i", "j"]` (for `B`) and `["i", "j", "k"]` (for `D`), so this is a valid definition.
-  * If the associated entity is supposed to be a source without dependencies, use `[]` as the `from` value.
+### Implementing the Storage (Optional)
 
 ### Running Operon
-<!-- FIXME: Rewrite this whole section, this information is out of date. -->
-
-Once you have configured Operon via the `include_operon!` macro, you can run the Operon engine using the `operon::Operon` struct's `run` method.
-Operon is meant to be run as a binary application, so you will have a `main` function that initializes the engine and starts it most of the time.
-
-_Warning_: Using `println!` or other routines that write to `stdout` or `stderr` after the Operon engine has started will cause the UI to malfunction.
-Use the `log` crate or the logging macros provided by Operon to log messages instead.
-
-A typical usage might look like this:
-
-```rust
-// src/main.rs
-operon_macros::include_operon! {
-    // ... configuration and types as shown above ...
-    use_psql_storage = DataStorage;
-}
-struct MyService;
-impl operon::OperonService for MyService {
-    // ... implement each task function ...
-}
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let primary_ub = 100; // The upper bound of the primary dimension.
-    let storage = DataStorage::new().await?;
-    // Insert primary entities into the storage.
-    for i in 0..primary_ub {
-        let a = A(format!("Primary entity {}", i));
-        storage.put_a(i, &a).await?;
-    }
-    let service = MyService;
-    let operon = operon::Operon::new(storage, service);
-    operon.run(primary_ub).await?;
-    Ok(())
-}
-```
-
-Note that the `run` method takes a single argument, which is the upper bound of the primary dimension.
-
-Also, by the time you call `run`, all primary entities must already be present in the entity storage.
-You can use the `put_*` methods of the storage to insert primary entities, as shown in the example above.
-
-Finally, you can give a custom `OperonStorage` implementation without the `use_psql_storage` configuration if you want to use a different storage backend or perhaps an in-memory storage for testing purposes.
-Refer to the generated documentation of `OperonStorage` for more details.
 
 #### UI Shell Commands
 
