@@ -50,9 +50,9 @@ struct Output(char);
 // More information about the macro DSL can be found in the documentations.
 //
 // This example pipeline is called "splitter", and it defines a simple flow:
-// ┌—————————————————————————————————————————————————————————————┐
+// ┌─────────────────────────────────────────────────────────────┐
 // │ Input  ——get_words——>  Intermediate  ——get_chars——>  Output │
-// └—————————————————————————————————————————————————————————————┘
+// └─────────────────────────────────────────────────────────────┘
 // where `Input`s are indexed by `[input_no]`,
 // `Intermediate`s are indexed by `[input_no][word_no]`,
 // and `Output`s are indexed by `[input_no][word_no][char_no]`.
