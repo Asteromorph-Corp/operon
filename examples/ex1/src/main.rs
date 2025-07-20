@@ -28,9 +28,15 @@ use std::sync::Arc;
 // * `Debug`
 // * Optionally, `Serialize` and `Deserialize` for database usage.
 
-type Input = String; // The primary entity, which is a string in this case.
+// Strings already implement all the necessary traits,
+// so using a type alias of `String` is sufficient for our `Input` type.
+type Input = String;
 
+// For composite types, we need to implement or derive the necessary traits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// The following attribute can be omitted
+// if you use `serde::{Serialize, Deserialize}`
+// instead of `operon::serde::{Serialize, Deserialize}`.
 #[serde(crate = "operon::serde")]
 struct Intermediate(String);
 
