@@ -7,7 +7,7 @@
 // To run this example as-is, you will need an URI to a working PostgreSQL database,
 // and use the following shell command in this example's root directory (`operon/examples/ex1`):
 // `POSTGRES_URI=<database_uri> cargo run --release`
-// 
+//
 // This example is meant to be run as a binary,
 // and was tested with Rust 1.90.0-nightly and PostgreSQL 17.5.
 
@@ -27,11 +27,8 @@ use std::sync::Arc;
 // * `Clone`
 // * `Debug`
 // * Optionally, `Serialize` and `Deserialize` for database usage.
-// We strongly recommend using only `struct`s and `enum`s for entities.
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(crate = "operon::serde")]
-struct Input(String);
+type Input = String; // The primary entity, which is a string in this case.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(crate = "operon::serde")]
@@ -89,7 +86,6 @@ impl SplitterService for MySplitterService {
         input: Input,
     ) -> Result<Vec<Intermediate>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(input
-            .0
             .split_whitespace()
             .map(|s| Intermediate(s.to_string()))
             .collect())
@@ -162,13 +158,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // as long as the storage is persistent and the data is in the expected format,
     // but if unsure, we recommend using the built-in `put_*` methods as shown below.
     let num_inputs = 3;
-    storage
-        .put_input(0, Input("Hello World".to_string()))
-        .await?;
-    storage
-        .put_input(1, Input("Hello Operon".to_string()))
-        .await?;
-    storage.put_input(2, Input("".to_string())).await?;
+    storage.put_input(0, "Hello World".to_string()).await?;
+    storage.put_input(1, "Hello Operon".to_string()).await?;
+    storage.put_input(2, "".to_string()).await?;
 
     //# ———————————————————————— Running Operon ——————————————————————— #//
     // Now we finally run Operon.
