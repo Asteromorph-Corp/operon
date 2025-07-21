@@ -200,7 +200,7 @@ The pipeline must follow a few rules that are enforced at macro-expansion time:
   Each task input must be either a single entity (`EntityType`) or a slice across dimensions (`EntityType<dim1, dim2, ...>`).
 * Each task must return one of the following two options:
   * A single entity, denoted `SpawnedEntityType`.
-  * An 1D vector of entities, denoted `SpawnedEntityType<spawned_dimension_name>`.
+  * A 1D vector of entities, denoted `SpawnedEntityType<spawned_dimension_name>`.
     In this case, this task spawns a dimension that can be iterated over in subsequent tasks.
 * The dimension specifications must be "well-formed," as thoroughly described in the [dimension system documentation](docs/dimension_system.md).
   * For illustration, take the list of `Intermediate`s as shown in [Figure 1](docs/figures/figure1.svg): `[["Good", "morning"], ["Bonjour"], ["Buenos", "días"]]`.
