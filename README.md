@@ -101,6 +101,7 @@ operon = { path = "~/operon/core" }
 _Entities_ are typed values that are produced and consumed by tasks in Operon.
 Any valid Rust type with a `PascalCase` name can be used as an entity, given that it implements the `Debug` and `Clone` traits.
 For persistent database use, it is also recommended that the type implements `serde::Serialize` and `serde::Deserialize`.
+An example of entity declarations is as follows:
 
 ```rust
 // In examples/ex1/src/main.rs:
@@ -147,16 +148,18 @@ More specifically, the pipeline consists of the following components:
 * **Tasks**: A listing of tasks that will be executed in the pipeline.
 Each task introduces a new type of entity to the pipeline, which can be used as input for subsequent tasks.
 
+Additionally, entities in Operon are paired with _named dimensions_ that represent the way you can iterate over the entities.
+Simply put, these dimensions can be understood as _directions_ the entities repeat in.
+For example, if you have an `Intermediate` entity that has two dimensions, `input_no` and `word_no`, you can think of it as a 2D grid where each cell is an `Intermediate` entity.
+
+![Figure 1](docs/figures/figure1.svg)
+
+_Figure 1. An example of a 2D grid of `Intermediate` entities._
+
+The following is an example of a pipeline definition using the `define_operon!` macro:
+
 ```rust
 // In examples/ex1/src/main.rs:
-
-// This example pipeline is called "splitter", and it defines a simple flow:
-// ┌─────────────────────────────────────────────────────────────┐
-// │ Input  ——get_words——>  Intermediate  ——get_chars——>  Output │
-// └─────────────────────────────────────────────────────────────┘
-// where `Input`s are indexed by `[input_no]`,
-// `Intermediate`s are indexed by `[input_no][word_no]`,
-// and `Output`s are indexed by `[input_no][word_no][char_no]`.
 
 operon::define_operon! {
     splitter = |Input<input_no>| {
@@ -166,21 +169,9 @@ operon::define_operon! {
 }
 ```
 
-Entities in Operon are paired with _named dimensions_ that represent the way you can iterate over the entities.
-Simply put, these dimensions can be understood as _directions_ the entities repeat in.
-For example, if you have an `Intermediate` entity that has two dimensions, `input_no` and `word_no`, you can think of it as a 2D grid where each cell is an `Intermediate` entity.
+![Figure 2](docs/figures/figure2.svg)
 
-![Figure 1](docs/figures/figure1.svg)
-
-The pipeline follows a few rules:
-
-* The primary entity must be paired with exactly one dimension, the _primary dimension_.
-* Each task must return one of the following two options:
-  * A single entity.
-  * A 1D vector of entities.
-  In this case, the length of the returned vector will represent a new dimension that can be used to index the entities later in the pipeline.
-* The dimension specifications must "make sense."
-  <!-- TODO: Expand on what "make sense" means. -->
+_Figure 2. A visual representation of the "splitter" pipeline._
 
 Invoking the `define_operon!` macro brings several utilities into scope:
 
@@ -190,7 +181,26 @@ Invoking the `define_operon!` macro brings several utilities into scope:
 * a `Psql{PipelineName}Storage` struct that serves as a default implementation of the storage interface using PostgreSQL;
 * a helper `{pipeline_name}_handler()` function for launching the engine later.
 
-Refer to the [`define_operon!` documentation](docs/define_operon_dsl.md) for more details on how to use the macro.
+The pipeline must follow a few rules that are enforced at macro-expansion time:
+
+* The primary entity must be paired with exactly one dimension, the _primary dimension_.
+* Each task takes a list of "arguments" or "inputs" that must be entities that were defined earlier in the pipeline.
+  Each task input must be either a single entity (`EntityType`) or a slice across dimensions (`EntityType<dim1, dim2, ...>`).
+* Each task must return one of the following two options:
+  * A single entity, denoted `SpawnedEntityType`.
+  * A 1D vector of entities, denoted `SpawnedEntityType<spawned_dimension_name>`.
+    In this case, this task spawns a dimension that can be iterated over in subsequent tasks.
+* The dimension specifications must be "well-formed," as thoroughly described in the [dimension system documentation](docs/dimension_system.md).
+  * For illustration, take the list of `Intermediate`s as shown in [Figure 1](docs/figures/figure1.svg): `[["Good", "morning"], ["Bonjour"], ["Buenos", "días"]]`.
+  * Writing `Intermediate<word_no>` represents a vector/slice of `Intermediate` entities indexed by `word_no`, which we will have for each `input_no` "coordinate."
+    `["Good", "morning"]` or `["Bonjour"]` would be a valid example of such a vector.
+  * However, writing `Intermediate<input_no>` would not be feasible.
+  If we apply the same logic with above, we need a vector of `Intermediate` entities indexed by `input_no` "for each `word_no` coordinate."
+  When `word_no` is `0`, we would have `["Good", "Bonjour", "Buenos"]`, but when `word_no` is `1`, what would we have — `["morning", ???, "días"]`?
+  The range of `word_no` is unknown until the coordinate of `input_no` is fixed, so we cannot implicitly iterate over `word_no` while collapsing `input_no`.
+
+We provide brief diagnostics for violations of these rules.
+If you need further information, refer to the [`define_operon!` documentation](docs/define_operon_dsl.md) and the [dimension system documentation](docs/dimension_system.md) for more details on the system.
 
 ### Implementing the Service
 
