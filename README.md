@@ -362,7 +362,9 @@ Commands:
 
 ## Examples & Demo
 
-<!-- TODO: Provide a GIF/video demo of Operon in action. -->
+![Demo 1](docs/figures/demo1.svg)
+
+▲ Animation of running [ex2](examples/ex2) with Operon. _(100 primary entities, log level `Info`)_
 
 You can find more examples in the [examples](examples/) directory of this repository.
 
