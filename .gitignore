@@ -1,2 +1,6 @@
-**/target/
-**/logs/
+.DS_Store/
+target/
+logs/
+*.log
+operon.csv
+.env
