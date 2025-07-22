@@ -114,7 +114,7 @@ impl CookingService for ExampleService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
-    let primary_ub = 1000;
+    let primary_ub = 100;
 
     let service = Arc::new(ExampleService);
 
@@ -125,7 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let operon_options = OperonOptions::new(&database_uri)
         .with_meta_storage_schema(Some("ex2_meta".to_string()))
         .with_log_dump(Some("./logs".to_string()))
-        .with_log_level(log::Level::Debug);
+        .with_log_level(log::Level::Info);
 
     storage.init().await?;
     for i in 0..primary_ub {

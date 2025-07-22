@@ -5,16 +5,11 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 
 ## Table of Contents
 
-1. [Key Features](#key-features)
-    * [Running DAG-Defined Tasks](#running-dag-defined-tasks)
-    * [Multiplexing](#multiplexing)
-    * [Incremental Scheduling](#incremental-scheduling)
-    * [Transactional Backend](#transactional-backend)
-    * [Interactive UI & Workflow Control](#interactive-ui--workflow-control)
-    * [Per-Task Parallelism](#per-task-parallelism)
-2. [Prerequisites](#prerequisites)
-3. [Quick Start](#quick-start)
-4. [Usage](#usage)
+1. [Examples & Demo](#examples--demo)
+2. [Key Features](#key-features)
+3. [Prerequisites](#prerequisites)
+4. [Quick Start](#quick-start)
+5. [Usage](#usage)
     * [Installation](#installation)
     * [Defining Entities](#defining-entities)
     * [Defining the Pipeline](#defining-the-pipeline)
@@ -22,9 +17,20 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
     * [Implementing the Storage (Optional)](#implementing-the-storage-optional)
     * [Running Operon](#running-operon)
         * [UI Shell Commands](#ui-shell-commands)
-5. [Examples & Demo](#examples--demo)
 6. [Roadmap](#roadmap)
 7. [License](#license)
+
+## Examples & Demo
+
+![Demo 1](docs/figures/demo1.svg)
+
+▲ Animation of running [ex2](examples/ex2) with Operon. _(100 primary entities, log level `Info`)_
+
+<!-- [Demo 2](docs/figures/demo2.svg): This file was too large, maybe convert to another format? -->
+
+▲ Animation of recovering from a poisoned run of ex2.
+
+You can find more examples in the [examples](examples/) directory of this repository.
 
 ## Key Features
 
@@ -359,14 +365,6 @@ Commands:
                         Resume paused jobs.
     help                Print this help message.
 ```
-
-## Examples & Demo
-
-![Demo 1](docs/figures/demo1.svg)
-
-▲ Animation of running [ex2](examples/ex2) with Operon. _(100 primary entities, log level `Info`)_
-
-You can find more examples in the [examples](examples/) directory of this repository.
 
 ## Roadmap
 
