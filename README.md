@@ -378,6 +378,7 @@ Operon is under active development. Planned features and improvements include:
   * Support for jobs with no dependencies that create "source" entities other than the primary entity.
 * Adding documentation for the dimension system and the macro DSL.
 * Updating the UI to scale better with larger workflows.
+* Adding support for running the engine without a UI, potentially outside a binary-executable context.
 * Implementing alternative backends for the entity storage and the metadata storage.
 
 Please reach out via [opening an issue](https://github.com/Asteromorph-Corp/operon/issues) if you have any suggestions or feature requests.
