@@ -18,7 +18,7 @@ pub enum OperonError {
     Scheduler(SchedulerError),
     /// Error in a user function
     #[error("User function error: {0}")]
-    User(::anyhow::Error),
+    User(Box<dyn std::error::Error + Send + Sync>),
     /// Error in a storage operation
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError),

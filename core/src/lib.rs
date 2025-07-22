@@ -10,7 +10,6 @@ pub mod ui;
 pub mod utils;
 
 // Re-export the external crates used in the macro expansions
-pub use anyhow;
 pub use async_trait;
 pub use bytes;
 pub use chrono;

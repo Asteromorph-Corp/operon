@@ -23,7 +23,7 @@ impl CookingService for ExampleService {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
-        //     return Err(anyhow::anyhow!("Simulated failure in beta"));
+        //     return Err("Simulated failure in beta".into());
         // }
         let mut result = Vec::new();
         let mut rng = rand::rng();
@@ -38,7 +38,7 @@ impl CookingService for ExampleService {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
-        //     return Err(anyhow::anyhow!("Simulated failure in gamma"));
+        //     return Err("Simulated failure in gamma".into());
         // }
         let mut result = Vec::new();
         let mut rng = rand::rng();
@@ -55,7 +55,7 @@ impl CookingService for ExampleService {
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
         //     // panic!("Simulated failure in delta");
-        //     return Err(anyhow::anyhow!("Simulated failure in delta"));
+        //     return Err("Simulated failure in delta".into());
         // }
         let d = D {
             a: a.clone(),
@@ -75,7 +75,7 @@ impl CookingService for ExampleService {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
-        //     return Err(anyhow::anyhow!("Simulated failure in epsilon"));
+        //     return Err("Simulated failure in epsilon".into());
         // }
         let e = E {
             b: b_j.to_vec(),
@@ -92,7 +92,7 @@ impl CookingService for ExampleService {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
-        //     return Err(anyhow::anyhow!("Simulated failure in zeta"));
+        //     return Err("Simulated failure in zeta".into());
         // }
         let mut rng = rand::rng();
         let f = if rng.random_bool(0.5) {

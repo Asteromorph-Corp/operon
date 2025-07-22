@@ -3,13 +3,15 @@ use async_trait::async_trait;
 use crate::storage::StorageError;
 
 /// # OperonStorage trait
+/// 
+/// FIXME: Most functions in this trait are moved to the generated `{PipelineName}Storage` trait.
 ///
 /// This trait contains the storage operations Operon will use.
 /// Implement this trait to provide a custom storage backend.
 ///
 /// Notes:
 ///
-/// * All functions are async methods and must return an `anyhow::Result`.
+/// * All functions are async methods and must return a `Result<(), StorageError>`.
 /// * The `clear` function should clear all data EXCEPT the primary data in the storage.
 /// * The `put_*` functions' default behaviour must be to *overwrite* existing data.
 ///   While this is almost never a problem, choosing not to do so may lead to
@@ -37,36 +39,36 @@ use crate::storage::StorageError;
 /// The functions were parsed as follows:
 ///
 /// ```rust,ignore
-/// use anyhow::Result;
+/// use operon::storage::StorageError;
 /// use async_trait::async_trait;
 /// use operon::dimension::*;
 /// use operon::entity::*;
 /// #[async_trait]
 /// pub trait OperonStorage {
-///     async fn clear(&self) -> Result<()>;
-///     async fn put_a(&self, i: I, value: &A) -> Result<()>;
-///     async fn get_a(&self, i: I) -> Result<Option<A>>;
-///     async fn put_b(&self, i: I, j: J, value: &B) -> Result<()>;
-///     async fn get_b(&self, i: I, j: J) -> Result<Option<B>>;
-///     async fn put_c(&self, i: I, k: K, value: &C) -> Result<()>;
-///     async fn get_c(&self, i: I, k: K) -> Result<Option<C>>;
-///     async fn put_d(&self, i: I, j: J, k: K, value: &D) -> Result<()>;
-///     async fn get_d(&self, i: I, j: J, k: K) -> Result<Option<D>>;
-///     async fn put_e(&self, i: I, k: K, value: &E) -> Result<()>;
-///     async fn get_e(&self, i: I, k: K) -> Result<Option<E>>;
-///     async fn put_f(&self, i: I, value: &F) -> Result<()>;
-///     async fn get_f(&self, i: I) -> Result<Option<F>>;
+///     async fn clear(&self) -> Result<(), StorageError>;
+///     async fn put_a(&self, i: I, value: &A) -> Result<(), StorageError>;
+///     async fn get_a(&self, i: I) -> Result<Option<A>, StorageError>;
+///     async fn put_b(&self, i: I, j: J, value: &B) -> Result<(), StorageError>;
+///     async fn get_b(&self, i: I, j: J) -> Result<Option<B>, StorageError>;
+///     async fn put_c(&self, i: I, k: K, value: &C) -> Result<(), StorageError>;
+///     async fn get_c(&self, i: I, k: K) -> Result<Option<C>, StorageError>;
+///     async fn put_d(&self, i: I, j: J, k: K, value: &D) -> Result<(), StorageError>;
+///     async fn get_d(&self, i: I, j: J, k: K) -> Result<Option<D>, StorageError>;
+///     async fn put_e(&self, i: I, k: K, value: &E) -> Result<(), StorageError>;
+///     async fn get_e(&self, i: I, k: K) -> Result<Option<E>, StorageError>;
+///     async fn put_f(&self, i: I, value: &F) -> Result<(), StorageError>;
+///     async fn get_f(&self, i: I) -> Result<Option<F>, StorageError>;
 ///     // Optional footprint operations:
-///     async fn clear_footprint(&self) -> Result<()>;
-///     async fn put_footprint(&self, footprint: &str) -> Result<()>;
-///     async fn get_footprint(&self) -> Result<Option<String>>;
+///     async fn clear_footprint(&self) -> Result<(), StorageError>;
+///     async fn put_footprint(&self, footprint: &str) -> Result<(), StorageError>;
+///     async fn get_footprint(&self) -> Result<Option<String>, StorageError>;
 ///     // Optional batch operations:
-///     async fn put_all_b(&self, i: I, values: &[B]) -> Result<()>;
-///     async fn put_all_c(&self, i: I, values: &[C]) -> Result<()>;
-///     async fn get_all_b_over_j(&self, i: I) -> Result<Vec<B>>;
-///     async fn get_all_c_over_k(&self, i: I) -> Result<Vec<C>>;
-///     async fn get_all_d_over_j(&self, i: I, k: K) -> Result<Vec<D>>;
-///     async fn get_all_e_over_k(&self, i: I) -> Result<Vec<E>>;
+///     async fn put_all_b(&self, i: I, values: &[B]) -> Result<(), StorageError>;
+///     async fn put_all_c(&self, i: I, values: &[C]) -> Result<(), StorageError>;
+///     async fn get_all_b_over_j(&self, i: I) -> Result<Vec<B>, StorageError>;
+///     async fn get_all_c_over_k(&self, i: I) -> Result<Vec<C>, StorageError>;
+///     async fn get_all_d_over_j(&self, i: I, k: K) -> Result<Vec<D>, StorageError>;
+///     async fn get_all_e_over_k(&self, i: I) -> Result<Vec<E>, StorageError>;
 /// }
 /// ```
 #[async_trait]
