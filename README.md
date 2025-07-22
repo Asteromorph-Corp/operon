@@ -26,7 +26,7 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 
 ▲ Animation of running [ex2](examples/ex2) with Operon. _(100 primary entities, log level `Info`)_
 
-<!-- [Demo 2](docs/figures/demo2.svg): This file was too large, maybe convert to another format? -->
+[Demo 2](docs/figures/demo2.svg)
 
 ▲ Animation of recovering from a poisoned run of ex2.
 
