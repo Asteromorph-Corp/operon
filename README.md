@@ -172,7 +172,7 @@ For example, if you have an `Intermediate` entity that has two dimensions, `inpu
 
 ![Figure 1](docs/figures/figure1.svg)
 
-_Figure 1. An example of a 2D grid of `Intermediate` entities._
+▲ An example of a 2D grid of `Intermediate` entities.
 
 The following is an example of a pipeline definition using the `define_operon!` macro:
 
@@ -189,7 +189,7 @@ operon::define_operon! {
 
 ![Figure 2](docs/figures/figure2.svg)
 
-_Figure 2. A visual representation of the "splitter" pipeline._
+▲ A visual representation of the "splitter" pipeline.
 
 Invoking the `define_operon!` macro brings several utilities into scope:
 
