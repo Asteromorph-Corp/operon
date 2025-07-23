@@ -6,7 +6,7 @@ authors = [
     "Jiho Park <jh.park@asteromorph.com>",
 ]
 description = "A workflow engine for parallel, incremental scheduling of DAG-defined multiplex tasks."
-license = "AGPL-3.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/Asteromorph-Corp/operon"
 readme = "../README.md"
 edition = "2024"

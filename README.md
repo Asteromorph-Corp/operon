@@ -383,4 +383,8 @@ Please reach out via [opening an issue](https://github.com/Asteromorph-Corp/oper
 
 ## License
 
-Licensed under the GNU Affero General Public License, see [LICENSE](LICENSE) for details.
+This project is licensed under either the [MIT License](LICENSE-MIT) or the [Apache License (Version 2.0)](LICENSE-APACHE), at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you shall be dual licensed as above, without any additional terms or conditions.
