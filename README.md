@@ -170,7 +170,7 @@ Additionally, entities in Operon are paired with _named dimensions_ that represe
 Simply put, these dimensions can be understood as _directions_ the entities repeat in.
 For example, if you have an `Intermediate` entity that has two dimensions, `input_no` and `word_no`, you can think of it as a 2D grid where each cell is an `Intermediate` entity.
 
-![Figure 1](docs/figures/figure1.svg)
+![Figure 1](docs/assets/figure1.svg)
 
 ▲ An example of a 2D grid of `Intermediate` entities.
 
@@ -187,7 +187,7 @@ operon::define_operon! {
 }
 ```
 
-![Figure 2](docs/figures/figure2.svg)
+![Figure 2](docs/assets/figure2.svg)
 
 ▲ A visual representation of the "splitter" pipeline.
 
