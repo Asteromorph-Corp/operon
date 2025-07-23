@@ -6,9 +6,9 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 ## Table of Contents
 
 1. [Examples & Demo](#examples--demo)
-2. [Key Features](#key-features)
-3. [Prerequisites](#prerequisites)
-4. [Quick Start](#quick-start)
+2. [Prerequisites](#prerequisites)
+3. [Quick Start](#quick-start)
+4. [Key Features](#key-features)
 5. [Usage](#usage)
     * [Installation](#installation)
     * [Defining Entities](#defining-entities)
@@ -31,6 +31,29 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 ▲ Animation of recovering from a poisoned run of ex2.
 
 You can find more examples in the [examples](examples/) directory of this repository.
+
+## Prerequisites
+
+You will need the following to run Operon:
+
+* [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.88+)
+* A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
+  * A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
+
+We also recommend having [`tokio`](https://crates.io/crates/tokio) in your `Cargo.toml` dependencies.
+
+## Quick Start
+
+If you want to try out Operon, you can clone the repository and run the provided examples:
+
+```bash
+git clone https://github.com/Asteromorph-Corp/operon
+cd operon/examples/ex1
+# Make sure the URI points to a running PostgreSQL database.
+POSTGRES_URI=<your_postgres_uri> cargo run --release
+```
+
+We recommend reading the source code of [ex1](examples/ex1/src/main.rs) to get a hang of how everything works.
 
 ## Key Features
 
@@ -71,29 +94,6 @@ Users can track task progress, browse past logs, and interact with the workflow 
 
 Operon supports per-task parallelism, meaning that each task type maintains its own thread pool.
 This is particularly useful for tasks that benefit from internal parallel execution or must adhere to external concurrency limits (e.g., database connections or API rate limits).
-
-## Prerequisites
-
-You will need the following to run Operon:
-
-* [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.88+)
-* A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
-  * A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
-
-We also recommend having [`tokio`](https://crates.io/crates/tokio) in your `Cargo.toml` dependencies.
-
-## Quick Start
-
-If you want to try out Operon, you can clone the repository and run the provided examples:
-
-```bash
-git clone https://github.com/Asteromorph-Corp/operon
-cd operon/examples/ex1
-# Make sure the URI points to a running PostgreSQL database.
-POSTGRES_URI=<your_postgres_uri> cargo run --release
-```
-
-We recommend reading the source code of [ex1](examples/ex1/src/main.rs) to get a hang of how everything works.
 
 ## Usage
 
