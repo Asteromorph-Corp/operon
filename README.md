@@ -98,9 +98,10 @@ This is particularly useful for tasks that benefit from internal parallel execut
 ## Usage
 
 ### Installation
-<!-- [x] Operon is not published in crates.io, so we can only provide manual installation methods for now. -->
 
-To use Operon in your Rust project, clone this repository:
+Operon is not published in crates.io for now, so you will need to manually install it to use it in your Rust project.
+
+To do so, clone this repository:
 
 ```bash
 git clone https://github.com/Asteromorph-Corp/operon
