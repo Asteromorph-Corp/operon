@@ -89,7 +89,7 @@ pub fn batch_gets(
                 }
             } else {
                 quote! {
-                    let #dim_var = usize::try_from(row.get::<_, i64>(#i_plus_1).unwrap_or(0))?; // TODO: Handle None case
+                    let #dim_var = usize::try_from(row.get::<_, i64>(#i_plus_1))?; // TODO: Handle None case
                     while result.len() <= #dim_var {
                         result.push(Default::default());
                     }
@@ -315,7 +315,7 @@ mod tests {
                     let mut result: Vec<Vec<D>> = Default::default();
                     for row in rows {
                         let value = operon::serde_json::from_value::<D_>(row.get(0))?;
-                        let j = usize::try_from(row.get::<_, i64>(1usize).unwrap_or(0))?;
+                        let j = usize::try_from(row.get::<_, i64>(1usize))?;
                         while result.len() <= j {
                             result.push(Default::default());
                         }
