@@ -157,7 +157,7 @@ Input entities must not have any hanging dimensions: an entity's dimensions that
 Formally:
 
 * `dims(slice) ⊆ dims(entity) ⊆ dims(context) ∪ dims(slice)`
-* `∀dim ∈ dims(slice) : (Succ(dim) ∩ dims(entity)) ⊆ dims(slice)`, where `Down(dim)` is the set of succedent dimensions of `dim`
+* `∀dim ∈ dims(slice) : (Succ(dim) ∩ dims(entity)) ⊆ dims(slice)`, where `Succ(dim)` is the set of succedent dimensions of `dim`
 
 Note that input entities **can** be aggregated by the context. When a slice lists a dimension that’s also in the context, the full axis is provided for each iteration point; the current index along that axis is ignored for that input. It can be expensive, since a full `Vec` is constructed per iteration point.
 
