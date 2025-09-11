@@ -80,10 +80,10 @@ OutputEntity = task_function ( InputEntity [, ...] ) for [ ( concurrency ) ] dim
 
 **`input_entities`**: Comma-separated list of entity references. Each can be:
 
-- `EntityIdent`:  A single entity instance
+- `EntityIdent`: A single entity instance
 - `EntityIdent < dimension [, ...] >`: A slice of entities across specified dimensions
 
-**`dimensional_context`**: The `for` clause defines the set of indices over which the task runs. **Every task must explicitly include the primary dimension identifier in its `for` clause.** A task’s `for` clause must not repeat a dimension.
+**`dimensional_context`**: The `for` clause defines the set of indices over which the task runs. **Every task must explicitly include the primary dimension identifier in it's `for` clause.** A task’s `for` clause must not repeat a dimension.
 
 **`concurrency`** (optional): A positive integer which limits the number of concurrent jobs for that task type within a single pipeline execution globally (regardless of the primary index). Each job corresponds to one index tuple in the task’s context. Additional jobs are queued. If not specified, defaults to `1`.
 
@@ -123,7 +123,7 @@ A non-primary dimension must be spawned **only once**.
 
 #### Dimensional context
 
-Each task must specify the dimensions over which it runs in its `for` clause. This context determines the dimension indices used for iteration. The primary dimension must be included in a context.
+Each task must specify the dimensions over which it runs in it's `for` clause. This context determines the dimension indices used for iteration. The primary dimension must be included in a context.
 
 Every dimension named in a task’s `for` clause must be either the primary dimension or a dimension spawned by a _previous_ task. This guarantees a topological order.
 
@@ -139,7 +139,7 @@ Similarly, **succedent dimensions** of `dim` are the complete set of dependencie
 
 #### Broadcasting
 
-If dimensions of an input entity lacks a dimension present in the task’s context, the entity is treated as constant (broadcast) along that dimension.When an input lacks a context dimension, the same value is supplied for all indices of that dimension within the task’s iteration.
+If dimensions of an input entity lacks a dimension present in the task’s context, the entity is treated as constant (broadcast) along that dimension. When an input lacks a context dimension, the same value is supplied for all indices of that dimension within the task’s iteration.
 
 Broadcasting is logical only; no physical replication occurs in storage.
 
@@ -374,4 +374,4 @@ operon.run(my_pipeline_handler(), primary_count).await?;
 ## Limitations
 
 - Two or more dimensions cannot be spawned by a single task 
-- Zero-dimension entities and standalone jobs will not be implemented<!-- TODO: This file needs to be filled, or maybe replaced with a link to docs.rs. -->
+- Zero-dimension entities and standalone jobs will not be implemented
