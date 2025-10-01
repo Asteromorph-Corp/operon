@@ -9,6 +9,8 @@ use quote::quote;
 use crate::configs::{AllConfig, DimensionConfig, EntityConfig, JobArg, JobConfig, JobConfigMap};
 use crate::macros::operon;
 
+// TODO: use text fixtures instead of constructing the configs in code.
+
 #[proc_macro]
 pub fn define_operon(input: TokenStream) -> TokenStream {
     let all_configs: AllConfig = match syn::parse(input) {
