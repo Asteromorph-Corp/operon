@@ -51,15 +51,27 @@ pub(super) fn impl_ticket(
             #fn_new
             #fn_get_dependency_quota
 
+            async fn resolve_dependency_quota(
+                self,
+                client: #operon::meta_storage::MetaClient<'_>,
+            ) -> Result<Self, #operon::meta_storage::MetaStorageError> {
+                let mut ticket = self;
+                if ticket.deps_quota.is_none() {
+                    ticket.deps_quota = ticket.get_dependency_quota(client).await?;
+                }
+                ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
+                if ticket.is_ready() {
+                    ticket.status = operon::schema_base::TicketStatus::Queued;
+                }
+                Ok(ticket)
+            }
+
             async fn raise_dependency_count(
                 self,
                 client: #operon::meta_storage::MetaClient<'_>,
             ) -> Result<Self, #operon::meta_storage::MetaStorageError> {
                 let mut ticket = self;
                 ticket.deps_count += 1;
-                if ticket.deps_quota.is_none() {
-                    ticket.deps_quota = ticket.get_dependency_quota(client).await?;
-                }
                 ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
                 if ticket.is_ready() {
                     ticket.status = operon::schema_base::TicketStatus::Queued;
@@ -139,8 +151,22 @@ mod tests {
                     }
                 }
 
-
                 #fn_get_dependency_quota
+
+                async fn resolve_dependency_quota(
+                    self,
+                    client: operon::meta_storage::MetaClient<'_>,
+                ) -> Result<Self, operon::meta_storage::MetaStorageError> {
+                    let mut ticket = self;
+                    if ticket.deps_quota.is_none() {
+                        ticket.deps_quota = ticket.get_dependency_quota(client).await?;
+                    }
+                    ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
+                    if ticket.is_ready() {
+                        ticket.status = operon::schema_base::TicketStatus::Queued;
+                    }
+                    Ok(ticket)
+                }
 
                 async fn raise_dependency_count(
                     self,
@@ -148,9 +174,6 @@ mod tests {
                 ) -> Result<Self, operon::meta_storage::MetaStorageError> {
                     let mut ticket = self;
                     ticket.deps_count += 1;
-                    if ticket.deps_quota.is_none() {
-                        ticket.deps_quota = ticket.get_dependency_quota(client).await?;
-                    }
                     ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
                     if ticket.is_ready() {
                         ticket.status = operon::schema_base::TicketStatus::Queued;

@@ -1,6 +1,8 @@
 mod configs;
+mod dependency_analysis;
 mod macros;
 mod utils;
+
 use proc_macro::TokenStream;
 use quote::quote;
 

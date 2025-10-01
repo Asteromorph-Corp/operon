@@ -100,6 +100,7 @@ impl std::fmt::Display for RaiseDepCopyInQuery<'_> {
 /// }
 /// ```
 pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
+    // TODO: only define raise_dep for a valid combination of jobs.
     let operon = operon_ident();
     let fn_name = raise_dep_ident(&job.id);
     let ticket_ident = ticket_ident(&job.id);

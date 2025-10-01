@@ -79,10 +79,13 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
                     #err_msg.into(),
                 ));
             }
-            let new_tickets = tickets
-                .iter()
-                .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().#with_fn_name(ub)))
-                .collect::<Vec<_>>();
+            let new_tickets = #operon::futures::future::try_join_all(
+                tickets
+                    .iter()
+                    .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().#with_fn_name(ub)))
+                    .map(|ticket| #operon::schema_base::Ticket::resolve_dependency_quota(ticket, client))
+            )
+            .await?;
 
             let copy_stmt = format!(#copy_query);
             let sink = client.copy_in::<_, #operon::bytes::Bytes>(&copy_stmt).await?;
@@ -240,10 +243,13 @@ mod tests {
                         "Called `explode(i)` on `beta`, but `i` was resolved".into(),
                     ));
                 }
-                let new_tickets = tickets
-                    .iter()
-                    .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().with_i(ub)))
-                    .collect::<Vec<_>>();
+                let new_tickets = operon::futures::future::try_join_all(
+                    tickets
+                        .iter()
+                        .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().with_i(ub)))
+                        .map(|ticket| operon::schema_base::Ticket::resolve_dependency_quota(ticket, client))
+                )
+                .await?;
 
                 let copy_stmt = format!(#copy_stmt);
                 let sink = client

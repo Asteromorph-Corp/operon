@@ -22,6 +22,7 @@ pub(super) fn resolution_definition(dimension: &DimensionConfig) -> syn::ItemStr
     );
 
     parse_quote! {
+        // TODO: Change this to non-tuple struct.
         #[doc = #doc]
         #[derive(Debug, Clone, Copy)]
         pub struct #res_ident(pub #dim_ident, #(pub #dep_dim_idents),*);

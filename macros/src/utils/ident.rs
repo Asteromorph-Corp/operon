@@ -101,6 +101,14 @@ pub fn raise_dep_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("raise_dep_{}", job_id.to_snake_case())
 }
 
+pub fn resolve_dep_ident(job_id: &JobId, dimension_id: &DimensionId) -> syn::Ident {
+    format_ident!(
+        "resolve_dep_{}_{}",
+        job_id.to_snake_case(),
+        dimension_id.to_snake_case()
+    )
+}
+
 pub fn job_fn_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}", job_id.to_snake_case())
 }

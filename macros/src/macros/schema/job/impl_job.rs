@@ -2,7 +2,8 @@ use syn::parse_quote;
 
 use crate::JobConfig;
 use crate::configs::JobConfigMap;
-use crate::utils::{get_upstream_jobs, job_id_ident, job_ident};
+use crate::dependency_analysis::get_upstream_jobs;
+use crate::utils::{job_id_ident, job_ident};
 
 /// Generates an implementation of the `Job` trait for the given job configuration.
 ///

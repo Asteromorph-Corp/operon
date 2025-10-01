@@ -34,6 +34,7 @@ pub(super) fn ticket_definition(job: &JobConfig) -> syn::ItemStruct {
             #(#dim_fields,)*
             deps_count: usize,
             deps_quota: Option<usize>,
+            // TODO: remove this field.
             deps_done: bool,
             pub status: #operon::schema_base::TicketStatus,
         }

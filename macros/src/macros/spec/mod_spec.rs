@@ -3,12 +3,15 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::AllConfig;
+use crate::dependency_analysis::{
+    get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on,
+    get_quota_requiring_jobs,
+};
 use crate::macros::spec::individual::{
     impl_job_rebuilder, impl_job_spec, impl_peer_txs, job_rebuilder_definition,
     job_spec_definition, peer_txs_definition,
 };
 use crate::macros::spec::primary::{impl_primary_spec, primary_spec_definition};
-use crate::utils::{get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on};
 
 /// Generates the `mod spec` module containing the primary spec and job specs.
 pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
@@ -27,9 +30,19 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             .as_ref()
             .map(|spawn_dim| get_jobs_repeating_on(spawn_dim, &all_configs.jobs))
             .unwrap_or_default();
+        let spawn_dim_requiring_jobs = job
+            .spawn_dim
+            .as_ref()
+            .map(|spawn_dim| get_quota_requiring_jobs(spawn_dim, &all_configs.jobs))
+            .unwrap_or_default();
+        let resolution_receiving_jobs = spawn_dim_repeating_jobs
+            .iter()
+            .chain(spawn_dim_requiring_jobs.iter())
+            .copied()
+            .collect::<IndexSet<_>>();
         let event_receiving_job_ids = downstream_jobs
             .iter()
-            .chain(spawn_dim_repeating_jobs.iter())
+            .chain(resolution_receiving_jobs.iter())
             .map(|job| &job.id)
             .collect::<IndexSet<_>>();
 
@@ -37,7 +50,7 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
         let impl_job_spec = impl_job_spec(
             &all_configs.service_id,
             job,
-            &spawn_dim_repeating_jobs,
+            &resolution_receiving_jobs,
             &upstream_jobs,
             &downstream_jobs,
             &all_configs.entities,

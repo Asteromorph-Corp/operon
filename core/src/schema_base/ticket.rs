@@ -45,6 +45,12 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
         client: MetaClient<'_>,
     ) -> Result<Option<usize>, MetaStorageError>;
 
+    /// Attempt to resolve the dependency quota for this ticket, if not yet known.
+    async fn resolve_dependency_quota(
+        self,
+        client: MetaClient<'_>,
+    ) -> Result<Self, MetaStorageError>;
+
     /// Raise the dependency count of this ticket by one,
     /// and compute if all dependencies are done.
     /// Return the updated ticket.
