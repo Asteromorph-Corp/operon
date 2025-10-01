@@ -1,19 +1,18 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    configs::{DimensionConfigMap, EntityConfigMap},
-    macros::spec::individual::{
-        fn_check_consistency::fn_check_consistency, fn_on_receive_job::fn_on_receive_job,
-        fn_on_receive_resolution::fn_on_receive_resolution, fn_pool_size::fn_pool_size,
-        fn_prepare_rebuild::fn_prepare_rebuild, fn_run_job::fn_run_job,
-        fn_send_on_finish::fn_send_on_finish,
-    },
-    utils::{
-        job_ident, operon_ident, peer_txs_ident, service_trait_ident, spawn_resolution, spec_ident,
-        storage_trait_ident, ticket_ident,
-    },
+use crate::JobConfig;
+use crate::configs::{DimensionConfigMap, EntityConfigMap};
+use crate::macros::spec::individual::fn_check_consistency::fn_check_consistency;
+use crate::macros::spec::individual::fn_on_receive_job::fn_on_receive_job;
+use crate::macros::spec::individual::fn_on_receive_resolution::fn_on_receive_resolution;
+use crate::macros::spec::individual::fn_pool_size::fn_pool_size;
+use crate::macros::spec::individual::fn_prepare_rebuild::fn_prepare_rebuild;
+use crate::macros::spec::individual::fn_run_job::fn_run_job;
+use crate::macros::spec::individual::fn_send_on_finish::fn_send_on_finish;
+use crate::utils::{
+    job_ident, operon_ident, peer_txs_ident, service_trait_ident, spawn_resolution, spec_ident,
+    storage_trait_ident, ticket_ident,
 };
 
 /// Generates the implementation of the `JobSpec` trait for a given job.

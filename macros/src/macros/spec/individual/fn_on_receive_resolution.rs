@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{explode_ident, operon_ident, resolution_enum_ident, variant_ident},
-};
+use crate::JobConfig;
+use crate::utils::{explode_ident, operon_ident, resolution_enum_ident, variant_ident};
 
 /// Generates the `on_receive_resolution` function for the implementation of the trait `JobSpec`.
 ///
@@ -61,9 +59,8 @@ pub(super) fn fn_on_receive_resolution(job: &JobConfig) -> syn::ImplItemFn {
 
 #[cfg(test)]
 mod tests {
-    use crate::JobArg;
-
     use super::*;
+    use crate::JobArg;
 
     #[test]
     fn test_fn_on_receive_resolution() {

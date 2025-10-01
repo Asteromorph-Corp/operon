@@ -1,12 +1,9 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::{
-    configs::JobId,
-    utils::{
-        job_enum_ident, job_ident, operon_ident, peer_txs_ident, resolution_enum_ident,
-        sender_ident,
-    },
+use crate::configs::JobId;
+use crate::utils::{
+    job_enum_ident, job_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident,
 };
 
 /// Generates an implementation of `PeerEventSenders` for a job's peer event senders.

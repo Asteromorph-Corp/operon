@@ -1,11 +1,9 @@
 use syn::parse_quote;
 
-use crate::{
-    DimensionConfig, JobConfig,
-    utils::{
-        explode_ident, operon_ident, resolution_ident, ticket_ident, variable_ident, with_ident,
-    },
+use crate::utils::{
+    explode_ident, operon_ident, resolution_ident, ticket_ident, variable_ident, with_ident,
 };
+use crate::{DimensionConfig, JobConfig};
 
 /// A helper struct to generate the SQL query for popping tickets to be exploded.
 struct ExplodePopQuery<'a>(&'a JobConfig, &'a DimensionConfig);
@@ -111,9 +109,8 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
 mod tests {
     use indoc::indoc;
 
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_explode_pop_query() {

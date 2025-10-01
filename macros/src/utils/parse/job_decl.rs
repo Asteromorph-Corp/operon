@@ -1,10 +1,9 @@
+use syn::parse::{Parse, ParseStream};
+use syn::spanned::Spanned;
+use syn::token::Paren;
+use syn::{Ident, LitInt, Token};
+
 use super::entity_decl::EntityDecl;
-use syn::{
-    Ident, LitInt, Token,
-    parse::{Parse, ParseStream},
-    spanned::Spanned,
-    token::Paren,
-};
 
 #[derive(Debug)]
 pub(super) struct JobDecl {
@@ -143,8 +142,9 @@ impl Parse for JobDecl {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use syn::parse_str;
+
+    use super::*;
 
     #[test]
     fn test_job_decl_simple() {

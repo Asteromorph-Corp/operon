@@ -1,8 +1,8 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{get_all_ident, get_resolution_ident, operon_ident, rebuilder_ident, variable_ident},
+use crate::JobConfig;
+use crate::utils::{
+    get_all_ident, get_resolution_ident, operon_ident, rebuilder_ident, variable_ident,
 };
 
 /// Generates the `prepare_rebuild` function for the implementation of the trait `JobSpec`.
@@ -103,9 +103,8 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
 
 #[cfg(test)]
 mod tests {
-    use crate::JobArg;
-
     use super::*;
+    use crate::JobArg;
 
     #[test]
     fn test_fn_prepare_rebuild() {

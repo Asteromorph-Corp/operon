@@ -1,9 +1,9 @@
-use super::{entity_decl::EntityDecl, job_decl::JobDecl};
-use syn::{
-    Ident, Token,
-    parse::{Parse, ParseStream},
-    token::Brace,
-};
+use syn::parse::{Parse, ParseStream};
+use syn::token::Brace;
+use syn::{Ident, Token};
+
+use super::entity_decl::EntityDecl;
+use super::job_decl::JobDecl;
 
 #[derive(Debug)]
 pub(super) struct ConfigDecl {
@@ -67,8 +67,9 @@ impl Parse for ConfigDecl {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use syn::parse_str;
+
+    use super::*;
 
     #[test]
     fn test_config_decl() {
@@ -94,7 +95,8 @@ mod tests {
             "cooking = || { A<i> = spawn_primary(); }",             // Missing primary entity
             "cooking |A<i>| { B<j> = beta(A) for(8) i; }",          // Missing equal sign
             "cooking = |A<i>| {}",                                  // Empty job block
-            "cooking = |A<i, j>| { B<k> = beta(A) for(8) i, j; }", // Multiple dimensions in primary entity
+            "cooking = |A<i, j>| { B<k> = beta(A) for(8) i, j; }",  /* Multiple dimensions in
+                                                                     * primary entity */
             "cooking = |A| { B<i> = beta(A); }", // Missing primary entity dimension
         ];
         let results = malformed_inputs

@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{dimension_ident, job_ident, variable_ident},
-};
+use crate::JobConfig;
+use crate::utils::{dimension_ident, job_ident, variable_ident};
 
 /// Generates a struct definition for the job, which includes fields for each dimension.
 ///
@@ -41,9 +39,8 @@ pub(super) fn job_definition(job: &JobConfig) -> syn::ItemStruct {
 mod tests {
     use syn::parse_quote;
 
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_job_definition() {

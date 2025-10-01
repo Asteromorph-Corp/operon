@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::JobConfigMap,
-    utils::{job_enum_ident, job_ident, variant_ident},
-};
+use crate::configs::JobConfigMap;
+use crate::utils::{job_enum_ident, job_ident, variant_ident};
 
 /// Generates an enum representing all jobs in the job configuration map.
 ///
@@ -40,9 +38,9 @@ pub(super) fn job_enum(jobs: &JobConfigMap) -> syn::ItemEnum {
 mod tests {
     use syn::parse_quote;
 
-    use crate::{JobConfig, configs::JobArg};
-
     use super::*;
+    use crate::JobConfig;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_job_enum() {

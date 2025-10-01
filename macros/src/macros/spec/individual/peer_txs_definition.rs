@@ -1,9 +1,9 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::{
-    configs::JobId,
-    utils::{job_enum_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident},
+use crate::configs::JobId;
+use crate::utils::{
+    job_enum_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident,
 };
 
 /// Generates a struct definition for peer event senders.

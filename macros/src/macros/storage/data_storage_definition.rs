@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::EntityConfigMap,
-    utils::{operon_ident, sql_storage_ident},
-};
+use crate::configs::EntityConfigMap;
+use crate::utils::{operon_ident, sql_storage_ident};
 
 pub(super) fn data_storage_definition(
     service_id: &str,

@@ -1,4 +1,6 @@
-use std::{borrow::Cow, io::Write, path::PathBuf};
+use std::borrow::Cow;
+use std::io::Write;
+use std::path::PathBuf;
 
 use crate::ui::{LogRecord, UiError};
 

@@ -2,17 +2,13 @@ use indexmap::IndexSet;
 use quote::quote;
 use syn::parse_quote;
 
-use crate::{
-    AllConfig,
-    macros::spec::{
-        individual::{
-            impl_job_rebuilder, impl_job_spec, impl_peer_txs, job_rebuilder_definition,
-            job_spec_definition, peer_txs_definition,
-        },
-        primary::{impl_primary_spec, primary_spec_definition},
-    },
-    utils::{get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on},
+use crate::AllConfig;
+use crate::macros::spec::individual::{
+    impl_job_rebuilder, impl_job_spec, impl_peer_txs, job_rebuilder_definition,
+    job_spec_definition, peer_txs_definition,
 };
+use crate::macros::spec::primary::{impl_primary_spec, primary_spec_definition};
+use crate::utils::{get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on};
 
 /// Generates the `mod spec` module containing the primary spec and job specs.
 pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {

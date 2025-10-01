@@ -1,13 +1,11 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    configs::DimensionId,
-    utils::{
-        explode_ident, mark_done_ident, operon_ident, put_resolution_ident, raise_dep_ident,
-        rebuilder_ident, resolution_ident, ticket_ident, variable_ident,
-    },
+use crate::JobConfig;
+use crate::configs::DimensionId;
+use crate::utils::{
+    explode_ident, mark_done_ident, operon_ident, put_resolution_ident, raise_dep_ident,
+    rebuilder_ident, resolution_ident, ticket_ident, variable_ident,
 };
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -151,9 +149,8 @@ pub fn impl_job_rebuilder(
 
 #[cfg(test)]
 mod tests {
-    use crate::JobArg;
-
     use super::*;
+    use crate::JobArg;
 
     #[test]
     fn test_impl_job_rebuilder() {

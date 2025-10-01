@@ -1,9 +1,7 @@
 use clap::Parser;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{
-    style::{Color, Style},
-    text::{Line, Span},
-};
+use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span};
 
 use crate::ui::{Action, PromptCommand};
 

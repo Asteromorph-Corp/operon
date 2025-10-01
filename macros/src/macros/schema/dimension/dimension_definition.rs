@@ -1,6 +1,7 @@
 use syn::parse_quote;
 
-use crate::{configs::DimensionId, utils::dimension_ident};
+use crate::configs::DimensionId;
+use crate::utils::dimension_ident;
 
 /// Generates a type definition for a dimension, which is represented as a `usize`.
 ///

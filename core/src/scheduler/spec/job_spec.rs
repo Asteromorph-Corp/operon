@@ -1,12 +1,10 @@
 use async_trait::async_trait;
 
-use crate::{
-    meta_storage::MetaClient,
-    scheduler::{JobRebuilder, PeerEventSenders, SchedulerError},
-    schema_base::{Job, Resolution, Ticket},
-    service::OperonService,
-    storage::OperonStorage,
-};
+use crate::meta_storage::MetaClient;
+use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
+use crate::schema_base::{Job, Resolution, Ticket};
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
 
 #[async_trait]
 pub trait JobSpec<Svc, Sto>: Clone + Send + Sync + 'static
@@ -29,7 +27,8 @@ where
         client: MetaClient<'_>,
     ) -> Result<bool, SchedulerError>;
 
-    /// Prepare the job rebuilder for the given storage and metadata client by fetching the necessary data.
+    /// Prepare the job rebuilder for the given storage and metadata client by fetching the
+    /// necessary data.
     async fn prepare_rebuild(
         &self,
         storage: &Sto,

@@ -1,12 +1,11 @@
-use crate::{
-    AllConfig,
-    utils::{
-        entity_ident, entity_over_dim_ident, job_enum_ident, job_fn_ident, operon_ident,
-        resolution_enum_ident, service_trait_ident,
-    },
-};
 use quote::ToTokens;
 use syn::parse_quote;
+
+use crate::AllConfig;
+use crate::utils::{
+    entity_ident, entity_over_dim_ident, job_enum_ident, job_fn_ident, operon_ident,
+    resolution_enum_ident, service_trait_ident,
+};
 
 /// Generates a trait for the service based on the provided AllConfig.
 ///
@@ -100,12 +99,9 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        JobArg, JobConfig, JobConfigMap,
-        configs::{DimensionConfigMap, EntityConfigMap},
-    };
-
     use super::*;
+    use crate::configs::{DimensionConfigMap, EntityConfigMap};
+    use crate::{JobArg, JobConfig, JobConfigMap};
 
     #[test]
     fn test_trait_service() {

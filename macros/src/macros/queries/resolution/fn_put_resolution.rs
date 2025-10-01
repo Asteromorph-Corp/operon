@@ -1,10 +1,8 @@
 use quote::format_ident;
 use syn::parse_quote;
 
-use crate::{
-    configs::DimensionConfig,
-    utils::{operon_ident, resolution_ident},
-};
+use crate::configs::DimensionConfig;
+use crate::utils::{operon_ident, resolution_ident};
 
 /// Helper struct to generate the SQL query for inserting a resolution into a dimension.
 pub struct PutResolutionQuery<'a>(pub(super) &'a DimensionConfig);

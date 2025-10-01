@@ -1,12 +1,10 @@
 use indexmap::IndexMap;
 
-use crate::{
-    operon::RunningState,
-    scheduler::{ControlEvent, JobHandler},
-    service::OperonService,
-    storage::OperonStorage,
-    ui::{LogBuffer, ShellPrompt, UiError, UiStateUpdate},
-};
+use crate::operon::RunningState;
+use crate::scheduler::{ControlEvent, JobHandler};
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
+use crate::ui::{LogBuffer, ShellPrompt, UiError, UiStateUpdate};
 
 pub type Progress = (i64, i64, i64, RunningState, bool);
 

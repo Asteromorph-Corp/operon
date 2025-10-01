@@ -1,14 +1,14 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::{
-    configs::JobConfigMap,
-    macros::schema::job::{
-        const_job_id::const_job_id, impl_enum_from_job::impl_enum_from_job, impl_job::impl_job,
-        impl_job_enum::impl_job_enum, impl_job_sql::impl_job_sql, job_definition::job_definition,
-        job_enum::job_enum,
-    },
-};
+use crate::configs::JobConfigMap;
+use crate::macros::schema::job::const_job_id::const_job_id;
+use crate::macros::schema::job::impl_enum_from_job::impl_enum_from_job;
+use crate::macros::schema::job::impl_job::impl_job;
+use crate::macros::schema::job::impl_job_enum::impl_job_enum;
+use crate::macros::schema::job::impl_job_sql::impl_job_sql;
+use crate::macros::schema::job::job_definition::job_definition;
+use crate::macros::schema::job::job_enum::job_enum;
 
 /// Generates the `mod job` module with all job-related items.
 pub fn mod_job(jobs: &JobConfigMap) -> syn::ItemMod {

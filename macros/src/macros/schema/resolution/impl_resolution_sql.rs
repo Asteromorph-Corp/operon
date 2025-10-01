@@ -1,11 +1,9 @@
 use syn::parse_quote;
 
-use crate::{
-    DimensionConfig,
-    utils::{
-        clear_resolution_ident, get_resolution_ident, init_resolution_ident, operon_ident,
-        put_resolution_ident, resolution_ident,
-    },
+use crate::DimensionConfig;
+use crate::utils::{
+    clear_resolution_ident, get_resolution_ident, init_resolution_ident, operon_ident,
+    put_resolution_ident, resolution_ident,
 };
 
 /// Generates an implementation of the `ResolutionSql` trait for a given dimension.

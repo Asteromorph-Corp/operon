@@ -1,12 +1,11 @@
 mod configs;
 mod macros;
 mod utils;
-use crate::{
-    configs::{AllConfig, DimensionConfig, EntityConfig, JobArg, JobConfig, JobConfigMap},
-    macros::operon,
-};
 use proc_macro::TokenStream;
 use quote::quote;
+
+use crate::configs::{AllConfig, DimensionConfig, EntityConfig, JobArg, JobConfig, JobConfigMap};
+use crate::macros::operon;
 
 #[proc_macro]
 pub fn define_operon(input: TokenStream) -> TokenStream {

@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::storage::StorageError;
 
 /// # OperonStorage trait
-/// 
+///
 /// FIXME: Most functions in this trait are moved to the generated `{PipelineName}Storage` trait.
 ///
 /// This trait contains the storage operations Operon will use.
@@ -13,24 +13,20 @@ use crate::storage::StorageError;
 ///
 /// * All functions are async methods and must return a `Result<(), StorageError>`.
 /// * The `clear` function should clear all data EXCEPT the primary data in the storage.
-/// * The `put_*` functions' default behaviour must be to *overwrite* existing data.
-///   While this is almost never a problem, choosing not to do so may lead to
-///   undefined behaviour in certain pause-and-resume scenarios.
+/// * The `put_*` functions' default behaviour must be to *overwrite* existing data. While this is
+///   almost never a problem, choosing not to do so may lead to undefined behaviour in certain
+///   pause-and-resume scenarios.
 /// * The `get_*` functions must return `None` instead of an error if the data is not found.
-/// * The optional `clear_footprint`, `put_footprint` and `get_footprint` functions
-///   are used to manipulate the footprint of the data.
-///   The footprint is used to verify the integrity of the data on a recovery from
-///   previous runs that were gracefully shut down.
-///   Provide these functions if you want to support fast progress restorations from
-///   graceful stops.
-/// * Due to having repeated types in the `OperonService` signatures,
-///   the default implementations of the `put_*` and `get_*` functions
-///   may cause DB-intensive behaviour.
-///   If you wish to minimize the number of DB operations,
-///   you can implement the provided `put_all_*` and `get_all_*_over_*` functions.
-///   The same rules for the `put_*` and `get_*` functions apply to these as well.
-///   Additionally, note that these functions assume
-///   that repeated data is sorted by the dimension it is repeated on.
+/// * The optional `clear_footprint`, `put_footprint` and `get_footprint` functions are used to
+///   manipulate the footprint of the data. The footprint is used to verify the integrity of the
+///   data on a recovery from previous runs that were gracefully shut down. Provide these functions
+///   if you want to support fast progress restorations from graceful stops.
+/// * Due to having repeated types in the `OperonService` signatures, the default implementations of
+///   the `put_*` and `get_*` functions may cause DB-intensive behaviour. If you wish to minimize
+///   the number of DB operations, you can implement the provided `put_all_*` and `get_all_*_over_*`
+///   functions. The same rules for the `put_*` and `get_*` functions apply to these as well.
+///   Additionally, note that these functions assume that repeated data is sorted by the dimension
+///   it is repeated on.
 ///
 /// Please consult the following section for exact function signatures.
 ///

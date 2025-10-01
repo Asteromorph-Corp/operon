@@ -1,7 +1,5 @@
-use ratatui::{
-    style::Stylize,
-    text::{Line, Span},
-};
+use ratatui::style::Stylize;
+use ratatui::text::{Line, Span};
 
 pub type LogRecordReceiver = tokio::sync::broadcast::Receiver<LogRecord>;
 

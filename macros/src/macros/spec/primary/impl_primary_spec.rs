@@ -1,10 +1,8 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::{DimensionId, EntityId},
-    utils::{
-        get_entity_ident, operon_ident, resolution_ident, service_trait_ident, storage_trait_ident,
-    },
+use crate::configs::{DimensionId, EntityId};
+use crate::utils::{
+    get_entity_ident, operon_ident, resolution_ident, service_trait_ident, storage_trait_ident,
 };
 
 /// Generates the `impl PrimarySpec` for the primary entity and dimension.

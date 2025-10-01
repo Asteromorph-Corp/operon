@@ -1,7 +1,5 @@
-use crate::{
-    meta_storage::{MetaClient, MetaStorageError},
-    schema_base::Job,
-};
+use crate::meta_storage::{MetaClient, MetaStorageError};
+use crate::schema_base::Job;
 
 pub async fn get_ticket_summary<J: Job>(
     client: MetaClient<'_>,

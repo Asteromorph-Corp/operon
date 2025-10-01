@@ -1,7 +1,8 @@
 use heck::ToSnakeCase;
 use syn::parse_quote;
 
-use crate::{configs::JobId, utils::job_id_ident};
+use crate::configs::JobId;
+use crate::utils::job_id_ident;
 
 /// Generates a constant variable for the given job ID.
 ///

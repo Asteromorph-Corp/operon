@@ -3,7 +3,8 @@ use std::borrow::Cow;
 use bytes::Buf;
 use tokio_postgres::{CopyInSink, ToStatement};
 
-use crate::{meta_storage::MetaStorageError, utils::SchemaPrefix};
+use crate::meta_storage::MetaStorageError;
+use crate::utils::SchemaPrefix;
 
 macro_rules! impl_meta_client {
     (

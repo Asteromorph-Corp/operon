@@ -1,11 +1,10 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::collections::HashMap;
+use std::fmt::Debug;
 
 use async_trait::async_trait;
 
-use crate::{
-    scheduler::SchedulerError,
-    schema_base::{JobEnum, ResolutionEnum},
-};
+use crate::scheduler::SchedulerError;
+use crate::schema_base::{JobEnum, ResolutionEnum};
 
 /// `IndividualScheduler`-`IndividualScheduler` communication events.
 ///

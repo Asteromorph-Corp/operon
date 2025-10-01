@@ -2,10 +2,8 @@ use std::collections::HashMap;
 
 use indexmap::IndexSet;
 
-use crate::{
-    JobConfig,
-    configs::{DimensionId, EntityId, JobConfigMap},
-};
+use crate::JobConfig;
+use crate::configs::{DimensionId, EntityId, JobConfigMap};
 
 /// Returns a mapping from job `to` entity to job `id`.
 fn build_upstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, &JobConfig> {
@@ -105,9 +103,9 @@ pub fn get_jobs_repeating_on<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{JobConfig, configs::JobArg};
-
     use super::*;
+    use crate::JobConfig;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_get_upstream_jobs() {

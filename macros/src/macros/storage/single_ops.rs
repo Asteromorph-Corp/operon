@@ -1,12 +1,9 @@
 use syn::parse_quote;
 
-use crate::{
-    EntityConfig,
-    configs::EntityConfigMap,
-    utils::{
-        dimension_ident, entity_ident, get_entity_ident, operon_ident, put_entity_ident,
-        variable_ident,
-    },
+use crate::EntityConfig;
+use crate::configs::EntityConfigMap;
+use crate::utils::{
+    dimension_ident, entity_ident, get_entity_ident, operon_ident, put_entity_ident, variable_ident,
 };
 
 struct SelectEntityQuery<'a>(&'a EntityConfig);

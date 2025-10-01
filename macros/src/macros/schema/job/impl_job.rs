@@ -1,10 +1,8 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    configs::JobConfigMap,
-    utils::{get_upstream_jobs, job_id_ident, job_ident},
-};
+use crate::JobConfig;
+use crate::configs::JobConfigMap;
+use crate::utils::{get_upstream_jobs, job_id_ident, job_ident};
 
 /// Generates an implementation of the `Job` trait for the given job configuration.
 ///
@@ -50,12 +48,9 @@ pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
 mod tests {
     use syn::parse_quote;
 
-    use crate::{
-        JobConfig,
-        configs::{JobArg, JobConfigMap},
-    };
-
     use super::*;
+    use crate::JobConfig;
+    use crate::configs::{JobArg, JobConfigMap};
 
     #[test]
     fn test_impl_job() {

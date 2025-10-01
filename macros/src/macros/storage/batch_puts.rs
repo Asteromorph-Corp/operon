@@ -1,9 +1,9 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig, JobConfigMap,
-    utils::{batch_put_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident},
+use crate::utils::{
+    batch_put_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident,
 };
+use crate::{JobConfig, JobConfigMap};
 
 struct BatchPutTempTableQuery<'a>(&'a JobConfig);
 
@@ -120,9 +120,8 @@ pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn>
 mod tests {
     use indoc::indoc;
 
-    use crate::JobArg;
-
     use super::*;
+    use crate::JobArg;
 
     #[test]
     fn test_batch_put_temp_table_query() {

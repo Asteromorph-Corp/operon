@@ -1,10 +1,8 @@
 use async_trait::async_trait;
 use postgres_types::ToSql;
 
-use crate::{
-    meta_storage::{MetaClient, MetaStorageError},
-    schema_base::{Job, Resolution, TicketStatus},
-};
+use crate::meta_storage::{MetaClient, MetaStorageError};
+use crate::schema_base::{Job, Resolution, TicketStatus};
 
 /// Trait that represents tickets for the jobs.
 #[async_trait]

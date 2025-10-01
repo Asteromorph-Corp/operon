@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::DimensionConfig,
-    utils::{dimension_ident, resolution_ident},
-};
+use crate::configs::DimensionConfig;
+use crate::utils::{dimension_ident, resolution_ident};
 
 /// Generates a struct definition for the resolution of a dimension.
 ///

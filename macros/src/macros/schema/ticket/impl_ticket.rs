@@ -1,11 +1,9 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig, JobConfigMap,
-    configs::{DimensionConfigMap, EntityId},
-    macros::schema::ticket::fn_get_dependency_quota::fn_get_dependency_quota,
-    utils::{job_ident, operon_ident, spawn_resolution, ticket_ident, variable_ident},
-};
+use crate::configs::{DimensionConfigMap, EntityId};
+use crate::macros::schema::ticket::fn_get_dependency_quota::fn_get_dependency_quota;
+use crate::utils::{job_ident, operon_ident, spawn_resolution, ticket_ident, variable_ident};
+use crate::{JobConfig, JobConfigMap};
 
 /// Generates the implementation of the `Ticket` trait for a given job's ticket.
 pub(super) fn impl_ticket(
@@ -94,12 +92,9 @@ pub(super) fn impl_ticket(
 mod tests {
     use syn::parse_quote;
 
-    use crate::{
-        DimensionConfig,
-        configs::{DimensionId, JobArg},
-    };
-
     use super::*;
+    use crate::DimensionConfig;
+    use crate::configs::{DimensionId, JobArg};
 
     #[test]
     fn test_impl_ticket() {

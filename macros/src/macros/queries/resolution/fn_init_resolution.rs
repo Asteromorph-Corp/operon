@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::DimensionConfig,
-    utils::{init_resolution_ident, operon_ident},
-};
+use crate::configs::DimensionConfig;
+use crate::utils::{init_resolution_ident, operon_ident};
 
 /// Helper struct to generate the SQL query for initializing a dimension's resolution.
 struct InitResolutionQuery<'a>(&'a DimensionConfig);

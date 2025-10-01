@@ -1,7 +1,5 @@
-use crate::{
-    scheduler::ControlEvent,
-    ui::{LogRecord, Progress},
-};
+use crate::scheduler::ControlEvent;
+use crate::ui::{LogRecord, Progress};
 
 pub enum UiStateUpdate {
     ProgressUpdate(String, Progress),

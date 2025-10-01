@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    DimensionConfig,
-    utils::{resolution_enum_ident, resolution_ident, variant_ident},
-};
+use crate::DimensionConfig;
+use crate::utils::{resolution_enum_ident, resolution_ident, variant_ident};
 
 /// Generates an implementation of `From` trait for converting a resolution type
 ///

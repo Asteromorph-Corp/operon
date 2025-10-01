@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use tokio::{sync::RwLock, task::JoinSet};
+use tokio::sync::RwLock;
+use tokio::task::JoinSet;
 
-use crate::{
-    meta_storage::MetaStorage,
-    operon::RunningState,
-    scheduler::{ControlEventReceiver, JobHandler, PeerEventReceiver, PeerEventSenderMap},
-    service::OperonService,
-    storage::OperonStorage,
-    ui::UiState,
-};
+use crate::meta_storage::MetaStorage;
+use crate::operon::RunningState;
+use crate::scheduler::{ControlEventReceiver, JobHandler, PeerEventReceiver, PeerEventSenderMap};
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
+use crate::ui::UiState;
 
 /// Helper struct for `Scheduler::prepare_channel`
 ///

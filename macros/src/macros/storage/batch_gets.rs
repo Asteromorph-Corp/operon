@@ -1,11 +1,11 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::{
-    EntityConfig, JobArg, JobConfigMap,
-    configs::EntityConfigMap,
-    utils::{batch_get_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident},
+use crate::configs::EntityConfigMap;
+use crate::utils::{
+    batch_get_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident,
 };
+use crate::{EntityConfig, JobArg, JobConfigMap};
 
 struct BatchGetQuery<'a>(&'a JobArg, &'a EntityConfig);
 
@@ -125,9 +125,8 @@ mod tests {
     use indoc::indoc;
     use quote::format_ident;
 
-    use crate::JobConfig;
-
     use super::*;
+    use crate::JobConfig;
 
     #[test]
     fn test_batch_get_query() {

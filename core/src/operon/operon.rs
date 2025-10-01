@@ -3,13 +3,11 @@ use std::sync::Arc;
 use futures::future::try_join;
 use tokio::sync::RwLock;
 
-use crate::{
-    operon::{OperonError, OperonOptions},
-    scheduler::{ControlEvent, RecoveryState, Scheduler, SchedulerHandler},
-    service::OperonService,
-    storage::OperonStorage,
-    ui::{UiLogger, UiLoop, UiState},
-};
+use crate::operon::{OperonError, OperonOptions};
+use crate::scheduler::{ControlEvent, RecoveryState, Scheduler, SchedulerHandler};
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
+use crate::ui::{UiLogger, UiLoop, UiState};
 
 /// # Operon
 ///
@@ -46,9 +44,9 @@ where
 
     /// Run the Operon instance with the given primary upper bound.
     ///
-    /// This function is intended to be called ONCE in the main thread in a binary executable context.
-    /// Running this will take over the terminal, so it is strongly discouraged to make any
-    /// other writes to `stdout` or `stderr` while this is running.
+    /// This function is intended to be called ONCE in the main thread in a binary executable
+    /// context. Running this will take over the terminal, so it is strongly discouraged to make
+    /// any other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
     pub async fn run(
         self,

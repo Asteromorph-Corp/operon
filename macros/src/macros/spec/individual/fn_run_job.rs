@@ -3,15 +3,13 @@ use indexmap::{IndexMap, IndexSet};
 use quote::{format_ident, quote};
 use syn::parse_quote;
 
-use crate::{
-    DimensionConfig, EntityConfig, JobConfig,
-    configs::{DimensionConfigMap, DimensionId, EntityConfigMap},
-    utils::{
-        batch_get_entity_ident, batch_put_entity_ident, dimension_ident, entity_over_dim_ident,
-        get_entity_ident, get_resolution_ident, job_fn_ident, operon_ident, put_entity_ident,
-        resolution_ident, variable_ident,
-    },
+use crate::configs::{DimensionConfigMap, DimensionId, EntityConfigMap};
+use crate::utils::{
+    batch_get_entity_ident, batch_put_entity_ident, dimension_ident, entity_over_dim_ident,
+    get_entity_ident, get_resolution_ident, job_fn_ident, operon_ident, put_entity_ident,
+    resolution_ident, variable_ident,
 };
+use crate::{DimensionConfig, EntityConfig, JobConfig};
 
 fn resolution_map_ident(dim: &DimensionId) -> syn::Ident {
     format_ident!("resolution_{}", dim.to_snake_case())
@@ -27,11 +25,11 @@ struct ResolutionIndexEntry<'a> {
     fetched_over: Vec<&'a DimensionId>,
 }
 
-/// Builds an index map that contains the resolution entries which needs to be fetched from a metadata storage
-/// which stores required information for the generation of the `run_job` function.
+/// Builds an index map that contains the resolution entries which needs to be fetched from a
+/// metadata storage which stores required information for the generation of the `run_job` function.
 ///
-/// The index map is keyed by the dimension ID and contains entries that specify the dimension configuration
-/// and the dependencies that need to be collected over.
+/// The index map is keyed by the dimension ID and contains entries that specify the dimension
+/// configuration and the dependencies that need to be collected over.
 fn build_resolution_index<'a>(
     job: &'a JobConfig,
     job_dim_set: &'a IndexSet<&'a DimensionId>,
@@ -46,7 +44,8 @@ fn build_resolution_index<'a>(
                 });
 
                 // Collect dependencies that are not part of the job dimensions
-                // In the generated code, the tuple of these dimensions are used as keys in the resolution map
+                // In the generated code, the tuple of these dimensions are used as keys in the
+                // resolution map
                 let fetched_over = config
                     .depends_on
                     .iter()
@@ -382,9 +381,8 @@ pub(super) fn fn_run_job(
 
 #[cfg(test)]
 mod tests {
-    use crate::{EntityConfig, JobArg};
-
     use super::*;
+    use crate::{EntityConfig, JobArg};
 
     #[test]
     fn test_fn_run_job() {

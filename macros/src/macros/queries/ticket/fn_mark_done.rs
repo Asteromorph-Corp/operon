@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::JobConfig,
-    utils::{job_ident, mark_done_ident, operon_ident, variable_ident},
-};
+use crate::configs::JobConfig;
+use crate::utils::{job_ident, mark_done_ident, operon_ident, variable_ident};
 
 /// An helper struct to generate the SQL query for marking a ticket as done for a given job.
 struct MarkDoneQuery<'a>(&'a JobConfig);
@@ -62,9 +60,8 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_mark_done_query() {

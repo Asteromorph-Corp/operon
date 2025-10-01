@@ -1,13 +1,11 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::{
-    configs::{DimensionConfigMap, DimensionId, JobConfigMap},
-    macros::schema::ticket::{
-        impl_ticket::impl_ticket, impl_ticket_sql::impl_ticket_sql, impl_with::impl_with_fns,
-        ticket_definition::ticket_definition,
-    },
-};
+use crate::configs::{DimensionConfigMap, DimensionId, JobConfigMap};
+use crate::macros::schema::ticket::impl_ticket::impl_ticket;
+use crate::macros::schema::ticket::impl_ticket_sql::impl_ticket_sql;
+use crate::macros::schema::ticket::impl_with::impl_with_fns;
+use crate::macros::schema::ticket::ticket_definition::ticket_definition;
 
 /// Generates the `mod ticket` module with all ticket-related items.
 pub fn mod_ticket(

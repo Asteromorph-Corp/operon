@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{job_enum_ident, job_ident, variant_ident},
-};
+use crate::JobConfig;
+use crate::utils::{job_enum_ident, job_ident, variant_ident};
 
 /// Generates an implementation of `From<Job>` for the `JobEnum`.
 ///
@@ -35,9 +33,8 @@ pub(super) fn impl_enum_from_job(job: &JobConfig) -> syn::ItemImpl {
 mod tests {
     use syn::parse_quote;
 
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_impl_enum_from_job() {

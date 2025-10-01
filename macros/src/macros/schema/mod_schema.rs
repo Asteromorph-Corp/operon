@@ -1,11 +1,10 @@
 use syn::parse_quote;
 
-use crate::{
-    AllConfig,
-    macros::schema::{
-        dimension::mod_dimension, job::mod_job, resolution::mod_resolution, ticket::mod_ticket,
-    },
-};
+use crate::AllConfig;
+use crate::macros::schema::dimension::mod_dimension;
+use crate::macros::schema::job::mod_job;
+use crate::macros::schema::resolution::mod_resolution;
+use crate::macros::schema::ticket::mod_ticket;
 
 /// Generates the `mod schema` module with all schema-related items.
 pub fn mod_schema(all_configs: &AllConfig) -> syn::ItemMod {

@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::JobConfig,
-    utils::{init_ticket_ident, job_ident, operon_ident},
-};
+use crate::configs::JobConfig;
+use crate::utils::{init_ticket_ident, job_ident, operon_ident};
 
 /// Helper struct to generate the SQL query for initializing a ticket table.
 struct InitTicketQuery<'a>(&'a JobConfig);
@@ -178,9 +176,8 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
 mod tests {
     use indoc::indoc;
 
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_init_ticket_query() {

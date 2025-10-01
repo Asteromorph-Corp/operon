@@ -1,14 +1,13 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::{
-    configs::{DimensionConfigMap, DimensionId},
-    macros::schema::resolution::{
-        impl_enum_from_resolution::impl_enum_from_resolution, impl_resolution::impl_resolution,
-        impl_resolution_enum::impl_resolution_enum, impl_resolution_sql::impl_resolution_sql,
-        resolution_definition::resolution_definition, resolution_enum::resolution_enum,
-    },
-};
+use crate::configs::{DimensionConfigMap, DimensionId};
+use crate::macros::schema::resolution::impl_enum_from_resolution::impl_enum_from_resolution;
+use crate::macros::schema::resolution::impl_resolution::impl_resolution;
+use crate::macros::schema::resolution::impl_resolution_enum::impl_resolution_enum;
+use crate::macros::schema::resolution::impl_resolution_sql::impl_resolution_sql;
+use crate::macros::schema::resolution::resolution_definition::resolution_definition;
+use crate::macros::schema::resolution::resolution_enum::resolution_enum;
 
 /// Generates the `mod resolution` module with all resolution-related items.
 pub fn mod_resolution(

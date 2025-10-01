@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{job_ident, rebuilder_ident, spawn_resolution},
-};
+use crate::JobConfig;
+use crate::utils::{job_ident, rebuilder_ident, spawn_resolution};
 
 /// Generates a struct definition for a job rebuilder.
 ///
@@ -25,9 +23,8 @@ pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
 
 #[cfg(test)]
 mod tests {
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_job_rebuilder_definition() {

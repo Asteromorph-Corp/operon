@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::JobConfig,
-    utils::{get_all_ident, operon_ident, ticket_ident},
-};
+use crate::configs::JobConfig;
+use crate::utils::{get_all_ident, operon_ident, ticket_ident};
 
 /// Helper struct to generate the SQL query for getting all tickets for a given job.
 struct GetAllTicketQuery<'a>(&'a JobConfig);
@@ -61,9 +59,8 @@ pub(super) fn fn_get_all(job: &JobConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_get_all_ticket_query() {

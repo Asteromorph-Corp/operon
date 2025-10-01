@@ -2,7 +2,8 @@ use std::borrow::Cow;
 
 use secrecy::SecretString;
 
-use crate::{scheduler::SchedulerOptions, ui::LogOptions};
+use crate::scheduler::SchedulerOptions;
+use crate::ui::LogOptions;
 
 pub struct OperonOptions {
     // Scheduler options

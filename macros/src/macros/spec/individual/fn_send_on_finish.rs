@@ -1,10 +1,8 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{operon_ident, sender_ident},
-};
+use crate::JobConfig;
+use crate::utils::{operon_ident, sender_ident};
 
 /// Generates the `send_on_finish` function for the implementation of the trait `JobSpec`.
 ///
@@ -124,9 +122,8 @@ pub(super) fn fn_send_on_finish(
 
 #[cfg(test)]
 mod tests {
-    use crate::JobArg;
-
     use super::*;
+    use crate::JobArg;
 
     #[test]
     fn test_fn_send_on_finish() {

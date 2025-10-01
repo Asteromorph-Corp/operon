@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::DimensionConfigMap,
-    utils::{resolution_enum_ident, resolution_ident, variant_ident},
-};
+use crate::configs::DimensionConfigMap;
+use crate::utils::{resolution_enum_ident, resolution_ident, variant_ident};
 
 /// Generates an enum representing the resolution of any dimension.
 ///
@@ -39,9 +37,8 @@ pub(super) fn resolution_enum(dimensions: &DimensionConfigMap) -> syn::ItemEnum 
 
 #[cfg(test)]
 mod tests {
-    use crate::DimensionConfig;
-
     use super::*;
+    use crate::DimensionConfig;
 
     #[test]
     fn test_resolution_enum() {

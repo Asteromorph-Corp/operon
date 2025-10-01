@@ -1,12 +1,10 @@
 use quote::quote;
 
-use crate::{
-    configs::DimensionConfig,
-    macros::queries::resolution::{
-        fn_clear_resolution::fn_clear_resolution, fn_get_resolution::fn_get_resolution,
-        fn_init_resolution::fn_init_resolution, fn_put_resolution::fn_put_resolution,
-    },
-};
+use crate::configs::DimensionConfig;
+use crate::macros::queries::resolution::fn_clear_resolution::fn_clear_resolution;
+use crate::macros::queries::resolution::fn_get_resolution::fn_get_resolution;
+use crate::macros::queries::resolution::fn_init_resolution::fn_init_resolution;
+use crate::macros::queries::resolution::fn_put_resolution::fn_put_resolution;
 
 /// Generates all resolution-related queries for a given dimension.
 pub fn resolution_queries(dimension: &DimensionConfig) -> proc_macro2::TokenStream {

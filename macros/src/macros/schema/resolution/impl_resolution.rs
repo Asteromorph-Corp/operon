@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    DimensionConfig,
-    utils::{dimension_ident, operon_ident, resolution_ident},
-};
+use crate::DimensionConfig;
+use crate::utils::{dimension_ident, operon_ident, resolution_ident};
 
 /// Generates an implementation of the `Resolution` trait for a given dimension.
 ///

@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{job_ident, mark_done_ident, operon_ident},
-};
+use crate::JobConfig;
+use crate::utils::{job_ident, mark_done_ident, operon_ident};
 
 /// Generates an implementation of the `JobSql` trait for the given job.
 ///
@@ -44,9 +42,8 @@ pub(super) fn impl_job_sql(job: &JobConfig) -> syn::ItemImpl {
 mod tests {
     use syn::parse_quote;
 
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_impl_job_sql() {

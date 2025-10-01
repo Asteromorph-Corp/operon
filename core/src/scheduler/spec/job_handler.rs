@@ -1,23 +1,23 @@
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use tokio::sync::RwLock;
 
-use crate::{
-    meta_storage::{MetaClient, MetaStorage},
-    operon::RunningState,
-    scheduler::{
-        ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, PeerEventReceiver,
-        PeerEventSenderMap, SchedulerError,
-    },
-    schema_base::{JobSql, ResolutionSql, TicketSql},
-    service::OperonService,
-    storage::OperonStorage,
-    ui::UiState,
+use crate::meta_storage::{MetaClient, MetaStorage};
+use crate::operon::RunningState;
+use crate::scheduler::{
+    ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, PeerEventReceiver,
+    PeerEventSenderMap, SchedulerError,
 };
+use crate::schema_base::{JobSql, ResolutionSql, TicketSql};
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
+use crate::ui::UiState;
 
 #[async_trait]
-/// An helper trait to expose `Resolution`, `Ticket`, and `JobManager` interfaces while being dyn compatible.
+/// An helper trait to expose `Resolution`, `Ticket`, and `JobManager` interfaces while being dyn
+/// compatible.
 ///
 /// The trait is automatically implemented for any structs that implements `JobManagerImpl`,
 /// and is used to initialize the job metadata storage and to run the individual job schedulers.
@@ -35,16 +35,19 @@ where
     /// Initialize the PSQL fact storage for the primary resolution.
     ///
     /// This function should be idempotent,
-    /// i.e. calling it multiple times, or calling it on an already-initialized storage should do nothing.
+    /// i.e. calling it multiple times, or calling it on an already-initialized storage should do
+    /// nothing.
     async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>;
 
-    /// Clear the primary resolution from the PSQL fact storage, assuming the table is already initialized.
+    /// Clear the primary resolution from the PSQL fact storage, assuming the table is already
+    /// initialized.
     async fn clear_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>; // `facts_psql::clear`, 877~
 
     /// Initialize the PSQL ticket storage.
     ///
     /// This function should be idempotent,
-    /// i.e. calling it multiple times, or calling it on an already-initialized storage should do nothing.
+    /// i.e. calling it multiple times, or calling it on an already-initialized storage should do
+    /// nothing.
     async fn init_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>; // `tickets_psql::init`, 1079~
 
     /// Clear the data from the PSQL ticket storage, assuming the tables are already initialized.
@@ -64,7 +67,8 @@ where
         client: MetaClient<'_>,
     ) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
 
-    /// Prepare the job rebuilder for the given storage and metadata client by fetching the necessary data.
+    /// Prepare the job rebuilder for the given storage and metadata client by fetching the
+    /// necessary data.
     async fn prepare_rebuild(
         &self,
         storage: &Sto,

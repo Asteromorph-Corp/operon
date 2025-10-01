@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{dimension_ident, operon_ident, ticket_ident, variable_ident},
-};
+use crate::JobConfig;
+use crate::utils::{dimension_ident, operon_ident, ticket_ident, variable_ident};
 
 /// Generates a struct definition for a ticket for a given job.
 ///
@@ -46,9 +44,8 @@ pub(super) fn ticket_definition(job: &JobConfig) -> syn::ItemStruct {
 mod tests {
     use syn::parse_quote;
 
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_ticket_definition() {

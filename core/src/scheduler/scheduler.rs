@@ -1,21 +1,20 @@
 use std::sync::Arc;
 
-use tokio::{sync::RwLock, task::JoinSet};
+use tokio::sync::RwLock;
+use tokio::task::JoinSet;
 
-use crate::{
-    meta_storage::{
-        MetaClient, MetaStorage, MetaStorageError, clear_footprint, get_footprint, put_footprint,
-    },
-    operon::RunningState,
-    scheduler::{
-        ControlEvent, ControlEventReceiver, PeerEvent, RecoveryState, RecoveryStateSender, RunMode,
-        SchedulerError, SchedulerHandler, SchedulerOptions,
-    },
-    schema_base::ResolutionEnum,
-    service::OperonService,
-    storage::OperonStorage,
-    ui::UiState,
+use crate::meta_storage::{
+    MetaClient, MetaStorage, MetaStorageError, clear_footprint, get_footprint, put_footprint,
 };
+use crate::operon::RunningState;
+use crate::scheduler::{
+    ControlEvent, ControlEventReceiver, PeerEvent, RecoveryState, RecoveryStateSender, RunMode,
+    SchedulerError, SchedulerHandler, SchedulerOptions,
+};
+use crate::schema_base::ResolutionEnum;
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
+use crate::ui::UiState;
 
 /// # Scheduler
 ///
@@ -194,7 +193,8 @@ where
                     // Both storages have the same footprint, and it is a "stopped" one.
                     return Ok(RecoveryState::GracefullyStopped);
                 } else {
-                    // Both storages have the same footprint, but it is neither "finished" nor "stopped".
+                    // Both storages have the same footprint, but it is neither "finished" nor
+                    // "stopped".
                     log::warn!("Unexpected footprint found: {df}, treating the run as aborted.");
                 }
             }
@@ -247,7 +247,8 @@ where
 
         // Here, we have the following possible states:
         // 1. All jobs finished successfully.
-        // 2. All jobs are `Finished` or `Stopped`, and the control signal is a `GracefulStop` event.
+        // 2. All jobs are `Finished` or `Stopped`, and the control signal is a `GracefulStop`
+        //    event.
         // 3-1. All jobs are `Finished` or `Stopped`, and the control signal is an `Abort` event.
         // 3-2. Some jobs returned an `Error`.
         // On `1`, we set the footprint to "F@{now}".
@@ -381,8 +382,8 @@ where
 
     async fn run_restore(&self) -> Result<JoinSet<RunningState>, SchedulerError> {
         // * The persistent storage is fully trusted.
-        // * Just pull the queued tickets, and have the individual schedulers'
-        //   initial `ready_to_run` set to them.
+        // * Just pull the queued tickets, and have the individual schedulers' initial
+        //   `ready_to_run` set to them.
         // * We need to clear the footprint only.
         let storage = &self.storage;
         let meta_storage = &self.meta_storage;

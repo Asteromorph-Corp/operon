@@ -1,12 +1,14 @@
-use super::config_decl::ConfigDecl;
-use crate::{
-    AllConfig, DimensionConfig, EntityConfig, JobArg, JobConfig, configs::DimensionConfigMap,
-    utils::DedupHasher,
-};
+use std::collections::HashSet;
+use std::hash::RandomState;
+
 use heck::{ToPascalCase, ToSnakeCase};
 use indexmap::IndexMap;
-use std::{collections::HashSet, hash::RandomState};
 use syn::parse::{Parse, ParseBuffer};
+
+use super::config_decl::ConfigDecl;
+use crate::configs::DimensionConfigMap;
+use crate::utils::DedupHasher;
+use crate::{AllConfig, DimensionConfig, EntityConfig, JobArg, JobConfig};
 
 fn create_generic_ident(id: &str, hasher: &mut DedupHasher) -> proc_macro2::Ident {
     proc_macro2::Ident::new(
@@ -116,8 +118,8 @@ impl Parse for AllConfig {
                         format!("Undefined entity '{arg_entity_id}'"),
                     ));
                 };
-                // Constraint 4b–d. Let A = arg_entity_config.dims, B = arg_entity.dims, C = job.dims.
-                // Use HashSet for set operations.
+                // Constraint 4b–d. Let A = arg_entity_config.dims, B = arg_entity.dims, C =
+                // job.dims. Use HashSet for set operations.
                 let a_set: HashSet<String, RandomState> =
                     HashSet::from_iter(arg_entity_config.dims.iter().cloned());
                 let b_set: HashSet<String, RandomState> = HashSet::from_iter(

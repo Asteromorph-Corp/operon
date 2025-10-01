@@ -1,14 +1,14 @@
 use quote::quote;
 
-use crate::{
-    DimensionConfig,
-    configs::JobConfig,
-    macros::queries::ticket::{
-        fn_clear_ticket::fn_clear_ticket, fn_explode::fn_explode, fn_get_all::fn_get_all,
-        fn_init_ticket::fn_init_ticket, fn_mark_done::fn_mark_done, fn_put_ticket::fn_put_ticket,
-        fn_raise_dep::fn_raise_dep,
-    },
-};
+use crate::DimensionConfig;
+use crate::configs::JobConfig;
+use crate::macros::queries::ticket::fn_clear_ticket::fn_clear_ticket;
+use crate::macros::queries::ticket::fn_explode::fn_explode;
+use crate::macros::queries::ticket::fn_get_all::fn_get_all;
+use crate::macros::queries::ticket::fn_init_ticket::fn_init_ticket;
+use crate::macros::queries::ticket::fn_mark_done::fn_mark_done;
+use crate::macros::queries::ticket::fn_put_ticket::fn_put_ticket;
+use crate::macros::queries::ticket::fn_raise_dep::fn_raise_dep;
 
 /// Generates all resolution-related queries for a given dimension.
 pub fn ticket_queries(job: &JobConfig, dims: &[&DimensionConfig]) -> proc_macro2::TokenStream {

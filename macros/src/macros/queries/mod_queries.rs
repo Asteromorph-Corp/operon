@@ -1,9 +1,8 @@
 use syn::parse_quote;
 
-use crate::{
-    AllConfig,
-    macros::queries::{resolution::resolution_queries, ticket::ticket_queries},
-};
+use crate::AllConfig;
+use crate::macros::queries::resolution::resolution_queries;
+use crate::macros::queries::ticket::ticket_queries;
 
 /// Generates the `mod queries` module with all query-related items.
 pub fn mod_queries(all_configs: &AllConfig) -> syn::ItemMod {

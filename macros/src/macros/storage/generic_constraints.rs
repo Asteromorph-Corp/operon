@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::EntityConfigMap,
-    utils::{entity_ident, operon_ident},
-};
+use crate::configs::EntityConfigMap;
+use crate::utils::{entity_ident, operon_ident};
 
 pub(super) fn generic_constraints(
     entities: &EntityConfigMap,

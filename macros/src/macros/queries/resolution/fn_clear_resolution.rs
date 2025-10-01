@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::DimensionConfig,
-    utils::{clear_resolution_ident, operon_ident},
-};
+use crate::configs::DimensionConfig;
+use crate::utils::{clear_resolution_ident, operon_ident};
 
 /// Helper struct to generate the SQL query for clearing a dimension's resolution.
 struct ClearResolutionQuery<'a>(&'a DimensionConfig);

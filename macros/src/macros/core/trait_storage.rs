@@ -1,14 +1,12 @@
 use quote::{format_ident, quote};
 use syn::parse_quote;
 
-use crate::{
-    AllConfig, JobConfigMap,
-    configs::EntityConfigMap,
-    utils::{
-        batch_get_entity_ident, batch_put_entity_ident, dimension_ident, entity_ident,
-        get_entity_ident, operon_ident, put_entity_ident, storage_trait_ident, variable_ident,
-    },
+use crate::configs::EntityConfigMap;
+use crate::utils::{
+    batch_get_entity_ident, batch_put_entity_ident, dimension_ident, entity_ident,
+    get_entity_ident, operon_ident, put_entity_ident, storage_trait_ident, variable_ident,
 };
+use crate::{AllConfig, JobConfigMap};
 
 /// A helper function to generate single operation functions for each entity.
 fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
@@ -175,9 +173,9 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
 
 #[cfg(test)]
 mod tests {
-    use crate::{EntityConfig, JobArg, JobConfig, JobConfigMap, configs::EntityConfigMap};
-
     use super::*;
+    use crate::configs::EntityConfigMap;
+    use crate::{EntityConfig, JobArg, JobConfig, JobConfigMap};
 
     #[test]
     fn test_single_ops() {

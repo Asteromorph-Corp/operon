@@ -1,10 +1,8 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::{EntityConfigMap, EntityId},
-    macros::storage::generic_constraints,
-    utils::{operon_ident, sql_storage_ident},
-};
+use crate::configs::{EntityConfigMap, EntityId};
+use crate::macros::storage::generic_constraints;
+use crate::utils::{operon_ident, sql_storage_ident};
 
 /// A helper struct to generate SQL queries for creating tables based on job configurations.
 struct CreateTablesQuery<'a>(&'a EntityConfigMap);
@@ -139,9 +137,8 @@ mod tests {
     use indoc::indoc;
     use quote::format_ident;
 
-    use crate::EntityConfig;
-
     use super::*;
+    use crate::EntityConfig;
 
     #[test]
     fn test_create_tables_query() {

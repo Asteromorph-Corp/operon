@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{dimension_ident, operon_ident, raise_dep_ident, ticket_ident, variable_ident},
-};
+use crate::JobConfig;
+use crate::utils::{dimension_ident, operon_ident, raise_dep_ident, ticket_ident, variable_ident};
 
 /// A helper struct to generate the SQL query for popping tickets to be raised.
 struct RaiseDepPopQuery<'a>(&'a JobConfig);
@@ -191,9 +189,8 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_fn_raise_dep() {

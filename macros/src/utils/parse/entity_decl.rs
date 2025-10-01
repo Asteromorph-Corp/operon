@@ -1,7 +1,5 @@
-use syn::{
-    Ident, Token,
-    parse::{Parse, ParseStream},
-};
+use syn::parse::{Parse, ParseStream};
+use syn::{Ident, Token};
 
 #[derive(Debug)]
 pub(super) struct EntityDecl {
@@ -66,8 +64,9 @@ impl Parse for EntityDecl {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use syn::parse_str;
+
+    use super::*;
 
     #[test]
     fn test_entity_decl_simple() {

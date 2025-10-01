@@ -2,19 +2,17 @@ use std::collections::HashMap;
 
 use futures::{StreamExt, TryStreamExt};
 
-use crate::{
-    meta_storage::{
-        MetaClient, init_footprint, init_schema, init_ticket_status_type, init_ticket_summary,
-    },
-    operon::RunningState,
-    scheduler::{
-        HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent, PeerEventSender,
-        PrimaryHandler, SchedulerError,
-    },
-    service::OperonService,
-    storage::OperonStorage,
-    ui::{UiState, UiStateUpdate},
+use crate::meta_storage::{
+    MetaClient, init_footprint, init_schema, init_ticket_status_type, init_ticket_summary,
 };
+use crate::operon::RunningState;
+use crate::scheduler::{
+    HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent, PeerEventSender,
+    PrimaryHandler, SchedulerError,
+};
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
+use crate::ui::{UiState, UiStateUpdate};
 
 pub struct SchedulerHandler<Svc, Sto> {
     pub primary_handler: Box<dyn PrimaryHandler<Svc, Sto>>,
@@ -76,9 +74,11 @@ where
     }
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
-    /// Return `true` if the data storage holds all needed data to restore, or `false` if it does not.
+    /// Return `true` if the data storage holds all needed data to restore, or `false` if it does
+    /// not.
     ///
-    /// This should be called only when the recovery state is either `AbortedUnchecked` or `GracefullyStopped`.
+    /// This should be called only when the recovery state is either `AbortedUnchecked` or
+    /// `GracefullyStopped`.
     pub(crate) async fn check_consistency(
         &self,
         storage: &Sto,

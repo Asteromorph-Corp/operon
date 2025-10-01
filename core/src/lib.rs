@@ -10,20 +10,7 @@ pub mod ui;
 pub mod utils;
 
 // Re-export the external crates used in the macro expansions
-pub use async_trait;
-pub use bytes;
-pub use chrono;
-pub use clap;
-pub use crossterm;
-pub use csv;
-pub use deadpool_postgres;
-pub use futures;
-pub use log;
-pub use postgres_types;
-pub use ratatui;
-pub use secrecy;
-pub use serde;
-pub use serde_json;
-pub use textwrap;
-pub use tokio;
-pub use tokio_postgres;
+pub use {
+    async_trait, bytes, chrono, clap, crossterm, csv, deadpool_postgres, futures, log,
+    postgres_types, ratatui, secrecy, serde, serde_json, textwrap, tokio, tokio_postgres,
+};

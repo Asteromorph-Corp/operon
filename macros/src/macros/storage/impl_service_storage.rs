@@ -1,13 +1,12 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfigMap,
-    configs::EntityConfigMap,
-    macros::storage::{
-        batch_gets::batch_gets, batch_puts::batch_puts, generic_constraints, single_ops::single_ops,
-    },
-    utils::{operon_ident, storage_trait_ident},
-};
+use crate::JobConfigMap;
+use crate::configs::EntityConfigMap;
+use crate::macros::storage::batch_gets::batch_gets;
+use crate::macros::storage::batch_puts::batch_puts;
+use crate::macros::storage::generic_constraints;
+use crate::macros::storage::single_ops::single_ops;
+use crate::utils::{operon_ident, storage_trait_ident};
 
 pub(super) fn impl_service_storage(
     service_id: &str,

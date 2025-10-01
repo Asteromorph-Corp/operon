@@ -1,12 +1,12 @@
 use syn::parse_quote;
 
-use crate::{
-    AllConfig,
-    macros::{
-        core::mod_core, prelude::prelude, queries::mod_queries, schema::mod_schema, spec::mod_spec,
-        storage::mod_storage,
-    },
-};
+use crate::AllConfig;
+use crate::macros::core::mod_core;
+use crate::macros::prelude::prelude;
+use crate::macros::queries::mod_queries;
+use crate::macros::schema::mod_schema;
+use crate::macros::spec::mod_spec;
+use crate::macros::storage::mod_storage;
 
 pub fn operon(all_configs: &AllConfig) -> syn::File {
     let mod_core = mod_core(all_configs);

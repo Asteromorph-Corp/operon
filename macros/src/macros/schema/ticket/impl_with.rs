@@ -1,10 +1,8 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    configs::DimensionId,
-    utils::{dimension_ident, operon_ident, ticket_ident, variable_ident, with_ident},
-};
+use crate::JobConfig;
+use crate::configs::DimensionId;
+use crate::utils::{dimension_ident, operon_ident, ticket_ident, variable_ident, with_ident};
 
 fn fn_with(job: &JobConfig, dim: &DimensionId) -> syn::ImplItemFn {
     let operon = operon_ident();
@@ -47,9 +45,8 @@ pub(super) fn impl_with_fns(job: &JobConfig) -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_fn_with() {

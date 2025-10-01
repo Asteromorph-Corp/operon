@@ -1,6 +1,7 @@
 use syn::parse_quote;
 
-use crate::{configs::JobId, utils::spec_ident};
+use crate::configs::JobId;
+use crate::utils::spec_ident;
 
 /// Generates a struct definition for a job specification.
 ///

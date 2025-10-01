@@ -1,22 +1,18 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 
 use tokio::sync::{RwLock, Semaphore};
 
-use crate::{
-    meta_storage::{MetaClient, MetaStorage},
-    operon::RunningState,
-    scheduler::{
-        ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
-        PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError,
-    },
-    schema_base::{JobSql, ResolutionSql, TicketSql, TicketStatus},
-    service::OperonService,
-    storage::OperonStorage,
-    ui::{UiState, UiStateUpdate},
+use crate::meta_storage::{MetaClient, MetaStorage};
+use crate::operon::RunningState;
+use crate::scheduler::{
+    ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
+    PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError,
 };
+use crate::schema_base::{JobSql, ResolutionSql, TicketSql, TicketStatus};
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
+use crate::ui::{UiState, UiStateUpdate};
 
 /// # IndividualScheduler
 ///
@@ -261,7 +257,8 @@ where
         // Main event loop.
         loop {
             // This loop cannot be entered with the `Error` or `Stopped` state,
-            // as changing the state to `Error` or `Stopped` always exits `run_internal` immediately.
+            // as changing the state to `Error` or `Stopped` always exits `run_internal`
+            // immediately.
             // 0. Check the control channel.
             let ctrl_event = ctrl_rx.borrow_and_update().clone();
             match ctrl_event {

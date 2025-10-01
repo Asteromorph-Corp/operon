@@ -1,12 +1,10 @@
 use async_trait::async_trait;
 
-use crate::{
-    meta_storage::MetaClient,
-    scheduler::{PrimarySpec, SchedulerError},
-    schema_base::ResolutionSql,
-    service::OperonService,
-    storage::OperonStorage,
-};
+use crate::meta_storage::MetaClient;
+use crate::scheduler::{PrimarySpec, SchedulerError};
+use crate::schema_base::ResolutionSql;
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
 
 #[async_trait]
 pub trait PrimaryHandler<Svc, Sto>: Send + Sync + 'static
@@ -17,10 +15,12 @@ where
     /// Initialize the PSQL fact storage for the primary resolution.
     ///
     /// This function should be idempotent,
-    /// i.e. calling it multiple times, or calling it on an already-initialized storage should do nothing.
+    /// i.e. calling it multiple times, or calling it on an already-initialized storage should do
+    /// nothing.
     async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>;
 
-    /// Clear the primary resolution from the PSQL fact storage, assuming the table is already initialized.
+    /// Clear the primary resolution from the PSQL fact storage, assuming the table is already
+    /// initialized.
     async fn clear_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>; // `facts_psql::clear`, 877~
 
     /// Get the primary resolution from the PSQL fact storage.

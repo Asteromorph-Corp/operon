@@ -1,18 +1,19 @@
-use crate::{
-    operon::RunningState,
-    scheduler::{ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver},
-    ui::{Action, LogRecordReceiver, Progress, UiError, UiState, UiStateUpdate},
-    utils::SplitFirstOwned,
-};
-use crossterm::{
-    event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers, MouseEventKind},
-    execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+use std::sync::Arc;
+
+use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers, MouseEventKind};
+use crossterm::execute;
+use crossterm::terminal::{
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 use futures::StreamExt;
-use ratatui::{prelude::*, widgets::*};
-use std::sync::Arc;
+use ratatui::prelude::*;
+use ratatui::widgets::*;
 use tokio::sync::RwLock;
+
+use crate::operon::RunningState;
+use crate::scheduler::{ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver};
+use crate::ui::{Action, LogRecordReceiver, Progress, UiError, UiState, UiStateUpdate};
+use crate::utils::SplitFirstOwned;
 
 const SEVENTY_SIX: u16 = 76;
 const HELP_TEXT: &str = r#"Operon TUI.
@@ -79,7 +80,8 @@ impl UiLoop {
         terminal.clear()?;
 
         // Main loop for the UI.
-        // Note: breaking this loop exits the UI, at least guard against `any_alive` before breaking.
+        // Note: breaking this loop exits the UI, at least guard against `any_alive` before
+        // breaking.
         let mut events = EventStream::new();
         loop {
             {

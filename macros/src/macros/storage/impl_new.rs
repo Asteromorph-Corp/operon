@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::EntityConfigMap,
-    utils::{operon_ident, sql_storage_ident},
-};
+use crate::configs::EntityConfigMap;
+use crate::utils::{operon_ident, sql_storage_ident};
 
 pub(super) fn impl_new(service_id: &str, entities: &EntityConfigMap) -> syn::ItemImpl {
     let operon = operon_ident();

@@ -1,12 +1,11 @@
 use thiserror::Error;
-use tokio::{sync::AcquireError, task::JoinError};
+use tokio::sync::AcquireError;
+use tokio::task::JoinError;
 
-use crate::{
-    meta_storage::MetaStorageError,
-    scheduler::{ControlEvent, RecoveryState, RecoveryStateSendError},
-    storage::StorageError,
-    ui::UiError,
-};
+use crate::meta_storage::MetaStorageError;
+use crate::scheduler::{ControlEvent, RecoveryState, RecoveryStateSendError};
+use crate::storage::StorageError;
+use crate::ui::UiError;
 
 #[derive(Debug, Error)]
 pub enum SchedulerError {

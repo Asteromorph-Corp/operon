@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::DimensionId,
-    utils::{operon_ident, resolution_enum_ident, resolution_ident, variant_ident},
-};
+use crate::configs::DimensionId;
+use crate::utils::{operon_ident, resolution_enum_ident, resolution_ident, variant_ident};
 
 /// Generates an implementation of the `ResolutionEnum` trait for a given resolution enum.
 ///

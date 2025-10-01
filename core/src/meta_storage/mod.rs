@@ -9,7 +9,8 @@ mod init_schema;
 pub use init_schema::*;
 
 /// Operations for footprinting the PSQL metadata storage.
-/// Given a connection with an optional schema, this module provides operations footprint the metadata storage.
+/// Given a connection with an optional schema, this module provides operations footprint the
+/// metadata storage.
 mod footprint;
 pub use footprint::*;
 

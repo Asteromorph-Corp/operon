@@ -1,11 +1,9 @@
 use syn::parse_quote;
 
-use crate::{
-    JobConfig,
-    utils::{
-        clear_ticket_ident, get_all_ident, init_ticket_ident, job_ident, operon_ident,
-        put_ticket_ident, ticket_ident, variable_ident,
-    },
+use crate::JobConfig;
+use crate::utils::{
+    clear_ticket_ident, get_all_ident, init_ticket_ident, job_ident, operon_ident,
+    put_ticket_ident, ticket_ident, variable_ident,
 };
 
 /// Generates the implementation of the `TicketSql` trait for a given job's ticket.
@@ -105,7 +103,6 @@ use crate::{
 ///         operon::meta_storage::get_ticket_summary::<BetaJob>(client).await
 ///     }
 /// }
-///
 pub(super) fn impl_ticket_sql(job: &JobConfig) -> syn::ItemImpl {
     let operon = operon_ident();
     let ticket_ident = ticket_ident(&job.id);
@@ -229,9 +226,8 @@ pub(super) fn impl_ticket_sql(job: &JobConfig) -> syn::ItemImpl {
 mod tests {
     use syn::parse_quote;
 
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_impl_ticket_sql() {

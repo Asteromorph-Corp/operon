@@ -3,11 +3,9 @@ use indexmap::{IndexMap, IndexSet};
 use quote::format_ident;
 use syn::parse_quote;
 
-use crate::{
-    DimensionConfig, JobConfig, JobConfigMap,
-    configs::{DimensionConfigMap, DimensionId, EntityId},
-    utils::{dimension_ident, get_resolution_ident, operon_ident, variable_ident},
-};
+use crate::configs::{DimensionConfigMap, DimensionId, EntityId};
+use crate::utils::{dimension_ident, get_resolution_ident, operon_ident, variable_ident};
+use crate::{DimensionConfig, JobConfig, JobConfigMap};
 
 fn resolution_map_ident(dim: &DimensionId) -> syn::Ident {
     format_ident!("resolution_{}", dim.to_snake_case())
@@ -25,11 +23,11 @@ struct ResolutionIndexEntry<'a> {
     count: usize,
 }
 
-/// Builds an index map that contains the resolution entries which needs to be fetched from a metadata storage
-/// which stores required information for the generation of the `run_job` function.
+/// Builds an index map that contains the resolution entries which needs to be fetched from a
+/// metadata storage which stores required information for the generation of the `run_job` function.
 ///
-/// The index map is keyed by the dimension ID and contains entries that specify the dimension configuration
-/// and the dependencies that need to be collected over.
+/// The index map is keyed by the dimension ID and contains entries that specify the dimension
+/// configuration and the dependencies that need to be collected over.
 fn calculate_dependency<'a>(
     job: &'a JobConfig,
     primary_entity: &'a EntityId,
@@ -200,9 +198,8 @@ pub(super) fn fn_get_dependency_quota(
 
 #[cfg(test)]
 mod tests {
-    use crate::JobArg;
-
     use super::*;
+    use crate::JobArg;
 
     #[test]
     fn test_fn_get_dependency_quota() {

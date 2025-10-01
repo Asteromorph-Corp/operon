@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
-use crate::{
-    configs::JobConfig,
-    utils::{clear_ticket_ident, operon_ident},
-};
+use crate::configs::JobConfig;
+use crate::utils::{clear_ticket_ident, operon_ident};
 
 /// Helper struct to generate the SQL query for clearing a ticket table.
 struct ClearTicketQuery<'a>(&'a JobConfig);
@@ -46,9 +44,8 @@ pub(super) fn fn_clear_ticket(job: &JobConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
-    use crate::configs::JobArg;
-
     use super::*;
+    use crate::configs::JobArg;
 
     #[test]
     fn test_clear_ticket_query() {

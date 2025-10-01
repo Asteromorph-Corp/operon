@@ -1,12 +1,10 @@
 use syn::parse_quote;
 
-use crate::{
-    AllConfig,
-    macros::storage::{
-        data_storage_definition::data_storage_definition, impl_new::impl_new,
-        impl_service_storage::impl_service_storage, impl_storage::impl_storage,
-    },
-};
+use crate::AllConfig;
+use crate::macros::storage::data_storage_definition::data_storage_definition;
+use crate::macros::storage::impl_new::impl_new;
+use crate::macros::storage::impl_service_storage::impl_service_storage;
+use crate::macros::storage::impl_storage::impl_storage;
 
 pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
     let data_storage_definition =
