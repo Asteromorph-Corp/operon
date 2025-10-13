@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{job_ident, rebuilder_ident, spawn_resolution};
 
 /// Generates a struct definition for a job rebuilder.

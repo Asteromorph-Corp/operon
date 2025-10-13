@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{dimension_ident, job_ident, variable_ident};
 
 /// Generates a struct definition for the job, which includes fields for each dimension.

@@ -1,11 +1,10 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::EntityConfigMap;
+use crate::configs::{EntityConfig, EntityConfigMap, JobArg, JobConfigMap};
 use crate::utils::{
     batch_get_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident,
 };
-use crate::{EntityConfig, JobArg, JobConfigMap};
 
 struct BatchGetQuery<'a>(&'a JobArg, &'a EntityConfig);
 

@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use quote::quote;
 use syn::parse_quote;
 
-use crate::AllConfig;
+use crate::configs::AllConfig;
 use crate::dependency_analysis::{
     get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on,
     get_quota_requiring_jobs,

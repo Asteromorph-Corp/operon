@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::utils::{
     explode_ident, operon_ident, resolution_ident, ticket_ident, variable_ident, with_ident,
 };
-use crate::{DimensionConfig, JobConfig};
+use crate::configs::{DimensionConfig, JobConfig};
 
 /// A helper struct to generate the SQL query for popping tickets to be exploded.
 struct ExplodePopQuery<'a>(&'a JobConfig, &'a DimensionConfig);

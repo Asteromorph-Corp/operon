@@ -1,9 +1,8 @@
 use syn::parse_quote;
 
-use crate::configs::{DimensionConfigMap, EntityId};
+use crate::configs::{DimensionConfigMap, EntityId, JobConfig, JobConfigMap};
 use crate::macros::schema::ticket::fn_get_dependency_quota::fn_get_dependency_quota;
 use crate::utils::{job_ident, operon_ident, spawn_resolution, ticket_ident, variable_ident};
-use crate::{JobConfig, JobConfigMap};
 
 /// Generates the implementation of the `Ticket` trait for a given job's ticket.
 pub(super) fn impl_ticket(

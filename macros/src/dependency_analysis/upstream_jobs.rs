@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use indexmap::IndexSet;
 
-use crate::configs::EntityId;
-use crate::{JobConfig, JobConfigMap};
+use crate::configs::{EntityId, JobConfig, JobConfigMap};
 
 /// Returns a mapping from job `to` entity to job `id`.
 fn build_upstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, &JobConfig> {
@@ -77,7 +76,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::JobConfigMap;
+    use crate::configs::JobConfigMap;
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]

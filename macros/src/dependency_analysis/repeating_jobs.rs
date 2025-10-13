@@ -1,7 +1,6 @@
 use indexmap::IndexSet;
 
-use crate::configs::DimensionId;
-use crate::{JobConfig, JobConfigMap};
+use crate::configs::{DimensionId, JobConfig, JobConfigMap};
 
 /// Returns a set of job ids that are repeating jobs for the given target dimension.
 pub fn get_jobs_repeating_on<'a>(

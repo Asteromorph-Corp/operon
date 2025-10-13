@@ -1,8 +1,7 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::JobConfig;
-use crate::configs::DimensionId;
+use crate::configs::{DimensionId, JobConfig};
 use crate::utils::{
     explode_ident, mark_done_ident, operon_ident, put_resolution_ident, raise_dep_ident,
     rebuilder_ident, resolution_ident, ticket_ident, variable_ident,
@@ -152,7 +151,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::JobConfigMap;
+    use crate::configs::JobConfigMap;
     use crate::dependency_analysis::{get_direct_downstream_jobs, get_jobs_repeating_on};
     use crate::test_utils::assert_item_eq;
     use crate::test_utils::simple_pipeline::{all_jobs, job_beta, primary_dim};

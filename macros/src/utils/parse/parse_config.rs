@@ -6,9 +6,10 @@ use indexmap::IndexMap;
 use syn::parse::{Parse, ParseBuffer};
 
 use super::config_decl::ConfigDecl;
-use crate::configs::DimensionConfigMap;
+use crate::configs::{
+    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, JobArg, JobConfig,
+};
 use crate::utils::DedupHasher;
-use crate::{AllConfig, DimensionConfig, EntityConfig, JobArg, JobConfig};
 
 fn create_generic_ident(id: &str, hasher: &mut DedupHasher) -> proc_macro2::Ident {
     proc_macro2::Ident::new(

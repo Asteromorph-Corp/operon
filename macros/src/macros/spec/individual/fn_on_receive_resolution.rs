@@ -1,7 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
-use crate::configs::DimensionConfigMap;
+use crate::configs::{DimensionConfigMap, JobConfig};
 use crate::dependency_analysis::get_quota_required_dims;
 use crate::utils::{
     explode_ident, operon_ident, resolution_enum_ident, resolve_dep_ident, variant_ident,

@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::utils::{
     batch_put_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident,
 };
-use crate::{JobConfig, JobConfigMap};
+use crate::configs::{JobConfig, JobConfigMap};
 
 struct BatchPutTempTableQuery<'a>(&'a JobConfig);
 

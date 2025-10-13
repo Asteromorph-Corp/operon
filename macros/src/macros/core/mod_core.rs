@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::AllConfig;
+use crate::configs::AllConfig;
 use crate::macros::core::trait_service::trait_service;
 use crate::macros::core::trait_storage::trait_storage;
 

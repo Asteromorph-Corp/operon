@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{dimension_ident, operon_ident, ticket_ident, variable_ident};
 
 /// Generates a struct definition for a ticket for a given job.

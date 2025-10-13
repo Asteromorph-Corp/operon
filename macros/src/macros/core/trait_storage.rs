@@ -1,12 +1,11 @@
 use quote::{format_ident, quote};
 use syn::parse_quote;
 
-use crate::configs::EntityConfigMap;
+use crate::configs::{AllConfig, EntityConfigMap, JobConfigMap};
 use crate::utils::{
     batch_get_entity_ident, batch_put_entity_ident, dimension_ident, entity_ident,
     get_entity_ident, operon_ident, put_entity_ident, storage_trait_ident, variable_ident,
 };
-use crate::{AllConfig, JobConfigMap};
 
 /// A helper function to generate single operation functions for each entity.
 fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
@@ -176,8 +175,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::JobConfigMap;
-    use crate::configs::EntityConfigMap;
+    use crate::configs::{EntityConfigMap, JobConfigMap};
     use crate::test_utils::assert_items_eq_in_trait;
     use crate::test_utils::complicated_pipeline::{
         all_entities as all_entities_complicated, all_jobs as all_jobs_complicated,

@@ -1,7 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfigMap;
-use crate::configs::EntityConfigMap;
+use crate::configs::{EntityConfigMap, JobConfigMap};
 use crate::macros::storage::batch_gets::batch_gets;
 use crate::macros::storage::batch_puts::batch_puts;
 use crate::macros::storage::generic_constraints;

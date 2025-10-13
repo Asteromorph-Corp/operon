@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{
     get_all_ident, get_resolution_ident, operon_ident, rebuilder_ident, variable_ident,
 };

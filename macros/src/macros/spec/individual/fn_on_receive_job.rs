@@ -1,7 +1,7 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{job_enum_ident, operon_ident, raise_dep_ident, variable_ident, variant_ident};
 
 /// Generates the `on_receive_job` function for the implementation of the trait `JobSpec`.
@@ -84,7 +84,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::JobConfigMap;
+    use crate::configs::JobConfigMap;
     use crate::dependency_analysis::get_direct_upstream_jobs;
     use crate::test_utils::assert_item_eq;
     use crate::test_utils::simple_pipeline::all_jobs;

@@ -3,13 +3,14 @@ use indexmap::{IndexMap, IndexSet};
 use quote::{format_ident, quote};
 use syn::parse_quote;
 
-use crate::configs::{DimensionConfigMap, DimensionId, EntityConfigMap};
+use crate::configs::{
+    DimensionConfig, DimensionConfigMap, DimensionId, EntityConfig, EntityConfigMap, JobConfig,
+};
 use crate::utils::{
     batch_get_entity_ident, batch_put_entity_ident, dimension_ident, entity_over_dim_ident,
     get_entity_ident, get_resolution_ident, job_fn_ident, operon_ident, put_entity_ident,
     resolution_ident, variable_ident,
 };
-use crate::{DimensionConfig, EntityConfig, JobConfig};
 
 fn resolution_map_ident(dim: &DimensionId) -> syn::Ident {
     format_ident!("resolution_{}", dim.to_snake_case())

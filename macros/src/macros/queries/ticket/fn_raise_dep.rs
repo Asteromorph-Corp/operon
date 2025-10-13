@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{dimension_ident, operon_ident, raise_dep_ident, ticket_ident, variable_ident};
 
 /// A helper struct to generate the SQL query for popping tickets to be raised.

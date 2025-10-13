@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{
     clear_ticket_ident, get_all_ident, init_ticket_ident, job_ident, operon_ident,
     put_ticket_ident, ticket_ident, variable_ident,

@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 
 pub(super) fn fn_pool_size(job: &JobConfig) -> syn::ImplItemFn {
     let pool_size = job.pool_size;

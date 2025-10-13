@@ -3,9 +3,10 @@ use indexmap::{IndexMap, IndexSet};
 use quote::format_ident;
 use syn::parse_quote;
 
-use crate::configs::{DimensionConfigMap, DimensionId, EntityId};
+use crate::configs::{
+    DimensionConfig, DimensionConfigMap, DimensionId, EntityId, JobConfig, JobConfigMap,
+};
 use crate::utils::{dimension_ident, get_resolution_ident, operon_ident, variable_ident};
-use crate::{DimensionConfig, JobConfig, JobConfigMap};
 
 fn resolution_map_ident(dim: &DimensionId) -> syn::Ident {
     format_ident!("resolution_{}", dim.to_snake_case())

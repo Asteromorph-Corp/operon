@@ -1,7 +1,6 @@
 use quote::quote;
 
-use crate::DimensionConfig;
-use crate::configs::{DimensionConfigMap, JobConfig};
+use crate::configs::{DimensionConfig, DimensionConfigMap, JobConfig};
 use crate::dependency_analysis::get_quota_required_dims;
 use crate::macros::queries::ticket::fn_clear_ticket::fn_clear_ticket;
 use crate::macros::queries::ticket::fn_explode::fn_explode;

@@ -1,7 +1,6 @@
 use indexmap::IndexSet;
 
-use crate::configs::{DimensionConfigMap, DimensionId};
-use crate::{DimensionConfig, JobConfig, JobConfigMap};
+use crate::configs::{DimensionConfig, DimensionConfigMap, DimensionId, JobConfig, JobConfigMap};
 
 /// Gett all dimensions that are required for the dependency quota calculation for the `target_job`.
 pub fn get_quota_required_dims<'a>(

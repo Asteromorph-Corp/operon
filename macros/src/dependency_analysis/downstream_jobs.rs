@@ -1,6 +1,6 @@
 use indexmap::IndexSet;
 
-use crate::{JobConfig, JobConfigMap};
+use crate::configs::{JobConfig, JobConfigMap};
 
 /// Return the full set of jobs that directly depend on `target_job`.
 ///

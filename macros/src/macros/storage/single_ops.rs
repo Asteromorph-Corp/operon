@@ -1,7 +1,6 @@
 use syn::parse_quote;
 
-use crate::EntityConfig;
-use crate::configs::EntityConfigMap;
+use crate::configs::{EntityConfig, EntityConfigMap};
 use crate::utils::{
     dimension_ident, entity_ident, get_entity_ident, operon_ident, put_entity_ident, variable_ident,
 };

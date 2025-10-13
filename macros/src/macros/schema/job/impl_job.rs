@@ -1,7 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
-use crate::configs::JobConfigMap;
+use crate::configs::{JobConfig, JobConfigMap};
 use crate::dependency_analysis::get_upstream_jobs;
 use crate::utils::{job_id_ident, job_ident};
 
@@ -50,8 +49,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::JobConfig;
-    use crate::configs::JobConfigMap;
+    use crate::configs::{JobConfig, JobConfigMap};
     use crate::test_utils::assert_item_eq;
     use crate::test_utils::simple_pipeline::{all_jobs, job_beta, job_epsilon};
 

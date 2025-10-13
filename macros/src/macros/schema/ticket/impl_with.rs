@@ -1,7 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
-use crate::configs::DimensionId;
+use crate::configs::{DimensionId, JobConfig};
 use crate::utils::{dimension_ident, operon_ident, ticket_ident, variable_ident, with_ident};
 
 fn fn_with(job: &JobConfig, dim: &DimensionId) -> syn::ImplItemFn {

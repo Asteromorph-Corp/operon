@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::AllConfig;
+use crate::configs::AllConfig;
 use crate::macros::core::mod_core;
 use crate::macros::prelude::prelude;
 use crate::macros::queries::mod_queries;

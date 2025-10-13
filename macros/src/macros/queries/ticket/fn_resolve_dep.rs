@@ -1,8 +1,7 @@
 use syn::parse_quote;
 
-use crate::configs::DimensionId;
+use crate::configs::{DimensionConfig, DimensionId, JobConfig};
 use crate::utils::{operon_ident, resolution_ident, resolve_dep_ident, ticket_ident};
-use crate::{DimensionConfig, JobConfig};
 
 /// A helper struct to generate the SQL query for popping tickets to be raised.
 struct ResolveDepPopQuery<'a>(&'a JobConfig, &'a [&'a DimensionId]);

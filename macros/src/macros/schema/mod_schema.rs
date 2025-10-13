@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::AllConfig;
+use crate::configs::AllConfig;
 use crate::macros::schema::dimension::mod_dimension;
 use crate::macros::schema::job::mod_job;
 use crate::macros::schema::resolution::mod_resolution;

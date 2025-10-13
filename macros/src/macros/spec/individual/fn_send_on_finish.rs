@@ -1,7 +1,7 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{operon_ident, sender_ident};
 
 /// Generates the `send_on_finish` function for the implementation of the trait `JobSpec`.
@@ -127,7 +127,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::JobConfigMap;
+    use crate::configs::JobConfigMap;
     use crate::dependency_analysis::{get_direct_downstream_jobs, get_jobs_repeating_on};
     use crate::test_utils::assert_item_eq;
     use crate::test_utils::simple_pipeline::{all_jobs, job_beta};

@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{job_ident, mark_done_ident, operon_ident};
 
 /// Generates an implementation of the `JobSql` trait for the given job.

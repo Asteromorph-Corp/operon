@@ -1,8 +1,7 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::JobConfig;
-use crate::configs::{DimensionConfigMap, EntityConfigMap};
+use crate::configs::{DimensionConfigMap, EntityConfigMap, JobConfig};
 use crate::macros::spec::individual::fn_check_consistency::fn_check_consistency;
 use crate::macros::spec::individual::fn_on_receive_job::fn_on_receive_job;
 use crate::macros::spec::individual::fn_on_receive_resolution::fn_on_receive_resolution;

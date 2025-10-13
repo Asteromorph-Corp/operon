@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::AllConfig;
+use crate::configs::AllConfig;
 use crate::macros::queries::resolution::resolution_queries;
 use crate::macros::queries::ticket::ticket_queries;
 

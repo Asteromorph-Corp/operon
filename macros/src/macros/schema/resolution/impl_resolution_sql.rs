@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::DimensionConfig;
+use crate::configs::DimensionConfig;
 use crate::utils::{
     clear_resolution_ident, get_resolution_ident, init_resolution_ident, operon_ident,
     put_resolution_ident, resolution_ident,

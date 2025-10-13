@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::JobConfig;
+use crate::configs::JobConfig;
 use crate::utils::{job_enum_ident, job_ident, variant_ident};
 
 /// Generates an implementation of `From<Job>` for the `JobEnum`.

@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::AllConfig;
+use crate::configs::AllConfig;
 use crate::utils::{
     entity_ident, get_handler_ident, operon_ident, service_trait_ident, spec_ident,
     sql_storage_ident, storage_trait_ident,
