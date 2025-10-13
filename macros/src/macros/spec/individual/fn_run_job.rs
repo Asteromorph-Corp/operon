@@ -387,8 +387,11 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
+    use crate::test_utils::complicated_pipeline::{
+        all_dimensions as all_dimensions_complicated, all_entities as all_entities_complicated,
+        job_delta as job_multiple_over,
+    };
     use crate::test_utils::simple_pipeline::{all_dimensions, all_entities, job_beta, job_epsilon};
-    use crate::{EntityConfig, JobArg};
 
     #[rstest]
     #[case::simple(
@@ -403,11 +406,11 @@ mod tests {
         job_epsilon(),
         "spec/fn_run_job.with_over.rs"
     )]
-    #[case::with_multi_dimensional_over(
-        entities_multiple_over(),
-        dimensions_multiple_over(),
+    #[case::multiple_over(
+        all_entities_complicated(),
+        all_dimensions_complicated(),
         job_multiple_over(),
-        "spec/fn_run_job.with_multi_dimensional_over.rs"
+        "spec/fn_run_job.multiple_over.rs"
     )]
     fn test_fn_run_job(
         #[case] all_entities: EntityConfigMap,
@@ -417,87 +420,5 @@ mod tests {
     ) {
         let item = fn_run_job(&job, &all_entities, &all_dimensions);
         assert_item_eq(&item, fixture_path);
-    }
-
-    fn entities_multiple_over() -> EntityConfigMap {
-        EntityConfigMap::from_iter([
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-            (
-                "d".to_string(),
-                EntityConfig {
-                    id: "d".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-                    generic: format_ident!("D_"),
-                },
-            ),
-            (
-                "e".to_string(),
-                EntityConfig {
-                    id: "e".to_string(),
-                    dims: vec!["i".to_string(), "l".to_string()],
-                    generic: format_ident!("E_"),
-                },
-            ),
-        ])
-    }
-
-    fn dimensions_multiple_over() -> DimensionConfigMap {
-        DimensionConfigMap::from_iter([
-            (
-                "i".to_string(),
-                DimensionConfig {
-                    id: "i".to_string(),
-                    depends_on: vec![],
-                },
-            ),
-            (
-                "j".to_string(),
-                DimensionConfig {
-                    id: "j".to_string(),
-                    depends_on: vec!["i".to_string()],
-                },
-            ),
-            (
-                "k".to_string(),
-                DimensionConfig {
-                    id: "k".to_string(),
-                    depends_on: vec!["i".to_string(), "j".to_string()],
-                },
-            ),
-            (
-                "l".to_string(),
-                DimensionConfig {
-                    id: "l".to_string(),
-                    depends_on: vec!["i".to_string()],
-                },
-            ),
-        ])
-    }
-
-    fn job_multiple_over() -> JobConfig {
-        JobConfig {
-            id: "epsilon".to_string(),
-            from: vec![
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec!["j".to_string()],
-                },
-                JobArg {
-                    id: "d".to_string(),
-                    over: vec!["j".to_string(), "k".to_string()],
-                },
-            ],
-            to: "e".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("l".to_string()),
-            pool_size: 4,
-        }
     }
 }

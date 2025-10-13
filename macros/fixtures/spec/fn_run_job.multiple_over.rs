@@ -46,12 +46,12 @@ async fn run_job(
             .map(|(j, elem)| Ok(elem))
             .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
     }?;
-    let d_j_k = {
-        let elem = storage.get_all_d_over_jk(job.i).await?;
+    let c_j_k = {
+        let elem = storage.get_all_c_over_jk(job.i).await?;
         let ub = resolution_j.get(&()).unwrap_or(&0);
         if elem.len() < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
-                "d (i = {}, j = *, k = _) expects {} elements, but only {} were found",
+                "c (i = {}, j = *, k = _) expects {} elements, but only {} were found",
                 job.i,
                 ub,
                 elem.len()
@@ -65,7 +65,7 @@ async fn run_job(
                 let ub = resolution_k.get(&(j,)).unwrap_or(&0);
                 if elem.len() < *ub {
                     return Err(operon::storage::StorageError::NotFound(format!(
-                        "d (i = {}, j = {}, k = *) expects {} elements, but only {} were found",
+                        "c (i = {}, j = {}, k = *) expects {} elements, but only {} were found",
                         job.i,
                         j,
                         ub,
@@ -82,12 +82,12 @@ async fn run_job(
             .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
     }?;
 
-    let e_l = service
-        .epsilon(b_j, d_j_k)
+    let d_l = service
+        .delta(b_j, c_j_k)
         .await
         .map_err(operon::scheduler::SchedulerError::UserError)?;
-    let resolution = schema::LResolution(e_l.len(), job.i);
+    let resolution = schema::LResolution(d_l.len(), job.i);
 
-    storage.put_all_e(job.i, e_l).await?;
+    storage.put_all_d(job.i, d_l).await?;
     Ok(resolution)
 }

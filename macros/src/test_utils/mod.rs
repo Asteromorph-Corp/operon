@@ -1,4 +1,5 @@
-pub mod simple_pipeline;
+mod sample_pipeline;
+pub use sample_pipeline::*;
 
 mod normalize_string;
 

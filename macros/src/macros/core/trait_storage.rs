@@ -176,62 +176,13 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::JobConfigMap;
     use crate::configs::EntityConfigMap;
     use crate::test_utils::assert_items_eq_in_trait;
+    use crate::test_utils::complicated_pipeline::{
+        all_entities as all_entities_complicated, all_jobs as all_jobs_complicated,
+    };
     use crate::test_utils::simple_pipeline::{all_entities, all_jobs};
-    use crate::{EntityConfig, JobArg, JobConfig, JobConfigMap};
-
-    fn jobs_multiple_over() -> JobConfigMap {
-        JobConfigMap::from_iter([(
-            "epsilon".to_string(),
-            JobConfig {
-                id: "epsilon".to_string(),
-                from: vec![
-                    JobArg {
-                        id: "b".to_string(),
-                        over: vec!["j".to_string()],
-                    },
-                    JobArg {
-                        id: "d".to_string(),
-                        over: vec!["j".to_string(), "k".to_string()],
-                    },
-                ],
-                to: "e".to_string(),
-                dims: vec!["i".to_string()],
-                spawn_dim: Some("l".to_string()),
-                pool_size: 4,
-            },
-        )])
-    }
-
-    fn entities_multiple_over() -> EntityConfigMap {
-        EntityConfigMap::from_iter([
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-            (
-                "d".to_string(),
-                EntityConfig {
-                    id: "d".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-                    generic: format_ident!("D_"),
-                },
-            ),
-            (
-                "e".to_string(),
-                EntityConfig {
-                    id: "e".to_string(),
-                    dims: vec!["i".to_string(), "l".to_string()],
-                    generic: format_ident!("E_"),
-                },
-            ),
-        ])
-    }
 
     #[rstest]
     fn test_single_ops(all_entities: EntityConfigMap) {
@@ -240,11 +191,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case::simple(all_jobs(), all_entities(), "core/storage_batch_gets.rs")]
+    #[case::simple(all_jobs(), all_entities(), "core/storage_batch_gets.simple.rs")]
     #[case::multiple_over(
-        jobs_multiple_over(),
-        entities_multiple_over(),
-        "core/storage_batch_gets_multiple_over.rs"
+        all_jobs_complicated(),
+        all_entities_complicated(),
+        "core/storage_batch_gets.multiple_over.rs"
     )]
     fn test_batch_gets(
         #[case] all_jobs: JobConfigMap,
