@@ -3,6 +3,9 @@ mod dependency_analysis;
 mod macros;
 mod utils;
 
+#[cfg(test)]
+mod test_utils;
+
 use proc_macro::TokenStream;
 use quote::quote;
 

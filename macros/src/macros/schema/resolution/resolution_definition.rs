@@ -31,20 +31,20 @@ pub(super) fn resolution_definition(dimension: &DimensionConfig) -> syn::ItemStr
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn test_resolution_definition() {
-        let dimension = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec!["j".to_string(), "k".to_string()],
-        };
-        let result = resolution_definition(&dimension);
-        let expected: syn::ItemStruct = parse_quote! {
-            #[doc = "A struct representing the resolution of dimension i"]
-            #[derive(Debug, Clone, Copy)]
-            pub struct IResolution(pub IDim, pub JDim, pub KDim);
-        };
-        assert_eq!(result, expected);
+    use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{dimension_i, dimension_j};
+
+    #[rstest]
+    #[case::simple(dimension_i(), "schema/resolution/resolution_definition.simple.rs")]
+    #[case::with_dependency(
+        dimension_j(),
+        "schema/resolution/resolution_definition.with_dependency.rs"
+    )]
+    fn test_resolution_definition(#[case] dim: DimensionConfig, #[case] fixture_path: &str) {
+        let result = resolution_definition(&dim);
+        assert_item_eq(&result, fixture_path);
     }
 }

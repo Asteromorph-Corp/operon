@@ -47,96 +47,19 @@ pub(super) fn impl_job(job: &JobConfig, jobs: &JobConfigMap) -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use rstest::rstest;
 
     use super::*;
     use crate::JobConfig;
-    use crate::configs::{JobArg, JobConfigMap};
+    use crate::configs::JobConfigMap;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_jobs, job_beta, job_epsilon};
 
-    #[test]
-    fn test_impl_job() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let jobs = JobConfigMap::from_iter([("beta".to_string(), job.clone())]);
-
-        let item = impl_job(&job, &jobs);
-        let expected: syn::ItemImpl = parse_quote! {
-            #[automatically_derived]
-            impl operon::schema_base::Job for BetaJob {
-                fn id() -> &'static str {
-                    BETA_ID
-                }
-
-                fn is_descendant_of(other: &str) -> bool {
-                    other == BETA_ID
-                }
-            }
-        };
-
-        assert_eq!(item, expected);
-    }
-
-    #[test]
-    fn test_impl_job_with_dependencies() {
-        let job_epsilon = JobConfig {
-            id: "epsilon".to_string(),
-            from: vec![
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec!["j".to_string()],
-                },
-                JobArg {
-                    id: "d".to_string(),
-                    over: vec!["j".to_string()],
-                },
-            ],
-            to: "e".to_string(),
-            dims: vec!["i".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-
-        let jobs = JobConfigMap::from_iter([
-            (
-                "beta".to_string(),
-                JobConfig {
-                    id: "beta".to_string(),
-                    from: vec![JobArg {
-                        id: "a".to_string(),
-                        over: vec![],
-                    }],
-                    to: "b".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: Some("j".to_string()),
-                    pool_size: 8,
-                },
-            ),
-            ("epsilon".to_string(), job_epsilon.clone()),
-        ]);
-
-        let item = impl_job(&job_epsilon, &jobs);
-        let expected: syn::ItemImpl = parse_quote! {
-            #[automatically_derived]
-            impl operon::schema_base::Job for EpsilonJob {
-                fn id() -> &'static str {
-                    EPSILON_ID
-                }
-
-                fn is_descendant_of(other: &str) -> bool {
-                    other == BETA_ID || other == EPSILON_ID
-                }
-            }
-        };
-
-        assert_eq!(item, expected);
+    #[rstest]
+    #[case::simple(job_beta(), "schema/job/impl_job.simple.rs")]
+    #[case::has_ancestor(job_epsilon(), "schema/job/impl_job.has_ancestor.rs")]
+    fn test_impl_job(all_jobs: JobConfigMap, #[case] job: JobConfig, #[case] fixture_path: &str) {
+        let result = impl_job(&job, &all_jobs);
+        assert_item_eq(&result, fixture_path);
     }
 }

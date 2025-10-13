@@ -49,43 +49,23 @@ pub(super) fn fn_clear_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::dimension_i;
 
-    #[test]
-    fn test_clear_resolution_query() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
-
-        let clear_resolution = ClearResolutionQuery(&dimension_i);
-
-        let stmt_i = "TRUNCATE TABLE {schema_prefix}dimension_i;";
-
-        assert_eq!(clear_resolution.to_string(), stmt_i);
+    #[rstest]
+    #[case::simple(dimension_i(), "TRUNCATE TABLE {schema_prefix}dimension_i;")]
+    fn test_clear_resolution_query(#[case] dim: DimensionConfig, #[case] expected: &str) {
+        let stmt = ClearResolutionQuery(&dim).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_fn_clear_resolution() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
-
-        let result_i = fn_clear_resolution(&dimension_i);
-
-        let stmt_i = "TRUNCATE TABLE {schema_prefix}dimension_i;"; // Note: placing this string literal inside the quote! macro results in a `\n` instead of `\\n`, causing the test to fail.
-        let expected_i: syn::ItemFn = parse_quote! {
-            pub async fn clear_resolution_i(
-                client: operon::meta_storage::MetaClient<'_>,
-            ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let stmt = format!(#stmt_i);
-                client.execute(&stmt, &[]).await?;
-                Ok(())
-            }
-        };
-
-        assert_eq!(result_i, expected_i);
+    #[rstest]
+    #[case::simple(dimension_i(), "queries/resolution/clear_resolution.rs")]
+    fn test_fn_clear_resolution(#[case] dim: DimensionConfig, #[case] fixture_path: &str) {
+        let result = fn_clear_resolution(&dim);
+        assert_item_eq(&result, fixture_path);
     }
 }

@@ -152,11 +152,7 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
         let #arg_ident = storage
             .#get_ident(#(job.#get_args),*)
             .await?
-            .ok_or_else(|| {
-                #operon::storage::StorageError::NotFound(
-                    format!(#not_found_msg, #(job.#get_args),*),
-                )
-        })?;
+            .ok_or_else(|| #operon::storage::StorageError::NotFound(format!(#not_found_msg, #(job.#get_args),*)))?;
     }
 }
 
@@ -184,6 +180,12 @@ fn arg_def_collected(
         .iter()
         .enumerate()
         .rfold(quote! { Ok(elem) }, |acc, (i, dim)| {
+            let acc = if i == over.len() - 1 {
+                acc
+            } else {
+                quote! { { #acc } }
+            };
+
             let dep_var = variable_ident(dim);
             let res_map_ident = resolution_map_ident(dim);
             let res_map_key = resolution_index
@@ -229,7 +231,7 @@ fn arg_def_collected(
                 elem.into_iter()
                     .take(*ub)
                     .enumerate()
-                    .map(|(#dep_var, elem)| { #acc })
+                    .map(|(#dep_var, elem)| #acc)
                     .collect::<Result<Vec<_>, #operon::scheduler::SchedulerError>>()
             }
         });
@@ -274,7 +276,7 @@ fn arg_def_collected(
 ///         elem.into_iter()
 ///             .take(*ub)
 ///             .enumerate()
-///             .map(|(j, elem)| { Ok(elem) })
+///             .map(|(j, elem)| Ok(elem))
 ///             .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
 ///     }?;
 ///     let d_j = {
@@ -288,7 +290,7 @@ fn arg_def_collected(
 ///         elem.into_iter()
 ///             .take(*ub)
 ///             .enumerate()
-///             .map(|(j, elem)| { Ok(elem) })
+///             .map(|(j, elem)| Ok(elem))
 ///             .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
 ///     }?;
 ///
@@ -381,225 +383,44 @@ pub(super) fn fn_run_job(
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_dimensions, all_entities, job_beta, job_epsilon};
     use crate::{EntityConfig, JobArg};
 
-    #[test]
-    fn test_fn_run_job() {
-        let entities = EntityConfigMap::from_iter([
-            (
-                "a".to_string(),
-                EntityConfig {
-                    id: "a".to_string(),
-                    dims: vec!["i".to_string()],
-                    generic: format_ident!("A_"),
-                },
-            ),
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-        ]);
-        let dimensions = DimensionConfigMap::from_iter([
-            (
-                "i".to_string(),
-                DimensionConfig {
-                    id: "i".to_string(),
-                    depends_on: vec![],
-                },
-            ),
-            (
-                "j".to_string(),
-                DimensionConfig {
-                    id: "j".to_string(),
-                    depends_on: vec!["i".to_string()],
-                },
-            ),
-        ]);
-
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-
-        let item = fn_run_job(&job, &entities, &dimensions);
-        let expected: syn::ImplItemFn = parse_quote! {
-            async fn run_job(
-                &self,
-                service: &Svc,
-                storage: &Sto,
-                client: operon::meta_storage::MetaClient<'_>,
-                job: &Self::Job,
-            ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
-                let a = storage
-                    .get_a(job.i)
-                    .await?
-                    .ok_or_else(|| {
-                        operon::storage::StorageError::NotFound(
-                            format!("a_{}", job.i),
-                        )
-                    })?;
-                let b_j = service
-                    .beta(a)
-                    .await
-                    .map_err(operon::scheduler::SchedulerError::UserError)?;
-
-                let resolution = schema::JResolution(b_j.len(), job.i);
-                storage.put_all_b(job.i, b_j).await?;
-
-                Ok(resolution)
-            }
-        };
-
-        assert_eq!(item, expected);
+    #[rstest]
+    #[case::simple(
+        all_entities(),
+        all_dimensions(),
+        job_beta(),
+        "spec/fn_run_job.simple.rs"
+    )]
+    #[case::with_over(
+        all_entities(),
+        all_dimensions(),
+        job_epsilon(),
+        "spec/fn_run_job.with_over.rs"
+    )]
+    #[case::with_multi_dimensional_over(
+        entities_multiple_over(),
+        dimensions_multiple_over(),
+        job_multiple_over(),
+        "spec/fn_run_job.with_multi_dimensional_over.rs"
+    )]
+    fn test_fn_run_job(
+        #[case] all_entities: EntityConfigMap,
+        #[case] all_dimensions: DimensionConfigMap,
+        #[case] job: JobConfig,
+        #[case] fixture_path: &str,
+    ) {
+        let item = fn_run_job(&job, &all_entities, &all_dimensions);
+        assert_item_eq(&item, fixture_path);
     }
 
-    #[test]
-    fn test_fn_run_with_over() {
-        let entities = EntityConfigMap::from_iter([
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-            (
-                "d".to_string(),
-                EntityConfig {
-                    id: "d".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-                    generic: format_ident!("D_"),
-                },
-            ),
-            (
-                "e".to_string(),
-                EntityConfig {
-                    id: "e".to_string(),
-                    dims: vec!["i".to_string(), "k".to_string()],
-                    generic: format_ident!("E_"),
-                },
-            ),
-        ]);
-        let dimensions = DimensionConfigMap::from_iter([
-            (
-                "i".to_string(),
-                DimensionConfig {
-                    id: "i".to_string(),
-                    depends_on: vec![],
-                },
-            ),
-            (
-                "j".to_string(),
-                DimensionConfig {
-                    id: "j".to_string(),
-                    depends_on: vec!["i".to_string()],
-                },
-            ),
-            (
-                "k".to_string(),
-                DimensionConfig {
-                    id: "k".to_string(),
-                    depends_on: vec!["i".to_string()],
-                },
-            ),
-        ]);
-
-        let job = JobConfig {
-            id: "epsilon".to_string(),
-            from: vec![
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec!["j".to_string()],
-                },
-                JobArg {
-                    id: "d".to_string(),
-                    over: vec!["j".to_string()],
-                },
-            ],
-            to: "e".to_string(),
-            dims: vec!["i".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-
-        let item = fn_run_job(&job, &entities, &dimensions);
-        let expected: syn::ImplItemFn = parse_quote! {
-            async fn run_job(
-                &self,
-                service: &Svc,
-                storage: &Sto,
-                client: operon::meta_storage::MetaClient<'_>,
-                job: &Self::Job,
-            ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
-                let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
-                let resolution = queries::get_resolution_j(client, job.i)
-                    .await?
-                    .ok_or_else(|| {
-                        operon::meta_storage::MetaStorageError::MissingResolution(
-                            format!("j_{}", job.i)
-                        )
-                    })?;
-                resolution_j.insert((), resolution.0);
-
-                let b_j = {
-                    let elem = storage.get_all_b_over_j(job.i).await?;
-                    let ub = resolution_j.get(&()).unwrap_or(&0);
-                    if elem.len() < *ub {
-                        return Err(operon::storage::StorageError::NotFound(
-                            format!("b (i = {}, j = *) expects {} elements, but only {} were found", job.i, ub, elem.len()
-                        )).into());
-                    }
-                    elem.into_iter()
-                        .take(*ub)
-                        .enumerate()
-                        .map(|(j, elem)| { Ok(elem) })
-                        .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
-                }?;
-                let d_j = {
-                    let elem = storage.get_all_d_over_j(job.i, job.k).await?;
-                    let ub = resolution_j.get(&()).unwrap_or(&0);
-                    if elem.len() < *ub {
-                        return Err(operon::storage::StorageError::NotFound(
-                            format!("d (i = {}, j = *, k = {}) expects {} elements, but only {} were found", job.i, job.k, ub, elem.len())
-                        ).into());
-                    }
-                    elem.into_iter()
-                        .take(*ub)
-                        .enumerate()
-                        .map(|(j, elem)| { Ok(elem) })
-                        .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
-                }?;
-
-                let e = service
-                    .epsilon(b_j, d_j)
-                    .await
-                    .map_err(operon::scheduler::SchedulerError::UserError)?;
-                let resolution = ();
-
-                storage.put_e(job.i, job.k, e).await?;
-                Ok(resolution)
-            }
-        };
-
-        assert_eq!(item, expected);
-    }
-
-    #[test]
-    fn test_fn_run_with_multi_dimensional_over() {
-        let entities = EntityConfigMap::from_iter([
+    fn entities_multiple_over() -> EntityConfigMap {
+        EntityConfigMap::from_iter([
             (
                 "b".to_string(),
                 EntityConfig {
@@ -624,8 +445,11 @@ mod tests {
                     generic: format_ident!("E_"),
                 },
             ),
-        ]);
-        let dimensions = DimensionConfigMap::from_iter([
+        ])
+    }
+
+    fn dimensions_multiple_over() -> DimensionConfigMap {
+        DimensionConfigMap::from_iter([
             (
                 "i".to_string(),
                 DimensionConfig {
@@ -654,9 +478,11 @@ mod tests {
                     depends_on: vec!["i".to_string()],
                 },
             ),
-        ]);
+        ])
+    }
 
-        let job = JobConfig {
+    fn job_multiple_over() -> JobConfig {
+        JobConfig {
             id: "epsilon".to_string(),
             from: vec![
                 JobArg {
@@ -672,92 +498,6 @@ mod tests {
             dims: vec!["i".to_string()],
             spawn_dim: Some("l".to_string()),
             pool_size: 4,
-        };
-
-        let item = fn_run_job(&job, &entities, &dimensions);
-        let expected: syn::ImplItemFn = parse_quote! {
-            async fn run_job(
-                &self,
-                service: &Svc,
-                storage: &Sto,
-                client: operon::meta_storage::MetaClient<'_>,
-                job: &Self::Job,
-            ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
-                let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
-                let mut resolution_k: std::collections::HashMap<(schema::JDim,), usize> = Default::default();
-
-                let resolution = queries::get_resolution_j(client, job.i)
-                    .await?
-                    .ok_or_else(|| {
-                        operon::meta_storage::MetaStorageError::MissingResolution(
-                            format!("j_{}", job.i)
-                        )
-                    })?;
-                resolution_j.insert((), resolution.0);
-
-                for j in 0..(*resolution_j.get(&()).unwrap_or(&0)) { // TODO: Remove unwrap
-                    let resolution = queries::get_resolution_k(client, job.i, j)
-                    .await?
-                        .ok_or_else(|| {
-                            operon::meta_storage::MetaStorageError::MissingResolution(
-                                format!("k_{},{}", job.i, j)
-                            )
-                        })?;
-                    resolution_k.insert((j,), resolution.0);
-                }
-
-                let b_j = {
-                    let elem = storage.get_all_b_over_j(job.i).await?;
-                    let ub = resolution_j.get(&()).unwrap_or(&0);
-                    if elem.len() < *ub {
-                        return Err(operon::storage::StorageError::NotFound(
-                            format!("b (i = {}, j = *) expects {} elements, but only {} were found", job.i, ub, elem.len())
-                        ).into());
-                    }
-                    elem.into_iter()
-                        .take(*ub)
-                        .enumerate()
-                        .map(|(j, elem)| { Ok(elem) })
-                        .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
-                }?;
-                let d_j_k = {
-                    let elem = storage.get_all_d_over_jk(job.i).await?;
-                    let ub = resolution_j.get(&()).unwrap_or(&0);
-                    if elem.len() < *ub {
-                        return Err(operon::storage::StorageError::NotFound(
-                            format!("d (i = {}, j = *, k = _) expects {} elements, but only {} were found", job.i, ub, elem.len())
-                        ).into());
-                    }
-                    elem.into_iter()
-                        .take(*ub)
-                        .enumerate()
-                        .map(|(j, elem)| {
-                            let ub = resolution_k.get(&(j,)).unwrap_or(&0);
-                            if elem.len() < *ub {
-                                return Err(operon::storage::StorageError::NotFound(
-                                    format!("d (i = {}, j = {}, k = *) expects {} elements, but only {} were found", job.i, j, ub, elem.len())
-                                ).into());
-                            }
-                            elem.into_iter()
-                                .take(*ub)
-                                .enumerate()
-                                .map(|(k, elem)| { Ok(elem) })
-                                .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
-                        })
-                        .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
-                }?;
-
-                let e_l = service
-                    .epsilon(b_j, d_j_k)
-                    .await
-                    .map_err(operon::scheduler::SchedulerError::UserError)?;
-                let resolution = schema::LResolution(e_l.len(), job.i);
-
-                storage.put_all_e(job.i, e_l).await?;
-                Ok(resolution)
-            }
-        };
-
-        assert_eq!(item, expected);
+        }
     }
 }

@@ -102,102 +102,23 @@ pub(super) fn impl_ticket(
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use rstest::rstest;
 
     use super::*;
-    use crate::DimensionConfig;
-    use crate::configs::{DimensionId, JobArg};
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_dimensions, all_jobs, primary_entity};
 
-    #[test]
-    fn test_impl_ticket() {
-        let jobs = JobConfigMap::from_iter([(
-            "beta".to_string(),
-            JobConfig {
-                id: "beta".to_string(),
-                from: vec![JobArg {
-                    id: "a".to_string(),
-                    over: vec![],
-                }],
-                to: "b".to_string(),
-                dims: vec!["i".to_string()],
-                spawn_dim: Some("j".to_string()),
-                pool_size: 8,
-            },
-        )]);
-        let primary_entity = DimensionId::from("a");
-        let dimensions = DimensionConfigMap::from_iter([(
-            "i".to_string(),
-            DimensionConfig {
-                id: "i".to_string(),
-                depends_on: vec![],
-            },
-        )]);
-        let beta = jobs.get("beta").unwrap();
-        let item = impl_ticket(beta, &primary_entity, &dimensions, &jobs);
-        let fn_get_dependency_quota =
-            fn_get_dependency_quota(beta, &primary_entity, &dimensions, &jobs);
-        let expected: syn::ItemImpl = parse_quote! {
-            #[operon::async_trait::async_trait]
-            #[automatically_derived]
-            impl operon::schema_base::Ticket for BetaTicket {
-                type Job = schema::BetaJob;
-                type Resolution = schema::JResolution;
-
-                fn new() -> Self {
-                    Self {
-                        deps_quota: Some(0),
-                        deps_done: true,
-                        ..Default::default()
-                    }
-                }
-
-                #fn_get_dependency_quota
-
-                async fn resolve_dependency_quota(
-                    self,
-                    client: operon::meta_storage::MetaClient<'_>,
-                ) -> Result<Self, operon::meta_storage::MetaStorageError> {
-                    let mut ticket = self;
-                    if ticket.deps_quota.is_none() {
-                        ticket.deps_quota = ticket.get_dependency_quota(client).await?;
-                    }
-                    ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
-                    if ticket.is_ready() {
-                        ticket.status = operon::schema_base::TicketStatus::Queued;
-                    }
-                    Ok(ticket)
-                }
-
-                async fn raise_dependency_count(
-                    self,
-                    client: operon::meta_storage::MetaClient<'_>,
-                ) -> Result<Self, operon::meta_storage::MetaStorageError> {
-                    let mut ticket = self;
-                    ticket.deps_count += 1;
-                    ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
-                    if ticket.is_ready() {
-                        ticket.status = operon::schema_base::TicketStatus::Queued;
-                    }
-                    Ok(ticket)
-                }
-
-                fn is_ready(&self) -> bool {
-                    self.is_resolved() && self.deps_done
-                }
-
-                fn is_resolved(&self) -> bool {
-                    self.i.is_some()
-                }
-
-                fn resolve(&self) -> Option<schema::BetaJob> {
-                    if self.is_ready() {
-                        Some(schema::BetaJob { i: self.i.0?, })
-                    } else {
-                        None
-                    }
-                }
-            }
-        };
-        assert_eq!(item, expected);
+    #[rstest]
+    #[case("beta", "schema/ticket/impl_ticket.rs")]
+    fn test_impl_ticket(
+        primary_entity: EntityId,
+        all_jobs: JobConfigMap,
+        all_dimensions: DimensionConfigMap,
+        #[case] job_id: &str,
+        #[case] fixture_path: &str,
+    ) {
+        let job = all_jobs.get(job_id).unwrap();
+        let item = impl_ticket(job, &primary_entity, &all_dimensions, &all_jobs);
+        assert_item_eq(&item, fixture_path);
     }
 }

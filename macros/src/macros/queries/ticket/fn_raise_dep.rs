@@ -139,15 +139,13 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
             let where_clause = if params.is_empty() {
                 String::new()
             } else {
-                format!(
-                    "WHERE {}",
-                    params
-                        .iter()
-                        .enumerate()
-                        .map(|(i, (name, _))| format!("{} = ${}", name, i + 1))
-                        .collect::<Vec<_>>()
-                        .join(" AND "),
-                )
+                let where_clause = params
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (name, _))| format!("{} = ${}", name, i + 1))
+                    .collect::<Vec<_>>()
+                    .join(" AND ");
+                format!("WHERE {where_clause}")
             };
             let params = params.into_iter().map(|(_, param)| param).collect::<Vec<_>>();
             let pop_stmt = format!(#pop_query);
@@ -190,86 +188,16 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
-    use crate::configs::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::job_beta;
 
-    #[test]
-    fn test_fn_raise_dep() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-
+    #[rstest]
+    #[case::simple(job_beta(), "queries/ticket/raise_dep.rs")]
+    fn test_fn_raise_dep(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let item = fn_raise_dep(&job);
-        let expected: syn::ItemFn = parse_quote! {
-            pub async fn raise_dep_beta(
-                client: operon::meta_storage::MetaClient<'_>,
-                i: &operon::schema_base::TicketDepCount<schema::IDim>,
-            ) -> Result<Vec<schema::BetaTicket>, operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let params = [("i", i),]
-                    .into_iter()
-                    .filter_map(|(name, param)| param.0.map(|p| (name, p)))
-                    .map(|(name, param)| i64::try_from(param).map(|p| (name, p)))
-                    .collect::<Result<Vec<_>, _>>()?;
-
-                let where_clause = if params.is_empty() {
-                    String::new()
-                } else {
-                    format!(
-                        "WHERE {}",
-                        params
-                            .iter()
-                            .enumerate()
-                            .map(|(i, (name, _))| format!("{} = ${}", name, i + 1))
-                            .collect::<Vec<_>>()
-                            .join(" AND "),
-                    )
-                };
-                let params = params.into_iter().map(|(_, param)| param).collect::<Vec<_>>();
-                let pop_stmt = format!("DELETE FROM {schema_prefix}ticket_beta\n{where_clause}\nRETURNING *;");
-
-                let rows = client.query(
-                    &pop_stmt,
-                    &params.iter().map(|p| p as &(dyn operon::postgres_types::ToSql + Sync)).collect::<Vec<_>>()
-                ).await?;
-                let tickets = rows
-                    .iter()
-                    .map(<schema::BetaTicket as operon::schema_base::TicketSql>::from_sql_row)
-                    .collect::<Result<Vec<_>, _>>()?;
-                let new_tickets = operon::futures::future::try_join_all(
-                    tickets
-                        .into_iter()
-                        .map(|ticket| operon::schema_base::Ticket::raise_dependency_count(ticket, client))
-                )
-                .await?;
-
-                let copy_stmt = format!("COPY {schema_prefix}ticket_beta (\n    i, resolved, deps_count, deps_quota, deps_done, status\n)\nFROM STDIN WITH (FORMAT csv);");
-                let sink = client.copy_in::<_, operon::bytes::Bytes>(&copy_stmt).await?;
-                let mut sink = Box::pin(sink);
-                for ticket in &new_tickets {
-                    operon::futures::SinkExt::feed(
-                        &mut sink,
-                        operon::schema_base::TicketSql::to_sql_copy_params(ticket)?.into(),
-                    )
-                    .await?;
-                }
-                operon::futures::SinkExt::close(&mut sink).await?;
-
-                let ready_tickets = new_tickets
-                    .into_iter()
-                    .filter(operon::schema_base::Ticket::is_ready)
-                    .collect::<Vec<_>>();
-                Ok(ready_tickets)
-            }
-        };
-        assert_eq!(item, expected);
+        assert_item_eq(&item, fixture_path);
     }
 }

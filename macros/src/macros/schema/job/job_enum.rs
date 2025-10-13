@@ -36,54 +36,15 @@ pub(super) fn job_enum(jobs: &JobConfigMap) -> syn::ItemEnum {
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use rstest::rstest;
 
     use super::*;
-    use crate::JobConfig;
-    use crate::configs::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::all_jobs;
 
-    #[test]
-    fn test_job_enum() {
-        let jobs = JobConfigMap::from_iter([
-            (
-                "beta".to_string(),
-                JobConfig {
-                    id: "beta".to_string(),
-                    from: vec![JobArg {
-                        id: "a".to_string(),
-                        over: vec![],
-                    }],
-                    to: "b".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: Some("j".to_string()),
-                    pool_size: 8,
-                },
-            ),
-            (
-                "gamma".to_string(),
-                JobConfig {
-                    id: "gamma".to_string(),
-                    from: vec![JobArg {
-                        id: "a".to_string(),
-                        over: vec![],
-                    }],
-                    to: "c".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: Some("k".to_string()),
-                    pool_size: 8,
-                },
-            ),
-        ]);
-
-        let item = job_enum(&jobs);
-        let expected: syn::ItemEnum = parse_quote! {
-            #[doc = "An enum representing any job."]
-            #[derive(Debug, Clone)]
-            pub enum JobEnum {
-                Beta(BetaJob),
-                Gamma(GammaJob),
-            }
-        };
-        assert_eq!(item, expected);
+    #[rstest]
+    fn test_job_enum(all_jobs: JobConfigMap) {
+        let result = job_enum(&all_jobs);
+        assert_item_eq(&result, "schema/job/job_enum.rs");
     }
 }

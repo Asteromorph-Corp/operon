@@ -60,72 +60,43 @@ pub(super) fn fn_init_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use rstest::rstest;
 
     use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{dimension_i, dimension_j};
 
-    #[test]
-    fn test_init_resolution_query_no_dependency() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
-
-        let init_resolution = InitResolutionQuery(&dimension_i);
-
-        let stmt_i = indoc! {"
+    #[rstest]
+    #[case::simple(
+        dimension_i(),
+        indoc! {"
             CREATE TABLE IF NOT EXISTS {schema_prefix}dimension_i (
                 i_ub BIGINT NOT NULL
             );"
-        }; // Note: placing this string literal inside the quote! macro results in a `\n` instead of `\\n`, causing the test to fail.
-
-        assert_eq!(init_resolution.to_string(), stmt_i);
-    }
-
-    #[test]
-    fn test_init_resolution_query_with_dependency() {
-        let dimension_j = DimensionConfig {
-            id: "j".to_string(),
-            depends_on: vec!["i".to_string()],
-        };
-
-        let init_resolution = InitResolutionQuery(&dimension_j);
-
-        let stmt_i = indoc! {"
+        },
+    )]
+    #[case::with_dependency(
+        dimension_j(),
+        indoc! {"
             CREATE TABLE IF NOT EXISTS {schema_prefix}dimension_j (
                 i BIGINT,
                 j_ub BIGINT NOT NULL,
                 PRIMARY KEY (i)
             );"
-        };
-
-        assert_eq!(init_resolution.to_string(), stmt_i);
+        }
+    )]
+    fn test_init_resolution_query_no_dependency(
+        #[case] dim: DimensionConfig,
+        #[case] expected: &str,
+    ) {
+        let stmt = InitResolutionQuery(&dim).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_fn_init_resolution() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
-
-        let result_i = fn_init_resolution(&dimension_i);
-
-        let stmt_i = indoc! {"
-            CREATE TABLE IF NOT EXISTS {schema_prefix}dimension_i (
-                i_ub BIGINT NOT NULL
-            );"
-        }; // Note: placing this string literal inside the quote! macro results in a `\n` instead of `\\n`, causing the test to fail.
-        let expected_i: syn::ItemFn = parse_quote! {
-            pub async fn init_resolution_i(
-                client: operon::meta_storage::MetaClient<'_>
-            ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let stmt = format!(#stmt_i);
-                client.execute(&stmt, &[]).await?;
-                Ok(())
-            }
-        };
-
-        assert_eq!(result_i, expected_i);
+    #[rstest]
+    #[case::simple(dimension_i(), "queries/resolution/init_resolution.rs")]
+    fn test_fn_init_resolution(#[case] dim: DimensionConfig, #[case] fixture_path: &str) {
+        let result = fn_init_resolution(&dim);
+        assert_item_eq(&result, fixture_path);
     }
 }

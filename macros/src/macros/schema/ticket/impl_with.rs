@@ -45,69 +45,24 @@ pub(super) fn impl_with_fns(job: &JobConfig) -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::configs::JobArg;
+    use rstest::rstest;
 
-    #[test]
-    fn test_fn_with() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let dim = DimensionId::from("i");
-        let item = fn_with(&job, &dim);
-        let expected: syn::ImplItemFn = parse_quote! {
-            pub fn with_i(self, i: IDim) -> Self {
-                let mut new = BetaTicket {
-                    i: i.into(),
-                    ..self
-                };
-                if operon::schema_base::Ticket::is_ready(&new) {
-                    new.status = operon::schema_base::TicketStatus::Queued;
-                }
-                new
-            }
-        };
-        assert_eq!(item, expected);
+    use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{job_beta, job_delta};
+
+    #[rstest]
+    #[case(job_beta(), DimensionId::from("i"), "schema/ticket/fn_with.rs")]
+    fn test_fn_with(#[case] job: JobConfig, #[case] dim: DimensionId, #[case] fixture_path: &str) {
+        let result = fn_with(&job, &dim);
+        assert_item_eq(&result, fixture_path);
     }
 
-    #[test]
-    fn test_impl_with_fns() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let item = impl_with_fns(&job);
-        let expected: syn::ItemImpl = parse_quote! {
-            impl BetaTicket {
-                pub fn with_i(self, i: IDim) -> Self {
-                    let mut new = BetaTicket {
-                        i: i.into(),
-                        ..self
-                    };
-
-                    if operon::schema_base::Ticket::is_ready(&new) {
-                        new.status = operon::schema_base::TicketStatus::Queued;
-                    }
-
-                    new
-                }
-            }
-        };
-        assert_eq!(item, expected);
+    #[rstest]
+    #[case(job_beta(), "schema/ticket/impl_with_fns.simple.rs")]
+    #[case(job_delta(), "schema/ticket/impl_with_fns.with_dependency.rs")]
+    fn test_impl_with_fns(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let result = impl_with_fns(&job);
+        assert_item_eq(&result, fixture_path);
     }
 }

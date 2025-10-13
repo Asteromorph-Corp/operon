@@ -124,109 +124,29 @@ pub(super) fn fn_send_on_finish(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::JobArg;
+    use rstest::rstest;
 
-    #[test]
-    fn test_fn_send_on_finish() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let delta = JobConfig {
-            id: "delta".to_string(),
-            from: vec![
-                JobArg {
-                    id: "a".to_string(),
-                    over: vec![],
-                },
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec![],
-                },
-                JobArg {
-                    id: "c".to_string(),
-                    over: vec![],
-                },
-            ],
-            to: "d".to_string(),
-            dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-        let epsilon = JobConfig {
-            id: "epsilon".to_string(),
-            from: vec![
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec!["j".to_string()],
-                },
-                JobArg {
-                    id: "d".to_string(),
-                    over: vec!["j".to_string()],
-                },
-            ],
-            to: "e".to_string(),
-            dims: vec!["i".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-        let spawn_dim_repeating_jobs = IndexSet::from_iter([&delta]);
-        let downstream_jobs = IndexSet::from_iter([&delta, &epsilon]);
+    use super::*;
+    use crate::JobConfigMap;
+    use crate::dependency_analysis::{get_direct_downstream_jobs, get_jobs_repeating_on};
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_jobs, job_beta};
+
+    #[rstest]
+    #[case::simple(job_beta(), "spec/fn_send_on_finish.rs")]
+    fn test_fn_send_on_finish(
+        all_jobs: JobConfigMap,
+        #[case] job: JobConfig,
+        #[case] fixture_path: &str,
+    ) {
+        let spawn_dim_repeating_jobs = job
+            .spawn_dim
+            .as_ref()
+            .map(|dim| get_jobs_repeating_on(dim, &all_jobs))
+            .unwrap_or_default();
+        let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
 
         let item = fn_send_on_finish(&job, &spawn_dim_repeating_jobs, &downstream_jobs);
-        let expected: syn::ImplItemFn = parse_quote! {
-            async fn send_on_finish(
-                &self,
-                peer_txs: &Self::PeerEventSenders,
-                job: Self::Job,
-                resolution: Self::Resolution,
-            ) -> Result<(), operon::scheduler::SchedulerError> {
-                match peer_txs
-                    .to_delta
-                    .send(operon::scheduler::PeerEvent::Resolution(resolution.into()))
-                    .await
-                {
-                    Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
-                    // Verbosity should be low here, since this can happen
-                    // an arbitrary number of times
-                    // if a descendant scheduler errored out.
-                    Err(_) => operon::log::trace!(
-                        "`delta`'s peer channel closed before handling `beta`'s {resolution:?}"
-                    ),
-                }
-                // out-dependencies (delta, epsilon)
-                match peer_txs
-                    .to_delta
-                    .send(operon::scheduler::PeerEvent::Job(job.into()))
-                    .await
-                {
-                    Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {job:?}"),
-                    Err(_) => operon::log::trace!(
-                        "`delta`'s peer channel closed before handling `beta`'s {job:?}"
-                    ),
-                }
-                match peer_txs
-                    .to_epsilon
-                    .send(operon::scheduler::PeerEvent::Job(job.into()))
-                    .await
-                {
-                    Ok(_) => operon::log::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
-                    Err(_) => operon::log::trace!(
-                        "`epsilon`'s peer channel closed before handling `beta`'s {job:?}"
-                    ),
-                }
-                Ok(())
-            }
-        };
-
-        assert_eq!(item, expected);
+        assert_item_eq(&item, fixture_path);
     }
 }

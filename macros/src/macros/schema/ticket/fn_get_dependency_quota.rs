@@ -198,192 +198,24 @@ pub(super) fn fn_get_dependency_quota(
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
-    use crate::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_dimensions, all_jobs, primary_entity};
 
-    #[test]
-    fn test_fn_get_dependency_quota() {
-        let primary_entity = DimensionId::from("a");
-        let dimensions = DimensionConfigMap::from_iter([(
-            "i".to_string(),
-            DimensionConfig {
-                id: "i".to_string(),
-                depends_on: vec![],
-            },
-        )]);
-        let jobs = JobConfigMap::from_iter([(
-            "beta".to_string(),
-            JobConfig {
-                id: "beta".to_string(),
-                from: vec![JobArg {
-                    id: "a".to_string(),
-                    over: vec![],
-                }],
-                to: "b".to_string(),
-                dims: vec!["i".to_string()],
-                spawn_dim: Some("j".to_string()),
-                pool_size: 8,
-            },
-        )]);
-        let beta = jobs.get("beta").unwrap();
-
-        let item = fn_get_dependency_quota(beta, &primary_entity, &dimensions, &jobs);
-        let expected: syn::ImplItemFn = parse_quote! {
-            #[allow(unused_variables)]
-            async fn get_dependency_quota(
-                &self,
-                client: operon::meta_storage::MetaClient<'_>,
-            ) -> Result<Option<usize>, operon::meta_storage::MetaStorageError> {
-                Ok(Some(0usize))
-            }
-        };
-
-        assert_eq!(item, expected);
-    }
-
-    #[test]
-    fn test_fn_get_dependency_quota_with_dependency() {
-        let primary_entity = EntityId::from("a");
-        let dimensions = DimensionConfigMap::from_iter([
-            (
-                "i".to_string(),
-                DimensionConfig {
-                    id: "i".to_string(),
-                    depends_on: vec![],
-                },
-            ),
-            (
-                "j".to_string(),
-                DimensionConfig {
-                    id: "j".to_string(),
-                    depends_on: vec!["i".to_string()],
-                },
-            ),
-            (
-                "k".to_string(),
-                DimensionConfig {
-                    id: "k".to_string(),
-                    depends_on: vec!["i".to_string()],
-                },
-            ),
-        ]);
-        let jobs = JobConfigMap::from_iter([
-            (
-                "beta".to_string(),
-                JobConfig {
-                    id: "beta".to_string(),
-                    from: vec![JobArg {
-                        id: "a".to_string(),
-                        over: vec![],
-                    }],
-                    to: "b".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: Some("j".to_string()),
-                    pool_size: 8,
-                },
-            ),
-            (
-                "gamma".to_string(),
-                JobConfig {
-                    id: "gamma".to_string(),
-                    from: vec![JobArg {
-                        id: "a".to_string(),
-                        over: vec![],
-                    }],
-                    to: "c".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: Some("k".to_string()),
-                    pool_size: 8,
-                },
-            ),
-            (
-                "delta".to_string(),
-                JobConfig {
-                    id: "delta".to_string(),
-                    from: vec![
-                        JobArg {
-                            id: "a".to_string(),
-                            over: vec![],
-                        },
-                        JobArg {
-                            id: "b".to_string(),
-                            over: vec![],
-                        },
-                        JobArg {
-                            id: "c".to_string(),
-                            over: vec![],
-                        },
-                    ],
-                    to: "d".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-                    spawn_dim: None,
-                    pool_size: 4,
-                },
-            ),
-            (
-                "epsilon".to_string(),
-                JobConfig {
-                    id: "epsilon".to_string(),
-                    from: vec![
-                        JobArg {
-                            id: "b".to_string(),
-                            over: vec!["j".to_string()],
-                        },
-                        JobArg {
-                            id: "d".to_string(),
-                            over: vec!["j".to_string()],
-                        },
-                    ],
-                    to: "e".to_string(),
-                    dims: vec!["i".to_string(), "k".to_string()],
-                    spawn_dim: None,
-                    pool_size: 4,
-                },
-            ),
-            (
-                "zeta".to_string(),
-                JobConfig {
-                    id: "zeta".to_string(),
-                    from: vec![
-                        JobArg {
-                            id: "c".to_string(),
-                            over: vec!["k".to_string()],
-                        },
-                        JobArg {
-                            id: "e".to_string(),
-                            over: vec!["k".to_string()],
-                        },
-                    ],
-                    to: "f".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: None,
-                    pool_size: 1,
-                },
-            ),
-        ]);
-        let epsilon = jobs.get("epsilon").unwrap();
-        let item = fn_get_dependency_quota(epsilon, &primary_entity, &dimensions, &jobs);
-        let expected: syn::ImplItemFn = parse_quote! {
-            #[allow(unused_variables)]
-            async fn get_dependency_quota(
-                &self,
-                client: operon::meta_storage::MetaClient<'_>,
-            ) -> Result<Option<usize>, operon::meta_storage::MetaStorageError> {
-                let Some(i) = self.i.0 else {
-                    return Ok(None);
-                };
-
-                let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
-
-                if let Some(resolution) = queries::get_resolution_j(client, i).await? {
-                    resolution_j.insert((), resolution.0);
-                } else {
-                    return Ok(None);
-                }
-
-                Ok(Some(1usize + resolution_j.values().sum::<usize>() * 1usize))
-            }
-        };
-        assert_eq!(item, expected);
+    #[rstest]
+    #[case::empty("beta", "schema/ticket/fn_get_dependency_quota.empty.rs")]
+    #[case::with_dependency("epsilon", "schema/ticket/fn_get_dependency_quota.with_dependency.rs")]
+    fn test_fn_get_dependency_quota(
+        primary_entity: EntityId,
+        all_dimensions: DimensionConfigMap,
+        all_jobs: JobConfigMap,
+        #[case] job_id: &str,
+        #[case] fixture_path: &str,
+    ) {
+        let job = all_jobs.get(job_id).unwrap();
+        let item = fn_get_dependency_quota(job, &primary_entity, &all_dimensions, &all_jobs);
+        assert_item_eq(&item, fixture_path);
     }
 }

@@ -39,24 +39,26 @@ pub fn peer_txs_definition(
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+    use crate::test_utils::assert_item_eq;
 
-    #[test]
-    fn test_peer_txs_definition() {
-        let beta = JobId::from("beta");
-        let delta = JobId::from("delta");
-        let epsilon = JobId::from("epsilon");
-        let downstream_job_ids = IndexSet::from_iter([&delta, &epsilon]);
+    #[rstest]
+    #[case::simple("beta", vec!["delta", "epsilon"], "spec/peer_txs_definition.rs")]
+    fn test_peer_txs_definition(
+        #[case] job_id: &str,
+        #[case] event_receiving_job_ids: Vec<&str>,
+        #[case] fixture_path: &str,
+    ) {
+        let job_id = JobId::from(job_id);
+        let event_receiving_job_ids = event_receiving_job_ids
+            .into_iter()
+            .map(JobId::from)
+            .collect::<Vec<_>>();
+        let event_receiving_job_ids = event_receiving_job_ids.iter().collect::<IndexSet<_>>();
 
-        let result = peer_txs_definition(&beta, &downstream_job_ids);
-        let expected: syn::ItemStruct = parse_quote! {
-            #[derive(Debug)]
-            pub struct BetaPeerTxs {
-                pub to_delta: operon::scheduler::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
-                pub to_epsilon: operon::scheduler::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
-            }
-        };
-
-        assert_eq!(result, expected);
+        let item = peer_txs_definition(&job_id, &event_receiving_job_ids);
+        assert_item_eq(&item, fixture_path);
     }
 }

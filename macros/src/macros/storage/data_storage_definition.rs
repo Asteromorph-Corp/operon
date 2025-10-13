@@ -24,3 +24,19 @@ pub(super) fn data_storage_definition(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+    use crate::configs::EntityConfigMap;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_entities, service_id};
+
+    #[rstest]
+    fn test_data_storage_definition(service_id: &str, all_entities: EntityConfigMap) {
+        let item = data_storage_definition(service_id, &all_entities);
+        assert_item_eq(&item, "storage/data_storage_definition.rs");
+    }
+}

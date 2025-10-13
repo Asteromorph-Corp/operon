@@ -108,3 +108,19 @@ pub(super) fn fn_resolve_dep(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{dimension_i, job_beta};
+
+    #[rstest]
+    #[case::simple(job_beta(), dimension_i())]
+    fn test_fn_resolve_dep(#[case] job: JobConfig, #[case] dim: DimensionConfig) {
+        let result = fn_resolve_dep(&job, &dim);
+        assert_item_eq(&result, "queries/ticket/resolve_dep.rs");
+    }
+}

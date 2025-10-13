@@ -60,88 +60,27 @@ pub(super) fn fn_mark_done(job: &JobConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
-    use crate::configs::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{job_beta, job_epsilon};
 
-    #[test]
-    fn test_mark_done_query() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let query = MarkDoneQuery(&job).to_string();
-        assert_eq!(
-            query,
-            "UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1;"
-        );
+    #[rstest]
+    #[case::simple(
+        job_beta(),
+        "UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1;"
+    )]
+    fn test_mark_done_query(#[case] job: JobConfig, #[case] expected: &str) {
+        let stmt = MarkDoneQuery(&job).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_fn_mark_done() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let tokens = fn_mark_done(&job);
-        let expected: syn::ItemFn = parse_quote! {
-            pub async fn mark_done_beta(
-                client: operon::meta_storage::MetaClient<'_>,
-                job: &schema::BetaJob,
-            ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let stmt = format!("UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1;");
-                client.execute(&stmt, &[&i64::try_from(job.i)?]).await?;
-                Ok(())
-            }
-        };
-        assert_eq!(tokens, expected);
-    }
-
-    #[test]
-    fn test_fn_mark_done_multiple_dis() {
-        let job = JobConfig {
-            id: "epsilon".to_string(),
-            from: vec![
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec!["j".to_string()],
-                },
-                JobArg {
-                    id: "d".to_string(),
-                    over: vec!["j".to_string()],
-                },
-            ],
-            to: "e".to_string(),
-            dims: vec!["i".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-        let tokens = fn_mark_done(&job);
-        let expected: syn::ItemFn = parse_quote! {
-            pub async fn mark_done_epsilon(
-                client: operon::meta_storage::MetaClient<'_>,
-                job: &schema::EpsilonJob,
-            ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let stmt = format!("UPDATE {schema_prefix}ticket_epsilon SET status = 'done' WHERE i = $1 AND k = $2;");
-                client.execute(&stmt, &[&i64::try_from(job.i)?, &i64::try_from(job.k)?]).await?;
-                Ok(())
-            }
-        };
-        assert_eq!(tokens, expected);
+    #[rstest]
+    #[case::simple(job_beta(), "queries/ticket/mark_done.simple.rs")]
+    #[case::multipe_dims(job_epsilon(), "queries/ticket/mark_done.multiple_dims.rs")]
+    fn test_fn_mark_done(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let result = fn_mark_done(&job);
+        assert_item_eq(&result, fixture_path);
     }
 }

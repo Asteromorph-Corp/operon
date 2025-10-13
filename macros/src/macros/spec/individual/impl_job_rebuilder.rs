@@ -149,127 +149,35 @@ pub fn impl_job_rebuilder(
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
-    use crate::JobArg;
+    use crate::JobConfigMap;
+    use crate::dependency_analysis::{get_direct_downstream_jobs, get_jobs_repeating_on};
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_jobs, job_beta, primary_dim};
 
-    #[test]
-    fn test_impl_job_rebuilder() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let delta = JobConfig {
-            id: "delta".to_string(),
-            from: vec![
-                JobArg {
-                    id: "a".to_string(),
-                    over: vec![],
-                },
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec![],
-                },
-                JobArg {
-                    id: "c".to_string(),
-                    over: vec![],
-                },
-            ],
-            to: "d".to_string(),
-            dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-        let epsilon = JobConfig {
-            id: "epsilon".to_string(),
-            from: vec![
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec!["j".to_string()],
-                },
-                JobArg {
-                    id: "d".to_string(),
-                    over: vec!["j".to_string()],
-                },
-            ],
-            to: "e".to_string(),
-            dims: vec!["i".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-
-        let primary_dimension = "i".to_string();
-        let spawn_dim_repeating_jobs = IndexSet::from_iter([&delta]);
-        let downstream_jobs = IndexSet::from_iter([&delta, &epsilon]);
+    #[rstest]
+    #[case::simple(job_beta(), "spec/impl_job_rebuilder.rs")]
+    fn test_impl_job_rebuilder(
+        primary_dim: DimensionId,
+        all_jobs: JobConfigMap,
+        #[case] job: JobConfig,
+        #[case] fixture_path: &str,
+    ) {
+        let spawn_dim_repeating_jobs = job
+            .spawn_dim
+            .as_ref()
+            .map(|dim| get_jobs_repeating_on(dim, &all_jobs))
+            .unwrap_or_default();
+        let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
 
         let item = impl_job_rebuilder(
             &job,
-            &primary_dimension,
+            &primary_dim,
             &spawn_dim_repeating_jobs,
             &downstream_jobs,
         );
-
-        let expected: syn::ItemImpl = parse_quote! {
-            #[operon::async_trait::async_trait]
-            #[automatically_derived]
-            impl operon::scheduler::JobRebuilder for BetaRebuilder {
-                async fn explode(
-                    &self,
-                    client: operon::meta_storage::MetaClient<'_>,
-                    primary_ub: usize,
-                ) -> Result<(), operon::scheduler::SchedulerError> {
-                    queries::explode_beta_i(client, &schema::IResolution(primary_ub)).await?;
-                    Ok(())
-                }
-
-                async fn rebuild(
-                    &self,
-                    client: operon::meta_storage::MetaClient<'_>,
-                    ui_state: &operon::tokio::sync::RwLock<operon::ui::UiState>,
-                ) -> Result<(), operon::scheduler::SchedulerError> {
-                    for (job, resolution) in &self.0 {
-                        queries::put_resolution_j(client, resolution).await?;
-                        queries::mark_done_beta(client, job).await?;
-
-                        queries::explode_delta_j(client, resolution).await?;
-                        queries::raise_dep_delta(
-                            client,
-                            &operon::schema_base::TicketDepCount::some(job.i),
-                            &operon::schema_base::TicketDepCount::none(),
-                            &operon::schema_base::TicketDepCount::none(),
-                        )
-                        .await?;
-                        queries::raise_dep_epsilon(
-                            client,
-                            &operon::schema_base::TicketDepCount::some(job.i),
-                            &operon::schema_base::TicketDepCount::none(),
-                        )
-                        .await?;
-
-                        let mut ui_state = ui_state.write().await;
-                        let (done, queued, waiting) = <schema::BetaTicket as operon::schema_base::TicketSql>::get_status(client).await?;
-                        let state = if queued + waiting == 0 {
-                            operon::operon::RunningState::Finished
-                        } else {
-                            operon::operon::RunningState::Running
-                        };
-                        ui_state.update_ui_state(operon::ui::UiStateUpdate::ProgressUpdate(
-                            "beta".to_string(),
-                            (done, queued, waiting, state, false),
-                        ))?;
-                    }
-
-                    Ok(())
-                }
-            }
-        };
-
-        assert_eq!(item, expected);
+        assert_item_eq(&item, fixture_path);
     }
 }

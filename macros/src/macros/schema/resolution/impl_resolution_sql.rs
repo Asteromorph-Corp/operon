@@ -86,48 +86,16 @@ pub(super) fn impl_resolution_sql(dimension: &DimensionConfig) -> syn::ItemImpl 
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::dimension_i;
 
-    #[test]
-    fn test_impl_resolution_sql() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
-
-        let result_i = impl_resolution_sql(&dimension_i);
-        let expected_i: syn::ItemImpl = parse_quote! {
-            #[operon::async_trait::async_trait]
-            #[automatically_derived]
-            impl operon::schema_base::ResolutionSql for IResolution {
-                async fn init_table(
-                    client: operon::meta_storage::MetaClient<'_>,
-                ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                    queries::init_resolution_i(client).await
-                }
-
-                async fn clear_table(
-                    client: operon::meta_storage::MetaClient<'_>,
-                ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                    queries::clear_resolution_i(client).await
-                }
-
-                async fn get(
-                    client: operon::meta_storage::MetaClient<'_>,
-                    primary_key: Self::PrimaryKey,
-                ) -> Result<Option<Self>, operon::meta_storage::MetaStorageError> {
-                    queries::get_resolution_i(client,).await
-                }
-
-                async fn put(
-                    &self,
-                    client: operon::meta_storage::MetaClient<'_>,
-                ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                    queries::put_resolution_i(client, self).await
-                }
-            }
-        };
-
-        assert_eq!(result_i, expected_i);
+    #[rstest]
+    #[case::simple(dimension_i(), "schema/resolution/impl_resolution_sql.rs")]
+    fn test_impl_resolution_sql(#[case] dim: DimensionConfig, #[case] fixture_path: &str) {
+        let result = impl_resolution_sql(&dim);
+        assert_item_eq(&result, fixture_path);
     }
 }

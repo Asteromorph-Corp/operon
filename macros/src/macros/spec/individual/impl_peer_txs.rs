@@ -79,40 +79,26 @@ pub fn impl_peer_txs(job_id: &JobId, event_receiving_job_ids: &IndexSet<&JobId>)
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+    use crate::test_utils::assert_item_eq;
 
-    #[test]
-    fn test_impl_peer_event_senders() {
-        let beta = JobId::from("beta");
-        let delta = JobId::from("delta");
-        let epsilon = JobId::from("epsilon");
-        let downstream_jobs = IndexSet::from_iter([&delta, &epsilon]);
+    #[rstest]
+    #[case::simple("beta", vec!["delta", "epsilon"], "spec/impl_peer_txs.rs")]
+    fn test_impl_peer_event_senders(
+        #[case] job_id: &str,
+        #[case] event_receiving_job_ids: Vec<&str>,
+        #[case] fixture_path: &str,
+    ) {
+        let job_id = JobId::from(job_id);
+        let event_receiving_job_ids = event_receiving_job_ids
+            .into_iter()
+            .map(JobId::from)
+            .collect::<Vec<_>>();
+        let event_receiving_job_ids = event_receiving_job_ids.iter().collect::<IndexSet<_>>();
 
-        let result = impl_peer_txs(&beta, &downstream_jobs);
-        let expected: syn::ItemImpl = parse_quote! {
-            #[operon::async_trait::async_trait]
-            #[automatically_derived]
-            impl operon::scheduler::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum> for BetaPeerTxs {
-                fn gather_from(
-                    mut senders: operon::scheduler::PeerEventSenderMap<schema::JobEnum, schema::ResolutionEnum>,
-                ) -> Self {
-                    BetaPeerTxs {
-                        to_delta: senders.remove(<schema::DeltaJob as operon::schema_base::Job>::id()).unwrap_or_else(|| {
-                            panic!("No sender for job `{}` found", <schema::DeltaJob as operon::schema_base::Job>::id())
-                        }),
-                        to_epsilon: senders.remove(<schema::EpsilonJob as operon::schema_base::Job>::id()).unwrap_or_else(|| {
-                            panic!("No sender for job `{}` found", <schema::EpsilonJob as operon::schema_base::Job>::id())
-                        }),
-                    }
-                }
-
-                fn downgrade_all(&mut self) {
-                    self.to_delta.downgrade();
-                    self.to_epsilon.downgrade();
-                }
-            }
-        };
-
-        assert_eq!(result, expected);
+        let item = impl_peer_txs(&job_id, &event_receiving_job_ids);
+        assert_item_eq(&item, fixture_path);
     }
 }

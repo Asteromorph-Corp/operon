@@ -31,25 +31,16 @@ pub(super) fn impl_enum_from_resolution(dimension: &DimensionConfig) -> syn::Ite
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::dimension_i;
 
-    #[test]
-    fn test_impl_enum_from_resolution() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
-
-        let result_i = impl_enum_from_resolution(&dimension_i);
-        let expected_i: syn::ItemImpl = parse_quote! {
-            #[automatically_derived]
-            impl From<IResolution> for ResolutionEnum {
-                fn from(resolution: IResolution) -> Self {
-                    Self::I(resolution)
-                }
-            }
-        };
-
-        assert_eq!(result_i, expected_i);
+    #[rstest]
+    #[case::simple(dimension_i(), "schema/resolution/impl_enum_from_resolution.rs")]
+    fn test_impl_enum_from_resolution(#[case] dim: DimensionConfig, #[case] fixture_path: &str) {
+        let result = impl_enum_from_resolution(&dim);
+        assert_item_eq(&result, fixture_path);
     }
 }

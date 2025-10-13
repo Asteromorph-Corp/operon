@@ -1,4 +1,5 @@
-use syn::parse_quote;
+use proc_macro2::Span;
+use syn::{LitStr, parse_quote};
 
 use crate::configs::JobConfig;
 use crate::utils::{init_ticket_ident, job_ident, operon_ident};
@@ -149,9 +150,12 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_ident = init_ticket_ident(&job.id);
     let job_ident = job_ident(&job.id);
-    let init_ticket_query = InitTicketQuery(job).to_string();
-    let ticket_summary_query = TICKET_SUMMARY_INSERT_QUERY;
-    let ticket_trigger_query = TicketSummaryTriggerQuery(job).to_string();
+    let init_ticket_query = LitStr::new(&InitTicketQuery(job).to_string(), Span::call_site());
+    let ticket_summary_query = LitStr::new(TICKET_SUMMARY_INSERT_QUERY, Span::call_site());
+    let ticket_trigger_query = LitStr::new(
+        &TicketSummaryTriggerQuery(job).to_string(),
+        Span::call_site(),
+    );
 
     parse_quote! {
         pub async fn #fn_ident(
@@ -175,26 +179,16 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::job_beta;
 
-    #[test]
-    fn test_init_ticket_query() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-
-        let init_ticket = InitTicketQuery(&job).to_string();
-        let expected = indoc! {"
+    #[rstest]
+    #[case::simple(
+        job_beta(),
+        indoc! {"
             CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_beta (
                 i BIGINT,
                 resolved BOOLEAN NOT NULL,
@@ -204,27 +198,17 @@ mod tests {
                 status {ticket_status_type} NOT NULL,
                 PRIMARY KEY (i)
             );"
-        };
-
-        assert_eq!(init_ticket, expected);
+        },
+    )]
+    fn test_init_ticket_query(#[case] job: JobConfig, #[case] expected: &str) {
+        let stmt = InitTicketQuery(&job).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_ticket_summary_query() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-
-        let ticket_summary = TicketSummaryTriggerQuery(&job).to_string();
-        let expected = indoc! {"
+    #[rstest]
+    #[case::simple(
+        job_beta(),
+        indoc! {"
             CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
                 AFTER INSERT ON {schema_prefix}ticket_beta
                 REFERENCING NEW TABLE AS NEW_TABLE
@@ -249,83 +233,17 @@ mod tests {
                 AFTER TRUNCATE ON {schema_prefix}ticket_beta
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');"
-        };
-
-        assert_eq!(ticket_summary, expected);
+        }
+    )]
+    fn test_ticket_summary_query(#[case] job: JobConfig, #[case] expected: &str) {
+        let stmt = TicketSummaryTriggerQuery(&job).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_fn_init_ticket() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-
+    #[rstest]
+    #[case::simple(job_beta(), "queries/ticket/init_ticket.rs")]
+    fn test_fn_init_ticket(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let result = fn_init_ticket(&job);
-        let init_stmt = indoc! {"
-            CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_beta (
-                i BIGINT,
-                resolved BOOLEAN NOT NULL,
-                deps_count BIGINT NOT NULL,
-                deps_quota BIGINT,
-                deps_done BOOLEAN NOT NULL,
-                status {ticket_status_type} NOT NULL,
-                PRIMARY KEY (i)
-            );"
-        };
-        let summary_stmt = TICKET_SUMMARY_INSERT_QUERY;
-        let trigger_stmts = indoc! {"
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
-                AFTER INSERT ON {schema_prefix}ticket_beta
-                REFERENCING NEW TABLE AS NEW_TABLE
-                FOR EACH STATEMENT
-                EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');
-
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_upd_trg
-                AFTER UPDATE ON {schema_prefix}ticket_beta
-                REFERENCING
-                    NEW TABLE AS NEW_TABLE
-                    OLD TABLE AS OLD_TABLE
-                FOR EACH STATEMENT
-                EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');
-
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_del_trg
-                AFTER DELETE ON {schema_prefix}ticket_beta
-                REFERENCING OLD TABLE AS OLD_TABLE
-                FOR EACH STATEMENT
-                EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');
-
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_trunc_trg
-                AFTER TRUNCATE ON {schema_prefix}ticket_beta
-                FOR EACH STATEMENT
-                EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');"
-        };
-
-        let expected: syn::ItemFn = parse_quote! {
-            pub async fn init_ticket_beta(
-                client: operon::meta_storage::MetaClient<'_>,
-            ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let ticket_status_type = client.ticket_status_type();
-                let init_stmt = format!(#init_stmt);
-                let summary_stmt = format!(#summary_stmt);
-                let trigger_stmts = format!(#trigger_stmts);
-
-                client.execute(&init_stmt, &[]).await?;
-                client.execute(&summary_stmt, &[&<schema::BetaJob as operon::schema_base::Job>::id()]).await?;
-                client.batch_execute(&trigger_stmts).await?;
-
-                Ok(())
-            }
-        };
-
-        assert_eq!(result, expected);
+        assert_item_eq(&result, fixture_path);
     }
 }

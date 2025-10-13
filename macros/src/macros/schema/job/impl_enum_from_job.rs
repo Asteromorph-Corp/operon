@@ -31,33 +31,16 @@ pub(super) fn impl_enum_from_job(job: &JobConfig) -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::job_beta;
 
-    #[test]
-    fn test_impl_enum_from_job() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let item = impl_enum_from_job(&job);
-        let expected: syn::ItemImpl = parse_quote! {
-            #[automatically_derived]
-            impl From<BetaJob> for JobEnum {
-                fn from(job: BetaJob) -> Self {
-                    JobEnum::Beta(job)
-                }
-            }
-        };
-        assert_eq!(item, expected);
+    #[rstest]
+    #[case::simple(job_beta(), "schema/job/impl_enum_from_job.rs")]
+    fn test_impl_enum_from_job(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let result = impl_enum_from_job(&job);
+        assert_item_eq(&result, fixture_path);
     }
 }

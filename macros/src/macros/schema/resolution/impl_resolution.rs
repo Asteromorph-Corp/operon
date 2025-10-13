@@ -62,64 +62,17 @@ pub(super) fn impl_resolution(dimension: &DimensionConfig) -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{dimension_i, dimension_j};
 
-    #[test]
-    fn test_impl_resolution() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
-
-        let result_i = impl_resolution(&dimension_i);
-        let expected_i: syn::ItemImpl = parse_quote! {
-            #[automatically_derived]
-            impl operon::schema_base::Resolution for IResolution {
-                type PrimaryKey = ();
-
-                #[allow(clippy::unused_unit)]
-                fn primary_key(&self) -> Self::PrimaryKey {
-                    ()
-                }
-
-                fn ub(&self) -> usize {
-                    self.0
-                }
-
-                #[allow(unused_variables)]
-                fn new(ub: usize, primary_key: Self::PrimaryKey) -> Self {
-                    Self(ub,)
-                }
-            }
-        };
-
-        assert_eq!(result_i, expected_i);
-
-        let dimension_k = DimensionConfig {
-            id: "j".to_string(),
-            depends_on: vec!["i".to_string()],
-        };
-        let result = impl_resolution(&dimension_k);
-        let expected: syn::ItemImpl = parse_quote! {
-            #[automatically_derived]
-            impl operon::schema_base::Resolution for JResolution {
-                type PrimaryKey = (IDim,);
-
-                #[allow(clippy::unused_unit)]
-                fn primary_key(&self) -> Self::PrimaryKey {
-                    (self.1,)
-                }
-
-                fn ub(&self) -> usize {
-                    self.0
-                }
-
-                #[allow(unused_variables)]
-                fn new(ub: usize, primary_key: Self::PrimaryKey) -> Self {
-                    Self(ub, primary_key.0,)
-                }
-            }
-        };
-        assert_eq!(result, expected);
+    #[rstest]
+    #[case::simple(dimension_i(), "schema/resolution/impl_resolution.simple.rs")]
+    #[case::with_dependency(dimension_j(), "schema/resolution/impl_resolution.with_dependency.rs")]
+    fn test_impl_resolution(#[case] dim: DimensionConfig, #[case] fixture_path: &str) {
+        let result = impl_resolution(&dim);
+        assert_item_eq(&result, fixture_path);
     }
 }

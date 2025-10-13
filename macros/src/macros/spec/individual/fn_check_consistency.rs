@@ -148,122 +148,17 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
-    use crate::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{job_beta, job_epsilon};
 
-    #[test]
-    fn test_fn_check_consistency() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-
+    #[rstest]
+    #[case::simple(job_beta(), "spec/fn_check_consistency.simple.rs")]
+    #[case::no_spawn_dim(job_epsilon(), "spec/fn_check_consistency.no_spawn_dim.rs")]
+    fn test_fn_check_consistency(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let item = fn_check_consistency(&job);
-        let expected: syn::ImplItemFn = parse_quote! {
-            async fn check_consistency(
-                &self,
-                storage: &Sto,
-                client: operon::meta_storage::MetaClient<'_>,
-            ) -> Result<bool, operon::scheduler::SchedulerError> {
-                // Pull the "done" beta jobs from the metadata storage...
-                let Some(jobs) = queries::get_all_beta(
-                    client,
-                    operon::schema_base::TicketStatus::Done,
-                )
-                .await?
-                .iter()
-                .map(|t| operon::schema_base::Ticket::resolve(t))
-                .collect::<Option<Vec<_>>>() else {
-                    operon::log::info!("Some `beta` tickets are corrupt in the metadata storage.");
-                    return Ok(false);
-                };
-                // ...and map them with the dimensions they spawned...
-                let mut tags = Vec::new();
-                for job in jobs {
-                    let Some(res) = queries::get_resolution_j(client, job.i,).await? else {
-                        operon::log::info!(
-                            "No `j` resolution found for `beta_{}` in the metadata storage.",
-                            job.i,
-                        );
-                        return Ok(false);
-                    };
-                    for j in 0..(res.0) {
-                        tags.push((job.i, j,));
-                    }
-                }
-                // ...and check if the data storage holds all the data for them.
-                for (i, j,) in tags {
-                    if storage.get_b(i, j,).await?.is_none() {
-                        operon::log::info!("Data storage does not hold `b_{},{}`.", i, j,);
-                        return Ok(false);
-                    }
-                }
-
-                Ok(true)
-            }
-        };
-
-        assert_eq!(item, expected)
-    }
-
-    #[test]
-    fn test_fn_check_consistency_no_spawn_dim() {
-        let job = JobConfig {
-            id: "epsilon".to_string(),
-            from: vec![
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec!["j".to_string()],
-                },
-                JobArg {
-                    id: "d".to_string(),
-                    over: vec!["j".to_string()],
-                },
-            ],
-            to: "e".to_string(),
-            dims: vec!["i".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-
-        let item = fn_check_consistency(&job);
-        let expected: syn::ImplItemFn = parse_quote! {
-            async fn check_consistency(
-                &self,
-                storage: &Sto,
-                client: operon::meta_storage::MetaClient<'_>,
-            ) -> Result<bool, operon::scheduler::SchedulerError> {
-                // Pull the "done" beta jobs from the metadata storage...
-                let Some(jobs) = queries::get_all_epsilon(
-                    client,
-                    operon::schema_base::TicketStatus::Done,
-                )
-                .await?
-                .iter()
-                .map(|t| operon::schema_base::Ticket::resolve(t))
-                .collect::<Option<Vec<_>>>() else {
-                    operon::log::info!("Some `epsilon` tickets are corrupt in the metadata storage.");
-                    return Ok(false);
-                };
-                // ...and check if the data storage holds all the data for them.
-                for job in jobs {
-                    if storage.get_e(job.i, job.k).await?.is_none() {
-                        operon::log::info!("Data storage does not hold `e_{},{}`.", job.i, job.k,);
-                        return Ok(false);
-                    }
-                }
-
-                Ok(true)
-            }
-        };
-
-        assert_eq!(item, expected)
+        assert_item_eq(&item, fixture_path)
     }
 }

@@ -23,4 +23,7 @@ syn = { version = "2.0.103", features = ["full"] }
 toml = "0.8.23"
 
 [dev-dependencies]
+pretty_assertions = "1.4.1"
+prettyplease = "0.2.37"
+rstest = "0.26.1"
 syn = { version = "2.0.103", features = ["extra-traits"] }

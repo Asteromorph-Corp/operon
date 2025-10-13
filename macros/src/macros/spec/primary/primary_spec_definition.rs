@@ -17,13 +17,11 @@ pub fn primary_spec_definition() -> syn::ItemStruct {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_item_eq;
 
     #[test]
     fn test_primary_spec_definition() {
-        let expected: syn::ItemStruct = parse_quote! {
-            #[derive(Debug, Clone, Copy)]
-            pub struct PrimarySpec;
-        };
-        assert_eq!(primary_spec_definition(), expected);
+        let item = primary_spec_definition();
+        assert_item_eq(&item, "spec/primary_spec_definition.rs");
     }
 }

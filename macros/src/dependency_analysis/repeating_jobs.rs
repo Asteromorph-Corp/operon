@@ -16,127 +16,25 @@ pub fn get_jobs_repeating_on<'a>(
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
-    use crate::JobArg;
+    use crate::test_utils::simple_pipeline::all_jobs;
 
-    #[test]
-    fn test_get_jobs_repeating_on() {
-        let jobs = JobConfigMap::from_iter([
-            (
-                "beta".to_string(),
-                JobConfig {
-                    id: "beta".to_string(),
-                    from: vec![JobArg {
-                        id: "a".to_string(),
-                        over: vec![],
-                    }],
-                    to: "b".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: Some("j".to_string()),
-                    pool_size: 8,
-                },
-            ),
-            (
-                "gamma".to_string(),
-                JobConfig {
-                    id: "gamma".to_string(),
-                    from: vec![JobArg {
-                        id: "a".to_string(),
-                        over: vec![],
-                    }],
-                    to: "c".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: Some("k".to_string()),
-                    pool_size: 8,
-                },
-            ),
-            (
-                "delta".to_string(),
-                JobConfig {
-                    id: "delta".to_string(),
-                    from: vec![
-                        JobArg {
-                            id: "a".to_string(),
-                            over: vec![],
-                        },
-                        JobArg {
-                            id: "b".to_string(),
-                            over: vec![],
-                        },
-                        JobArg {
-                            id: "c".to_string(),
-                            over: vec![],
-                        },
-                    ],
-                    to: "d".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-                    spawn_dim: None,
-                    pool_size: 4,
-                },
-            ),
-            (
-                "epsilon".to_string(),
-                JobConfig {
-                    id: "epsilon".to_string(),
-                    from: vec![
-                        JobArg {
-                            id: "b".to_string(),
-                            over: vec!["j".to_string()],
-                        },
-                        JobArg {
-                            id: "d".to_string(),
-                            over: vec!["j".to_string()],
-                        },
-                    ],
-                    to: "e".to_string(),
-                    dims: vec!["i".to_string(), "k".to_string()],
-                    spawn_dim: None,
-                    pool_size: 4,
-                },
-            ),
-            (
-                "zeta".to_string(),
-                JobConfig {
-                    id: "zeta".to_string(),
-                    from: vec![
-                        JobArg {
-                            id: "c".to_string(),
-                            over: vec!["k".to_string()],
-                        },
-                        JobArg {
-                            id: "e".to_string(),
-                            over: vec!["k".to_string()],
-                        },
-                    ],
-                    to: "f".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: None,
-                    pool_size: 1,
-                },
-            ),
-        ]);
-
-        let beta = jobs.get("beta").unwrap();
-        let gamma = jobs.get("gamma").unwrap();
-        let delta = jobs.get("delta").unwrap();
-        let epsilon = jobs.get("epsilon").unwrap();
-        let zeta = jobs.get("zeta").unwrap();
-
-        let i_dim = DimensionId::from("i");
-        let j_dim = DimensionId::from("j");
-        let k_dim = DimensionId::from("k");
-
-        assert_eq!(
-            get_jobs_repeating_on(&i_dim, &jobs),
-            IndexSet::from([beta, gamma, delta, epsilon, zeta])
-        );
-        assert_eq!(
-            get_jobs_repeating_on(&j_dim, &jobs),
-            IndexSet::from([delta])
-        );
-        assert_eq!(
-            get_jobs_repeating_on(&k_dim, &jobs),
-            IndexSet::from([delta, epsilon])
-        );
+    #[rstest]
+    #[case::i("i", vec!["beta", "gamma", "delta", "epsilon", "zeta"])]
+    #[case::j("j", vec!["delta"])]
+    #[case::k("k", vec!["delta", "epsilon"])]
+    fn test_get_jobs_repeating_on(
+        all_jobs: JobConfigMap,
+        #[case] dim_id: &str,
+        #[case] expected_job_ids: Vec<&str>,
+    ) {
+        let dim_id = DimensionId::from(dim_id);
+        let expected = expected_job_ids
+            .into_iter()
+            .map(|id| all_jobs.get(id).unwrap())
+            .collect::<IndexSet<_>>();
+        assert_eq!(get_jobs_repeating_on(&dim_id, &all_jobs), expected);
     }
 }

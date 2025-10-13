@@ -31,19 +31,15 @@ pub(super) fn impl_resolution_enum(primary_dimension: &DimensionId) -> syn::Item
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn test_impl_resolution_enum() {
-        let primary_dimension = DimensionId::from("i");
-        let result = impl_resolution_enum(&primary_dimension);
-        let expected: syn::ItemImpl = parse_quote! {
-            impl operon::schema_base::ResolutionEnum for ResolutionEnum {
-                fn primary(resolution: usize) -> Self {
-                    Self::I(IResolution(resolution))
-                }
-            }
-        };
-        assert_eq!(result, expected);
+    use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::primary_dim;
+
+    #[rstest]
+    fn test_impl_resolution_enum(primary_dim: DimensionId) {
+        let result = impl_resolution_enum(&primary_dim);
+        assert_item_eq(&result, "schema/resolution/impl_resolution_enum.rs");
     }
 }

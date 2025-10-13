@@ -21,8 +21,7 @@ impl std::fmt::Display for GetResolutionQuery<'_> {
         for (i, dep) in self.0.depends_on.iter().enumerate().skip(1) {
             write!(f, " AND {} = ${}", dep, i + 1)?;
         }
-
-        Ok(())
+        write!(f, ";")
     }
 }
 
@@ -34,7 +33,7 @@ impl std::fmt::Display for GetResolutionQuery<'_> {
 ///    client: operon::meta_storage::MetaClient<'_>,
 /// ) -> Result<Option<schema::IResolution>, operon::meta_storage::MetaStorageError> {
 ///     let schema_prefix = client.schema_prefix();
-///     let stmt = format!("SELECT i_ub FROM {schema_prefix}dimension_i");
+///     let stmt = format!("SELECT i_ub FROM {schema_prefix}dimension_i;");
 ///     let Some(row) = client.query_opt(&stmt, &[]).await? else {
 ///         return Ok(None);
 ///     };
@@ -81,90 +80,35 @@ pub(super) fn fn_get_resolution(dimension: &DimensionConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::dimension_i;
 
-    #[test]
-    fn test_get_resolution_query_no_dependency() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
-
-        let get_resolution = GetResolutionQuery(&dimension_i);
-
-        let stmt_i = "SELECT i_ub FROM {schema_prefix}dimension_i";
-
-        assert_eq!(get_resolution.to_string(), stmt_i);
-    }
-
-    #[test]
-    fn test_get_resolution_query_with_dependency() {
-        let dimension_l = DimensionConfig {
+    fn dimension_l() -> DimensionConfig {
+        DimensionConfig {
             id: "l".to_string(),
             depends_on: vec!["j".to_string(), "k".to_string()],
-        };
-
-        let get_resolution = GetResolutionQuery(&dimension_l);
-
-        let stmt_l = "SELECT l_ub FROM {schema_prefix}dimension_l WHERE j = $1 AND k = $2";
-
-        assert_eq!(get_resolution.to_string(), stmt_l);
+        }
     }
 
-    #[test]
-    fn test_get_resolution() {
-        let dimension_i = DimensionConfig {
-            id: "i".to_string(),
-            depends_on: vec![],
-        };
+    #[rstest]
+    #[case::simple(dimension_i(), "SELECT i_ub FROM {schema_prefix}dimension_i;")]
+    #[case::with_dependency(
+        dimension_l(),
+        "SELECT l_ub FROM {schema_prefix}dimension_l WHERE j = $1 AND k = $2;"
+    )]
+    fn test_get_resolution_query(#[case] dim: DimensionConfig, #[case] expected: &str) {
+        let stmt = GetResolutionQuery(&dim).to_string();
+        assert_eq!(stmt, expected);
+    }
 
-        let result_i = fn_get_resolution(&dimension_i);
-
-        let stmt_i = "SELECT i_ub FROM {schema_prefix}dimension_i"; // Note: placing this string literal inside the quote! macro results in a `\n` instead of `\\n`, causing the test to fail.
-
-        let expected_i: syn::ItemFn = parse_quote! {
-            pub async fn get_resolution_i(
-                client: operon::meta_storage::MetaClient<'_>,
-            ) -> Result<Option<schema::IResolution>, operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let stmt = format!(#stmt_i);
-                let Some(row) = client.query_opt(&stmt, &[]).await? else {
-                    return Ok(None);
-                };
-                Ok(Some(schema::IResolution(
-                    usize::try_from(row.get::<_, i64>("i_ub"))?,
-                )))
-            }
-        };
-
-        assert_eq!(result_i, expected_i);
-
-        let dimension_l = DimensionConfig {
-            id: "l".to_string(),
-            depends_on: vec!["j".to_string(), "k".to_string()],
-        };
-
-        let result_l = fn_get_resolution(&dimension_l);
-        let stmt_l = "SELECT l_ub FROM {schema_prefix}dimension_l WHERE j = $1 AND k = $2";
-        let expected_l: syn::ItemFn = parse_quote! {
-            pub async fn get_resolution_l(
-                client: operon::meta_storage::MetaClient<'_>,
-                j: schema::JDim,
-                k: schema::KDim,
-            ) -> Result<Option<schema::LResolution>, operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let stmt = format!(#stmt_l);
-                let Some(row) = client.query_opt(&stmt, &[&i64::try_from(j)?, &i64::try_from(k)?]).await? else {
-                    return Ok(None);
-                };
-                Ok(Some(schema::LResolution(
-                    usize::try_from(row.get::<_, i64>("l_ub"))?,
-                    j,
-                    k,
-                )))
-            }
-        };
-
-        assert_eq!(result_l, expected_l);
+    #[rstest]
+    #[case::simple(dimension_i(), "queries/resolution/get_resolution.simple.rs")]
+    #[case::with_dependency(dimension_l(), "queries/resolution/get_resolution.with_dependency.rs")]
+    fn test_get_resolution(#[case] dim: DimensionConfig, #[case] fixture_path: &str) {
+        let result = fn_get_resolution(&dim);
+        assert_item_eq(&result, fixture_path);
     }
 }

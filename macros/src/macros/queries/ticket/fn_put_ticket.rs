@@ -76,71 +76,30 @@ pub(super) fn fn_put_ticket(job: &JobConfig) -> syn::ItemFn {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::job_beta;
 
-    #[test]
-    fn test_put_ticket_query() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let query = PutTicketQuery(&job).to_string();
-        let expected = indoc! {"
+    #[rstest]
+    #[case::simple(
+        job_beta(),
+        indoc! {"
             INSERT INTO {schema_prefix}ticket_beta (i, resolved, deps_count, deps_quota, deps_done, status)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT DO NOTHING;"
-        };
-        assert_eq!(query, expected);
+        }
+    )]
+    fn test_put_ticket_query(#[case] job: JobConfig, #[case] expected: &str) {
+        let stmt = PutTicketQuery(&job).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_fn_put_ticket() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-
+    #[rstest]
+    #[case::simple(job_beta(), "queries/ticket/put_ticket.rs")]
+    fn test_fn_put_ticket(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let result = fn_put_ticket(&job);
-
-        let stmt = indoc! {"
-            INSERT INTO {schema_prefix}ticket_beta (i, resolved, deps_count, deps_quota, deps_done, status)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT DO NOTHING;"
-        };
-
-        let expected: syn::ItemFn = parse_quote! {
-            pub async fn put_ticket_beta(
-                client: operon::meta_storage::MetaClient<'_>,
-                ticket: &schema::BetaTicket,
-            ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                let schema_prefix = client.schema_prefix();
-                let stmt = format!(#stmt);
-                let params = operon::schema_base::TicketSql::to_sql_insert_params(ticket)?;
-                let params = params
-                    .iter()
-                    .map(|p| p.as_ref() as &(dyn operon::postgres_types::ToSql + Sync))
-                    .collect::<Vec<_>>();
-
-                client.execute(&stmt, &params).await?;
-                Ok(())
-            }
-        };
-        assert_eq!(result, expected);
+        assert_item_eq(&result, fixture_path);
     }
 }

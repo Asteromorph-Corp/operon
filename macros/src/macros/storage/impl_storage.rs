@@ -135,32 +135,15 @@ pub(super) fn impl_storage(
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use quote::format_ident;
+    use pretty_assertions::assert_eq;
+    use rstest::rstest;
 
     use super::*;
-    use crate::EntityConfig;
+    use crate::test_utils::simple_pipeline::{all_entities, primary_entity};
 
-    #[test]
-    fn test_create_tables_query() {
-        let entities = EntityConfigMap::from_iter([
-            (
-                "a".to_string(),
-                EntityConfig {
-                    id: "a".to_string(),
-                    dims: vec!["i".to_string()],
-                    generic: format_ident!("A_"),
-                },
-            ),
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-        ]);
-        let query = super::CreateTablesQuery(&entities).to_string();
+    #[rstest]
+    fn test_create_tables_query(all_entities: EntityConfigMap) {
+        let stmt = super::CreateTablesQuery(&all_entities).to_string();
         let expected = indoc! {"
             CREATE TABLE IF NOT EXISTS {schema_prefix}a (
                 i BIGINT,
@@ -173,41 +156,43 @@ mod tests {
                 value JSONB,
                 PRIMARY KEY (i, j)
             );
+            CREATE TABLE IF NOT EXISTS {schema_prefix}c (
+                i BIGINT,
+                k BIGINT,
+                value JSONB,
+                PRIMARY KEY (i, k)
+            );
+            CREATE TABLE IF NOT EXISTS {schema_prefix}d (
+                i BIGINT,
+                j BIGINT,
+                k BIGINT,
+                value JSONB,
+                PRIMARY KEY (i, j, k)
+            );
+            CREATE TABLE IF NOT EXISTS {schema_prefix}e (
+                i BIGINT,
+                k BIGINT,
+                value JSONB,
+                PRIMARY KEY (i, k)
+            );
+            CREATE TABLE IF NOT EXISTS {schema_prefix}f (
+                i BIGINT,
+                value JSONB,
+                PRIMARY KEY (i)
+            );
             CREATE TABLE IF NOT EXISTS {schema_prefix}_data_footprint (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );"
         };
 
-        assert_eq!(query, expected);
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_clear_tables_query() {
-        let primary_entity = EntityId::from("a");
-        let entities = EntityConfigMap::from_iter([
-            (
-                "a".to_string(),
-                EntityConfig {
-                    id: "a".to_string(),
-                    dims: vec!["i".to_string()],
-                    generic: format_ident!("A_"),
-                },
-            ),
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-        ]);
-        let query = super::TruncateTablesQuery(&primary_entity, &entities).to_string();
-        let expected = indoc! {"
-            TRUNCATE TABLE {schema_prefix}b, {schema_prefix}_data_footprint;"
-        };
-
-        assert_eq!(query, expected);
+    #[rstest]
+    fn test_clear_tables_query(primary_entity: EntityId, all_entities: EntityConfigMap) {
+        let stmt = super::TruncateTablesQuery(&primary_entity, &all_entities).to_string();
+        let expected = "TRUNCATE TABLE {schema_prefix}b, {schema_prefix}c, {schema_prefix}d, {schema_prefix}e, {schema_prefix}f, {schema_prefix}_data_footprint;";
+        assert_eq!(stmt, expected);
     }
 }

@@ -1,0 +1,14 @@
+style_edition = "2024"
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# Unstable features
+unstable_features = true
+wrap_comments = true
+comment_width = 100
+format_code_in_doc_comments = true
+format_macro_bodies = true
+format_macro_matchers = true
+normalize_doc_attributes = true
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"

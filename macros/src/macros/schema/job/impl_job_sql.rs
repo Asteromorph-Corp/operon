@@ -40,37 +40,16 @@ pub(super) fn impl_job_sql(job: &JobConfig) -> syn::ItemImpl {
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::job_beta;
 
-    #[test]
-    fn test_impl_job_sql() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let item = impl_job_sql(&job);
-        let expected: syn::ItemImpl = parse_quote! {
-            #[operon::async_trait::async_trait]
-            #[automatically_derived]
-            impl operon::schema_base::JobSql for BetaJob {
-                async fn mark_done(
-                    &self,
-                    client: operon::meta_storage::MetaClient<'_>,
-                ) -> Result<(), operon::meta_storage::MetaStorageError> {
-                    queries::mark_done_beta(client, self).await
-                }
-            }
-        };
-        assert_eq!(item, expected);
+    #[rstest]
+    #[case::simple(job_beta(), "schema/job/impl_job_sql.rs")]
+    fn test_impl_job_sql(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let result = impl_job_sql(&job);
+        assert_item_eq(&result, fixture_path);
     }
 }

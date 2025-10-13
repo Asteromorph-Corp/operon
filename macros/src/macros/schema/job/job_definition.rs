@@ -37,65 +37,17 @@ pub(super) fn job_definition(job: &JobConfig) -> syn::ItemStruct {
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobArg;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{job_beta, job_epsilon};
 
-    #[test]
-    fn test_job_definition() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let item = job_definition(&job);
-        let expected: syn::ItemStruct = parse_quote! {
-            #[doc = "A struct representing the job `beta`."]
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-            pub struct BetaJob {
-                pub i: IDim,
-            }
-        };
-
-        assert_eq!(item, expected);
-    }
-
-    #[test]
-    fn test_job_definition_multiple_dims() {
-        let job = JobConfig {
-            id: "epsilon".to_string(),
-            from: vec![
-                JobArg {
-                    id: "b".to_string(),
-                    over: vec!["j".to_string()],
-                },
-                JobArg {
-                    id: "d".to_string(),
-                    over: vec!["j".to_string()],
-                },
-            ],
-            to: "e".to_string(),
-            dims: vec!["i".to_string(), "k".to_string()],
-            spawn_dim: None,
-            pool_size: 4,
-        };
-        let item = job_definition(&job);
-        let expected: syn::ItemStruct = parse_quote! {
-            #[doc = "A struct representing the job `epsilon`."]
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-            pub struct EpsilonJob {
-                pub i: IDim,
-                pub k: KDim,
-            }
-        };
-
-        assert_eq!(item, expected);
+    #[rstest]
+    #[case::simple(job_beta(), "schema/job/job_definition.simple.rs")]
+    #[case::multiple_dims(job_epsilon(), "schema/job/job_definition.multiple_dims.rs")]
+    fn test_job_definition(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let result = job_definition(&job);
+        assert_item_eq(&result, fixture_path);
     }
 }

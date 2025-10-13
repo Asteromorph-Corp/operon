@@ -123,209 +123,38 @@ mod tests {
     use std::vec;
 
     use indoc::indoc;
-    use quote::format_ident;
+    use rstest::rstest;
 
     use super::*;
-    use crate::JobConfig;
+    use crate::test_utils::assert_items_eq_in_trait;
+    use crate::test_utils::simple_pipeline::{all_entities, all_jobs, entity_d};
 
-    #[test]
-    fn test_batch_get_query() {
-        let job_arg = JobArg {
+    #[rstest]
+    #[case::simple(
+        JobArg {
             id: "d".to_string(),
             over: vec!["j".to_string()],
-        };
-        let entity_config = EntityConfig {
-            id: "d".to_string(),
-            dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-            generic: parse_quote!(String),
-        };
-
-        let query = BatchGetQuery(&job_arg, &entity_config).to_string();
-        let expected = indoc! {"
+        },
+        entity_d(),
+        indoc! {"
             SELECT value, j
             FROM {schema_prefix}d
             WHERE i = $1 AND k = $2
             ORDER BY j"
-        };
-        assert_eq!(query, expected);
+        },
+    )]
+    fn test_batch_get_query(
+        #[case] job_arg: JobArg,
+        #[case] entity: EntityConfig,
+        #[case] expected: &str,
+    ) {
+        let stmt = BatchGetQuery(&job_arg, &entity).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_batch_gets() {
-        let entities = EntityConfigMap::from_iter([
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-            (
-                "d".to_string(),
-                EntityConfig {
-                    id: "d".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-                    generic: format_ident!("D_"),
-                },
-            ),
-            (
-                "e".to_string(),
-                EntityConfig {
-                    id: "e".to_string(),
-                    dims: vec!["i".to_string(), "k".to_string()],
-                    generic: format_ident!("E_"),
-                },
-            ),
-        ]);
-        let jobs = JobConfigMap::from_iter([(
-            "epsilon".to_string(),
-            JobConfig {
-                id: "epsilon".to_string(),
-                from: vec![
-                    JobArg {
-                        id: "b".to_string(),
-                        over: vec!["j".to_string()],
-                    },
-                    JobArg {
-                        id: "d".to_string(),
-                        over: vec!["j".to_string()],
-                    },
-                ],
-                to: "e".to_string(),
-                dims: vec!["i".to_string(), "k".to_string()],
-                spawn_dim: None,
-                pool_size: 4,
-            },
-        )]);
-
-        let item = batch_gets(&jobs, &entities).collect::<Vec<_>>();
-        let expected: Vec<syn::TraitItemFn> = vec![
-            parse_quote! {
-                async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::storage::StorageError> {
-                    let conn = self.pool.get().await?;
-                    let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
-                    let stmt = format!("SELECT value, j\nFROM {schema_prefix}b\nWHERE i = $1\nORDER BY j");
-                    let rows = conn.query(&stmt, &[&i64::try_from(i)?]).await?;
-
-                    let mut result: Vec<B> = Default::default();
-                    for row in rows {
-                        let value = operon::serde_json::from_value::<B_>(row.get(0))?;
-                        result.push(value.into());
-                    }
-
-                    Ok(result)
-                }
-            },
-            parse_quote! {
-                async fn get_all_d_over_j(&self, i: schema::IDim, k: schema::KDim) -> Result<Vec<D>, operon::storage::StorageError> {
-                    let conn = self.pool.get().await?;
-                    let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
-                    let stmt = format!("SELECT value, j\nFROM {schema_prefix}d\nWHERE i = $1 AND k = $2\nORDER BY j");
-                    let rows = conn.query(&stmt, &[&i64::try_from(i)?, &i64::try_from(k)?]).await?;
-
-                    let mut result: Vec<D> = Default::default();
-                    for row in rows {
-                        let value = operon::serde_json::from_value::<D_>(row.get(0))?;
-                        result.push(value.into());
-                    }
-
-                    Ok(result)
-                }
-            },
-        ];
-        assert_eq!(item, expected);
-    }
-
-    #[test]
-    fn test_batch_get_over_multiple_dimension() {
-        let entities = EntityConfigMap::from_iter([
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-            (
-                "d".to_string(),
-                EntityConfig {
-                    id: "d".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-                    generic: format_ident!("D_"),
-                },
-            ),
-            (
-                "e".to_string(),
-                EntityConfig {
-                    id: "e".to_string(),
-                    dims: vec!["i".to_string(), "l".to_string()],
-                    generic: format_ident!("E_"),
-                },
-            ),
-        ]);
-        let jobs = JobConfigMap::from_iter([(
-            "epsilon".to_string(),
-            JobConfig {
-                id: "epsilon".to_string(),
-                from: vec![
-                    JobArg {
-                        id: "b".to_string(),
-                        over: vec!["j".to_string()],
-                    },
-                    JobArg {
-                        id: "d".to_string(),
-                        over: vec!["j".to_string(), "k".to_string()],
-                    },
-                ],
-                to: "e".to_string(),
-                dims: vec!["i".to_string()],
-                spawn_dim: Some("l".to_string()),
-                pool_size: 4,
-            },
-        )]);
-
-        let item = batch_gets(&jobs, &entities).collect::<Vec<_>>();
-        let expected: Vec<syn::TraitItemFn> = vec![
-            parse_quote! {
-                async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::storage::StorageError> {
-                    let conn = self.pool.get().await?;
-                    let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
-                    let stmt = format!("SELECT value, j\nFROM {schema_prefix}b\nWHERE i = $1\nORDER BY j");
-                    let rows = conn.query(&stmt, &[&i64::try_from(i)?]).await?;
-
-                    let mut result: Vec<B> = Default::default();
-                    for row in rows {
-                        let value = operon::serde_json::from_value::<B_>(row.get(0))?;
-                        result.push(value.into());
-                    }
-
-                    Ok(result)
-                }
-            },
-            parse_quote! {
-                async fn get_all_d_over_jk(&self, i: schema::IDim) -> Result<Vec<Vec<D>>, operon::storage::StorageError> {
-                    let conn = self.pool.get().await?;
-                    let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
-                    let stmt = format!("SELECT value, j, k\nFROM {schema_prefix}d\nWHERE i = $1\nORDER BY j, k");
-                    let rows = conn.query(&stmt, &[&i64::try_from(i)?]).await?;
-
-                    let mut result: Vec<Vec<D>> = Default::default();
-                    for row in rows {
-                        let value = operon::serde_json::from_value::<D_>(row.get(0))?;
-                        let j = usize::try_from(row.get::<_, i64>(1usize))?;
-                        while result.len() <= j {
-                            result.push(Default::default());
-                        }
-                        let mut result = &mut result[j];
-                        result.push(value.into());
-                    }
-
-                    Ok(result)
-                }
-            },
-        ];
-        assert_eq!(item, expected);
+    #[rstest]
+    fn test_batch_gets(all_jobs: JobConfigMap, all_entities: EntityConfigMap) {
+        let items = batch_gets(&all_jobs, &all_entities).collect::<Vec<_>>();
+        assert_items_eq_in_trait(&items, "storage/batch_gets.rs");
     }
 }

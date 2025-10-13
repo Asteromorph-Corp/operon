@@ -173,78 +173,16 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
     use crate::configs::EntityConfigMap;
+    use crate::test_utils::assert_items_eq_in_trait;
+    use crate::test_utils::simple_pipeline::{all_entities, all_jobs};
     use crate::{EntityConfig, JobArg, JobConfig, JobConfigMap};
 
-    #[test]
-    fn test_single_ops() {
-        let entities = EntityConfigMap::from_iter([
-            (
-                "a".to_string(),
-                EntityConfig {
-                    id: "a".to_string(),
-                    dims: vec!["i".to_string()],
-                    generic: format_ident!("A_"),
-                },
-            ),
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-        ]);
-        let single_ops = single_ops(&entities).collect::<Vec<_>>();
-        let expected: Vec<syn::TraitItemFn> = vec![
-            parse_quote! {
-                async fn get_a(&self, i: schema::IDim) -> Result<Option<A>, operon::storage::StorageError>;
-            },
-            parse_quote! {
-                async fn put_a(&self, i: schema::IDim, value: A) -> Result<(), operon::storage::StorageError>;
-            },
-            parse_quote! {
-                async fn get_b(&self, i: schema::IDim, j: schema::JDim) -> Result<Option<B>, operon::storage::StorageError>;
-            },
-            parse_quote! {
-                async fn put_b(&self, i: schema::IDim, j: schema::JDim, value: B) -> Result<(), operon::storage::StorageError>;
-            },
-        ];
-
-        assert_eq!(single_ops, expected);
-    }
-
-    #[test]
-    fn test_batch_gets() {
-        let entities = EntityConfigMap::from_iter([
-            (
-                "b".to_string(),
-                EntityConfig {
-                    id: "b".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string()],
-                    generic: format_ident!("B_"),
-                },
-            ),
-            (
-                "d".to_string(),
-                EntityConfig {
-                    id: "d".to_string(),
-                    dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-                    generic: format_ident!("D_"),
-                },
-            ),
-            (
-                "e".to_string(),
-                EntityConfig {
-                    id: "e".to_string(),
-                    dims: vec!["i".to_string(), "k".to_string()],
-                    generic: format_ident!("E_"),
-                },
-            ),
-        ]);
-        let jobs = JobConfigMap::from_iter([(
+    fn jobs_multiple_over() -> JobConfigMap {
+        JobConfigMap::from_iter([(
             "epsilon".to_string(),
             JobConfig {
                 id: "epsilon".to_string(),
@@ -255,54 +193,19 @@ mod tests {
                     },
                     JobArg {
                         id: "d".to_string(),
-                        over: vec!["j".to_string()],
+                        over: vec!["j".to_string(), "k".to_string()],
                     },
                 ],
                 to: "e".to_string(),
-                dims: vec!["i".to_string(), "k".to_string()],
-                spawn_dim: None,
+                dims: vec!["i".to_string()],
+                spawn_dim: Some("l".to_string()),
                 pool_size: 4,
             },
-        )]);
-
-        let item = batch_gets(&jobs, &entities).collect::<Vec<_>>();
-        let expected: Vec<syn::TraitItemFn> = vec![
-            parse_quote! {
-                async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::storage::StorageError> {
-                    let final_results = {
-                        let mut results_0 = Vec::new();
-                        let mut j = 0usize;
-                        while let Some(value) = self.get_b(i, j.into()).await? {
-                            results_0.push(value);
-                            j += 1;
-                        }
-                        (!results_0.is_empty()).then_some(results_0)
-                    };
-                    Ok(final_results.unwrap_or_default())
-                }
-            },
-            parse_quote! {
-                async fn get_all_d_over_j(&self, i: schema::IDim, k: schema::KDim) -> Result<Vec<D>, operon::storage::StorageError> {
-                    let final_results = {
-                        let mut results_0 = Vec::new();
-                        let mut j = 0usize;
-                        while let Some(value) = self.get_d(i, j.into(), k).await? {
-                            results_0.push(value);
-                            j += 1;
-                        }
-                        (!results_0.is_empty()).then_some(results_0)
-                    };
-                    Ok(final_results.unwrap_or_default())
-                }
-            },
-        ];
-
-        assert_eq!(item, expected);
+        )])
     }
 
-    #[test]
-    fn test_batch_gets_with_multiple_over() {
-        let entities = EntityConfigMap::from_iter([
+    fn entities_multiple_over() -> EntityConfigMap {
+        EntityConfigMap::from_iter([
             (
                 "b".to_string(),
                 EntityConfig {
@@ -327,121 +230,34 @@ mod tests {
                     generic: format_ident!("E_"),
                 },
             ),
-        ]);
-        let jobs = JobConfigMap::from_iter([(
-            "epsilon".to_string(),
-            JobConfig {
-                id: "epsilon".to_string(),
-                from: vec![
-                    JobArg {
-                        id: "b".to_string(),
-                        over: vec!["j".to_string()],
-                    },
-                    JobArg {
-                        id: "d".to_string(),
-                        over: vec!["j".to_string(), "k".to_string()],
-                    },
-                ],
-                to: "e".to_string(),
-                dims: vec!["i".to_string()],
-                spawn_dim: Some("l".to_string()),
-                pool_size: 4,
-            },
-        )]);
-
-        let item = batch_gets(&jobs, &entities).collect::<Vec<_>>();
-        let expected: Vec<syn::TraitItemFn> = vec![
-            parse_quote! {
-                async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::storage::StorageError> {
-                    let final_results = {
-                        let mut results_0 = Vec::new();
-                        let mut j = 0usize;
-                        while let Some(value) = self.get_b(i, j.into()).await? {
-                            results_0.push(value);
-                            j += 1;
-                        }
-                        (!results_0.is_empty()).then_some(results_0)
-                    };
-                    Ok(final_results.unwrap_or_default())
-                }
-            },
-            parse_quote! {
-                async fn get_all_d_over_jk(&self, i: schema::IDim) -> Result<Vec<Vec<D>>, operon::storage::StorageError> {
-                    let final_results = {
-                        let mut results_0 = Vec::new();
-                        let mut j = 0usize;
-                        while let Some(value) = {
-                            let mut results_1 = Vec::new();
-                            let mut k = 0usize;
-                            while let Some(value) = self.get_d(i, j.into(), k.into()).await? {
-                                results_1.push(value);
-                                k += 1;
-                            }
-                            (!results_1.is_empty()).then_some(results_1)
-                        }
-                        {
-                            results_0.push(value);
-                            j += 1;
-                        }
-                        (!results_0.is_empty()).then_some(results_0)
-                    };
-                    Ok(final_results.unwrap_or_default())
-                }
-            },
-        ];
-
-        assert_eq!(item, expected);
+        ])
     }
 
-    #[test]
-    fn test_batch_inserts() {
-        let jobs = JobConfigMap::from_iter([
-            (
-                "beta".to_string(),
-                JobConfig {
-                    id: "beta".to_string(),
-                    from: vec![JobArg {
-                        id: "a".to_string(),
-                        over: vec![],
-                    }],
-                    to: "b".to_string(),
-                    dims: vec!["i".to_string()],
-                    spawn_dim: Some("j".to_string()),
-                    pool_size: 8,
-                },
-            ),
-            (
-                "epsilon".to_string(),
-                JobConfig {
-                    id: "epsilon".to_string(),
-                    from: vec![
-                        JobArg {
-                            id: "b".to_string(),
-                            over: vec!["j".to_string()],
-                        },
-                        JobArg {
-                            id: "d".to_string(),
-                            over: vec!["j".to_string()],
-                        },
-                    ],
-                    to: "e".to_string(),
-                    dims: vec!["i".to_string(), "k".to_string()],
-                    spawn_dim: None,
-                    pool_size: 4,
-                },
-            ),
-        ]);
+    #[rstest]
+    fn test_single_ops(all_entities: EntityConfigMap) {
+        let items = single_ops(&all_entities).collect::<Vec<_>>();
+        assert_items_eq_in_trait(&items, "core/storage_single_ops.rs");
+    }
 
-        let item = batch_inserts(&jobs).collect::<Vec<_>>();
-        let expected: Vec<syn::TraitItemFn> = vec![parse_quote! {
-            async fn put_all_b(&self, i: schema::IDim, values: Vec<B>) -> Result<(), operon::storage::StorageError> {
-                for (j, value) in values.into_iter().enumerate() {
-                    self.put_b(i, j.into(), value).await?;
-                }
-                Ok(())
-            }
-        }];
+    #[rstest]
+    #[case::simple(all_jobs(), all_entities(), "core/storage_batch_gets.rs")]
+    #[case::multiple_over(
+        jobs_multiple_over(),
+        entities_multiple_over(),
+        "core/storage_batch_gets_multiple_over.rs"
+    )]
+    fn test_batch_gets(
+        #[case] all_jobs: JobConfigMap,
+        #[case] all_entities: EntityConfigMap,
+        #[case] fixture_path: &str,
+    ) {
+        let item = batch_gets(&all_jobs, &all_entities).collect::<Vec<_>>();
+        assert_items_eq_in_trait(&item, fixture_path);
+    }
 
-        assert_eq!(item, expected);
+    #[rstest]
+    fn test_batch_inserts(all_jobs: JobConfigMap) {
+        let items = batch_inserts(&all_jobs).collect::<Vec<_>>();
+        assert_items_eq_in_trait(&items, "core/storage_batch_inserts.rs");
     }
 }

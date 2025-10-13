@@ -119,116 +119,46 @@ pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn>
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use rstest::rstest;
 
     use super::*;
-    use crate::JobArg;
+    use crate::test_utils::assert_items_eq_in_trait;
+    use crate::test_utils::simple_pipeline::{all_jobs, job_beta};
 
-    #[test]
-    fn test_batch_put_temp_table_query() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let query = BatchPutTempTableQuery(&job).to_string();
-        let expected =
-            "CREATE TEMP TABLE temp (LIKE {schema_prefix}b INCLUDING ALL) ON COMMIT DROP;";
-
-        assert_eq!(query, expected);
+    #[rstest]
+    #[case::simple(
+        job_beta(),
+        "CREATE TEMP TABLE temp (LIKE {schema_prefix}b INCLUDING ALL) ON COMMIT DROP;"
+    )]
+    fn test_batch_put_temp_table_query(#[case] job: JobConfig, #[case] expected: &str) {
+        let stmt = BatchPutTempTableQuery(&job).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_batch_put_copy_query() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let query = BatchPutCopyQuery(&job).to_string();
-        let expected = "COPY temp (i, j, value) FROM STDIN WITH (FORMAT csv);";
-        assert_eq!(query, expected);
+    #[rstest]
+    #[case::simple(job_beta(), "COPY temp (i, j, value) FROM STDIN WITH (FORMAT csv);")]
+    fn test_batch_put_copy_query(#[case] job: JobConfig, #[case] expected: &str) {
+        let stmt = BatchPutCopyQuery(&job).to_string();
+        assert_eq!(stmt, expected);
     }
 
-    #[test]
-    fn test_batch_put_insert_query() {
-        let job = JobConfig {
-            id: "beta".to_string(),
-            from: vec![JobArg {
-                id: "a".to_string(),
-                over: vec![],
-            }],
-            to: "b".to_string(),
-            dims: vec!["i".to_string()],
-            spawn_dim: Some("j".to_string()),
-            pool_size: 8,
-        };
-        let query = BatchPutInsertQuery(&job).to_string();
-        let expected = indoc! {"
+    #[rstest]
+    #[case::simple(
+        job_beta(), 
+        indoc! {"
             INSERT INTO {schema_prefix}b (i, j, value)
             SELECT i, j, value FROM temp
             ON CONFLICT (i, j) DO UPDATE SET value = EXCLUDED.value;"
-        };
+        }
+    )]
+    fn test_batch_put_insert_query(#[case] job: JobConfig, #[case] expected: &str) {
+        let query = BatchPutInsertQuery(&job).to_string();
         assert_eq!(query, expected);
     }
 
-    #[test]
-    fn test_batch_puts() {
-        let jobs = JobConfigMap::from([(
-            "beta".to_string(),
-            JobConfig {
-                id: "beta".to_string(),
-                from: vec![JobArg {
-                    id: "a".to_string(),
-                    over: vec![],
-                }],
-                to: "b".to_string(),
-                dims: vec!["i".to_string()],
-                spawn_dim: Some("j".to_string()),
-                pool_size: 8,
-            },
-        )]);
-
-        let item = batch_puts(&jobs).collect::<Vec<_>>();
-        let expected: Vec<syn::TraitItemFn> = vec![parse_quote! {
-            async fn put_all_b(&self, i: schema::IDim, values: Vec<B>) -> Result<(), operon::storage::StorageError> {
-                let mut conn = self.pool.get().await?;
-                let tx = conn.transaction().await?;
-                let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
-
-                let temp_table_stmt = format!("CREATE TEMP TABLE temp (LIKE {schema_prefix}b INCLUDING ALL) ON COMMIT DROP;");
-                tx.execute(&temp_table_stmt, &[]).await?;
-
-                let mut writer = operon::csv::WriterBuilder::new()
-                    .has_headers(false)
-                    .from_writer(vec![]);
-                for (j, value) in values.iter().enumerate() {
-                    writer.serialize((i, j, operon::serde_json::to_value(value)?.to_string()))?;
-                }
-                let copy_stmt = "COPY temp (i, j, value) FROM STDIN WITH (FORMAT csv);";
-                let sink = tx.copy_in(copy_stmt).await?;
-                let mut sink = Box::pin(sink);
-                operon::futures::sink::SinkExt::send(&mut sink, operon::bytes::Bytes::from(writer.into_inner()?)).await?;
-                operon::futures::sink::SinkExt::close(&mut sink).await?;
-
-                let insert_stmt = format!("INSERT INTO {schema_prefix}b (i, j, value)\nSELECT i, j, value FROM temp\nON CONFLICT (i, j) DO UPDATE SET value = EXCLUDED.value;");
-                tx.execute(&insert_stmt, &[]).await?;
-                tx.commit().await?;
-                Ok(())
-            }
-        }];
-
-        assert_eq!(item, expected);
+    #[rstest]
+    fn test_batch_puts(all_jobs: JobConfigMap) {
+        let items = batch_puts(&all_jobs).collect::<Vec<_>>();
+        assert_items_eq_in_trait(&items, "storage/batch_puts.rs");
     }
 }
