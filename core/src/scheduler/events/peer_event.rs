@@ -9,7 +9,7 @@ use crate::schema_base::{JobEnum, ResolutionEnum};
 /// `IndividualScheduler`-`IndividualScheduler` communication events.
 ///
 /// These are used for communication between individual schedulers,
-/// where each scheduler should modify its tickets based on the events.\
+/// where each scheduler should modify its tickets based on the events.
 #[derive(Debug, Clone)]
 pub enum PeerEvent<JE, RE>
 where
