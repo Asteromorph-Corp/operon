@@ -6,50 +6,28 @@ impl operon::schema_base::Ticket for BetaTicket {
 
     fn new() -> Self {
         Self {
-            deps_quota: Some(0),
+            deps_quota: 0usize,
             deps_done: true,
             ..Default::default()
         }
     }
 
-    #[allow(unused_variables)]
-    async fn get_dependency_quota(
-        &self,
-        client: operon::meta_storage::MetaClient<'_>,
-    ) -> Result<Option<usize>, operon::meta_storage::MetaStorageError> {
-        Ok(Some(0usize))
+    fn update_deps_done(mut self) -> Self {
+        self.deps_done = self.deps_count >= self.deps_quota;
+        if self.is_ready() {
+            self.status = operon::schema_base::TicketStatus::Queued;
+        }
+        self
     }
 
-    async fn resolve_dependency_quota(
-        self,
-        client: operon::meta_storage::MetaClient<'_>,
-    ) -> Result<Self, operon::meta_storage::MetaStorageError> {
-        let mut ticket = self;
-        if ticket.deps_quota.is_none() {
-            ticket.deps_quota = ticket.get_dependency_quota(client).await?;
-        }
-        ticket.deps_done = ticket
-            .deps_quota
-            .is_some_and(|quota| ticket.deps_count >= quota);
-        if ticket.is_ready() {
-            ticket.status = operon::schema_base::TicketStatus::Queued;
-        }
-        Ok(ticket)
+    fn raise_dependency_count(mut self) -> Self {
+        self.deps_count += 1;
+        self.update_deps_done()
     }
 
-    async fn raise_dependency_count(
-        self,
-        client: operon::meta_storage::MetaClient<'_>,
-    ) -> Result<Self, operon::meta_storage::MetaStorageError> {
-        let mut ticket = self;
-        ticket.deps_count += 1;
-        ticket.deps_done = ticket
-            .deps_quota
-            .is_some_and(|quota| ticket.deps_count >= quota);
-        if ticket.is_ready() {
-            ticket.status = operon::schema_base::TicketStatus::Queued;
-        }
-        Ok(ticket)
+    fn raise_dependency_quota(mut self, quota: usize) -> Self {
+        self.deps_quota += quota;
+        self.update_deps_done()
     }
 
     fn is_ready(&self) -> bool {
