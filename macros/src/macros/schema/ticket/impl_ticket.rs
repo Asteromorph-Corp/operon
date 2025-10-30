@@ -65,17 +65,13 @@ pub(super) fn impl_ticket(
                 Ok(ticket)
             }
 
-            async fn raise_dependency_count(
-                self,
-                client: #operon::meta_storage::MetaClient<'_>,
-            ) -> Result<Self, #operon::meta_storage::MetaStorageError> {
-                let mut ticket = self;
-                ticket.deps_count += 1;
-                ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
-                if ticket.is_ready() {
-                    ticket.status = operon::schema_base::TicketStatus::Queued;
+            fn raise_dependency_count(mut self) -> Self {
+                self.deps_count += 1;
+                self.deps_done = self.deps_quota.is_some_and(|quota| self.deps_count >= quota);
+                if self.is_ready() {
+                    self.status = operon::schema_base::TicketStatus::Queued;
                 }
-                Ok(ticket)
+                self
             }
 
             fn is_ready(&self) -> bool {

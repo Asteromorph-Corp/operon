@@ -158,12 +158,10 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
                 .iter()
                 .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)
                 .collect::<Result<Vec<_>, _>>()?;
-            let new_tickets = #operon::futures::future::try_join_all(
-                tickets
-                    .into_iter()
-                    .map(|ticket| #operon::schema_base::Ticket::raise_dependency_count(ticket, client))
-            )
-            .await?;
+            let new_tickets = tickets
+                .into_iter()
+                .map(#operon::schema_base::Ticket::raise_dependency_count)
+                .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);
             let sink = client.copy_in::<_, #operon::bytes::Bytes>(&copy_stmt).await?;
