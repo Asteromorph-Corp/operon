@@ -1,9 +1,9 @@
 use syn::parse_quote;
 
+use crate::configs::{DimensionConfig, JobConfig};
 use crate::utils::{
     explode_ident, operon_ident, resolution_ident, ticket_ident, variable_ident, with_ident,
 };
-use crate::configs::{DimensionConfig, JobConfig};
 
 /// A helper struct to generate the SQL query for popping tickets to be exploded.
 struct ExplodePopQuery<'a>(&'a JobConfig, &'a DimensionConfig);
@@ -79,13 +79,11 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
                     #err_msg.into(),
                 ));
             }
-            let new_tickets = #operon::futures::future::try_join_all(
-                tickets
-                    .iter()
-                    .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().#with_fn_name(ub)))
-                    .map(|ticket| #operon::schema_base::Ticket::resolve_dependency_quota(ticket, client))
-            )
-            .await?;
+            let new_tickets = tickets
+                .iter()
+                .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().#with_fn_name(ub)))
+                .map(#operon::schema_base::Ticket::update_deps_done)
+                .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);
             let sink = client.copy_in::<_, #operon::bytes::Bytes>(&copy_stmt).await?;

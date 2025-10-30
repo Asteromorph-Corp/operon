@@ -160,7 +160,7 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
                 .collect::<Result<Vec<_>, _>>()?;
             let new_tickets = tickets
                 .into_iter()
-                .map(#operon::schema_base::Ticket::raise_dependency_count)
+                .map(|ticket| #operon::schema_base::Ticket::raise_dependency_count(ticket))
                 .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);

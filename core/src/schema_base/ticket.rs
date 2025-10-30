@@ -16,45 +16,26 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
         Self::default()
     }
 
-    /// Fetch the required dependency count for this ticket.
-    /// If the quota is not yet known, return `None`.
-    ///
-    /// This function is async because it may need to access the fact storage
-    /// to get the dependency count.
-    ///
-    /// The dependency quota for each job is computed as the total number of upstream jobs,
-    /// where for each type of upstream job, the quota is a sum of products.
-    /// As pseudocode:
-    ///
-    /// ```lua
-    /// --[[ "Sink" dimensions are dimensions with no outdegrees,
-    ///     i.e. no other relevant dimensions depend on them. ]]
-    /// quota = 0
-    /// for parent_coordinates in non_sink_dimensions_valid_coordinates do
-    ///   product = 1
-    ///   for dimension in sink_dimensions do
-    ///     -- We call the fact storage to get this upper_bound here
-    ///     product *= dimension.upper_bound(parent_coordinates)
-    ///   end
-    ///   quota += product
-    /// end
-    /// print(quota)
-    /// ```
-    async fn get_dependency_quota(
-        &self,
-        client: MetaClient<'_>,
-    ) -> Result<Option<usize>, MetaStorageError>;
+    // /// Attempt to resolve the dependency quota for this ticket, if not yet known.
+    // async fn resolve_dependency_quota(
+    //     self,
+    //     client: MetaClient<'_>,
+    // ) -> Result<Self, MetaStorageError>;
 
-    /// Attempt to resolve the dependency quota for this ticket, if not yet known.
-    async fn resolve_dependency_quota(
-        self,
-        client: MetaClient<'_>,
-    ) -> Result<Self, MetaStorageError>;
+    /// Compute if all dependencies are done.
+    ///
+    /// Return the updated ticket.
+    fn update_deps_done(self) -> Self;
 
     /// Raise the dependency count of this ticket by one, and compute if all dependencies are done.
     ///
     /// Return the updated ticket.
     fn raise_dependency_count(self) -> Self;
+
+    /// Raise the dependency quota of this ticket by one, and compute if all dependencies are done.
+    ///
+    /// Return the updated ticket.
+    fn raise_dependency_quota(self, quota: usize) -> Self;
 
     /// Whether this ticket is ready to run,
     /// i.e. whether all dependencies are done and the job is fully resolved.

@@ -1,16 +1,10 @@
 use syn::parse_quote;
 
-use crate::configs::{DimensionConfigMap, EntityId, JobConfig, JobConfigMap};
-use crate::macros::schema::ticket::fn_get_dependency_quota::fn_get_dependency_quota;
+use crate::configs::{EntityId, JobConfig};
 use crate::utils::{job_ident, operon_ident, spawn_resolution, ticket_ident, variable_ident};
 
 /// Generates the implementation of the `Ticket` trait for a given job's ticket.
-pub(super) fn impl_ticket(
-    job: &JobConfig,
-    primary_entity: &EntityId,
-    dimensions: &DimensionConfigMap,
-    jobs: &JobConfigMap,
-) -> syn::ItemImpl {
+pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::ItemImpl {
     let operon = operon_ident();
     let job_ident = job_ident(&job.id);
     let res_ident = spawn_resolution(job.spawn_dim.as_ref());
@@ -30,15 +24,13 @@ pub(super) fn impl_ticket(
             parse_quote! {
                 fn new() -> Self {
                     Self {
-                        deps_quota: Some(0),
+                        deps_quota: 0,
                         deps_done: true,
                         ..Default::default()
                     }
                 }
             }
         });
-
-    let fn_get_dependency_quota = fn_get_dependency_quota(job, primary_entity, dimensions, jobs);
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -48,30 +40,23 @@ pub(super) fn impl_ticket(
             type Resolution = #res_ident;
 
             #fn_new
-            #fn_get_dependency_quota
 
-            async fn resolve_dependency_quota(
-                self,
-                client: #operon::meta_storage::MetaClient<'_>,
-            ) -> Result<Self, #operon::meta_storage::MetaStorageError> {
-                let mut ticket = self;
-                if ticket.deps_quota.is_none() {
-                    ticket.deps_quota = ticket.get_dependency_quota(client).await?;
-                }
-                ticket.deps_done = ticket.deps_quota.is_some_and(|quota| ticket.deps_count >= quota);
-                if ticket.is_ready() {
-                    ticket.status = operon::schema_base::TicketStatus::Queued;
-                }
-                Ok(ticket)
-            }
-
-            fn raise_dependency_count(mut self) -> Self {
-                self.deps_count += 1;
-                self.deps_done = self.deps_quota.is_some_and(|quota| self.deps_count >= quota);
+            fn update_deps_done(mut self) -> Self {
+                self.deps_done = self.deps_count >= self.deps_quota;
                 if self.is_ready() {
                     self.status = operon::schema_base::TicketStatus::Queued;
                 }
                 self
+            }
+
+            fn raise_dependency_count(mut self) -> Self {
+                self.deps_count += 1;
+                self.update_deps_done()
+            }
+
+            fn raise_dependency_quota(mut self, quota: usize) -> Self {
+                self.deps_quota += quota;
+                self.update_deps_done()
             }
 
             fn is_ready(&self) -> bool {
@@ -101,19 +86,16 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{all_dimensions, all_jobs, primary_entity};
+    use crate::test_utils::simple_pipeline::{job_beta, primary_entity};
 
     #[rstest]
-    #[case("beta", "schema/ticket/impl_ticket.rs")]
+    #[case(job_beta(), "schema/ticket/impl_ticket.rs")]
     fn test_impl_ticket(
         primary_entity: EntityId,
-        all_jobs: JobConfigMap,
-        all_dimensions: DimensionConfigMap,
-        #[case] job_id: &str,
+        #[case] job: JobConfig,
         #[case] fixture_path: &str,
     ) {
-        let job = all_jobs.get(job_id).unwrap();
-        let item = impl_ticket(job, &primary_entity, &all_dimensions, &all_jobs);
+        let item = impl_ticket(&job, &primary_entity);
         assert_item_eq(&item, fixture_path);
     }
 }

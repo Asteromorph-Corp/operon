@@ -13,7 +13,7 @@ pub fn mod_queries(all_configs: &AllConfig) -> syn::ItemMod {
             .iter()
             .filter_map(|dim_id| all_configs.dimensions.get(dim_id))
             .collect::<Vec<_>>();
-        ticket_queries(job, &dims, &all_configs.dimensions)
+        ticket_queries(job, &dims)
     });
 
     parse_quote! {

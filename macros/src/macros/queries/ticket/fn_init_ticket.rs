@@ -19,7 +19,7 @@ impl std::fmt::Display for InitTicketQuery<'_> {
         }
         writeln!(f, "    resolved BOOLEAN NOT NULL,")?;
         writeln!(f, "    deps_count BIGINT NOT NULL,")?;
-        writeln!(f, "    deps_quota BIGINT,")?;
+        writeln!(f, "    deps_quota BIGINT NOT NULL,")?;
         writeln!(f, "    deps_done BOOLEAN NOT NULL,")?;
         writeln!(f, "    status {{ticket_status_type}} NOT NULL,")?;
         write!(f, "    PRIMARY KEY (")?;
@@ -102,7 +102,7 @@ impl std::fmt::Display for TicketSummaryTriggerQuery<'_> {
 ///             i BIGINT,
 ///             resolved BOOLEAN NOT NULL,
 ///             deps_count BIGINT NOT NULL,
-///             deps_quota BIGINT,
+///             deps_quota BIGINT NOT NULL,
 ///             deps_done BOOLEAN NOT NULL,
 ///             status {ticket_status_type} NOT NULL,
 ///             PRIMARY KEY (i)
@@ -193,7 +193,7 @@ mod tests {
                 i BIGINT,
                 resolved BOOLEAN NOT NULL,
                 deps_count BIGINT NOT NULL,
-                deps_quota BIGINT,
+                deps_quota BIGINT NOT NULL,
                 deps_done BOOLEAN NOT NULL,
                 status {ticket_status_type} NOT NULL,
                 PRIMARY KEY (i)
