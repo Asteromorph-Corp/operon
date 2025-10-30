@@ -119,6 +119,11 @@ where
                     .on_receive_resolution(tx.as_client(), resolution)
                     .await?
             }
+            PeerEvent::Explosion(explosion) => {
+                self.spec
+                    .on_receive_explosion(tx.as_client(), explosion)
+                    .await?
+            }
         };
         self.update_state(tx.as_client(), false, state).await?;
         tx.commit().await?;

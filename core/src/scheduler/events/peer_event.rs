@@ -11,21 +11,14 @@ use crate::schema_base::{JobEnum, ResolutionEnum};
 /// These are used for communication between individual schedulers,
 /// where each scheduler should modify its tickets based on the events.
 #[derive(Debug, Clone)]
-pub enum PeerEvent<JE, RE>
-where
-    JE: JobEnum,
-    RE: ResolutionEnum,
-{
+pub enum PeerEvent<JE: JobEnum, RE: ResolutionEnum> {
     Job(JE),
     Resolution(RE),
+    Explosion(RE),
 }
 
 #[derive(Debug, Clone)]
-pub enum PeerEventSender<JE, RE>
-where
-    JE: JobEnum,
-    RE: ResolutionEnum,
-{
+pub enum PeerEventSender<JE: JobEnum, RE: ResolutionEnum> {
     Up(tokio::sync::mpsc::Sender<PeerEvent<JE, RE>>),
     Downgraded(tokio::sync::mpsc::WeakSender<PeerEvent<JE, RE>>),
 }
@@ -33,11 +26,7 @@ where
 pub type PeerEventReceiver<JE, RE> = tokio::sync::mpsc::Receiver<PeerEvent<JE, RE>>;
 pub type PeerEventSenderMap<JE, RE> = HashMap<&'static str, PeerEventSender<JE, RE>>;
 
-impl<JE, RE> PeerEventSender<JE, RE>
-where
-    JE: JobEnum,
-    RE: ResolutionEnum,
-{
+impl<JE: JobEnum, RE: ResolutionEnum> PeerEventSender<JE, RE> {
     pub async fn send(&self, event: PeerEvent<JE, RE>) -> Result<(), SchedulerError> {
         match self {
             PeerEventSender::Up(tx) => tx
@@ -60,11 +49,7 @@ where
 }
 
 #[async_trait]
-pub trait PeerEventSenders<JE, RE>: Send + Sync
-where
-    JE: JobEnum,
-    RE: ResolutionEnum,
-{
+pub trait PeerEventSenders<JE: JobEnum, RE: ResolutionEnum>: Send + Sync {
     /// Constructs a new `PeerEventSenders` instance from the given senders.
     ///
     /// Remove the senders from the map.
@@ -74,11 +59,7 @@ where
 }
 
 #[async_trait]
-impl<JE, RE> PeerEventSenders<JE, RE> for ()
-where
-    JE: JobEnum,
-    RE: ResolutionEnum,
-{
+impl<JE: JobEnum, RE: ResolutionEnum> PeerEventSenders<JE, RE> for () {
     fn gather_from(_: HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self {}
 
     fn downgrade_all(&mut self) {}

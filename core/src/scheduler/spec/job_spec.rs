@@ -64,4 +64,10 @@ where
         client: MetaClient<'_>,
         resolution: Svc::ResolutionEnum,
     ) -> Result<Vec<Self::Ticket>, SchedulerError>;
+
+    async fn on_receive_explosion(
+        &self,
+        client: MetaClient<'_>,
+        explosion: Svc::ResolutionEnum,
+    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
 }

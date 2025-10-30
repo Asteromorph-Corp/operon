@@ -1,4 +1,5 @@
 mod fn_check_consistency;
+mod fn_on_receive_explosion;
 mod fn_on_receive_job;
 mod fn_on_receive_resolution;
 mod fn_pool_size;

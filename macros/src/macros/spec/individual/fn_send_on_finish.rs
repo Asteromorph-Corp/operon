@@ -53,12 +53,12 @@ use crate::utils::{operon_ident, sender_ident};
 /// ```
 pub(super) fn fn_send_on_finish(
     job: &JobConfig,
-    resolution_receiving_jobs: &IndexSet<&JobConfig>,
-    job_receiving_jobs: &IndexSet<&JobConfig>,
+    spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
+    downstream_jobs: &IndexSet<&JobConfig>,
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
 
-    let send_resolutions = resolution_receiving_jobs
+    let send_resolutions = spawn_dim_repeating_jobs
         .iter()
         .map(|repeating_job| -> syn::Expr {
             let sender_ident = sender_ident(&repeating_job.id);
@@ -83,30 +83,28 @@ pub(super) fn fn_send_on_finish(
             }
         });
 
-    let send_jobs = job_receiving_jobs
-        .iter()
-        .map(|downstream_job| -> syn::Expr {
-            let sender_ident = sender_ident(&downstream_job.id);
-            let ok_msg = format!(
-                "`{}` sent peer event to `{}`: {{job:?}}",
-                job.id, downstream_job.id
-            );
-            let err_msg = format!(
-                "`{}`'s peer channel closed before handling `{}`'s {{job:?}}",
-                downstream_job.id, job.id
-            );
+    let send_jobs = downstream_jobs.iter().map(|downstream_job| -> syn::Expr {
+        let sender_ident = sender_ident(&downstream_job.id);
+        let ok_msg = format!(
+            "`{}` sent peer event to `{}`: {{job:?}}",
+            job.id, downstream_job.id
+        );
+        let err_msg = format!(
+            "`{}`'s peer channel closed before handling `{}`'s {{job:?}}",
+            downstream_job.id, job.id
+        );
 
-            parse_quote! {
-                match peer_txs
-                    .#sender_ident
-                    .send(#operon::scheduler::PeerEvent::Job(job.into()))
-                    .await
-                {
-                    Ok(_) => #operon::log::trace!(#ok_msg),
-                    Err(_) => #operon::log::trace!(#err_msg),
-                }
+        parse_quote! {
+            match peer_txs
+                .#sender_ident
+                .send(#operon::scheduler::PeerEvent::Job(job.into()))
+                .await
+            {
+                Ok(_) => #operon::log::trace!(#ok_msg),
+                Err(_) => #operon::log::trace!(#err_msg),
             }
-        });
+        }
+    });
 
     parse_quote! {
         async fn send_on_finish(
