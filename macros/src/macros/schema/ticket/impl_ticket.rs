@@ -16,21 +16,8 @@ pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::It
         .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
 
-    let fn_new: Option<syn::ImplItemFn> = job
-        .from
-        .iter()
-        .all(|arg| arg.id == *primary_entity)
-        .then(|| {
-            parse_quote! {
-                fn new() -> Self {
-                    Self {
-                        deps_quota: 0,
-                        deps_done: true,
-                        ..Default::default()
-                    }
-                }
-            }
-        });
+    let initial_done = job.from.iter().all(|arg| arg.id == *primary_entity);
+    let initial_quota: usize = if initial_done { 0 } else { 1 };
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -39,7 +26,13 @@ pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::It
             type Job = schema::#job_ident;
             type Resolution = #res_ident;
 
-            #fn_new
+            fn new() -> Self {
+                Self {
+                    deps_quota: #initial_quota,
+                    deps_done: #initial_done,
+                    ..Default::default()
+                }
+            }
 
             fn update_deps_done(mut self) -> Self {
                 self.deps_done = self.deps_count >= self.deps_quota;

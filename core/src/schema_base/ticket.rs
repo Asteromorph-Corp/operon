@@ -12,9 +12,7 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
 
     /// Brand-new ticket, with none of the dimensions resolved.
     /// Return the ticket that should be present at startup time.
-    fn new() -> Self {
-        Self::default()
-    }
+    fn new() -> Self;
 
     // /// Attempt to resolve the dependency quota for this ticket, if not yet known.
     // async fn resolve_dependency_quota(
