@@ -16,6 +16,12 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
         .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
 
+    let is_resolved: syn::Expr = if dim_fields.is_empty() {
+        parse_quote! { true }
+    } else {
+        parse_quote! { #(self.#dim_fields.is_some())&&* }
+    };
+
     let initial_quota = job.from.len();
     let initial_done = initial_quota == 0;
 
@@ -58,7 +64,7 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
             }
 
             fn is_resolved(&self) -> bool {
-                #(self.#dim_fields.is_some())&&*
+                #is_resolved
             }
 
             fn resolve(&self) -> Option<schema::#job_ident> {
