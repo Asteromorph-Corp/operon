@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::{RwLock, Semaphore};
 
-use crate::meta_storage::{MetaClient, MetaStorage};
+use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
 use crate::operon::RunningState;
 use crate::scheduler::{
     ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
@@ -102,6 +102,11 @@ where
         Ok(())
     }
 
+    async fn initial_ready_tickets(&self) -> Result<Vec<T>, MetaStorageError> {
+        let conn = self.meta_storage.conn().await?;
+        T::get_all(conn.as_client(), TicketStatus::Queued).await
+    }
+
     /// Handle a received event.
     ///
     /// One event corresponds to one metadata transaction.
@@ -131,22 +136,17 @@ where
         Ok(ready_tickets)
     }
 
-    fn check_initial_data(&self, initial_data: Vec<T>) -> Result<VecDeque<T>, ()> {
-        let (ready, not_ready) = initial_data
-            .into_iter()
-            .partition::<Vec<_>, _>(|ticket| ticket.is_ready());
-
-        if !not_ready.is_empty() {
-            for ticket in not_ready {
-                log::error!(
-                    "Restored ticket for `{}` job is not ready to run: {ticket:?}",
-                    J::id()
-                );
-            }
-            return Err(());
+    fn check_initial_data(&self, tickets: &[T]) -> bool {
+        let mut all_ready = true;
+        for ticket in tickets.iter().filter(|t| !t.is_ready()) {
+            log::error!(
+                "Restored ticket for `{}` job is not ready to run: {:?}",
+                J::id(),
+                ticket
+            );
+            all_ready = false;
         }
-
-        Ok(ready.into())
+        all_ready
     }
 
     /// Drive the scheduler until every ticket of this job type is finished
@@ -168,20 +168,14 @@ where
 
         let mut state = RunningState::Running;
 
-        let ready_tickets = if clean {
-            VecDeque::new()
-        } else {
-            let Ok(conn) = self.meta_storage.conn().await.map_err(SchedulerError::from) else {
-                return RunningState::Error;
-            };
-            let Ok(tickets) = T::get_all(conn.as_client(), TicketStatus::Queued).await else {
-                return RunningState::Error;
-            };
-            match self.check_initial_data(tickets) {
-                Ok(ready_tickets) => ready_tickets,
-                Err(_) => return RunningState::Error,
-            }
+        let Ok(initial_tickets) = self.initial_ready_tickets().await else {
+            return RunningState::Error;
         };
+
+        // Check if the initial data is valid, it can only be done if the job is not clean.
+        if !clean && !self.check_initial_data(&initial_tickets) {
+            return RunningState::Error;
+        }
 
         // Update the UI state before entering the loop.
         if self
@@ -211,7 +205,7 @@ where
             return state;
         }
         let res = self
-            .run_internal(ready_tickets, &peer_txs, peer_rx, ctrl_rx, &mut state)
+            .run_internal(initial_tickets, &peer_txs, peer_rx, ctrl_rx, &mut state)
             .await;
 
         // Close peer senders
@@ -249,13 +243,15 @@ where
 
     async fn run_internal(
         &mut self,
-        mut ready_tickets: VecDeque<T>,
+        initial_tickets: Vec<T>,
         peer_txs: &JS::PeerEventSenders,
         mut peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         mut ctrl_rx: ControlEventReceiver,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
         let pool = self.pool.clone();
+
+        let mut ready_tickets: VecDeque<T> = initial_tickets.into();
         let mut got_all_updates = false;
 
         let (int_tx, mut int_rx) = tokio::sync::mpsc::unbounded_channel::<InternalEvent<J, R>>();
