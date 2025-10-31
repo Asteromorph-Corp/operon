@@ -1,4 +1,5 @@
-use operon::{serde::{Deserialize, Serialize}, define_operon};
+use operon::define_operon;
+use operon::serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(crate = "operon::serde")]

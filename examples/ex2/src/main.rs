@@ -1,14 +1,13 @@
+use std::sync::Arc;
+
 use ex2::{
     A, B, C, CookingService, CookingStorage, D, E, F, PsqlCookingStorage, cooking_handler, schema,
 };
-use operon::{
-    async_trait::async_trait,
-    operon::{Operon, OperonOptions},
-    service::OperonService,
-    storage::{OperonStorage, StorageOptions},
-};
+use operon::async_trait::async_trait;
+use operon::operon::{Operon, OperonOptions};
+use operon::service::OperonService;
+use operon::storage::{OperonStorage, StorageOptions};
 use rand::Rng;
-use std::sync::Arc;
 
 // Example service implementation
 struct ExampleService;

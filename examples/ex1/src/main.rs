@@ -11,15 +11,14 @@
 // This example is meant to be run as a binary,
 // and was tested with Rust 1.90.0-nightly and PostgreSQL 17.5.
 
-use operon::{
-    async_trait::async_trait,
-    define_operon,
-    operon::{Operon, OperonOptions},
-    serde::{Deserialize, Serialize},
-    service::OperonService,
-    storage::{OperonStorage, StorageOptions},
-};
 use std::sync::Arc;
+
+use operon::async_trait::async_trait;
+use operon::define_operon;
+use operon::operon::{Operon, OperonOptions};
+use operon::serde::{Deserialize, Serialize};
+use operon::service::OperonService;
+use operon::storage::{OperonStorage, StorageOptions};
 
 //# —————————————————————— A. Entity Definitions —————————————————————— #//
 // Define the entities that will be used.
