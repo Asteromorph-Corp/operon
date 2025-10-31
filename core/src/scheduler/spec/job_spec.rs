@@ -62,6 +62,7 @@ where
     async fn on_receive_resolution(
         &self,
         client: MetaClient<'_>,
+        peer_txs: &Self::PeerEventSenders,
         resolution: Svc::ResolutionEnum,
     ) -> Result<Vec<Self::Ticket>, SchedulerError>;
 

@@ -40,7 +40,7 @@ pub fn impl_job_spec(
     let fn_run_job = fn_run_job(job, entities, dimensions);
     let fn_send_on_finish = fn_send_on_finish(job, spawn_dim_repeating_jobs, downstream_jobs);
     let fn_on_receive_job = fn_on_receive_job(job, upstream_jobs);
-    let fn_on_receive_resolution = fn_on_receive_resolution(job);
+    let fn_on_receive_resolution = fn_on_receive_resolution(job, downstream_jobs);
     let fn_on_receive_explosion = fn_on_receive_explosion(job, upstream_jobs);
     let fn_pool_size = fn_pool_size(job);
 
