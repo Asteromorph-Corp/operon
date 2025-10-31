@@ -3,17 +3,8 @@ pub async fn raise_quota_epsilon_j(
     res: &schema::JResolution,
 ) -> Result<Vec<schema::EpsilonTicket>, operon::meta_storage::MetaStorageError> {
     let schema_prefix = client.schema_prefix();
-    let params = [i64::try_from(res.1)?];
     let pop_stmt = format!("DELETE FROM {schema_prefix}ticket_epsilon\nWHERE i = $1\nRETURNING *;");
-    let rows = client
-        .query(
-            &pop_stmt,
-            &params
-                .iter()
-                .map(|p| p as &(dyn operon::postgres_types::ToSql + Sync))
-                .collect::<Vec<_>>(),
-        )
-        .await?;
+    let rows = client.query(&pop_stmt, &[&i64::try_from(res.1)?]).await?;
     let tickets = rows
         .iter()
         .map(<schema::EpsilonTicket as operon::schema_base::TicketSql>::from_sql_row)
