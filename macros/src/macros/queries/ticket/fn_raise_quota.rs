@@ -11,7 +11,13 @@ impl std::fmt::Display for RaiseQuotaPopQuery<'_> {
         let job_id = &self.0.id;
 
         writeln!(f, "DELETE FROM {{schema_prefix}}ticket_{job_id}")?;
-        for (idx, dim) in self.1.depends_on.iter().enumerate() {
+        for (idx, dim) in self
+            .1
+            .depends_on
+            .iter()
+            .filter(|dim| self.0.dims.contains(dim))
+            .enumerate()
+        {
             if idx == 0 {
                 write!(f, "WHERE {dim} = ${}", idx + 1)?;
             } else {
@@ -50,16 +56,13 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
     let pop_query = RaiseQuotaPopQuery(job, dim).to_string();
     let copy_query = RaiseQuotaCopyInQuery(job).to_string();
 
-    let params = dim
-        .depends_on
-        .iter()
-        .enumerate()
-        .map(|(idx, _)| -> syn::Expr {
-            let idx = syn::Index::from(idx + 1);
-            parse_quote! {
-                i64::try_from(res.#idx)?
-            }
-        });
+    let indices = dim.depends_on.iter().enumerate().filter_map(|(idx, dim)| {
+        if job.dims.contains(dim) {
+            Some(syn::Index::from(idx + 1))
+        } else {
+            None
+        }
+    });
 
     parse_quote! {
         pub async fn #fn_name(
@@ -67,15 +70,9 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
             res: &schema::#res_ident,
         ) -> Result<Vec<schema::#ticket_ident>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
-            let params = [
-                #(#params,)*
-            ];
             let pop_stmt = format!(#pop_query);
 
-            let rows = client.query(
-                &pop_stmt,
-                &params.iter().map(|p| p as &(dyn #operon::postgres_types::ToSql + Sync)).collect::<Vec<_>>()
-            ).await?;
+            let rows = client.query(&pop_stmt, &[#(&i64::try_from(res.#indices)?,)*]).await?;
             let tickets = rows
                 .iter()
                 .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)

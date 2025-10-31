@@ -13,7 +13,13 @@ impl std::fmt::Display for ExplodePopQuery<'_> {
         let job_id = &self.0.id;
 
         writeln!(f, "DELETE FROM {{schema_prefix}}ticket_{job_id}")?;
-        for (i, dep) in self.1.depends_on.iter().enumerate() {
+        for (i, dep) in self
+            .1
+            .depends_on
+            .iter()
+            .filter(|dim| self.0.dims.contains(dim))
+            .enumerate()
+        {
             if i == 0 {
                 write!(f, "WHERE")?;
             } else {
@@ -53,7 +59,13 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
     let pop_query = ExplodePopQuery(job, dim).to_string();
     let copy_query = ExplodeCopyInQuery(job).to_string();
 
-    let indices = (1..=dim.depends_on.len()).map(syn::Index::from);
+    let indices = dim.depends_on.iter().enumerate().filter_map(|(idx, dim)| {
+        if job.dims.contains(dim) {
+            Some(syn::Index::from(idx + 1))
+        } else {
+            None
+        }
+    });
 
     let err_msg = format!(
         "Called `explode({})` on `{}`, but `{}` was resolved",
