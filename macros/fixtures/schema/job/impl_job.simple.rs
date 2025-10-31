@@ -5,6 +5,6 @@ impl operon::schema_base::Job for BetaJob {
     }
 
     fn is_descendant_of(other: &str) -> bool {
-        other == BETA_ID
+        other == ALPHA_ID || other == BETA_ID
     }
 }

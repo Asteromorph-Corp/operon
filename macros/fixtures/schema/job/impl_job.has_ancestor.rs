@@ -5,6 +5,10 @@ impl operon::schema_base::Job for EpsilonJob {
     }
 
     fn is_descendant_of(other: &str) -> bool {
-        other == BETA_ID || other == DELTA_ID || other == EPSILON_ID || other == GAMMA_ID
+        other == ALPHA_ID
+            || other == BETA_ID
+            || other == DELTA_ID
+            || other == EPSILON_ID
+            || other == GAMMA_ID
     }
 }

@@ -1,6 +1,7 @@
 pub trait CookingService:
     operon::service::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum>
 {
+    async fn alpha(&self) -> Result<Vec<A>, Box<dyn std::error::Error + Send + Sync>>;
     async fn beta(&self, a: A) -> Result<Vec<B>, Box<dyn std::error::Error + Send + Sync>>;
     async fn gamma(&self, a: A) -> Result<Vec<C>, Box<dyn std::error::Error + Send + Sync>>;
     async fn delta(&self, a: A, b: B, c: C) -> Result<D, Box<dyn std::error::Error + Send + Sync>>;

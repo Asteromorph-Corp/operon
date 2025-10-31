@@ -80,11 +80,11 @@ mod tests {
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]
-    #[case::beta("beta", vec!["beta"])]
-    #[case::gamma("gamma", vec!["gamma"])]
-    #[case::delta("delta", vec!["beta", "gamma", "delta"])]
-    #[case::epsilon("epsilon", vec!["beta", "gamma", "delta", "epsilon"])]
-    #[case::zeta("zeta", vec!["beta", "gamma", "delta", "epsilon", "zeta"])]
+    #[case::beta("beta", vec!["alpha", "beta"])]
+    #[case::gamma("gamma", vec!["alpha", "gamma"])]
+    #[case::delta("delta", vec!["alpha", "beta", "gamma", "delta"])]
+    #[case::epsilon("epsilon", vec!["alpha", "beta", "gamma", "delta", "epsilon"])]
+    #[case::zeta("zeta", vec!["alpha", "beta", "gamma", "delta", "epsilon", "zeta"])]
     fn test_get_upstream_jobs(
         all_jobs: JobConfigMap,
         #[case] job_id: &str,
@@ -99,9 +99,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case::beta("beta", vec![])]
-    #[case::gamma("gamma", vec![])]
-    #[case::delta("delta", vec!["beta", "gamma"])]
+    #[case::beta("beta", vec!["alpha"])]
+    #[case::gamma("gamma", vec!["alpha"])]
+    #[case::delta("delta", vec!["alpha", "beta", "gamma"])]
     #[case::epsilon("epsilon", vec!["beta", "delta"])]
     #[case::zeta("zeta", vec!["gamma", "epsilon"])]
     fn test_get_direct_upstream_jobs(
