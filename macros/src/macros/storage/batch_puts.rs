@@ -53,14 +53,11 @@ impl std::fmt::Display for BatchPutInsertQuery<'_> {
         }
         writeln!(f, "value FROM temp")?;
         write!(f, "ON CONFLICT (")?;
-        for (i, dim) in self.0.dims.iter().enumerate() {
-            if i != 0 {
+        for (idx, dim) in self.0.dims.iter().chain(&self.0.spawn_dim).enumerate() {
+            if idx != 0 {
                 write!(f, ", ")?;
             }
             write!(f, "{dim}")?;
-        }
-        if let Some(spawn_dim) = &self.0.spawn_dim {
-            write!(f, ", {spawn_dim}")?;
         }
         write!(f, ") DO UPDATE SET value = EXCLUDED.value;")
     }

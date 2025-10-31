@@ -10,14 +10,16 @@ impl std::fmt::Display for MarkDoneQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "UPDATE {{schema_prefix}}ticket_{} SET status = 'done' WHERE",
+            "UPDATE {{schema_prefix}}ticket_{} SET status = 'done'",
             self.0.id
         )?;
-        for (i, dim) in self.0.dims.iter().enumerate() {
-            if i != 0 {
+        for (idx, dim) in self.0.dims.iter().enumerate() {
+            if idx == 0 {
+                write!(f, " WHERE")?;
+            } else {
                 write!(f, " AND")?;
             }
-            write!(f, " {dim} = ${}", i + 1)?;
+            write!(f, " {dim} = ${}", idx + 1)?;
         }
         write!(f, ";")
     }

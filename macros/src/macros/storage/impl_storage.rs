@@ -18,8 +18,14 @@ impl std::fmt::Display for CreateTablesQuery<'_> {
             for dim in &entity.dims {
                 writeln!(f, "    {dim} BIGINT,")?;
             }
-            writeln!(f, "    value JSONB,")?;
-            writeln!(f, "    PRIMARY KEY ({})", entity.dims.join(", "))?;
+            write!(f, "    value JSONB")?;
+            if !entity.dims.is_empty() {
+                writeln!(f, ",")?;
+                writeln!(f, "    PRIMARY KEY ({})", entity.dims.join(", "))?;
+            } else {
+                writeln!(f)?;
+            }
+
             writeln!(f, ");")?;
         }
         writeln!(

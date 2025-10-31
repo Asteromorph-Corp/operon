@@ -19,10 +19,11 @@ impl std::fmt::Display for RaiseQuotaPopQuery<'_> {
             .enumerate()
         {
             if idx == 0 {
-                write!(f, "WHERE {dim} = ${}", idx + 1)?;
+                write!(f, "WHERE")?;
             } else {
-                write!(f, " AND {dim} = ${}", idx + 1)?;
+                write!(f, " AND")?;
             }
+            write!(f, " {} = ${}", dim, idx + 1)?
         }
         writeln!(f)?;
         write!(f, "RETURNING *;")

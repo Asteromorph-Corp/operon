@@ -16,23 +16,23 @@ impl std::fmt::Display for BatchGetQuery<'_> {
         }
         writeln!(f)?;
         writeln!(f, "FROM {{schema_prefix}}{}", self.0.id)?;
-        for (i, dim) in self
+        for (idx, dim) in self
             .1
             .dims
             .iter()
             .filter(|dim| !self.0.over.contains(dim))
             .enumerate()
         {
-            if i == 0 {
+            if idx == 0 {
                 write!(f, "WHERE")?;
             } else {
                 write!(f, " AND")?;
             }
-            write!(f, " {} = ${}", dim, i + 1)?;
+            write!(f, " {} = ${}", dim, idx + 1)?;
         }
         writeln!(f)?;
-        for (i, dim) in self.0.over.iter().enumerate() {
-            if i == 0 {
+        for (idx, dim) in self.0.over.iter().enumerate() {
+            if idx == 0 {
                 write!(f, "ORDER BY {dim}")?;
             } else {
                 write!(f, ", {dim}")?;
