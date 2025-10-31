@@ -8,7 +8,7 @@ pub async fn init_ticket_beta(
     i BIGINT,
     resolved BOOLEAN NOT NULL,
     deps_count BIGINT NOT NULL,
-    deps_quota BIGINT,
+    deps_quota BIGINT NOT NULL,
     deps_done BOOLEAN NOT NULL,
     status {ticket_status_type} NOT NULL,
     PRIMARY KEY (i)

@@ -109,6 +109,7 @@ where
         &mut self,
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum>,
         state: &mut RunningState,
+        peer_txs: &JS::PeerEventSenders,
     ) -> Result<Vec<T>, SchedulerError> {
         let mut conn = self.meta_storage.conn_static().await?;
         let tx = conn.transaction().await?;
@@ -116,7 +117,12 @@ where
             PeerEvent::Job(job) => self.spec.on_receive_job(tx.as_client(), job).await?,
             PeerEvent::Resolution(resolution) => {
                 self.spec
-                    .on_receive_resolution(tx.as_client(), resolution)
+                    .on_receive_resolution(tx.as_client(), peer_txs, resolution)
+                    .await?
+            }
+            PeerEvent::Explosion(explosion) => {
+                self.spec
+                    .on_receive_explosion(tx.as_client(), explosion)
                     .await?
             }
         };
@@ -338,7 +344,7 @@ where
                                 Peer channel has {} events left.",
                                 J::id(), peer_rx.len()
                             );
-                            ready_tickets.extend(self.on_event_ready_tickets(evt, state).await?)
+                            ready_tickets.extend(self.on_event_ready_tickets(evt, state, peer_txs).await?)
                         },
                         None => {
                             // The peer channel was closed,

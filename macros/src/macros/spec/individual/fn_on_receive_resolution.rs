@@ -1,9 +1,9 @@
+use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::configs::{DimensionConfigMap, JobConfig};
-use crate::dependency_analysis::get_quota_required_dims;
+use crate::configs::JobConfig;
 use crate::utils::{
-    explode_ident, operon_ident, resolution_enum_ident, resolve_dep_ident, variant_ident,
+    explode_ident, operon_ident, resolution_enum_ident, sender_ident, variant_ident,
 };
 
 /// Generates the `on_receive_resolution` function for the implementation of the trait `JobSpec`.
@@ -32,7 +32,7 @@ use crate::utils::{
 /// ```
 pub(super) fn fn_on_receive_resolution(
     job: &JobConfig,
-    all_dims: &DimensionConfigMap,
+    downstream_jobs: &IndexSet<&JobConfig>,
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
@@ -41,36 +41,51 @@ pub(super) fn fn_on_receive_resolution(
     let explode_arms = job.dims.iter().map(|dim| -> syn::Arm {
         let variant_ident = variant_ident(dim);
         let explode_fn_name = explode_ident(job_id, dim);
+        let send_explosions = downstream_jobs.iter().filter_map(|downstream_job| {
+            if downstream_job.dims.contains(dim) {
+                return None;
+            }
+            let sender_ident = sender_ident(&downstream_job.id);
+            let ok_msg = format!(
+                "`{}` sent peer event to `{}`: {{resolution:?}}",
+                job.id, downstream_job.id
+            );
+            let err_msg = format!(
+                "`{}`'s peer channel closed before handling `{}`'s {{resolution:?}}",
+                downstream_job.id, job.id
+            );
+
+            let stmt: syn::Stmt = parse_quote! {
+                match peer_txs
+                    .#sender_ident
+                    .send(#operon::scheduler::PeerEvent::Explosion(res.into()))
+                    .await
+                {
+                    Ok(_) => #operon::log::trace!(#ok_msg),
+                    Err(_) => #operon::log::trace!(#err_msg),
+                }
+            };
+            Some(stmt)
+        });
+
         parse_quote! {
-            schema::#res_enum_ident::#variant_ident(res) => Ok(
-                queries::#explode_fn_name(client, &res).await?
-            ),
+            schema::#res_enum_ident::#variant_ident(res) => {
+                #(#send_explosions)*
+                Ok(queries::#explode_fn_name(client, &res).await?)
+            },
         }
     });
-    let resolve_arms = get_quota_required_dims(job, all_dims)
-        .into_iter()
-        .map(|dim| -> syn::Arm {
-            let variant_ident = variant_ident(&dim.id);
-            let resolve_dep_fn_name = resolve_dep_ident(&job.id, &dim.id);
-            parse_quote! {
-                schema::#res_enum_ident::#variant_ident(res) => {
-                    let new_ready = queries::#resolve_dep_fn_name(client, &res).await?;
-                    #operon::log::info!("{:#?}, {:#?}", res, new_ready);
-                    Ok(new_ready)
-                },
-            }
-        });
 
     parse_quote! {
         #[allow(unused_variables, clippy::match_single_binding)]
         async fn on_receive_resolution(
             &self,
             client: #operon::meta_storage::MetaClient<'_>,
+            peer_txs: &Self::PeerEventSenders,
             resolution: schema::#res_enum_ident,
         ) -> Result<Vec<Self::Ticket>, #operon::scheduler::SchedulerError> {
             match resolution {
                 #(#explode_arms)*
-                #(#resolve_arms)*
                 _ => Err(#operon::scheduler::SchedulerError::InvalidPeerEventReceived("resolution", #job_id)),
             }
         }
@@ -82,17 +97,20 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::configs::JobConfigMap;
+    use crate::dependency_analysis::get_direct_downstream_jobs;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{all_dimensions, job_delta};
+    use crate::test_utils::simple_pipeline::{all_jobs, job_delta};
 
     #[rstest]
     #[case::simple(job_delta(), "spec/fn_on_receive_resolution.rs")]
     fn test_fn_on_receive_resolution(
-        all_dimensions: DimensionConfigMap,
+        all_jobs: JobConfigMap,
         #[case] job: JobConfig,
         #[case] fixture_path: &str,
     ) {
-        let item = fn_on_receive_resolution(&job, &all_dimensions);
+        let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
+        let item = fn_on_receive_resolution(&job, &downstream_jobs);
         assert_item_eq(&item, fixture_path);
     }
 }

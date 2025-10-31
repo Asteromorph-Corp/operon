@@ -1,30 +1,38 @@
 use syn::parse_quote;
 
-use crate::configs::{DimensionConfig, DimensionId, JobConfig};
-use crate::utils::{operon_ident, resolution_ident, resolve_dep_ident, ticket_ident};
+use crate::configs::{DimensionConfig, JobConfig};
+use crate::utils::{operon_ident, raise_quota_ident, resolution_ident, ticket_ident};
 
 /// A helper struct to generate the SQL query for popping tickets to be raised.
-struct ResolveDepPopQuery<'a>(&'a JobConfig, &'a [&'a DimensionId]);
+struct RaiseQuotaPopQuery<'a>(&'a JobConfig, &'a DimensionConfig);
 
-impl std::fmt::Display for ResolveDepPopQuery<'_> {
+impl std::fmt::Display for RaiseQuotaPopQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let job_id = &self.0.id;
 
         writeln!(f, "DELETE FROM {{schema_prefix}}ticket_{job_id}")?;
-        writeln!(f, "WHERE deps_quota IS NULL")?;
-
-        for (i, dim) in self.1.iter().enumerate() {
-            writeln!(f, " AND {dim} = ${}", i + 1)?;
+        for (idx, dim) in self
+            .1
+            .depends_on
+            .iter()
+            .filter(|dim| self.0.dims.contains(dim))
+            .enumerate()
+        {
+            if idx == 0 {
+                write!(f, "WHERE {dim} = ${}", idx + 1)?;
+            } else {
+                write!(f, " AND {dim} = ${}", idx + 1)?;
+            }
         }
-
+        writeln!(f)?;
         write!(f, "RETURNING *;")
     }
 }
 
 /// A helper struct to generate the SQL query for copying exploded result into the database.
-struct ResolveDepCopyInQuery<'a>(&'a JobConfig);
+struct RaiseQuotaCopyInQuery<'a>(&'a JobConfig);
 
-impl std::fmt::Display for ResolveDepCopyInQuery<'_> {
+impl std::fmt::Display for RaiseQuotaCopyInQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let job_id = &self.0.id;
 
@@ -39,53 +47,40 @@ impl std::fmt::Display for ResolveDepCopyInQuery<'_> {
     }
 }
 
-pub(super) fn fn_resolve_dep(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn {
+pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn {
+    // TODO: only define raise_dep for a valid combination of jobs.
     let operon = operon_ident();
-    let fn_name = resolve_dep_ident(&job.id, &dim.id);
+    let fn_name = raise_quota_ident(&job.id, &dim.id);
     let ticket_ident = ticket_ident(&job.id);
     let res_ident = resolution_ident(&dim.id);
+    let pop_query = RaiseQuotaPopQuery(job, dim).to_string();
+    let copy_query = RaiseQuotaCopyInQuery(job).to_string();
 
-    let params = dim
-        .depends_on
-        .iter()
-        .filter(|d| job.dims.contains(d))
-        .collect::<Vec<_>>();
-    let param_vars = params
-        .iter()
-        .map(|d| syn::Index::from(dim.depends_on.iter().position(|x| x == *d).unwrap() + 1));
-
-    let pop_query = ResolveDepPopQuery(job, &params).to_string();
-    let copy_query = ResolveDepCopyInQuery(job).to_string();
+    let indices = dim.depends_on.iter().enumerate().filter_map(|(idx, dim)| {
+        if job.dims.contains(dim) {
+            Some(syn::Index::from(idx + 1))
+        } else {
+            None
+        }
+    });
 
     parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            resolution: &schema::#res_ident,
+            res: &schema::#res_ident,
         ) -> Result<Vec<schema::#ticket_ident>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
-            let params = [
-                #(resolution.#param_vars),*
-            ]
-            .into_iter()
-            .map(|v| i64::try_from(v))
-            .collect::<Result<Vec<_>, _>>()?;
-
             let pop_stmt = format!(#pop_query);
-            let rows = client.query(
-                &pop_stmt,
-                &params.iter().map(|p| p as &(dyn #operon::postgres_types::ToSql + Sync)).collect::<Vec<_>>()
-            ).await?;
 
+            let rows = client.query(&pop_stmt, &[#(&i64::try_from(res.#indices)?,)*]).await?;
             let tickets = rows
                 .iter()
                 .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)
                 .collect::<Result<Vec<_>, _>>()?;
-            let new_tickets = #operon::futures::future::try_join_all(
-                tickets
-                    .into_iter()
-                    .map(|ticket| #operon::schema_base::Ticket::resolve_dependency_quota(ticket, client))
-            )
-            .await?;
+            let new_tickets = tickets
+                .into_iter()
+                .map(|ticket| #operon::schema_base::Ticket::raise_dependency_quota(ticket, res.0))
+                .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);
             let sink = client.copy_in::<_, #operon::bytes::Bytes>(&copy_stmt).await?;
@@ -114,12 +109,16 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{dimension_i, job_beta};
+    use crate::test_utils::simple_pipeline::{dimension_j, job_epsilon};
 
     #[rstest]
-    #[case::simple(job_beta(), dimension_i())]
-    fn test_fn_resolve_dep(#[case] job: JobConfig, #[case] dim: DimensionConfig) {
-        let result = fn_resolve_dep(&job, &dim);
-        assert_item_eq(&result, "queries/ticket/resolve_dep.rs");
+    #[case::simple(job_epsilon(), dimension_j(), "queries/ticket/raise_quota.rs")]
+    fn test_fn_raise_quota(
+        #[case] job: JobConfig,
+        #[case] dim: DimensionConfig,
+        #[case] fixture_path: &str,
+    ) {
+        let item = fn_raise_quota(&job, &dim);
+        assert_item_eq(&item, fixture_path);
     }
 }

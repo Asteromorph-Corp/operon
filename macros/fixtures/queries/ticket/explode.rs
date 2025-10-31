@@ -5,8 +5,10 @@ pub async fn explode_beta_i(
     let schema_prefix = client.schema_prefix();
     // Statement to select all tickets that match the *parent dimensions* in the resolution.
     // (In this case, there are none.)
-    let pop_stmt = format!("DELETE FROM {schema_prefix}ticket_beta
-RETURNING *;");
+    let pop_stmt = format!(
+        "DELETE FROM {schema_prefix}ticket_beta
+RETURNING *;"
+    );
 
     let rows = client.query(&pop_stmt, &[]).await?;
     let tickets = rows
@@ -19,13 +21,11 @@ RETURNING *;");
             "Called `explode(i)` on `beta`, but `i` was resolved".into(),
         ));
     }
-    let new_tickets = operon::futures::future::try_join_all(
-        tickets
-            .iter()
-            .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().with_i(ub)))
-            .map(|ticket| operon::schema_base::Ticket::resolve_dependency_quota(ticket, client)),
-    )
-    .await?;
+    let new_tickets = tickets
+        .iter()
+        .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().with_i(ub)))
+        .map(operon::schema_base::Ticket::update_deps_done)
+        .collect::<Vec<_>>();
 
     let copy_stmt = format!(
         "COPY {schema_prefix}ticket_beta (

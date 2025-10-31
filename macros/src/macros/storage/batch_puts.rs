@@ -1,9 +1,9 @@
 use syn::parse_quote;
 
+use crate::configs::{JobConfig, JobConfigMap};
 use crate::utils::{
     batch_put_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident,
 };
-use crate::configs::{JobConfig, JobConfigMap};
 
 struct BatchPutTempTableQuery<'a>(&'a JobConfig);
 
@@ -144,7 +144,7 @@ mod tests {
 
     #[rstest]
     #[case::simple(
-        job_beta(), 
+        job_beta(),
         indoc! {"
             INSERT INTO {schema_prefix}b (i, j, value)
             SELECT i, j, value FROM temp

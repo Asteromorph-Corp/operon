@@ -1,10 +1,11 @@
+use std::error::Error;
 use std::num::TryFromIntError;
 
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum MetaStorageError {
-    #[error("Database error: {0}")]
+    #[error("Database error: {}{}", .0, .0.source().map_or_else(String::new, |e| format!(", cause: {e}")))]
     DatabaseError(#[from] deadpool_postgres::tokio_postgres::Error),
     #[error("Database pool error: {0}")]
     DatabasePoolError(#[from] deadpool_postgres::PoolError),

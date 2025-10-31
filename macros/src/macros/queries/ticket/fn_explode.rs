@@ -1,9 +1,9 @@
 use syn::parse_quote;
 
+use crate::configs::{DimensionConfig, JobConfig};
 use crate::utils::{
     explode_ident, operon_ident, resolution_ident, ticket_ident, variable_ident, with_ident,
 };
-use crate::configs::{DimensionConfig, JobConfig};
 
 /// A helper struct to generate the SQL query for popping tickets to be exploded.
 struct ExplodePopQuery<'a>(&'a JobConfig, &'a DimensionConfig);
@@ -13,7 +13,13 @@ impl std::fmt::Display for ExplodePopQuery<'_> {
         let job_id = &self.0.id;
 
         writeln!(f, "DELETE FROM {{schema_prefix}}ticket_{job_id}")?;
-        for (i, dep) in self.1.depends_on.iter().enumerate() {
+        for (i, dep) in self
+            .1
+            .depends_on
+            .iter()
+            .filter(|dim| self.0.dims.contains(dim))
+            .enumerate()
+        {
             if i == 0 {
                 write!(f, "WHERE")?;
             } else {
@@ -53,7 +59,13 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
     let pop_query = ExplodePopQuery(job, dim).to_string();
     let copy_query = ExplodeCopyInQuery(job).to_string();
 
-    let indices = (1..=dim.depends_on.len()).map(syn::Index::from);
+    let indices = dim.depends_on.iter().enumerate().filter_map(|(idx, dim)| {
+        if job.dims.contains(dim) {
+            Some(syn::Index::from(idx + 1))
+        } else {
+            None
+        }
+    });
 
     let err_msg = format!(
         "Called `explode({})` on `{}`, but `{}` was resolved",
@@ -79,13 +91,11 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
                     #err_msg.into(),
                 ));
             }
-            let new_tickets = #operon::futures::future::try_join_all(
-                tickets
-                    .iter()
-                    .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().#with_fn_name(ub)))
-                    .map(|ticket| #operon::schema_base::Ticket::resolve_dependency_quota(ticket, client))
-            )
-            .await?;
+            let new_tickets = tickets
+                .iter()
+                .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().#with_fn_name(ub)))
+                .map(#operon::schema_base::Ticket::update_deps_done)
+                .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);
             let sink = client.copy_in::<_, #operon::bytes::Bytes>(&copy_stmt).await?;

@@ -43,12 +43,10 @@ RETURNING *;"
         .iter()
         .map(<schema::BetaTicket as operon::schema_base::TicketSql>::from_sql_row)
         .collect::<Result<Vec<_>, _>>()?;
-    let new_tickets = operon::futures::future::try_join_all(
-        tickets
-            .into_iter()
-            .map(|ticket| operon::schema_base::Ticket::raise_dependency_count(ticket, client)),
-    )
-    .await?;
+    let new_tickets = tickets
+        .into_iter()
+        .map(|ticket| operon::schema_base::Ticket::raise_dependency_count(ticket))
+        .collect::<Vec<_>>();
 
     let copy_stmt = format!(
         "COPY {schema_prefix}ticket_beta (

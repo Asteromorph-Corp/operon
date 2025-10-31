@@ -3,6 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::{DimensionConfigMap, EntityConfigMap, JobConfig};
 use crate::macros::spec::individual::fn_check_consistency::fn_check_consistency;
+use crate::macros::spec::individual::fn_on_receive_explosion::fn_on_receive_explosion;
 use crate::macros::spec::individual::fn_on_receive_job::fn_on_receive_job;
 use crate::macros::spec::individual::fn_on_receive_resolution::fn_on_receive_resolution;
 use crate::macros::spec::individual::fn_pool_size::fn_pool_size;
@@ -18,7 +19,7 @@ use crate::utils::{
 pub fn impl_job_spec(
     service_id: &str,
     job: &JobConfig,
-    resolution_receiving_jobs: &IndexSet<&JobConfig>,
+    spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
     upstream_jobs: &IndexSet<&JobConfig>,
     downstream_jobs: &IndexSet<&JobConfig>,
     entities: &EntityConfigMap,
@@ -37,9 +38,10 @@ pub fn impl_job_spec(
     let fn_check_consistency = fn_check_consistency(job);
     let fn_prepare_rebuild = fn_prepare_rebuild(job);
     let fn_run_job = fn_run_job(job, entities, dimensions);
-    let fn_send_on_finish = fn_send_on_finish(job, resolution_receiving_jobs, downstream_jobs);
+    let fn_send_on_finish = fn_send_on_finish(job, spawn_dim_repeating_jobs, downstream_jobs);
     let fn_on_receive_job = fn_on_receive_job(job, upstream_jobs);
-    let fn_on_receive_resolution = fn_on_receive_resolution(job, dimensions);
+    let fn_on_receive_resolution = fn_on_receive_resolution(job, downstream_jobs);
+    let fn_on_receive_explosion = fn_on_receive_explosion(job, upstream_jobs);
     let fn_pool_size = fn_pool_size(job);
 
     parse_quote! {
@@ -58,6 +60,7 @@ pub fn impl_job_spec(
             #fn_send_on_finish
             #fn_on_receive_job
             #fn_on_receive_resolution
+            #fn_on_receive_explosion
         }
     }
 }
