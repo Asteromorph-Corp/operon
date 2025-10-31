@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use ex2::{
-    A, B, C, CookingService, CookingStorage, D, E, F, PsqlCookingStorage, cooking_handler, schema,
-};
+use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage, cooking_handler, schema};
 use operon::async_trait::async_trait;
 use operon::operon::{Operon, OperonOptions};
 use operon::service::OperonService;
