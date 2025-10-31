@@ -55,7 +55,7 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
         .iter()
         .enumerate()
         .map(|(idx, _)| -> syn::Expr {
-            let idx = syn::Index::from(idx);
+            let idx = syn::Index::from(idx + 1);
             parse_quote! {
                 i64::try_from(res.#idx)?
             }
@@ -82,7 +82,7 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
                 .collect::<Result<Vec<_>, _>>()?;
             let new_tickets = tickets
                 .into_iter()
-                .map(|ticket| #operon::schema_base::Ticket::raise_dependency_quota(ticket, res.0))
+                .map(|ticket| #operon::schema_base::Ticket::raise_dependency_quota(ticket, res.0 - 1))
                 .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);
