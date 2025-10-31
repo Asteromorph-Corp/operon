@@ -132,7 +132,7 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
                 #(#params,)*
             ]
             .into_iter()
-            .filter_map(|(name, param)| param.0.map(|p| (name, p)))
+            .filter_map(|(name, param): (&str, &#operon::schema_base::TicketDepCount<usize>)| param.0.map(|p| (name, p)))
             .map(|(name, param)| i64::try_from(param).map(|p| (name, p)))
             .collect::<Result<Vec<_>, _>>()?;
 
