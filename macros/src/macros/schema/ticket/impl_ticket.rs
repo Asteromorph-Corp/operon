@@ -16,8 +16,12 @@ pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::It
         .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
 
-    let initial_done = job.from.iter().all(|arg| arg.id == *primary_entity);
-    let initial_quota: usize = if initial_done { 0 } else { 1 };
+    let initial_quota = job
+        .from
+        .iter()
+        .filter(|arg| arg.id != *primary_entity)
+        .count();
+    let initial_done = initial_quota == 0;
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
