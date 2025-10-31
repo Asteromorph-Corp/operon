@@ -2,12 +2,6 @@
 mod scheduler_handler;
 pub use scheduler_handler::*;
 
-mod primary_handler;
-pub use primary_handler::*;
-
-mod primary_spec;
-pub use primary_spec::*;
-
 mod job_handler;
 pub use job_handler::*;
 

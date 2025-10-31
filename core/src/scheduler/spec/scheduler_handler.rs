@@ -8,30 +8,19 @@ use crate::meta_storage::{
 use crate::operon::RunningState;
 use crate::scheduler::{
     HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent, PeerEventSender,
-    PrimaryHandler, SchedulerError,
+    SchedulerError,
 };
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiState, UiStateUpdate};
 
-pub struct SchedulerHandler<Svc, Sto> {
-    pub primary_handler: Box<dyn PrimaryHandler<Svc, Sto>>,
+pub struct SchedulerHandler<Svc: OperonService, Sto: OperonStorage> {
     pub job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>,
 }
 
-impl<Svc, Sto> SchedulerHandler<Svc, Sto>
-where
-    Svc: OperonService,
-    Sto: OperonStorage,
-{
-    pub fn new(
-        primary_handler: Box<dyn PrimaryHandler<Svc, Sto>>,
-        job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>,
-    ) -> Self {
-        Self {
-            primary_handler,
-            job_handlers,
-        }
+impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
+    pub fn new(job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>) -> Self {
+        Self { job_handlers }
     }
 
     pub(crate) fn prepare_channels(
@@ -59,7 +48,6 @@ where
         client: MetaClient<'_>,
     ) -> Result<(), SchedulerError> {
         init_schema(client).await?;
-        self.primary_handler.init_resolution(client).await?;
         for job_handler in &self.job_handlers {
             job_handler.init_resolution(client).await?;
         }
@@ -96,7 +84,6 @@ where
         &self,
         client: MetaClient<'_>,
     ) -> Result<(), SchedulerError> {
-        self.primary_handler.clear_resolution(client).await?;
         for spec in &self.job_handlers {
             spec.clear_resolution(client).await?;
         }
