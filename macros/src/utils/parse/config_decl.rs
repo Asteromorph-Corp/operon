@@ -2,28 +2,18 @@ use syn::parse::{Parse, ParseStream};
 use syn::token::Brace;
 use syn::{Ident, Token};
 
-use super::entity_decl::EntityDecl;
 use super::job_decl::JobDecl;
 
 #[derive(Debug)]
 pub(super) struct ConfigDecl {
     pub(super) service_id: Ident,
     pub(super) _eq_token: Token![=],
-    pub(super) _left_bar_token: Token![|],
-    pub(super) primary_entity: EntityDecl,
-    pub(super) _right_bar_token: Token![|],
     pub(super) _braces_token: Brace,
     pub(super) jobs: Vec<JobDecl>,
     pub(super) _span: proc_macro2::Span,
 }
 impl ConfigDecl {
     pub fn validate(&self) -> syn::Result<()> {
-        if self.primary_entity.dims.is_empty() || self.primary_entity.dims.len() > 1 {
-            return Err(syn::Error::new(
-                self.primary_entity._span,
-                "Primary entity must have exactly one dimension",
-            ));
-        }
         if self.jobs.is_empty() {
             return Err(syn::Error::new(
                 self._span,
@@ -38,9 +28,6 @@ impl Parse for ConfigDecl {
         let start = input.span();
         let service_id: Ident = input.parse()?;
         let eq_token: Token![=] = input.parse()?;
-        let left_bar_token: Token![|] = input.parse()?;
-        let primary_entity: EntityDecl = input.parse()?;
-        let right_bar_token: Token![|] = input.parse()?;
         let jobs_content;
         let braces_token: Brace = syn::braced!(jobs_content in input);
         let mut jobs = Vec::new();
@@ -53,9 +40,6 @@ impl Parse for ConfigDecl {
         let config_decl = ConfigDecl {
             service_id,
             _eq_token: eq_token,
-            _left_bar_token: left_bar_token,
-            primary_entity,
-            _right_bar_token: right_bar_token,
             _braces_token: braces_token,
             jobs,
             _span,
@@ -73,7 +57,8 @@ mod tests {
 
     #[test]
     fn test_config_decl() {
-        let input = "cooking = |A<i>| {
+        let input = "cooking = {
+            A<i> = alpha();
             B<j> = beta(A) for(8) i;
             C<k> = gamma(A) for(8) i;
             D    = delta(A, B, C) for(4) i, j, k;
@@ -82,10 +67,7 @@ mod tests {
         }";
         let parsed: ConfigDecl = parse_str(input).expect("Failed to parse");
         assert_eq!(parsed.service_id.to_string(), "cooking");
-        assert_eq!(parsed.primary_entity.id.to_string(), "A");
-        assert_eq!(parsed.primary_entity.dims.len(), 1);
-        assert_eq!(parsed.primary_entity.dims[0].to_string(), "i");
-        assert_eq!(parsed.jobs.len(), 5);
+        assert_eq!(parsed.jobs.len(), 6);
     }
 
     #[test]

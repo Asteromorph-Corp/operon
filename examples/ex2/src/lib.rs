@@ -36,7 +36,8 @@ pub enum F {
 }
 
 define_operon! {
-    cooking = |A<i>| {
+    cooking = {
+        A<i> = alpha();
         B<j> = beta(A) for(8) i;
         C<k> = gamma(A) for(8) i;
         D    = delta(A, B, C) for(4) i, j, k;

@@ -18,6 +18,10 @@ impl OperonService for ExampleService {
 
 #[async_trait]
 impl CookingService for ExampleService {
+    async fn alpha(&self) -> Result<Vec<A>, Box<dyn std::error::Error + Send + Sync>> {
+        Ok((0..100).map(|i| A(format!("A ({i})"))).collect())
+    }
+
     async fn beta(&self, a: A) -> Result<Vec<B>, Box<dyn std::error::Error + Send + Sync>> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
@@ -113,7 +117,6 @@ impl CookingService for ExampleService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
-    let primary_ub = 100;
 
     let service = Arc::new(ExampleService);
 
@@ -127,9 +130,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .with_log_level(log::Level::Info);
 
     storage.init().await?;
-    for i in 0..primary_ub {
-        storage.put_a(i, A(format!("A ({i})"))).await?;
-    }
 
     Operon::new(service, storage, operon_options)
         .run(cooking_handler())

@@ -236,7 +236,8 @@ mod tests {
 
     #[test]
     fn test_parse_config() {
-        let input = "splitter = |Input<input_no>| {
+        let input = "splitter = {
+                Input<input_no> = get_inputs();
                 Intermediate<word_no> = get_words(Input) for input_no;
                 Output<char_no> = get_chars(Intermediate) for input_no, word_no;
             }";

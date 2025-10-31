@@ -60,7 +60,8 @@ struct Output(char);
 // we provide detailed documentation for the semantic system in this repository.
 
 define_operon! {
-    splitter = |Input<input_no>| {
+    splitter = {
+        Input<input_no> = get_inputs();
         Intermediate<word_no> = get_words(Input) for input_no;
         Output<char_no> = get_chars(Intermediate) for input_no, word_no;
     }
@@ -86,6 +87,10 @@ impl OperonService for MySplitterService {
 // to see what methods are required.
 #[async_trait]
 impl SplitterService for MySplitterService {
+    async fn get_inputs(&self) -> Result<Vec<Input>, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(vec![Input::from("Hello World"), Input::from("Hello Operon"), Input::from("")])
+    }
+
     async fn get_words(
         &self,
         input: Input,
@@ -158,14 +163,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // or point to a different, fresh schema in `StorageOptions`.
     storage.init().await?;
 
-    // The primary entities (`Input`s in this case) MUST be in the storage before running Operon.
-    // It is possible to prepare the data externally
-    // as long as the storage is persistent and the data is in the expected format,
-    // but if unsure, we recommend using the built-in `put_*` methods as shown below.
-    let num_inputs = 3;
-    storage.put_input(0, "Hello World".to_string()).await?;
-    storage.put_input(1, "Hello Operon".to_string()).await?;
-    storage.put_input(2, "".to_string()).await?;
+    // // The primary entities (`Input`s in this case) MUST be in the storage before running Operon.
+    // // It is possible to prepare the data externally
+    // // as long as the storage is persistent and the data is in the expected format,
+    // // but if unsure, we recommend using the built-in `put_*` methods as shown below.
+    // storage.put_input(0, "Hello World".to_string()).await?;
+    // storage.put_input(1, "Hello Operon".to_string()).await?;
+    // storage.put_input(2, "".to_string()).await?;
 
     //# ———————————————————————— Running Operon ——————————————————————— #//
     // Now we finally run Operon.
