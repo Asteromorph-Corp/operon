@@ -1,7 +1,6 @@
 use syn::parse_quote;
 
-use crate::configs::DimensionId;
-use crate::utils::{operon_ident, resolution_enum_ident, resolution_ident, variant_ident};
+use crate::utils::{operon_ident, resolution_enum_ident};
 
 /// Generates an implementation of the `ResolutionEnum` trait for a given resolution enum.
 ///
@@ -14,18 +13,12 @@ use crate::utils::{operon_ident, resolution_enum_ident, resolution_ident, varian
 ///     }
 /// }
 /// ```
-pub(super) fn impl_resolution_enum(primary_dimension: &DimensionId) -> syn::ItemImpl {
+pub(super) fn impl_resolution_enum() -> syn::ItemImpl {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
-    let res_ident = resolution_ident(primary_dimension);
-    let primary_variant_ident = variant_ident(primary_dimension);
 
     parse_quote! {
-        impl #operon::schema_base::ResolutionEnum for #res_enum_ident {
-            fn primary(resolution: usize) -> Self {
-                Self::#primary_variant_ident(#res_ident(resolution))
-            }
-        }
+        impl #operon::schema_base::ResolutionEnum for #res_enum_ident {}
     }
 }
 
@@ -35,11 +28,10 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::primary_dim;
 
     #[rstest]
-    fn test_impl_resolution_enum(primary_dim: DimensionId) {
-        let result = impl_resolution_enum(&primary_dim);
+    fn test_impl_resolution_enum() {
+        let result = impl_resolution_enum();
         assert_item_eq(&result, "schema/resolution/impl_resolution_enum.rs");
     }
 }

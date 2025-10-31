@@ -132,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     Operon::new(service, storage, operon_options)
-        .run(cooking_handler(), primary_ub)
+        .run(cooking_handler())
         .await?;
 
     Ok(())

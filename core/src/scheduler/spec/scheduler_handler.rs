@@ -83,15 +83,7 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-        primary_ub: usize,
     ) -> Result<bool, SchedulerError> {
-        if !self
-            .primary_handler
-            .check_consistency(storage, client, primary_ub)
-            .await?
-        {
-            return Ok(false);
-        }
         for schedule in &self.job_handlers {
             if !schedule.check_consistency(storage, client).await? {
                 return Ok(false);
@@ -108,25 +100,6 @@ where
         for spec in &self.job_handlers {
             spec.clear_resolution(client).await?;
         }
-        Ok(())
-    }
-
-    pub(crate) async fn get_primary_resolution(
-        &self,
-        client: MetaClient<'_>,
-    ) -> Result<Option<usize>, SchedulerError> {
-        let primary_resolution = self.primary_handler.get_primary_resolution(client).await?;
-        Ok(primary_resolution)
-    }
-
-    pub(crate) async fn put_primary_resolution(
-        &self,
-        client: MetaClient<'_>,
-        primary_ub: usize,
-    ) -> Result<(), SchedulerError> {
-        self.primary_handler
-            .put_primary_resolution(client, primary_ub)
-            .await?;
         Ok(())
     }
 

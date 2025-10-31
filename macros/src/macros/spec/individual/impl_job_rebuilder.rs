@@ -1,10 +1,10 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::configs::{DimensionId, JobConfig};
+use crate::configs::JobConfig;
 use crate::utils::{
     explode_ident, mark_done_ident, operon_ident, put_resolution_ident, raise_dep_ident,
-    rebuilder_ident, resolution_ident, ticket_ident, variable_ident,
+    rebuilder_ident, ticket_ident, variable_ident,
 };
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -53,17 +53,13 @@ use crate::utils::{
 /// ```
 pub fn impl_job_rebuilder(
     job: &JobConfig,
-    primary_dimension: &DimensionId,
     spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
     downstream_jobs: &IndexSet<&JobConfig>,
 ) -> syn::ItemImpl {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
-    let primary_res_ident = resolution_ident(primary_dimension);
     let ticket_ident = ticket_ident(&job.id);
     let job_id = &job.id;
-
-    let explode_fn_name = explode_ident(&job.id, primary_dimension);
 
     let maybe_put_resolution = job.spawn_dim.as_ref().map(|dim| -> syn::Stmt {
         let put_resolution_fn_name = put_resolution_ident(dim);
@@ -106,15 +102,6 @@ pub fn impl_job_rebuilder(
         #[#operon::async_trait::async_trait]
         #[automatically_derived]
         impl #operon::scheduler::JobRebuilder for #rebuilder_ident {
-            async fn explode(
-                &self,
-                client: #operon::meta_storage::MetaClient<'_>,
-                primary_ub: usize,
-            ) -> Result<(), #operon::scheduler::SchedulerError> {
-                queries::#explode_fn_name(client, &schema::#primary_res_ident(primary_ub)).await?;
-                Ok(())
-            }
-
             async fn rebuild(
                 &self,
                 client: #operon::meta_storage::MetaClient<'_>,
@@ -154,12 +141,11 @@ mod tests {
     use crate::configs::JobConfigMap;
     use crate::dependency_analysis::{get_direct_downstream_jobs, get_jobs_repeating_on};
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{all_jobs, job_beta, primary_dim};
+    use crate::test_utils::simple_pipeline::{all_jobs, job_beta};
 
     #[rstest]
     #[case::simple(job_beta(), "spec/impl_job_rebuilder.rs")]
     fn test_impl_job_rebuilder(
-        primary_dim: DimensionId,
         all_jobs: JobConfigMap,
         #[case] job: JobConfig,
         #[case] fixture_path: &str,
@@ -171,12 +157,7 @@ mod tests {
             .unwrap_or_default();
         let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
 
-        let item = impl_job_rebuilder(
-            &job,
-            &primary_dim,
-            &spawn_dim_repeating_jobs,
-            &downstream_jobs,
-        );
+        let item = impl_job_rebuilder(&job, &spawn_dim_repeating_jobs, &downstream_jobs);
         assert_item_eq(&item, fixture_path);
     }
 }

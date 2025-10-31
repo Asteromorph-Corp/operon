@@ -47,12 +47,8 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
         );
 
         let job_rebuilder_def = job_rebuilder_definition(job);
-        let impl_job_rebuilder = impl_job_rebuilder(
-            job,
-            &all_configs.primary_dimension,
-            &spawn_dim_repeating_jobs,
-            &downstream_jobs,
-        );
+        let impl_job_rebuilder =
+            impl_job_rebuilder(job, &spawn_dim_repeating_jobs, &downstream_jobs);
 
         let peer_txs_def = peer_txs_definition(&job.id, &event_receiving_job_ids);
         let impl_peer_txs = impl_peer_txs(&job.id, &event_receiving_job_ids);
@@ -77,7 +73,6 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             #impl_primary_spec
 
             #(#job_specs)*
-            // Add your spec-related items here
         }
     }
 }

@@ -11,13 +11,13 @@ pub enum ControlEvent {
     #[default]
     Start,
     /// Perform a check on the consistency between the storages.
-    Check { primary_ub: usize },
+    Check,
     /// Perform a clean run.
-    CleanRun { primary_ub: usize },
+    CleanRun,
     /// Perform a rebuilding run from an `AbortedChecked` state.
-    RebuildRun { primary_ub: usize },
+    RebuildRun,
     /// Perform a restoring run from a `GracefullyStopped` state.
-    RestoreRun { primary_ub: usize },
+    RestoreRun,
     /// Pause executing new jobs.
     /// Note that pausing the scheduler does not stop ongoing jobs,
     /// neither does it stop handling events (i.e. updating the ticket storage).
@@ -38,22 +38,6 @@ pub enum ControlEvent {
 }
 
 impl ControlEvent {
-    pub fn check(primary_ub: usize) -> Self {
-        ControlEvent::Check { primary_ub }
-    }
-
-    pub fn clean_run(primary_ub: usize) -> Self {
-        ControlEvent::CleanRun { primary_ub }
-    }
-
-    pub fn rebuild_run(primary_ub: usize) -> Self {
-        ControlEvent::RebuildRun { primary_ub }
-    }
-
-    pub fn restore_run(primary_ub: usize) -> Self {
-        ControlEvent::RestoreRun { primary_ub }
-    }
-
     pub fn pause(targets: Vec<String>, cascade: bool) -> Self {
         ControlEvent::Pause { targets, cascade }
     }

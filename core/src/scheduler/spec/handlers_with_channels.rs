@@ -74,11 +74,8 @@ where
         ui_state: &Arc<RwLock<UiState>>,
         ctrl_rx: &ControlEventReceiver,
         clean: bool,
-    ) -> (
-        JoinSet<RunningState>,
-        PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
-    ) {
-        let handles = JoinSet::from_iter(self.handlers_with_rx.into_iter().map(
+    ) -> JoinSet<RunningState> {
+        JoinSet::from_iter(self.handlers_with_rx.into_iter().map(
             |HandlerWithRx { handler, peer_rx }| {
                 handler.run_scheduler(
                     service.clone(),
@@ -91,7 +88,6 @@ where
                     clean,
                 )
             },
-        ));
-        (handles, self.peer_txs)
+        ))
     }
 }

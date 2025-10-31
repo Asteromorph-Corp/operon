@@ -6,7 +6,7 @@ use crate::configs::{EntityId, JobConfig, JobConfigMap};
 
 /// Returns a mapping from job `to` entity to job `id`.
 fn build_upstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, &JobConfig> {
-    let mut index: HashMap<&String, &JobConfig> = HashMap::new();
+    let mut index: HashMap<&EntityId, &JobConfig> = HashMap::new();
 
     for job in jobs.values() {
         if let Some(dup) = index.get(&job.to) {
