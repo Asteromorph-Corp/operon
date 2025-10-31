@@ -9,6 +9,7 @@ impl operon::schema_base::Ticket for BetaTicket {
             deps_count: 0,
             deps_quota: 1usize,
             deps_done: false,
+            status: operon::schema_base::TicketStatus::Waiting,
             ..Default::default()
         }
     }

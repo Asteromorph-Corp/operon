@@ -24,6 +24,11 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
 
     let initial_quota = job.from.len();
     let initial_done = initial_quota == 0;
+    let initial_status: syn::Expr = if initial_done {
+        parse_quote! { #operon::schema_base::TicketStatus::Queued }
+    } else {
+        parse_quote! { #operon::schema_base::TicketStatus::Waiting }
+    };
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -37,6 +42,7 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
                     deps_count: 0,
                     deps_quota: #initial_quota,
                     deps_done: #initial_done,
+                    status: #initial_status,
                     ..Default::default()
                 }
             }
