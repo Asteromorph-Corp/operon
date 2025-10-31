@@ -4,6 +4,7 @@ impl operon::schema_base::Ticket for BetaTicket {
     type Job = schema::BetaJob;
     type Resolution = schema::JResolution;
 
+    #[allow(clippy::needless_update)]
     fn new() -> Self {
         Self {
             deps_count: 0,

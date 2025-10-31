@@ -37,6 +37,7 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
             type Job = schema::#job_ident;
             type Resolution = #res_ident;
 
+            #[allow(clippy::needless_update)]
             fn new() -> Self {
                 Self {
                     deps_count: 0,
