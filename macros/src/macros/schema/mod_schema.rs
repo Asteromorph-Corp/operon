@@ -11,7 +11,7 @@ pub fn mod_schema(all_configs: &AllConfig) -> syn::ItemMod {
     let mod_dimension = mod_dimension(&all_configs.dimensions);
     let mod_resolution = mod_resolution(&all_configs.dimensions);
     let mod_job = mod_job(&all_configs.jobs);
-    let mod_ticket = mod_ticket(&all_configs.jobs, &all_configs.primary_entity);
+    let mod_ticket = mod_ticket(&all_configs.jobs);
 
     parse_quote! {
         pub mod schema {

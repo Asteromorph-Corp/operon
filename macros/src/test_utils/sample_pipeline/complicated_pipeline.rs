@@ -158,18 +158,8 @@ pub fn service_id() -> &'static str {
 pub fn complicated_pipeline() -> AllConfig {
     AllConfig {
         service_id: service_id().to_string(),
-        primary_dimension: primary_dim(),
-        primary_entity: primary_entity(),
         dimensions: all_dimensions(),
         entities: all_entities(),
         jobs: all_jobs(),
     }
-}
-
-pub fn primary_dim() -> DimensionId {
-    DimensionId::from("i")
-}
-
-pub fn primary_entity() -> EntityId {
-    EntityId::from("a")
 }

@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::configs::{EntityConfigMap, EntityId};
+use crate::configs::EntityConfigMap;
 use crate::macros::storage::generic_constraints;
 use crate::utils::{operon_ident, sql_storage_ident};
 
@@ -33,31 +33,24 @@ impl std::fmt::Display for CreateTablesQuery<'_> {
 }
 
 /// A helper struct to generate the SQL storage identifier based on the service ID.
-struct TruncateTablesQuery<'a>(&'a EntityId, &'a EntityConfigMap);
+struct TruncateTablesQuery<'a>(&'a EntityConfigMap);
 
 impl std::fmt::Display for TruncateTablesQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TRUNCATE TABLE ")?;
-        for entity in self.1.values() {
-            if entity.id == *self.0 {
-                continue;
-            }
+        for entity in self.0.values() {
             write!(f, "{{schema_prefix}}{}, ", entity.id)?;
         }
         write!(f, "{{schema_prefix}}_data_footprint;")
     }
 }
 
-pub(super) fn impl_storage(
-    service_id: &str,
-    primary_entity: &EntityId,
-    entities: &EntityConfigMap,
-) -> syn::ItemImpl {
+pub(super) fn impl_storage(service_id: &str, entities: &EntityConfigMap) -> syn::ItemImpl {
     let operon = operon_ident();
     let sql_storage_ident = sql_storage_ident(service_id);
 
     let create_tables_query = CreateTablesQuery(entities).to_string();
-    let truncate_tables_query = TruncateTablesQuery(primary_entity, entities).to_string();
+    let truncate_tables_query = TruncateTablesQuery(entities).to_string();
 
     let generics = entities
         .values()
@@ -139,7 +132,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::test_utils::simple_pipeline::{all_entities, primary_entity};
+    use crate::test_utils::simple_pipeline::all_entities;
 
     #[rstest]
     fn test_create_tables_query(all_entities: EntityConfigMap) {
@@ -190,9 +183,9 @@ mod tests {
     }
 
     #[rstest]
-    fn test_clear_tables_query(primary_entity: EntityId, all_entities: EntityConfigMap) {
-        let stmt = super::TruncateTablesQuery(&primary_entity, &all_entities).to_string();
-        let expected = "TRUNCATE TABLE {schema_prefix}b, {schema_prefix}c, {schema_prefix}d, {schema_prefix}e, {schema_prefix}f, {schema_prefix}_data_footprint;";
+    fn test_clear_tables_query(all_entities: EntityConfigMap) {
+        let stmt = super::TruncateTablesQuery(&all_entities).to_string();
+        let expected = "TRUNCATE TABLE {schema_prefix}a, {schema_prefix}b, {schema_prefix}c, {schema_prefix}d, {schema_prefix}e, {schema_prefix}f, {schema_prefix}_data_footprint;";
         assert_eq!(stmt, expected);
     }
 }

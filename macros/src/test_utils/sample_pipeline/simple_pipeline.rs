@@ -221,20 +221,8 @@ pub fn service_id() -> &'static str {
 pub fn simple_pipeline() -> AllConfig {
     AllConfig {
         service_id: service_id().to_string(),
-        primary_dimension: primary_dim(),
-        primary_entity: primary_entity(),
         dimensions: all_dimensions(),
         entities: all_entities(),
         jobs: all_jobs(),
     }
-}
-
-#[fixture]
-pub fn primary_dim() -> DimensionId {
-    DimensionId::from("i")
-}
-
-#[fixture]
-pub fn primary_entity() -> String {
-    "a".to_string()
 }
