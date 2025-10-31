@@ -51,8 +51,8 @@ pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::It
                 self.update_deps_done()
             }
 
-            fn raise_dependency_quota(mut self, quota: usize) -> Self {
-                self.deps_quota += quota;
+            fn raise_dependency_quota(mut self, explosion_ub: usize) -> Self {
+                self.deps_quota = self.deps_quota + explosion_ub - 1;
                 self.update_deps_done()
             }
 

@@ -33,7 +33,7 @@ pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'sta
     /// Raise the dependency quota of this ticket by one, and compute if all dependencies are done.
     ///
     /// Return the updated ticket.
-    fn raise_dependency_quota(self, quota: usize) -> Self;
+    fn raise_dependency_quota(self, explosion_ub: usize) -> Self;
 
     /// Whether this ticket is ready to run,
     /// i.e. whether all dependencies are done and the job is fully resolved.

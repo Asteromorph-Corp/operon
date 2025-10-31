@@ -20,7 +20,7 @@ pub async fn raise_quota_epsilon_j(
         .collect::<Result<Vec<_>, _>>()?;
     let new_tickets = tickets
         .into_iter()
-        .map(|ticket| operon::schema_base::Ticket::raise_dependency_quota(ticket, res.0 - 1))
+        .map(|ticket| operon::schema_base::Ticket::raise_dependency_quota(ticket, res.0))
         .collect::<Vec<_>>();
     let copy_stmt = format!(
         "COPY {schema_prefix}ticket_epsilon (\n    i, k, resolved, deps_count, deps_quota, deps_done, status\n)\nFROM STDIN WITH (FORMAT csv);"
