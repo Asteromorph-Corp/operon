@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
+use tokio::time::Instant;
 
 use crate::meta_storage::{
     MetaClient, MetaStorage, MetaStorageError, clear_footprint, get_footprint, put_footprint,
@@ -228,6 +229,8 @@ where
     }
 
     async fn run(self, primary_ub: usize, run_mode: RunMode) -> Result<(), SchedulerError> {
+        let start = Instant::now();
+
         // Set up the initial storage setup and initial tickets for the individual schedulers.
         let mut handles = match run_mode {
             RunMode::Clean => self.run_clean(primary_ub).await?,
@@ -278,7 +281,7 @@ where
             put_footprint(tx.as_client(), "global", footprint).await?;
             tx.commit().await?;
         }
-        log::info!("All jobs closed.");
+        log::info!("All jobs closed in: {:?}.", start.elapsed());
         Ok(())
     }
 
