@@ -4,7 +4,7 @@ use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage, cooking_handler,
 use operon::async_trait::async_trait;
 use operon::operon::{Operon, OperonOptions};
 use operon::service::OperonService;
-use operon::storage::{OperonStorage, StorageOptions};
+use operon::storage::StorageOptions;
 use rand::Rng;
 
 // Example service implementation
@@ -126,8 +126,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .with_meta_storage_schema(Some("ex2_meta".to_string()))
         .with_log_dump(Some("./logs".to_string()))
         .with_log_level(log::Level::Info);
-
-    storage.init().await?;
 
     Operon::new(service, storage, operon_options)
         .run(cooking_handler())

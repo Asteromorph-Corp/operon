@@ -18,7 +18,7 @@ use operon::define_operon;
 use operon::operon::{Operon, OperonOptions};
 use operon::serde::{Deserialize, Serialize};
 use operon::service::OperonService;
-use operon::storage::{OperonStorage, StorageOptions};
+use operon::storage::StorageOptions;
 
 //# —————————————————————— A. Entity Definitions —————————————————————— #//
 // Define the entities that will be used.
@@ -151,17 +151,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_log_level(operon::log::Level::Info) // What should be the minimum log level to show in the UI?
         .with_log_dump(Some("./logs".to_string())); // Optionally, which directory should all logs be dumped to?
 
-    //# —————————————————————— Initializing Data —————————————————————— #//
-    // It is good practice to initialize the storage before touching the data.
-    // NOTE THAT if there is a predefined table in the database
-    // that matches the name but not the exact dimensions defined in the macro,
-    // the initialization will not overwrite it, resulting in an error.
-    // This happens when you shift around the definitions in the macro
-    // after you had already run the pipeline once or more.
-    // In this case, you might want to drop the related tables manually
-    // (i.e., run `DROP SCHEMA ex1_data CASCADE;` in the database),
-    // or point to a different, fresh schema in `StorageOptions`.
-    storage.init().await?;
+    // //# —————————————————————— Initializing Data —————————————————————— #//
+    // // It is good practice to initialize the storage before touching the data.
+    // // NOTE THAT if there is a predefined table in the database
+    // // that matches the name but not the exact dimensions defined in the macro,
+    // // the initialization will not overwrite it, resulting in an error.
+    // // This happens when you shift around the definitions in the macro
+    // // after you had already run the pipeline once or more.
+    // // In this case, you might want to drop the related tables manually
+    // // (i.e., run `DROP SCHEMA ex1_data CASCADE;` in the database),
+    // // or point to a different, fresh schema in `StorageOptions`.
+    // storage.init().await?;
 
     // // The primary entities (`Input`s in this case) MUST be in the storage before running Operon.
     // // It is possible to prepare the data externally
