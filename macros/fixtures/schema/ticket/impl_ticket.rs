@@ -4,10 +4,13 @@ impl operon::schema_base::Ticket for BetaTicket {
     type Job = schema::BetaJob;
     type Resolution = schema::JResolution;
 
+    #[allow(clippy::needless_update)]
     fn new() -> Self {
         Self {
-            deps_quota: 0usize,
-            deps_done: true,
+            deps_count: 0,
+            deps_quota: 1usize,
+            deps_done: false,
+            status: operon::schema_base::TicketStatus::Waiting,
             ..Default::default()
         }
     }
@@ -39,10 +42,10 @@ impl operon::schema_base::Ticket for BetaTicket {
     }
 
     fn resolve(&self) -> Option<schema::BetaJob> {
-        if self.is_ready() {
-            Some(schema::BetaJob { i: self.i.0? })
-        } else {
-            None
+        if !self.is_ready() {
+            return None;
         }
+        let job = schema::BetaJob { i: self.i.0? };
+        Some(job)
     }
 }

@@ -15,11 +15,14 @@ impl std::fmt::Display for GetResolutionQuery<'_> {
             "SELECT {}_ub FROM {{schema_prefix}}dimension_{}",
             self.0.id, self.0.id
         )?;
-        if let Some(dep) = self.0.depends_on.first() {
-            write!(f, " WHERE {dep} = $1")?;
-        }
-        for (i, dep) in self.0.depends_on.iter().enumerate().skip(1) {
-            write!(f, " AND {} = ${}", dep, i + 1)?;
+
+        for (idx, dim) in self.0.depends_on.iter().enumerate() {
+            if idx == 0 {
+                write!(f, " WHERE")?;
+            } else {
+                write!(f, " AND")?;
+            }
+            write!(f, " {} = ${}", dim, idx + 1)?;
         }
         write!(f, ";")
     }

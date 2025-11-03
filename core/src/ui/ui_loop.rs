@@ -46,7 +46,6 @@ Commands:
 /// The main UI loop that handles user input and updates the UI state.
 pub struct UiLoop {
     state: Arc<RwLock<UiState>>,
-    primary_ub: usize,
     log_rx: LogRecordReceiver,
     ctrl_tx: ControlEventSender,
     rec_rx: RecoveryStateReceiver,
@@ -57,14 +56,12 @@ impl UiLoop {
     /// control event sender, and recovery state receiver.
     pub fn new(
         state: Arc<RwLock<UiState>>,
-        primary_ub: usize,
         log_rx: LogRecordReceiver,
         ctrl_tx: ControlEventSender,
         rec_rx: RecoveryStateReceiver,
     ) -> Self {
         Self {
             state,
-            primary_ub,
             log_rx,
             ctrl_tx,
             rec_rx,
@@ -208,79 +205,79 @@ impl UiLoop {
                                     if rebuild {
                                         log::error!("Cannot rebuild.")
                                     } else {
-                                        self.ctrl_tx.send(ControlEvent::clean_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::clean_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
                                     }
                                 }
                                 RecoveryState::AbortedUnchecked => {
                                     if rebuild {
                                         log::error!("Cannot rebuild before checking for consistency.")
                                     } else {
-                                        self.ctrl_tx.send(ControlEvent::clean_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::clean_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
                                     }
                                 }
                                 RecoveryState::AbortedChecked => {
                                     if fresh {
                                         log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::clean_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::clean_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
                                     } else {
                                         log::info!("Rebuilding the run from trusted data.");
-                                        self.ctrl_tx.send(ControlEvent::rebuild_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::rebuild_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::RebuildRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::RebuildRun)?;
                                     }
                                 }
                                 RecoveryState::GracefullyStopped => {
                                     if fresh {
                                         log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::clean_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::clean_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
                                     } else if rebuild {
                                         log::info!("Rebuilding the run from trusted data.");
-                                        self.ctrl_tx.send(ControlEvent::rebuild_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::rebuild_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::RebuildRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::RebuildRun)?;
                                     } else {
                                         log::info!("Continuing the last run.");
-                                        self.ctrl_tx.send(ControlEvent::restore_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::restore_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::RestoreRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::RestoreRun)?;
                                     }
                                 }
                                 _ => unreachable!(),
                             },
-                            ControlEvent::Check { .. } => match rec_state {
+                            ControlEvent::Check => match rec_state {
                                 RecoveryState::MissingData => {
                                     if rebuild {
                                         log::error!("Cannot rebuild.");
                                         continue;
                                     }
-                                    self.ctrl_tx.send(ControlEvent::clean_run(self.primary_ub))?;
-                                    self.state.write().await.update_ui_state(ControlEvent::clean_run(self.primary_ub))?;
+                                    self.ctrl_tx.send(ControlEvent::CleanRun)?;
+                                    self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
                                 }
                                 RecoveryState::AbortedChecked => {
                                     if fresh {
                                         log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::clean_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::clean_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
                                     } else {
                                         log::info!("Rebuilding the run from trusted data.");
-                                        self.ctrl_tx.send(ControlEvent::rebuild_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::rebuild_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::RebuildRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::RebuildRun)?;
                                     }
                                 }
                                 RecoveryState::GracefullyStoppedChecked => {
                                     if fresh {
                                         log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::clean_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::clean_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
                                     } else if rebuild {
                                         log::info!("Rebuilding the run from trusted data.");
-                                        self.ctrl_tx.send(ControlEvent::rebuild_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::rebuild_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::RebuildRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::RebuildRun)?;
                                     } else {
                                         log::info!("Continuing the last run.");
-                                        self.ctrl_tx.send(ControlEvent::restore_run(self.primary_ub))?;
-                                        self.state.write().await.update_ui_state(ControlEvent::restore_run(self.primary_ub))?;
+                                        self.ctrl_tx.send(ControlEvent::RestoreRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::RestoreRun)?;
                                     }
                                 }
                                 _ => {
@@ -294,15 +291,15 @@ impl UiLoop {
                             }
                         },
                         Action::Check => match exec_snapshot.last_control_event {
-                            ControlEvent::Check { .. } => {
+                            ControlEvent::Check => {
                                 log::warn!("Already run a check.");
                             }
                             ControlEvent::Start => match rec_state {
                                 RecoveryState::AbortedUnchecked
                                 | RecoveryState::GracefullyStopped => {
                                     log::info!("Starting a consistency check of the remaining data.");
-                                    self.ctrl_tx.send(ControlEvent::check(self.primary_ub))?;
-                                    self.state.write().await.update_ui_state(ControlEvent::check(self.primary_ub))?;
+                                    self.ctrl_tx.send(ControlEvent::Check)?;
+                                    self.state.write().await.update_ui_state(ControlEvent::Check)?;
                                 }
                                 _ => {
                                     log::warn!(
@@ -315,7 +312,7 @@ impl UiLoop {
                             }
                         },
                         Action::Exit => match exec_snapshot.last_control_event {
-                            ControlEvent::Start | ControlEvent::Check { .. } => {
+                            ControlEvent::Start | ControlEvent::Check => {
                                 // We didn't start any jobs, so we can exit immediately.
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
                                 break;
@@ -357,7 +354,7 @@ impl UiLoop {
                             guard.unread_logs = 0;
                         }
                         Action::Quit { force, no_exit } => match exec_snapshot.last_control_event {
-                            ControlEvent::Start | ControlEvent::Check { .. } => {
+                            ControlEvent::Start | ControlEvent::Check  => {
                                 if no_exit {
                                     log::warn!("Cannot quit before the run has started.");
                                     continue;
@@ -434,7 +431,7 @@ impl UiLoop {
                             },
                         },
                         Action::Pause { targets, cascade } => match exec_snapshot.last_control_event {
-                            ControlEvent::Start | ControlEvent::Check { .. } => {
+                            ControlEvent::Start | ControlEvent::Check => {
                                 log::warn!("Cannot pause before the run has started.");
                             }
                             ControlEvent::Abort | ControlEvent::GracefulStop
@@ -457,7 +454,7 @@ impl UiLoop {
                             }
                         }
                         Action::Resume { targets } => match exec_snapshot.last_control_event {
-                            ControlEvent::Start | ControlEvent::Check { .. } => {
+                            ControlEvent::Start | ControlEvent::Check => {
                                 log::warn!("Cannot resume before the run has started.");
                             }
                             ControlEvent::Abort | ControlEvent::GracefulStop

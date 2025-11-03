@@ -28,9 +28,7 @@ pub trait ResolutionSql: Resolution {
     async fn put(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>;
 }
 
-pub trait ResolutionEnum: Debug + Clone + Send + Sync + 'static {
-    fn primary(resolution: usize) -> Self;
-}
+pub trait ResolutionEnum: Debug + Clone + Send + Sync + 'static {}
 
 impl Resolution for () {
     type PrimaryKey = ();

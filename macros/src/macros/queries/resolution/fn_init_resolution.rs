@@ -17,12 +17,14 @@ impl std::fmt::Display for InitResolutionQuery<'_> {
             writeln!(f, "    {dep} BIGINT,")?;
         }
         write!(f, "    {}_ub BIGINT NOT NULL", self.0.id)?;
-        if !self.0.depends_on.is_empty() {
-            writeln!(f, ",")?;
-            writeln!(f, "    PRIMARY KEY ({})", self.0.depends_on.join(","))?;
-        } else {
+
+        if self.0.depends_on.is_empty() {
             writeln!(f)?;
+            return write!(f, ");");
         }
+
+        writeln!(f, ",")?;
+        writeln!(f, "    PRIMARY KEY ({})", self.0.depends_on.join(","))?;
         write!(f, ");")
     }
 }

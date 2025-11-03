@@ -7,7 +7,8 @@ use syn::parse::{Parse, ParseBuffer};
 
 use super::config_decl::ConfigDecl;
 use crate::configs::{
-    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, JobArg, JobConfig,
+    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
+    JobConfig, JobConfigMap,
 };
 use crate::utils::DedupHasher;
 
@@ -39,37 +40,10 @@ impl Parse for AllConfig {
     fn parse(input: &ParseBuffer) -> syn::Result<AllConfig> {
         let config_decl: ConfigDecl = input.parse()?;
         let service_id = config_decl.service_id.to_string();
-        let primary_entity_id = config_decl.primary_entity.id.to_string().to_pascal_case();
-        let primary_dimension_id = config_decl
-            .primary_entity
-            .dims
-            .first()
-            .map(|d| d.to_string().to_snake_case())
-            .ok_or_else(|| {
-                syn::Error::new(
-                    config_decl.primary_entity._span,
-                    "Primary entity must have a dimension",
-                )
-            })?;
-        let mut dimensions = IndexMap::new();
-        let mut entities = IndexMap::new();
-        let mut jobs = IndexMap::new();
+        let mut dimensions: DimensionConfigMap = IndexMap::new();
+        let mut entities: EntityConfigMap = IndexMap::new();
+        let mut jobs: JobConfigMap = IndexMap::new();
         let mut hasher = DedupHasher::new();
-        dimensions.insert(
-            primary_dimension_id.clone(),
-            DimensionConfig {
-                id: primary_dimension_id.clone(),
-                depends_on: vec![],
-            },
-        );
-        entities.insert(
-            primary_entity_id.clone(),
-            EntityConfig {
-                id: primary_entity_id.clone(),
-                dims: vec![primary_dimension_id.clone()],
-                generic: create_generic_ident(&primary_entity_id, &mut hasher),
-            },
-        );
         for job in config_decl.jobs {
             let new_entity = job.spawned_entity;
             let job_id = job.id.to_string().to_snake_case();
@@ -235,8 +209,6 @@ impl Parse for AllConfig {
 
         Ok(AllConfig {
             service_id,
-            primary_entity: primary_entity_id,
-            primary_dimension: primary_dimension_id,
             dimensions,
             entities,
             jobs,
@@ -264,7 +236,8 @@ mod tests {
 
     #[test]
     fn test_parse_config() {
-        let input = "splitter = |Input<input_no>| {
+        let input = "splitter = {
+                Input<input_no> = get_inputs();
                 Intermediate<word_no> = get_words(Input) for input_no;
                 Output<char_no> = get_chars(Intermediate) for input_no, word_no;
             }";

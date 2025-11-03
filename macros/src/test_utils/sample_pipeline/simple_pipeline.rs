@@ -2,7 +2,8 @@
 //!
 //! These fixtures corresponds to a following pipeline:
 //! ```rust,ignore
-//! alpha = |A<i>| {
+//! alpha = {
+//!     A<i> = alpha()
 //!     B<j> = beta(A) for(8) i;
 //!     C<k> = gamma(A) for(8) i, j;
 //!     D = delta(A, B, C) for(4) i, j, k;
@@ -15,9 +16,20 @@ use quote::format_ident;
 use rstest::fixture;
 
 use crate::configs::{
-    AllConfig, DimensionConfig, DimensionConfigMap, DimensionId, EntityConfig, EntityConfigMap,
-    JobArg, JobConfig, JobConfigMap,
+    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
+    JobConfig, JobConfigMap,
 };
+
+pub fn job_alpha() -> JobConfig {
+    JobConfig {
+        id: "alpha".to_string(),
+        from: vec![],
+        to: "a".to_string(),
+        dims: vec![],
+        spawn_dim: Some("i".to_string()),
+        pool_size: 1,
+    }
+}
 
 pub fn job_beta() -> JobConfig {
     JobConfig {
@@ -114,6 +126,7 @@ pub fn job_zeta() -> JobConfig {
 #[fixture]
 pub fn all_jobs() -> JobConfigMap {
     JobConfigMap::from_iter([
+        ("alpha".to_string(), job_alpha()),
         ("beta".to_string(), job_beta()),
         ("gamma".to_string(), job_gamma()),
         ("delta".to_string(), job_delta()),
@@ -221,20 +234,8 @@ pub fn service_id() -> &'static str {
 pub fn simple_pipeline() -> AllConfig {
     AllConfig {
         service_id: service_id().to_string(),
-        primary_dimension: primary_dim(),
-        primary_entity: primary_entity(),
         dimensions: all_dimensions(),
         entities: all_entities(),
         jobs: all_jobs(),
     }
-}
-
-#[fixture]
-pub fn primary_dim() -> DimensionId {
-    DimensionId::from("i")
-}
-
-#[fixture]
-pub fn primary_entity() -> String {
-    "a".to_string()
 }

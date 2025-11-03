@@ -13,19 +13,19 @@ impl std::fmt::Display for ExplodePopQuery<'_> {
         let job_id = &self.0.id;
 
         writeln!(f, "DELETE FROM {{schema_prefix}}ticket_{job_id}")?;
-        for (i, dep) in self
+        for (idx, dep) in self
             .1
             .depends_on
             .iter()
             .filter(|dim| self.0.dims.contains(dim))
             .enumerate()
         {
-            if i == 0 {
+            if idx == 0 {
                 write!(f, "WHERE")?;
             } else {
                 write!(f, "    AND")?;
             }
-            writeln!(f, " {} = ${}", dep, i + 1)?;
+            writeln!(f, " {} = ${}", dep, idx + 1)?;
         }
         write!(f, "RETURNING *;")
     }

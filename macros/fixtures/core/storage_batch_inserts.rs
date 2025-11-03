@@ -1,3 +1,10 @@
+async fn put_all_a(&self, values: Vec<A>) -> Result<(), operon::storage::StorageError> {
+    for (i, value) in values.into_iter().enumerate() {
+        self.put_a(i.into(), value).await?;
+    }
+    Ok(())
+}
+
 async fn put_all_b(
     &self,
     i: schema::IDim,

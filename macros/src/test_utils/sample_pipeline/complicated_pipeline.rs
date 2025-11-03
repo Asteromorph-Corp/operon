@@ -2,7 +2,8 @@
 //!
 //! These fixtures corresponds to a following pipeline:
 //! ```rust,ignore
-//! alpha = |A<i>| {
+//! alpha = {
+//!     A<i> = alpha();
 //!     B<j> = beta(A) for(8) i;
 //!     C<k> = gamma(B) for(8) i, j;
 //!     D<l> = delta(B<j>, C<j, k>) for(4) i, k;
@@ -12,8 +13,8 @@
 use quote::format_ident;
 
 use crate::configs::{
-    AllConfig, DimensionConfig, DimensionConfigMap, DimensionId, EntityConfig, EntityConfigMap,
-    EntityId, JobArg, JobConfig, JobConfigMap,
+    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
+    JobConfig, JobConfigMap,
 };
 
 pub fn job_beta() -> JobConfig {
@@ -158,18 +159,8 @@ pub fn service_id() -> &'static str {
 pub fn complicated_pipeline() -> AllConfig {
     AllConfig {
         service_id: service_id().to_string(),
-        primary_dimension: primary_dim(),
-        primary_entity: primary_entity(),
         dimensions: all_dimensions(),
         entities: all_entities(),
         jobs: all_jobs(),
     }
-}
-
-pub fn primary_dim() -> DimensionId {
-    DimensionId::from("i")
-}
-
-pub fn primary_entity() -> EntityId {
-    EntityId::from("a")
 }

@@ -1,10 +1,10 @@
 use syn::parse_quote;
 
-use crate::configs::{EntityId, JobConfig};
+use crate::configs::JobConfig;
 use crate::utils::{job_ident, operon_ident, spawn_resolution, ticket_ident, variable_ident};
 
 /// Generates the implementation of the `Ticket` trait for a given job's ticket.
-pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::ItemImpl {
+pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
     let operon = operon_ident();
     let job_ident = job_ident(&job.id);
     let res_ident = spawn_resolution(job.spawn_dim.as_ref());
@@ -16,12 +16,19 @@ pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::It
         .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
 
-    let initial_quota = job
-        .from
-        .iter()
-        .filter(|arg| arg.id != *primary_entity)
-        .count();
+    let is_resolved: syn::Expr = if dim_fields.is_empty() {
+        parse_quote! { true }
+    } else {
+        parse_quote! { #(self.#dim_fields.is_some())&&* }
+    };
+
+    let initial_quota = job.from.len();
     let initial_done = initial_quota == 0;
+    let initial_status: syn::Expr = if initial_done {
+        parse_quote! { #operon::schema_base::TicketStatus::Queued }
+    } else {
+        parse_quote! { #operon::schema_base::TicketStatus::Waiting }
+    };
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -30,10 +37,13 @@ pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::It
             type Job = schema::#job_ident;
             type Resolution = #res_ident;
 
+            #[allow(clippy::needless_update)]
             fn new() -> Self {
                 Self {
+                    deps_count: 0,
                     deps_quota: #initial_quota,
                     deps_done: #initial_done,
+                    status: #initial_status,
                     ..Default::default()
                 }
             }
@@ -41,7 +51,7 @@ pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::It
             fn update_deps_done(mut self) -> Self {
                 self.deps_done = self.deps_count >= self.deps_quota;
                 if self.is_ready() {
-                    self.status = operon::schema_base::TicketStatus::Queued;
+                    self.status = #operon::schema_base::TicketStatus::Queued;
                 }
                 self
             }
@@ -61,17 +71,18 @@ pub(super) fn impl_ticket(job: &JobConfig, primary_entity: &EntityId) -> syn::It
             }
 
             fn is_resolved(&self) -> bool {
-                #(self.#dim_fields.is_some())&&*
+                #is_resolved
             }
 
             fn resolve(&self) -> Option<schema::#job_ident> {
-                if self.is_ready() {
-                    Some(schema::#job_ident {
-                        #(#dim_fields: self.#dim_fields.0?,)*
-                    })
-                } else {
-                    None
+                if !self.is_ready() {
+                    return None;
                 }
+
+                let job = schema::#job_ident {
+                    #(#dim_fields: self.#dim_fields.0?,)*
+                };
+                Some(job)
             }
         }
     }
@@ -83,16 +94,12 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{job_beta, primary_entity};
+    use crate::test_utils::simple_pipeline::job_beta;
 
     #[rstest]
     #[case(job_beta(), "schema/ticket/impl_ticket.rs")]
-    fn test_impl_ticket(
-        primary_entity: EntityId,
-        #[case] job: JobConfig,
-        #[case] fixture_path: &str,
-    ) {
-        let item = impl_ticket(&job, &primary_entity);
+    fn test_impl_ticket(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let item = impl_ticket(&job);
         assert_item_eq(&item, fixture_path);
     }
 }

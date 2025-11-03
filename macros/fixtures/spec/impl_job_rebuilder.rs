@@ -1,15 +1,6 @@
 #[operon::async_trait::async_trait]
 #[automatically_derived]
 impl operon::scheduler::JobRebuilder for BetaRebuilder {
-    async fn explode(
-        &self,
-        client: operon::meta_storage::MetaClient<'_>,
-        primary_ub: usize,
-    ) -> Result<(), operon::scheduler::SchedulerError> {
-        queries::explode_beta_i(client, &schema::IResolution(primary_ub)).await?;
-        Ok(())
-    }
-
     async fn rebuild(
         &self,
         client: operon::meta_storage::MetaClient<'_>,

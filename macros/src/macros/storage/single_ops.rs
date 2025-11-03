@@ -12,14 +12,14 @@ impl std::fmt::Display for SelectEntityQuery<'_> {
         let entity = self.0;
 
         write!(f, "SELECT value FROM {{schema_prefix}}{}", self.0.id)?;
-        for (i, dim) in entity.dims.iter().enumerate() {
-            if i == 0 {
+        for (idx, dim) in entity.dims.iter().enumerate() {
+            if idx == 0 {
                 write!(f, " WHERE")?;
             } else {
                 write!(f, " AND")?;
             }
 
-            write!(f, " {} = ${}", variable_ident(dim), i + 1)?;
+            write!(f, " {} = ${}", variable_ident(dim), idx + 1)?;
         }
         Ok(())
     }
@@ -41,8 +41,8 @@ impl std::fmt::Display for InsertEntityQuery<'_> {
         }
         write!(f, "${})", entity.dims.len() + 1)?;
         write!(f, " ON CONFLICT (")?;
-        for (i, dim) in entity.dims.iter().enumerate() {
-            if i > 0 {
+        for (idx, dim) in entity.dims.iter().enumerate() {
+            if idx > 0 {
                 write!(f, ", ")?;
             }
             write!(f, "{dim}")?;

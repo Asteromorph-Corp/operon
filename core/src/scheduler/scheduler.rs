@@ -4,15 +4,12 @@ use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 
-use crate::meta_storage::{
-    MetaClient, MetaStorage, MetaStorageError, clear_footprint, get_footprint, put_footprint,
-};
+use crate::meta_storage::{MetaClient, MetaStorage, clear_footprint, get_footprint, put_footprint};
 use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEvent, ControlEventReceiver, PeerEvent, RecoveryState, RecoveryStateSender, RunMode,
+    ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
     SchedulerError, SchedulerHandler, SchedulerOptions,
 };
-use crate::schema_base::ResolutionEnum;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiState;
@@ -109,13 +106,12 @@ where
             self.ctrl_rx.changed().await?;
             let ctrl_event = self.ctrl_rx.borrow_and_update().clone();
             match ctrl_event {
-                ControlEvent::Check { primary_ub } => {
+                ControlEvent::Check => {
                     let consistent = self
                         .handler
                         .check_consistency(
                             &self.storage,
                             self.meta_storage.conn().await?.as_client(),
-                            primary_ub,
                         )
                         .await
                         .map_err(|e| {
@@ -155,19 +151,11 @@ where
                         ),
                     }
                 }
-                ControlEvent::CleanRun { primary_ub } => {
-                    return self.run(primary_ub, RunMode::Clean).await;
-                }
-                ControlEvent::RebuildRun { primary_ub } => {
-                    return self.run(primary_ub, RunMode::Rebuild).await;
-                }
-                ControlEvent::RestoreRun { primary_ub } => {
-                    return self.run(primary_ub, RunMode::Restore).await;
-                }
-                ControlEvent::Abort => {
-                    // Decided to not start a new run.
-                    return Ok(());
-                }
+                ControlEvent::CleanRun => return self.run(RunMode::Clean).await,
+                ControlEvent::RebuildRun => return self.run(RunMode::Rebuild).await,
+                ControlEvent::RestoreRun => return self.run(RunMode::Restore).await,
+                // Decided to not start a new run.
+                ControlEvent::Abort => return Ok(()),
                 _ => {
                     // Other control events should not be passed in here.
                     log::warn!("Received an unexpected control event: {ctrl_event:?}");
@@ -215,26 +203,18 @@ where
             _ => (),
         }
 
-        let resolution = self
-            .handler
-            .get_primary_resolution(meta_conn.as_client())
-            .await?;
-        if resolution.is_none() {
-            // No resolution found, so the metadata storage is empty.
-            return Ok(RecoveryState::Fresh);
-        }
         // Fall back to `AbortedUnchecked`: the metadata storage has some data,
         // but it is not consistent with the data storage.
         Ok(RecoveryState::AbortedUnchecked)
     }
 
-    async fn run(self, primary_ub: usize, run_mode: RunMode) -> Result<(), SchedulerError> {
+    async fn run(self, run_mode: RunMode) -> Result<(), SchedulerError> {
         let start = Instant::now();
 
         // Set up the initial storage setup and initial tickets for the individual schedulers.
         let mut handles = match run_mode {
-            RunMode::Clean => self.run_clean(primary_ub).await?,
-            RunMode::Rebuild => self.run_rebuild(primary_ub).await?,
+            RunMode::Clean => self.run_clean().await?,
+            RunMode::Rebuild => self.run_rebuild().await?,
             RunMode::Restore => self.run_restore().await?,
         };
 
@@ -285,21 +265,18 @@ where
         Ok(())
     }
 
-    async fn run_clean(&self, primary_ub: usize) -> Result<JoinSet<RunningState>, SchedulerError> {
+    async fn run_clean(&self) -> Result<JoinSet<RunningState>, SchedulerError> {
         // Wipe the data storage clean.
         self.storage.clear().await?;
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
         self.handler.clear_resolution(tx.as_client()).await?;
-        self.handler
-            .put_primary_resolution(tx.as_client(), primary_ub)
-            .await?;
         self.handler.clear_tickets(tx.as_client()).await?;
         self.handler.put_default_tickets(tx.as_client()).await?;
         clear_footprint(tx.as_client()).await?;
         tx.commit().await?;
 
-        let (handles, peer_txs) = self
+        let handles = self
             .handler
             .prepare_channels(self.internal_channel_size)
             .run_schedulers(
@@ -311,23 +288,10 @@ where
                 true,
             );
 
-        let resolved_i = self
-            .handler
-            .get_primary_resolution(self.meta_storage.conn().await?.as_client())
-            .await?
-            .ok_or(MetaStorageError::NotFound("Initial resolution".into()))?;
-        let event = PeerEvent::Resolution(Svc::ResolutionEnum::primary(resolved_i));
-        for peer_tx in peer_txs.into_values() {
-            peer_tx.send(event.clone()).await?;
-        }
-
         Ok(handles)
     }
 
-    async fn run_rebuild(
-        &self,
-        primary_ub: usize,
-    ) -> Result<JoinSet<RunningState>, SchedulerError> {
+    async fn run_rebuild(&self) -> Result<JoinSet<RunningState>, SchedulerError> {
         // * We *trust* the following data to be correct:
         //   - The data storage,
         //   - All dimension resolutions,
@@ -352,12 +316,6 @@ where
         clear_footprint(tx.as_client()).await?;
 
         self.handler.put_default_tickets(tx.as_client()).await?;
-        self.handler
-            .put_primary_resolution(tx.as_client(), primary_ub)
-            .await?;
-        for rebuilder in &rebuilders {
-            rebuilder.explode(tx.as_client(), primary_ub).await?;
-        }
         self.update_ui(tx.as_client()).await?;
 
         for rebuilder in rebuilders {
@@ -369,7 +327,7 @@ where
         tx.commit().await?;
         log::info!("Rebuild complete, starting the run.");
 
-        let (handles, _) = self
+        let handles = self
             .handler
             .prepare_channels(self.internal_channel_size)
             .run_schedulers(
@@ -401,7 +359,7 @@ where
             tx.commit().await?;
         }
 
-        let (handles, _) = self
+        let handles = self
             .handler
             .prepare_channels(self.internal_channel_size)
             .run_schedulers(
