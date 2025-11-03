@@ -32,20 +32,31 @@ impl std::fmt::Display for InsertEntityQuery<'_> {
         let entity = self.0;
 
         write!(f, "INSERT INTO {{schema_prefix}}{} (", entity.id)?;
-        for dim in &entity.dims {
-            write!(f, "{dim}, ")?;
-        }
-        write!(f, "value) VALUES (")?;
-        for i in 1..=entity.dims.len() {
-            write!(f, "${i}, ")?;
-        }
-        write!(f, "${})", entity.dims.len() + 1)?;
-        write!(f, " ON CONFLICT (")?;
-        for (idx, dim) in entity.dims.iter().enumerate() {
-            if idx > 0 {
-                write!(f, ", ")?;
+
+        if !entity.dims.is_empty() {
+            for dim in &entity.dims {
+                write!(f, "{dim}, ")?;
             }
-            write!(f, "{dim}")?;
+        } else {
+            write!(f, "id, ")?;
+        }
+        writeln!(f, "value)")?;
+
+        write!(f, "VALUES (")?;
+        if !entity.dims.is_empty() {
+            for i in 1..=entity.dims.len() {
+                write!(f, "${i}, ")?;
+            }
+        } else {
+            write!(f, "0, ")?;
+        }
+        writeln!(f, "${})", entity.dims.len() + 1)?;
+
+        write!(f, "ON CONFLICT (")?;
+        if !entity.dims.is_empty() {
+            write!(f, "{}", entity.dims.join(", "))?;
+        } else {
+            write!(f, "id")?;
         }
         write!(f, ") DO UPDATE SET value = EXCLUDED.value")
     }
@@ -121,6 +132,7 @@ pub fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::ImplI
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
     use rstest::rstest;
 
     use super::*;
@@ -140,7 +152,11 @@ mod tests {
     #[rstest]
     #[case(
         entity_b(),
-        "INSERT INTO {schema_prefix}b (i, j, value) VALUES ($1, $2, $3) ON CONFLICT (i, j) DO UPDATE SET value = EXCLUDED.value"
+        indoc! {"
+            INSERT INTO {schema_prefix}b (i, j, value)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (i, j) DO UPDATE SET value = EXCLUDED.value"
+        }
     )]
     fn test_insert_entity_query(#[case] entity: EntityConfig, #[case] expected: &str) {
         let stmt = InsertEntityQuery(&entity).to_string();
