@@ -10,20 +10,22 @@ struct CreateTablesQuery<'a>(&'a EntityConfigMap);
 impl std::fmt::Display for CreateTablesQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for entity in self.0.values() {
-            writeln!(
-                f,
-                "CREATE TABLE IF NOT EXISTS {{schema_prefix}}{} (",
-                entity.id
-            )?;
-            for dim in &entity.dims {
-                writeln!(f, "    {dim} BIGINT,")?;
-            }
-            write!(f, "    value JSONB")?;
+            let id = &entity.id;
+            writeln!(f, "CREATE TABLE IF NOT EXISTS {{schema_prefix}}{id} (",)?;
+
             if !entity.dims.is_empty() {
-                writeln!(f, ",")?;
+                for dim in &entity.dims {
+                    writeln!(f, "    {dim} BIGINT,")?;
+                }
+            } else {
+                writeln!(f, "    id BIGINT,")?;
+            }
+            writeln!(f, "    value JSONB,")?;
+
+            if !entity.dims.is_empty() {
                 writeln!(f, "    PRIMARY KEY ({})", entity.dims.join(", "))?;
             } else {
-                writeln!(f)?;
+                writeln!(f, "    PRIMARY KEY (id)")?;
             }
 
             writeln!(f, ");")?;
