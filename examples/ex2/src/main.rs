@@ -8,11 +8,9 @@ use operon::storage::StorageOptions;
 use rand::Rng;
 
 // Example service implementation
+#[derive(OperonService)]
+#[operon(pipeline = "ex2")]
 struct ExampleService;
-impl OperonService for ExampleService {
-    type JobEnum = schema::JobEnum;
-    type ResolutionEnum = schema::ResolutionEnum;
-}
 
 #[async_trait]
 impl CookingService for ExampleService {
