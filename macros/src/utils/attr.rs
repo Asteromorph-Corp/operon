@@ -4,7 +4,7 @@ use syn::parse_str;
 #[derive(Default)]
 pub struct OperonAttrs {
     pub crate_path: Option<syn::Path>,
-    pub schema_path: Option<syn::Path>,
+    pub pipeline_path: Option<syn::Path>,
 }
 
 pub fn extract_attr<T: Default>(
@@ -32,7 +32,7 @@ pub fn get_operon_attrs(attr: &syn::Attribute) -> Result<Option<OperonAttrs>, Di
             let path = parse_str::<syn::Path>(&lit.value())?;
             crate_path = Some(path)
         }
-        if meta.path.is_ident("schema") {
+        if meta.path.is_ident("pipeline") {
             let value = meta.value()?;
             let lit: syn::LitStr = value.parse()?;
             let path = parse_str::<syn::Path>(&lit.value())?;
@@ -51,6 +51,6 @@ pub fn get_operon_attrs(attr: &syn::Attribute) -> Result<Option<OperonAttrs>, Di
 
     Ok(Some(OperonAttrs {
         crate_path,
-        schema_path,
+        pipeline_path: schema_path,
     }))
 }

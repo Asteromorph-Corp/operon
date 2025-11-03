@@ -11,7 +11,7 @@ use rand::Rng;
 
 // Example service implementation
 #[derive(OperonService)]
-#[operon(schema = "ex2")]
+#[operon(pipeline = "ex2")]
 struct ExampleService;
 
 #[async_trait]
