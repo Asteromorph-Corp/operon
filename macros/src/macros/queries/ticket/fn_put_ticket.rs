@@ -80,9 +80,17 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::job_beta;
+    use crate::test_utils::simple_pipeline::{job_alpha, job_beta};
 
     #[rstest]
+    #[case::empty(
+        job_alpha(),
+        indoc! {"
+            INSERT INTO {schema_prefix}ticket_alpha (resolved, deps_count, deps_quota, deps_done, status)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT DO NOTHING;"
+        }
+    )]
     #[case::simple(
         job_beta(),
         indoc! {"

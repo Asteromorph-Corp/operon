@@ -66,9 +66,10 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{job_beta, job_epsilon};
+    use crate::test_utils::simple_pipeline::{job_alpha, job_beta, job_epsilon};
 
     #[rstest]
+    #[case::empty(job_alpha(), "UPDATE {schema_prefix}ticket_alpha SET status = 'done';")]
     #[case::simple(
         job_beta(),
         "UPDATE {schema_prefix}ticket_beta SET status = 'done' WHERE i = $1;"

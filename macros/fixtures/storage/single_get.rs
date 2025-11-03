@@ -5,7 +5,7 @@ async fn get_b(
 ) -> Result<Option<B>, operon::storage::StorageError> {
     let conn = self.pool.get().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
-    let stmt = format!("SELECT value FROM {schema_prefix}b WHERE i = $1 AND j = $2");
+    let stmt = format!("SELECT value FROM {schema_prefix}b WHERE i = $1 AND j = $2;");
     let row = conn
         .query_opt(&stmt, &[&i64::try_from(i)?, &i64::try_from(j)?])
         .await?;

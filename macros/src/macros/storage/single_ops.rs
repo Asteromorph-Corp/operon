@@ -21,7 +21,7 @@ impl std::fmt::Display for SelectEntityQuery<'_> {
 
             write!(f, " {} = ${}", variable_ident(dim), idx + 1)?;
         }
-        Ok(())
+        write!(f, ";")
     }
 }
 
@@ -58,7 +58,7 @@ impl std::fmt::Display for InsertEntityQuery<'_> {
         } else {
             write!(f, "id")?;
         }
-        write!(f, ") DO UPDATE SET value = EXCLUDED.value")
+        write!(f, ") DO UPDATE SET value = EXCLUDED.value;")
     }
 }
 
@@ -137,12 +137,13 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
+    use crate::test_utils::complicated_pipeline::entity_a as entity_empty;
     use crate::test_utils::simple_pipeline::entity_b;
 
     #[rstest]
     #[case(
         entity_b(),
-        "SELECT value FROM {schema_prefix}b WHERE i = $1 AND j = $2"
+        "SELECT value FROM {schema_prefix}b WHERE i = $1 AND j = $2;"
     )]
     fn test_select_entity_query(#[case] entity: EntityConfig, #[case] expected: &str) {
         let stmt = SelectEntityQuery(&entity).to_string();
@@ -150,12 +151,20 @@ mod tests {
     }
 
     #[rstest]
+    #[case::empty(
+        entity_empty(),
+        indoc! {"
+            INSERT INTO {schema_prefix}a (id, value)
+            VALUES (0, $1)
+            ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;"
+        }
+    )]
     #[case(
         entity_b(),
         indoc! {"
             INSERT INTO {schema_prefix}b (i, j, value)
             VALUES ($1, $2, $3)
-            ON CONFLICT (i, j) DO UPDATE SET value = EXCLUDED.value"
+            ON CONFLICT (i, j) DO UPDATE SET value = EXCLUDED.value;"
         }
     )]
     fn test_insert_entity_query(#[case] entity: EntityConfig, #[case] expected: &str) {

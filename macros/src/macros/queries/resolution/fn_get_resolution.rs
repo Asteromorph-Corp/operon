@@ -87,20 +87,13 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::dimension_i;
-
-    fn dimension_l() -> DimensionConfig {
-        DimensionConfig {
-            id: "l".to_string(),
-            depends_on: vec!["j".to_string(), "k".to_string()],
-        }
-    }
+    use crate::test_utils::simple_pipeline::{dimension_i, dimension_j};
 
     #[rstest]
     #[case::simple(dimension_i(), "SELECT i_ub FROM {schema_prefix}dimension_i;")]
     #[case::with_dependency(
-        dimension_l(),
-        "SELECT l_ub FROM {schema_prefix}dimension_l WHERE j = $1 AND k = $2;"
+        dimension_j(),
+        "SELECT j_ub FROM {schema_prefix}dimension_j WHERE i = $1;"
     )]
     fn test_get_resolution_query(#[case] dim: DimensionConfig, #[case] expected: &str) {
         let stmt = GetResolutionQuery(&dim).to_string();
@@ -109,7 +102,7 @@ mod tests {
 
     #[rstest]
     #[case::simple(dimension_i(), "queries/resolution/get_resolution.simple.rs")]
-    #[case::with_dependency(dimension_l(), "queries/resolution/get_resolution.with_dependency.rs")]
+    #[case::with_dependency(dimension_j(), "queries/resolution/get_resolution.with_dependency.rs")]
     fn test_get_resolution(#[case] dim: DimensionConfig, #[case] fixture_path: &str) {
         let result = fn_get_resolution(&dim);
         assert_item_eq(&result, fixture_path);

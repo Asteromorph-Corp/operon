@@ -1,19 +1,14 @@
-pub async fn get_resolution_l(
+pub async fn get_resolution_j(
     client: operon::meta_storage::MetaClient<'_>,
-    j: schema::JDim,
-    k: schema::KDim,
-) -> Result<Option<schema::LResolution>, operon::meta_storage::MetaStorageError> {
+    i: schema::IDim,
+) -> Result<Option<schema::JResolution>, operon::meta_storage::MetaStorageError> {
     let schema_prefix = client.schema_prefix();
-    let stmt = format!("SELECT l_ub FROM {schema_prefix}dimension_l WHERE j = $1 AND k = $2;");
-    let Some(row) = client
-        .query_opt(&stmt, &[&i64::try_from(j)?, &i64::try_from(k)?])
-        .await?
-    else {
+    let stmt = format!("SELECT j_ub FROM {schema_prefix}dimension_j WHERE i = $1;");
+    let Some(row) = client.query_opt(&stmt, &[&i64::try_from(i)?]).await? else {
         return Ok(None);
     };
-    Ok(Some(schema::LResolution(
-        usize::try_from(row.get::<_, i64>("l_ub"))?,
-        j,
-        k,
+    Ok(Some(schema::JResolution(
+        usize::try_from(row.get::<_, i64>("j_ub"))?,
+        i,
     )))
 }

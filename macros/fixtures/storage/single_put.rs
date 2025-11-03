@@ -9,7 +9,7 @@ async fn put_b(
     let stmt = format!(
         "INSERT INTO {schema_prefix}b (i, j, value)
 VALUES ($1, $2, $3)
-ON CONFLICT (i, j) DO UPDATE SET value = EXCLUDED.value"
+ON CONFLICT (i, j) DO UPDATE SET value = EXCLUDED.value;"
     );
     let value: B_ = value.into();
     conn.execute(

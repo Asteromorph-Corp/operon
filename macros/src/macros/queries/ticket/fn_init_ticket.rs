@@ -190,9 +190,21 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::job_beta;
+    use crate::test_utils::simple_pipeline::{job_alpha, job_beta};
 
     #[rstest]
+    #[case::empty(
+        job_alpha(),
+        indoc!{"
+            CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_alpha (
+                resolved BOOLEAN NOT NULL,
+                deps_count BIGINT NOT NULL,
+                deps_quota BIGINT NOT NULL,
+                deps_done BOOLEAN NOT NULL,
+                status {ticket_status_type} NOT NULL
+            );"
+        }
+    )]
     #[case::simple(
         job_beta(),
         indoc! {"
