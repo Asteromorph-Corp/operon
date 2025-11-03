@@ -6,7 +6,7 @@
 
 ```rust
 operon::define_operon! {
-    pipeline_name = | PrimaryEntityIdent < primary_dimension > | {
+    pipeline_name = {
         [ TaskDecl ] ...
     }
 }
@@ -15,7 +15,7 @@ operon::define_operon! {
 where `TaskDecl` is:
 
 ```rust
-OutputEntity = task_function ( InputEntity [, ...] ) for [ ( concurrency ) ] dimension [, ...] ;
+OutputEntity = task_function ( [ InputEntity ] ... ) for [ ( concurrency ) ] dimension [, ...] ;
 ```
 
 where `OutputEntity` can be one of:
@@ -51,18 +51,6 @@ The `pipeline_name` must be a valid Rust identifier in `snake_case`. This name i
 - `Psql{PipelineName}Storage` struct
 - `{pipeline_name}_handler()` function
 
-### Primary Entity Declaration
-
-The primary entity declaration has the form:
-
-```
-| PrimaryEntityIdent < primary_dimension > |
-```
-
-**`PrimaryEntityIdent`**: The identifier of the primary entity. Should be in `PascalCase`.
-
-**`primary_dimension`**: A single dimension identifier that establishes the iteration scope for the entire pipeline.
-
 ### Task Declarations
 
 Each task declaration specifies the transformation from input entities to output entities:
@@ -73,8 +61,8 @@ OutputEntity = task_function ( InputEntity [, ...] ) for [ ( concurrency ) ] dim
 
 **`OutputEntity`**: Must be an `EntityIdent [ < spawned_dimension > ]`.
 
-* `EntityIdent`: The identifier of the entity produced by this task. Should be in `PascalCase`.
-* **`spawned_dimension`** (optional): When present, indicates this task produces multiple entities, creating a new dimension for iteration. If not present, the task produces an entity without spawning a new dimension.
+- `EntityIdent`: The identifier of the entity produced by this task. Should be in `PascalCase`.
+- **`spawned_dimension`** (optional): When present, indicates this task produces multiple entities, creating a new dimension for iteration. If not present, the task produces an entity without spawning a new dimension.
 
 **`task_function`**: A valid Rust identifier should be in `snake_case` that will become an async method in the generated service trait.
 
@@ -83,9 +71,9 @@ OutputEntity = task_function ( InputEntity [, ...] ) for [ ( concurrency ) ] dim
 - `EntityIdent`: A single entity instance
 - `EntityIdent < dimension [, ...] >`: A slice of entities across specified dimensions
 
-**`dimensional_context`**: The `for` clause defines the set of indices over which the task runs. **Every task must explicitly include the primary dimension identifier in it's `for` clause.** A task’s `for` clause must not repeat a dimension.
+**`dimensional_context`**: The `for` clause defines the set of indices over which the task runs. A task’s `for` clause must not repeat a dimension.
 
-**`concurrency`** (optional): A positive integer which limits the number of concurrent jobs for that task type within a single pipeline execution globally (regardless of the primary index). Each job corresponds to one index tuple in the task’s context. Additional jobs are queued. If not specified, defaults to `1`.
+**`concurrency`** (optional): A positive integer which limits the number of concurrent jobs for that task type within a single pipeline execution globally. Each job corresponds to one index tuple in the task’s context. Additional jobs are queued. If not specified, defaults to `1`.
 
 ### Identifiers
 
@@ -97,7 +85,7 @@ Task declarations are **order-dependent**, and the resulting pipeline must form 
 
 ### Dependencies
 
-Each task implicitly depends on the entities it consumes. Tasks can only depend on entities that have been **previously declared** (either as the primary entity or as outputs of earlier tasks), thereby the dependency graph remains acyclic by design.
+Each task implicitly depends on the entities it consumes. Tasks can only depend on entities that have been **previously declared**, thereby the dependency graph remains acyclic by design.
 
 Standalone jobs are disallowed: every task must consume at least one entity.
 
@@ -107,33 +95,27 @@ Dimensions define the **iteration context** for entities and tasks. They act as 
 
 If you need further information or mathematical formalism, refer to the [[dimension system documentation]] for more details on the system.
 
-#### Primary dimension
-
-The primary entity introduces exactly one dimension, which becomes the root iteration scope. All tasks and entities must preserve dependency on this primary dimension — it cannot be aggregated away.
-
 #### Spawned dimensions
 
 A task may declare a single `<spawned_dimension>` to represent multiple outputs (fan-out). Each spawned dimension expands the iteration scope for downstream tasks.
 
-A non-primary dimension must be spawned **only once**.
-
 #### The canonical dimension order
 
-**The canonical dimension order** is defined as an ordering which the primary dimension goes first, and then spawned dimensions in the order they are introduced in the pipeline definition.
+**The canonical dimension order** is defined as an order they are introduced in the pipeline definition.
 
 #### Dimensional context
 
-Each task must specify the dimensions over which it runs in it's `for` clause. This context determines the dimension indices used for iteration. The primary dimension must be included in a context.
+Each task must specify the dimensions over which it runs in it's `for` clause. This context determines the dimension indices used for iteration.
 
-Every dimension named in a task’s `for` clause must be either the primary dimension or a dimension spawned by a _previous_ task. This guarantees a topological order.
+Every dimension named in a task’s `for` clause must be either a dimension spawned by a _previous_ task. This guarantees a topological order.
 
-An output entity’s dimensions are exactly the task’s dimensional context dimensions plus the spawned dimension (if any). Because every task must include the primary dimension, zero-dimension outputs are not possible.
+An output entity’s dimensions are exactly the task’s dimensional context dimensions plus the spawned dimension (if any).
 
 #### Precedent and succedent dimensions
 
 When a dimension is spawned, the spawned dimension **depends on** the task's dimensional context.
 
-**Precedent dimensions** of `dim` are the complete set of dependencies leading into `dim`, that is, all dimensions from which a dependency path to  `dim` exists.
+**Precedent dimensions** of `dim` are the complete set of dependencies leading into `dim`, that is, all dimensions from which a dependency path to `dim` exists.
 
 Similarly, **succedent dimensions** of `dim` are the complete set of dependencies reachable from `dim`, that is, all dimensions from which a dependency path from `dim` exists.
 
@@ -147,8 +129,8 @@ Broadcasting is logical only; no physical replication occurs in storage.
 
 Input entities can be referenced across one or more dimensions (within its dimensions), and we define this behavior as **aggregating** (over a dimension):
 
-* `Entity<dim, ...>` means a slice across given dimensions.
-* `Entity` means a single entity bound to the current iteration context.
+- `Entity<dim, ...>` means a slice across given dimensions.
+- `Entity` means a single entity bound to the current iteration context.
 
 The slice is shaped in the declared `<dim1, ..., dimN>` order. (need not follow the canonical dimension order)
 
@@ -156,8 +138,8 @@ Input entities must not have any hanging dimensions: an entity's dimensions that
 
 Formally:
 
-* `dims(slice) ⊆ dims(entity) ⊆ dims(context) ∪ dims(slice)`
-* `∀dim ∈ dims(slice) : (Succ(dim) ∩ dims(entity)) ⊆ dims(slice)`, where `Succ(dim)` is the set of succedent dimensions of `dim`
+- `dims(slice) ⊆ dims(entity) ⊆ dims(context) ∪ dims(slice)`
+- `∀dim ∈ dims(slice) : (Succ(dim) ∩ dims(entity)) ⊆ dims(slice)`, where `Succ(dim)` is the set of succedent dimensions of `dim`
 
 Note that input entities **can** be aggregated by the context. When a slice lists a dimension that’s also in the context, the full axis is provided for each iteration point; the current index along that axis is ignored for that input. It can be expensive, since a full `Vec` is constructed per iteration point.
 
@@ -169,7 +151,7 @@ Note that input entities **can** be aggregated by the context. When a slice list
 operon::define_operon! {
     text_processor = |Document<doc_id>| {
         Sentence<sentence_id> = extract_sentences(Document) for doc_id;
-        Word<word_id> = tokenize(Sentence) for doc_id, sentence_id;  
+        Word<word_id> = tokenize(Sentence) for doc_id, sentence_id;
         Token = analyze(Word) for doc_id, sentence_id, word_id;
     }
 }
@@ -235,7 +217,6 @@ This demonstrates:
 - Aggregation over the context (task `delta` consumes slices over `j` while iterating over `j`, meaning `delta` sees the full `Vec<B>` across `j` for each `(i, j, k)`)
 - Dimension slicing (tasks consume slices like `B<j>` (`Vec<B>` of all entities across `j` dimension, for each `(i,k)` context)
 
-
 ## Generated Artifacts
 
 ### Service Trait
@@ -269,8 +250,6 @@ The `{PipelineName}Storage` trait provides entity persistence methods:
 ```rust
 #[async_trait::async_trait]
 pub trait ExampleStorage: OperonStorage {
-    async fn get_primary_entity(&self, primary_dim: usize) -> Result<Option<PrimaryEntity>, Self::Error>;
-    async fn put_primary_entity(&self, primary_dim: usize, entity: PrimaryEntity) -> Result<(), Self::Error>;
     async fn get_output_entity(&self, dim1: usize, dim2: usize, ...) -> Result<Option<OutputEntity>, Self::Error>;
     async fn put_output_entity(&self, dim1: usize, dim2: usize, ... , entity: OutputEntity) -> Result<(), Self::Error>;
     // ... methods for each entity type
@@ -291,10 +270,10 @@ pub mod schema {
         TaskFunction { /* dimensions */ },
         // ... variants for each task
     }
-    
+
     pub enum ResolutionEnum {
         OutputEntity(DimensionTuple),
-        // ... variants for each entity type  
+        // ... variants for each entity type
     }
 }
 ```
@@ -306,7 +285,7 @@ where `DimensionTuple` is `(usize, ...)` ordered by the canonical dimension orde
 A `{pipeline_name}_handler()` function having a following signature:
 
 ```rust
-pub fn {pipeline_name}_handler<Svc, Sto>() 
+pub fn {pipeline_name}_handler<Svc, Sto>()
   -> operon::scheduler::SchedulerHandler<schema::JobEnum, Svc, Sto>
 where
   Svc: {PipelineName}Service,
@@ -322,9 +301,9 @@ The macro validates case conventions for identifiers and generates items using s
 - Pipelines: `snake_case` (e.g., `text_processor`)
 - Entities: `PascalCase  (e.g., `Document`, `Token`)
 - Tasks (functions): `snake_case` (e.g., `extract_sentences`)
-- Dimensions:  `snake_case` (e.g., `doc_id`, `word_id`)
+- Dimensions: `snake_case` (e.g., `doc_id`, `word_id`)
 
-Every entity type must be `Debug + Clone`. Additional  `serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static` to use the default PostgreSQL storage.
+Every entity type must be `Debug + Clone`. Additional `serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static` to use the default PostgreSQL storage.
 
 ### Common Compilation Errors
 
@@ -366,12 +345,9 @@ let storage = PsqlMyPipelineStorage::new(
 
 // Run the pipeline
 let operon = Operon::new(Arc::new(MyService), Arc::new(storage), options);
-operon.run(my_pipeline_handler(), primary_count).await?;
+operon.run(my_pipeline_handler()).await?;
 ```
-
-`primary_count` needs to be runtime-provided externally.
 
 ## Limitations
 
-- Two or more dimensions cannot be spawned by a single task 
-- Zero-dimension entities and standalone jobs will not be implemented
+- Two or more dimensions cannot be spawned by a single task

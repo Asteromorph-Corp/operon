@@ -10,13 +10,13 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 3. [Quick Start](#quick-start)
 4. [Key Features](#key-features)
 5. [Usage](#usage)
-    * [Installation](#installation)
-    * [Defining Entities](#defining-entities)
-    * [Defining the Pipeline](#defining-the-pipeline)
-    * [Implementing the Service](#implementing-the-service)
-    * [Implementing the Storage (Optional)](#implementing-the-storage-optional)
-    * [Running Operon](#running-operon)
-        * [UI Shell Commands](#ui-shell-commands)
+    - [Installation](#installation)
+    - [Defining Entities](#defining-entities)
+    - [Defining the Pipeline](#defining-the-pipeline)
+    - [Implementing the Service](#implementing-the-service)
+    - [Implementing the Storage (Optional)](#implementing-the-storage-optional)
+    - [Running Operon](#running-operon)
+        - [UI Shell Commands](#ui-shell-commands)
 6. [Roadmap](#roadmap)
 7. [License](#license)
 
@@ -24,7 +24,7 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 
 ![Demo 1](docs/assets/demo1.gif)
 
-▲ Animation of running [ex2](examples/ex2) with Operon. _(100 primary entities, log level `Info`)_
+▲ Animation of running [ex2](examples/ex2) with Operon. _(log level `Info`)_
 
 ![Demo 2](docs/assets/demo2.gif)
 
@@ -36,9 +36,9 @@ You can find more examples in the [examples](examples/) directory of this reposi
 
 You will need the following to run Operon:
 
-* [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.88+)
-* A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
-  * A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
+- [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.88+)
+- A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
+    - A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
 
 We also recommend having [`tokio`](https://crates.io/crates/tokio) in your `Cargo.toml` dependencies.
 
@@ -149,23 +149,22 @@ _Note 1_. These entity types must be directly accessible (without module scoping
 _Note 2_. The engine can only recognize type names that are in `PascalCase` (a.k.a. `UpperCamelCase`) as defined in the [`heck` crate](https://docs.rs/heck/latest/heck).
 Here are some examples of valid and invalid entity names:
 
-| Invalid Name | Valid Name |
-|--|--|
-| `a` | `A` |
-| `lowerCamel` | `UpperCamel` |
-| `APIResponse` | `ApiResponse` |
-| `XYCoordinates` | `XyCoordinates` / `XAndYCoordinates` |
-| `_String` / `String_` | `StringEntity` |
+| Invalid Name          | Valid Name                           |
+| --------------------- | ------------------------------------ |
+| `a`                   | `A`                                  |
+| `lowerCamel`          | `UpperCamel`                         |
+| `APIResponse`         | `ApiResponse`                        |
+| `XYCoordinates`       | `XyCoordinates` / `XAndYCoordinates` |
+| `_String` / `String_` | `StringEntity`                       |
 
 ### Defining the Pipeline
 
 The _pipeline_ is the skeleton of the Operon workflow, defining _how_ the entities will be produced and consumed.
 More specifically, the pipeline consists of the following components:
 
-* **Name**: A unique identifier for the pipeline.
-* **Primary entity type**: The type of the entity that will be used as the input to the pipeline.
-* **Tasks**: A listing of tasks that will be executed in the pipeline.
-Each task introduces a new type of entity to the pipeline, which can be used as input for subsequent tasks.
+- **Name**: A unique identifier for the pipeline.
+- **Tasks**: A listing of tasks that will be executed in the pipeline.
+  Each task introduces a new type of entity to the pipeline, which can be used as input for subsequent tasks.
 
 Additionally, entities in Operon are paired with _named dimensions_ that represent the way you can iterate over the entities.
 Simply put, these dimensions can be understood as _directions_ the entities repeat in.
@@ -194,29 +193,28 @@ operon::define_operon! {
 
 Invoking the `define_operon!` macro brings several utilities into scope:
 
-* a `schema` module that contains the metadata of the pipeline;
-* a `{PipelineName}Service` trait that provides the parsed tasks [you would need to implement](#implementing-the-service);
-* a `{PipelineName}Storage` trait that exposes [the storage interface](#implementing-the-storage-optional) for the entities;
-* a `Psql{PipelineName}Storage` struct that serves as a default implementation of the storage interface using PostgreSQL;
-* a helper `{pipeline_name}_handler()` function for [launching the engine](#running-operon) later.
+- a `schema` module that contains the metadata of the pipeline;
+- a `{PipelineName}Service` trait that provides the parsed tasks [you would need to implement](#implementing-the-service);
+- a `{PipelineName}Storage` trait that exposes [the storage interface](#implementing-the-storage-optional) for the entities;
+- a `Psql{PipelineName}Storage` struct that serves as a default implementation of the storage interface using PostgreSQL;
+- a helper `{pipeline_name}_handler()` function for [launching the engine](#running-operon) later.
 
 The pipeline must follow a few rules that are enforced at macro-expansion time:
 
-* The primary entity must be paired with exactly one dimension, the _primary dimension_.
-* Each task takes a list of "arguments" or "inputs" that must be entities that were defined earlier in the pipeline.
+- Each task takes a list of "arguments" or "inputs" that must be entities that were defined earlier in the pipeline.
   Each task input must be either a single entity (`EntityType`) or a slice across dimensions (`EntityType<dim1, dim2, ...>`).
-* Each task must return one of the following two options:
-  * A single entity, denoted `SpawnedEntityType`.
-  * A 1D vector of entities, denoted `SpawnedEntityType<spawned_dimension_name>`.
-    In this case, this task spawns a dimension that can be iterated over in subsequent tasks.
-* The dimension specifications must be "well-formed," as thoroughly described in the [dimension system documentation](docs/dimension_system.md).
-  * For illustration, take the list of `Intermediate`s as shown in [Figure 1](docs/figures/figure1.svg): `[["Good", "morning"], ["Bonjour"], ["Buenos", "días"]]`.
-  * Writing `Intermediate<word_no>` represents a vector/slice of `Intermediate` entities indexed by `word_no`, which we will have for each `input_no` "coordinate."
-    `["Good", "morning"]` or `["Bonjour"]` would be a valid example of such a vector.
-  * However, writing `Intermediate<input_no>` would not be feasible.
-  If we apply the same logic with above, we need a vector of `Intermediate` entities indexed by `input_no` "for each `word_no` coordinate."
-  When `word_no` is `0`, we would have `["Good", "Bonjour", "Buenos"]`, but when `word_no` is `1`, what would we have — `["morning", ???, "días"]`?
-  The range of `word_no` is unknown until the coordinate of `input_no` is fixed, so we cannot implicitly iterate over `word_no` while collapsing `input_no`.
+- Each task must return one of the following two options:
+    - A single entity, denoted `SpawnedEntityType`.
+    - A 1D vector of entities, denoted `SpawnedEntityType<spawned_dimension_name>`.
+      In this case, this task spawns a dimension that can be iterated over in subsequent tasks.
+- The dimension specifications must be "well-formed," as thoroughly described in the [dimension system documentation](docs/dimension_system.md).
+    - For illustration, take the list of `Intermediate`s as shown in [Figure 1](docs/figures/figure1.svg): `[["Good", "morning"], ["Bonjour"], ["Buenos", "días"]]`.
+    - Writing `Intermediate<word_no>` represents a vector/slice of `Intermediate` entities indexed by `word_no`, which we will have for each `input_no` "coordinate."
+      `["Good", "morning"]` or `["Bonjour"]` would be a valid example of such a vector.
+    - However, writing `Intermediate<input_no>` would not be feasible.
+      If we apply the same logic with above, we need a vector of `Intermediate` entities indexed by `input_no` "for each `word_no` coordinate."
+      When `word_no` is `0`, we would have `["Good", "Bonjour", "Buenos"]`, but when `word_no` is `1`, what would we have — `["morning", ???, "días"]`?
+      The range of `word_no` is unknown until the coordinate of `input_no` is fixed, so we cannot implicitly iterate over `word_no` while collapsing `input_no`.
 
 We provide brief diagnostics for violations of these rules.
 If you need further information, refer to the [`define_operon!` documentation](docs/define_operon_dsl.md) and the [dimension system documentation](docs/dimension_system.md) for more details on the system.
@@ -288,7 +286,6 @@ However, note that the engine will not provide recoverability if the storage is 
 ### Running Operon
 
 Once you have all the pieces in place, you can run the Operon engine by constructing an `Operon` instance and calling the `.run()` method.
-Note that the primary entity data must be initialized in the storage before running the engine.
 
 ```rust
 // In examples/ex1/src/main.rs (slightly modified):
@@ -313,17 +310,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_log_level(operon::log::Level::Info)
         .with_log_dump(Some("./logs".to_string()));
 
-    //# —————————————————————— Initializing Data —————————————————————— #//
-    // Initialize the storage with primary entity data.
-    storage.init().await?;
-    let num_inputs = 3;
-    storage.put_input(0, "Good morning".to_string()).await?;
-    storage.put_input(1, "Bonjour".to_string()).await?;
-    storage.put_input(2, "Buenos días".to_string()).await?;
-
     //# ———————————————————————— Running Operon ——————————————————————— #//
     let operon_instance = Operon::new(service, storage, operon_options);
-    operon_instance.run(splitter_handler(), num_inputs).await?;
+    operon_instance.run(splitter_handler()).await?;
 
     Ok(())
 }
@@ -371,14 +360,10 @@ Commands:
 
 Operon is under active development. Planned features and improvements include:
 
-* Implementing the following features.
-  These should inherently follow from the current model, but are not yet implemented due to technical difficulties:
-  * Support for zero-dimension entities or tasks ("singletons" or "scalars").
-  * Support for jobs with no dependencies that create "source" entities other than the primary entity.
-* Adding documentation for the dimension system and the macro DSL.
-* Updating the UI to scale better with larger workflows.
-* Adding support for running the engine without a UI, potentially outside a binary-executable context.
-* Implementing alternative backends for the entity storage and the metadata storage.
+- Adding documentation for the dimension system.
+- Updating the UI to scale better with larger workflows.
+- Adding support for running the engine without a UI, potentially outside a binary-executable context.
+- Implementing alternative backends for the entity storage and the metadata storage.
 
 Please reach out via [opening an issue](https://github.com/Asteromorph-Corp/operon/issues) if you have any suggestions or feature requests.
 
