@@ -69,7 +69,7 @@ fn resolution_inserts(
     resolution_index: &IndexMap<&DimensionId, ResolutionIndexEntry>,
     job_dim_set: &IndexSet<&DimensionId>,
 ) -> impl Iterator<Item = proc_macro2::TokenStream> {
-    resolution_index.iter().map(|(dim, entry)| {
+    resolution_index.iter().map(|(&dim, entry)| {
         let operon = operon_ident();
         let res_map = resolution_map_ident(dim);
         let get_resolution_fn_name = get_resolution_ident(dim);
@@ -88,13 +88,12 @@ fn resolution_inserts(
             .collect::<Vec<_>>();
         let dep_vars = entry.fetched_over.iter().map(|dep| variable_ident(dep));
 
-        let missing_msg = format!(
-            "{}_{}",
-            dim,
-            "{},"
-                .repeat(entry.config.depends_on.len())
-                .trim_end_matches(",")
-        );
+        let missing_msg = if entry.config.depends_on.is_empty() {
+            dim.clone()
+        } else {
+            let indices = ["{}"].repeat(entry.config.depends_on.len()).join(",");
+            format!("{dim}_{indices}")
+        };
 
         entry.fetched_over.iter().rfold(
             quote! {
@@ -390,7 +389,7 @@ mod tests {
     use crate::test_utils::assert_item_eq;
     use crate::test_utils::complicated_pipeline::{
         all_dimensions as all_dimensions_complicated, all_entities as all_entities_complicated,
-        job_delta as job_multiple_over,
+        job_epsilon as job_multiple_over,
     };
     use crate::test_utils::simple_pipeline::{all_dimensions, all_entities, job_beta, job_epsilon};
 
