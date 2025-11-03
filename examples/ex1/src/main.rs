@@ -72,14 +72,9 @@ define_operon! {
 
 // The necessary functions are generated as traits,
 // so we will need to create a struct to implement them.
+#[derive(OperonService)]
 struct MySplitterService;
-impl OperonService for MySplitterService {
-    // Always use `schema::JobEnum` and `schema::ResolutionEnum` here.
-    // These are automatically generated enums that represent the schema,
-    // defined in the `define_operon!` macro above.
-    type JobEnum = schema::JobEnum;
-    type ResolutionEnum = schema::ResolutionEnum;
-}
+
 // The following is the main trait that we need to implement.
 // Note that its name depends on the pipeline name we gave above.
 // Consult the generated documentation for this trait
