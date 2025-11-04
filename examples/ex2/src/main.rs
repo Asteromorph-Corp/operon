@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage, cooking_handler, schema};
+use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage, cooking_handler};
 use operon::async_trait::async_trait;
 use operon::operon::{Operon, OperonOptions};
 use operon::service::OperonService;
@@ -9,7 +9,7 @@ use rand::Rng;
 
 // Example service implementation
 #[derive(OperonService)]
-#[operon(pipeline = "ex2")]
+#[operon(defined_at = "ex2")]
 struct ExampleService;
 
 #[async_trait]

@@ -4,7 +4,7 @@ use syn::parse_str;
 #[derive(Default)]
 pub struct OperonAttrs {
     pub crate_path: Option<syn::Path>,
-    pub pipeline_path: Option<syn::Path>,
+    pub definition_path: Option<syn::Path>,
 }
 
 pub fn extract_attr<T: Default>(
@@ -23,7 +23,7 @@ pub fn get_operon_attrs(attr: &syn::Attribute) -> Result<Option<OperonAttrs>, Di
     }
 
     let mut crate_path = None;
-    let mut schema_path = None;
+    let mut definition_path = None;
 
     attr.parse_nested_meta(|meta| {
         if meta.path.is_ident("crate") {
@@ -32,11 +32,11 @@ pub fn get_operon_attrs(attr: &syn::Attribute) -> Result<Option<OperonAttrs>, Di
             let path = parse_str::<syn::Path>(&lit.value())?;
             crate_path = Some(path)
         }
-        if meta.path.is_ident("pipeline") {
+        if meta.path.is_ident("defined_at") {
             let value = meta.value()?;
             let lit: syn::LitStr = value.parse()?;
             let path = parse_str::<syn::Path>(&lit.value())?;
-            schema_path = Some(path)
+            definition_path = Some(path)
         }
 
         Ok(())
@@ -51,6 +51,6 @@ pub fn get_operon_attrs(attr: &syn::Attribute) -> Result<Option<OperonAttrs>, Di
 
     Ok(Some(OperonAttrs {
         crate_path,
-        pipeline_path: schema_path,
+        definition_path,
     }))
 }

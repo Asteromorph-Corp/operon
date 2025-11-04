@@ -33,15 +33,15 @@ pub fn derive_operon_service(input: TokenStream) -> TokenStream {
 
     let service = input.ident;
     let operon = attrs.crate_path.unwrap_or_else(|| operon_ident().into());
-    let schema: syn::Path = match attrs.pipeline_path {
+    let definition: syn::Path = match attrs.definition_path {
         Some(path) => parse_quote! { #path::schema },
         None => parse_quote! { schema },
     };
 
     quote! {
         impl #operon::service::OperonService for #service {
-            type JobEnum = #schema::JobEnum;
-            type ResolutionEnum = #schema::ResolutionEnum;
+            type JobEnum = #definition::JobEnum;
+            type ResolutionEnum = #definition::ResolutionEnum;
         }
     }
     .into()
