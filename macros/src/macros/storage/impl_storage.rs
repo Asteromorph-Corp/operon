@@ -21,6 +21,7 @@ impl std::fmt::Display for CreateTablesQuery<'_> {
                 writeln!(f, "    id BIGINT,")?;
             }
             writeln!(f, "    value JSONB,")?;
+            writeln!(f, "    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),")?;
 
             if !entity.dims.is_empty() {
                 writeln!(f, "    PRIMARY KEY ({})", entity.dims.join(", "))?;
@@ -149,18 +150,21 @@ mod tests {
             CREATE TABLE IF NOT EXISTS {schema_prefix}a (
                 i BIGINT,
                 value JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
                 PRIMARY KEY (i)
             );
             CREATE TABLE IF NOT EXISTS {schema_prefix}b (
                 i BIGINT,
                 j BIGINT,
                 value JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
                 PRIMARY KEY (i, j)
             );
             CREATE TABLE IF NOT EXISTS {schema_prefix}c (
                 i BIGINT,
                 k BIGINT,
                 value JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
                 PRIMARY KEY (i, k)
             );
             CREATE TABLE IF NOT EXISTS {schema_prefix}d (
@@ -168,17 +172,20 @@ mod tests {
                 j BIGINT,
                 k BIGINT,
                 value JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
                 PRIMARY KEY (i, j, k)
             );
             CREATE TABLE IF NOT EXISTS {schema_prefix}e (
                 i BIGINT,
                 k BIGINT,
                 value JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
                 PRIMARY KEY (i, k)
             );
             CREATE TABLE IF NOT EXISTS {schema_prefix}f (
                 i BIGINT,
                 value JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
                 PRIMARY KEY (i)
             );
             CREATE TABLE IF NOT EXISTS {schema_prefix}_data_footprint (
