@@ -100,7 +100,7 @@ use crate::utils::{
 ///     async fn get_status(
 ///         client: operon::meta_storage::MetaClient<'_>,
 ///     ) -> Result<(i64, i64, i64), operon::meta_storage::MetaStorageError> {
-///         operon::meta_storage::get_ticket_summary::<BetaJob>(client).await
+///         client.get_ticket_summary::<BetaJob>().await
 ///     }
 /// }
 pub(super) fn impl_ticket_sql(job: &JobConfig) -> syn::ItemImpl {
@@ -212,7 +212,7 @@ pub(super) fn impl_ticket_sql(job: &JobConfig) -> syn::ItemImpl {
             async fn get_status(
                 client: #operon::meta_storage::MetaClient<'_>,
             ) -> Result<(i64, i64, i64), #operon::meta_storage::MetaStorageError> {
-                #operon::meta_storage::get_ticket_summary::<#job_ident>(client).await
+                client.get_ticket_summary::<#job_ident>().await
             }
         }
     }

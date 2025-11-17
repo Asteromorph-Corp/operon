@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use futures::{StreamExt, TryStreamExt};
 
-use crate::meta_storage::{
-    MetaClient, init_footprint, init_schema, init_ticket_status_type, init_ticket_summary,
-};
+use crate::meta_storage::MetaClient;
 use crate::operon::RunningState;
 use crate::scheduler::{
     HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent, PeerEventSender,
@@ -47,16 +45,16 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         &self,
         client: MetaClient<'_>,
     ) -> Result<(), SchedulerError> {
-        init_schema(client).await?;
+        client.init_schema().await?;
         for job_handler in &self.job_handlers {
             job_handler.init_resolution(client).await?;
         }
-        init_ticket_summary(client).await?;
-        init_ticket_status_type(client).await?;
+        client.init_ticket_summary().await?;
+        client.init_ticket_status_type().await?;
         for job_handler in &self.job_handlers {
             job_handler.init_tickets(client).await?;
         }
-        init_footprint(client).await?;
+        client.init_footprint().await?;
 
         Ok(())
     }
