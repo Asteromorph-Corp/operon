@@ -3,8 +3,8 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    explode_ident, mark_done_ident, operon_ident, put_resolution_ident, raise_dep_ident,
-    rebuilder_ident, ticket_ident, variable_ident,
+    explode_ident, mark_done_ident, operon_ident, raise_dep_ident, rebuilder_ident,
+    resolution_ident, ticket_ident, variable_ident,
 };
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -53,8 +53,8 @@ pub fn impl_job_rebuilder(
     let job_id = &job.id;
 
     let maybe_put_resolution = job.spawn_dim.as_ref().map(|dim| -> syn::Stmt {
-        let put_resolution_fn_name = put_resolution_ident(dim);
-        parse_quote! { queries::#put_resolution_fn_name(client, resolution).await?; }
+        let res_ident = resolution_ident(dim);
+        parse_quote! { <schema::#res_ident as #operon::schema_base::ResolutionSql>::put(&resolution, client).await?; }
     });
     let mark_done_fn_name = mark_done_ident(&job.id);
 

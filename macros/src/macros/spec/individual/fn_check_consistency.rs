@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    get_all_ident, get_entity_ident, get_resolution_ident, operon_ident, variable_ident,
+    get_all_ident, get_entity_ident, operon_ident, resolution_ident, variable_ident,
 };
 
 /// Generates the `check_consistency` function for the implementation of the trait `JobSpec`.
@@ -69,8 +69,8 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
 
     let check_res_and_entity = match job.spawn_dim.as_ref() {
         Some(dim) => {
+            let res_ident = resolution_ident(dim);
             let dim_var = variable_ident(dim);
-            let get_resolution_fn_name = get_resolution_ident(dim);
             let missing_res_msg = format!(
                 "No `{}` resolution found for `{}{}` in the metadata storage.",
                 dim,
@@ -86,8 +86,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             quote! {
                 let mut tags = Vec::new();
                 for job in jobs {
-                    let Some(res) =
-                        queries::#get_resolution_fn_name(client, #(job.#field_vars,)*).await?
+                    let Some(res) = <schema::#res_ident as #operon::schema_base::ResolutionSql>::get(client, (#(job.#field_vars,)*)).await?
                     else {
                         #operon::log::info!(#missing_res_msg, #(job.#field_vars,)*);
                         return Ok(false);

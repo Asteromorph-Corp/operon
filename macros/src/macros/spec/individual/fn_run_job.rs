@@ -8,8 +8,8 @@ use crate::configs::{
 };
 use crate::utils::{
     batch_get_entity_ident, batch_put_entity_ident, dimension_ident, entity_over_dim_ident,
-    get_entity_ident, get_resolution_ident, job_fn_ident, operon_ident, put_entity_ident,
-    resolution_ident, variable_ident,
+    get_entity_ident, job_fn_ident, operon_ident, put_entity_ident, resolution_ident,
+    variable_ident,
 };
 
 fn resolution_map_ident(dim: &DimensionId) -> syn::Ident {
@@ -71,8 +71,8 @@ fn resolution_inserts(
 ) -> impl Iterator<Item = proc_macro2::TokenStream> {
     resolution_index.iter().map(|(&dim, entry)| {
         let operon = operon_ident();
+        let res_ident = resolution_ident(dim);
         let res_map = resolution_map_ident(dim);
-        let get_resolution_fn_name = get_resolution_ident(dim);
         let get_resolution_args = entry
             .config
             .depends_on
@@ -97,7 +97,7 @@ fn resolution_inserts(
 
         entry.fetched_over.iter().rfold(
             quote! {
-                let resolution = queries::#get_resolution_fn_name(client, #(#get_resolution_args),*)
+                let resolution = <schema::#res_ident as #operon::schema_base::ResolutionSql>::get(client, (#(#get_resolution_args,)*))
                     .await?
                     .ok_or_else(|| {
                         #operon::meta_storage::MetaStorageError::MissingResolution(

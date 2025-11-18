@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    get_all_ident, get_resolution_ident, operon_ident, rebuilder_ident, variable_ident,
+    get_all_ident, operon_ident, rebuilder_ident, resolution_ident, variable_ident,
 };
 
 /// Generates the `prepare_rebuild` function for the implementation of the trait `JobSpec`.
@@ -46,7 +46,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
 
     let resolution_expr: syn::Expr = match job.spawn_dim.as_ref() {
         Some(dim) => {
-            let get_resolution_fn_name = get_resolution_ident(dim);
+            let res_ident = resolution_ident(dim);
             let dim_vars = job
                 .dims
                 .iter()
@@ -60,7 +60,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             );
 
             parse_quote! {
-                queries::#get_resolution_fn_name(client, #(job.#dim_vars,)*)
+                <schema::#res_ident as #operon::schema_base::ResolutionSql>::get(client, (#(job.#dim_vars,)*))
                     .await?
                     .ok_or_else(|| {
                         #operon::scheduler::SchedulerError::Other(format!(
