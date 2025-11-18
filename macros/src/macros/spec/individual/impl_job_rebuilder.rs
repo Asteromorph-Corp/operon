@@ -94,7 +94,7 @@ pub fn impl_job_rebuilder(
                     parse_quote! { #operon::schema_base::TicketDepCount::none() }
                 }
             });
-            parse_quote! { queries::#raise_dep_fn_name(client, #(&#args,)*).await?; }
+            parse_quote! { queries::#raise_dep_fn_name(client, #(#args,)*).await?; }
         })
         .collect::<Vec<_>>();
 

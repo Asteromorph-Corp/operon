@@ -1,12 +1,12 @@
 pub async fn raise_dep_beta(
     client: operon::meta_storage::MetaClient<'_>,
-    i: &operon::schema_base::TicketDepCount<schema::IDim>,
+    i: operon::schema_base::TicketDepCount<schema::IDim>,
 ) -> Result<Vec<schema::BetaTicket>, operon::meta_storage::MetaStorageError> {
     let schema_prefix = client.schema_prefix();
     let params = [("i", i)]
         .into_iter()
         .filter_map(
-            |(name, param): (&str, &operon::schema_base::TicketDepCount<usize>)| {
+            |(name, param): (&str, operon::schema_base::TicketDepCount<usize>)| {
                 param.0.map(|p| (name, p))
             },
         )

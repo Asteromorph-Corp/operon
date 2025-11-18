@@ -59,7 +59,7 @@ pub(super) fn fn_on_receive_job(
 
         parse_quote! {
             schema::#job_enum_ident::#variant_ident(job) => Ok(
-                queries::#raise_dep_fn_name(client, #(&#args,)*).await?
+                queries::#raise_dep_fn_name(client, #(#args,)*).await?
             ),
         }
     });

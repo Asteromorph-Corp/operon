@@ -13,15 +13,15 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
             queries::explode_delta_j(client, resolution).await?;
             queries::raise_dep_delta(
                 client,
-                &operon::schema_base::TicketDepCount::some(job.i),
-                &operon::schema_base::TicketDepCount::none(),
-                &operon::schema_base::TicketDepCount::none(),
+                operon::schema_base::TicketDepCount::some(job.i),
+                operon::schema_base::TicketDepCount::none(),
+                operon::schema_base::TicketDepCount::none(),
             )
             .await?;
             queries::raise_dep_epsilon(
                 client,
-                &operon::schema_base::TicketDepCount::some(job.i),
-                &operon::schema_base::TicketDepCount::none(),
+                operon::schema_base::TicketDepCount::some(job.i),
+                operon::schema_base::TicketDepCount::none(),
             )
             .await?;
 
