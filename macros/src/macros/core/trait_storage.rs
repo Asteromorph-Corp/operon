@@ -70,11 +70,7 @@ fn batch_gets(
         });
         let dim_vars = arg_config.dims.iter().map(|d| -> syn::Expr {
             let var_ident = variable_ident(d);
-            if arg.over.contains(d) {
-                parse_quote! { #var_ident.into() }
-            } else {
-                parse_quote! { #var_ident }
-            }
+            parse_quote! { #var_ident }
         });
         let batch_get_fn_name = batch_get_entity_ident(&arg.id, &arg.over);
         let get_fn_name = get_entity_ident(&arg.id);
