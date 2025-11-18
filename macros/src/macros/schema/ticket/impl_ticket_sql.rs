@@ -22,7 +22,7 @@ use crate::utils::{
 ///         let i = self.i.to_sql()?;
 ///         let resolved = operon::schema_base::Ticket::is_resolved(self);
 ///         let deps_count = i64::try_from(self.deps_count)?;
-///         let deps_quota = self.deps_quota.map(i64::try_from).transpose()?;
+///         let deps_quota = i64::try_from(self.deps_quota)?;
 ///         let deps_done = self.deps_done;
 ///         let status = self.status;
 ///
@@ -54,10 +54,7 @@ use crate::utils::{
 ///         let i = operon::schema_base::TicketDepCount::from_sql(row.get(stringify!(i)))?;
 ///         // let resolved: bool = row.get("resolved");
 ///         let deps_count = usize::try_from(row.get::<_, i64>("deps_count"))?;
-///         let deps_quota = row
-///             .get::<_, Option<i64>>("deps_quota")
-///             .map(usize::try_from)
-///             .transpose()?;
+///         let deps_quota = usize::try_from(row.get::<_, i64>("deps_quota"))?;
 ///         let deps_done: bool = row.get("deps_done");
 ///         let status: operon::schema_base::TicketStatus = row.get("status");
 ///
