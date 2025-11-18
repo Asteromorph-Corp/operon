@@ -1,8 +1,25 @@
 use std::fmt::Debug;
+use std::num::TryFromIntError;
 
 use async_trait::async_trait;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
+use crate::utils::SqlParams;
+
+pub struct ResolutionStruct<const N: usize> {
+    pub primary_key: [usize; N],
+    pub ub: usize,
+}
+
+impl<const N: usize> ResolutionStruct<N> {
+    pub fn new(ub: usize, primary_key: [usize; N]) -> Self {
+        Self { primary_key, ub }
+    }
+
+    pub fn as_insert_params(&self) -> Result<SqlParams, TryFromIntError> {
+        SqlParams::from_usize(self.primary_key.into_iter().chain([self.ub]))
+    }
+}
 
 pub trait Resolution: Debug + Clone + Send + Sync + 'static {
     type PrimaryKey: Copy;

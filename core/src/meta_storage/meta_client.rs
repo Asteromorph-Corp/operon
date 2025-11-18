@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Display;
 
 use bytes::Buf;
 use tokio_postgres::{CopyInSink, ToStatement};
@@ -102,6 +103,34 @@ impl MetaClient<'_> {
         where T: ?Sized + ToStatement + Send + Sync,
               U: Buf + 'static + Send + Sync
     );
+
+    pub async fn batch_execute_stmt(&self, stmt: &impl Display) -> Result<(), MetaStorageError> {
+        self.batch_execute(&stmt.to_string()).await
+    }
+
+    pub async fn execute_stmt(
+        &self,
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<u64, MetaStorageError> {
+        self.execute(&stmt.to_string(), params).await
+    }
+
+    pub async fn query_stmt(
+        &self,
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<Vec<tokio_postgres::Row>, MetaStorageError> {
+        self.query(&stmt.to_string(), params).await
+    }
+
+    pub async fn query_opt_stmt(
+        &self,
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<Option<tokio_postgres::Row>, MetaStorageError> {
+        self.query_opt(&stmt.to_string(), params).await
+    }
 
     pub fn schema(&self) -> Option<&str> {
         match self {

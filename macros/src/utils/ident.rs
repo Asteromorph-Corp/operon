@@ -53,22 +53,6 @@ pub fn batch_put_entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("put_all_{}", entity_id.to_snake_case())
 }
 
-pub fn init_resolution_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("init_resolution_{}", dimension_id.to_snake_case())
-}
-
-pub fn clear_resolution_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("clear_resolution_{}", dimension_id.to_snake_case())
-}
-
-pub fn get_resolution_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("get_resolution_{}", dimension_id.to_snake_case())
-}
-
-pub fn put_resolution_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("put_resolution_{}", dimension_id.to_snake_case())
-}
-
 pub fn init_ticket_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("init_ticket_{}", job_id.to_snake_case())
 }

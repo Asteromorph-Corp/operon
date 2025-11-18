@@ -6,6 +6,7 @@ mod meta_client;
 pub use meta_client::*;
 
 mod queries;
+pub use queries::*;
 
 mod options;
 pub use options::*;

@@ -1,10 +1,8 @@
+use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::DimensionConfig;
-use crate::utils::{
-    clear_resolution_ident, get_resolution_ident, init_resolution_ident, operon_ident,
-    put_resolution_ident, resolution_ident,
-};
+use crate::utils::{operon_ident, resolution_ident};
 
 /// Generates an implementation of the `ResolutionSql` trait for a given dimension.
 ///
@@ -44,12 +42,19 @@ pub(super) fn impl_resolution_sql(dimension: &DimensionConfig) -> syn::ItemImpl 
     let operon = operon_ident();
     let res_ident = resolution_ident(&dimension.id);
 
-    let init_fn_name = init_resolution_ident(&dimension.id);
-    let clear_fn_name = clear_resolution_ident(&dimension.id);
-    let get_fn_name = get_resolution_ident(&dimension.id);
-    let put_fn_name = put_resolution_ident(&dimension.id);
+    let id = &dimension.id;
+    let deps = &dimension.depends_on;
+    let meta = quote! {
+        #operon::meta_storage::ResolutionMeta {
+            id: #id,
+            deps: [#(#deps),*]
+        }
+    };
 
-    let indices = (0..dimension.depends_on.len()).map(syn::Index::from);
+    let indices = (0..dimension.depends_on.len())
+        .map(syn::Index::from)
+        .collect::<Vec<_>>();
+    let indices_1 = (1..=dimension.depends_on.len()).map(syn::Index::from);
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
@@ -58,27 +63,34 @@ pub(super) fn impl_resolution_sql(dimension: &DimensionConfig) -> syn::ItemImpl 
             async fn init_table(
                 client: #operon::meta_storage::MetaClient<'_>,
             ) -> Result<(), #operon::meta_storage::MetaStorageError> {
-                queries::#init_fn_name(client).await
+                client.resolution(#meta).init().await
             }
 
             async fn clear_table(
                 client: #operon::meta_storage::MetaClient<'_>,
             ) -> Result<(), #operon::meta_storage::MetaStorageError> {
-                queries::#clear_fn_name(client).await
+                client.resolution(#meta).clear().await
             }
 
             async fn get(
                 client: #operon::meta_storage::MetaClient<'_>,
                 primary_key: Self::PrimaryKey,
             ) -> Result<Option<Self>, #operon::meta_storage::MetaStorageError> {
-                queries::#get_fn_name(client, #(primary_key.#indices),*).await
+                let Some(a) = client.resolution(#meta).get([#(primary_key.#indices),*]).await? else {
+                    return Ok(None)
+                };
+                Ok(Some(Self(a.ub, #(a.primary_key[#indices]),*)))
             }
 
             async fn put(
                 &self,
                 client: #operon::meta_storage::MetaClient<'_>,
             ) -> Result<(), #operon::meta_storage::MetaStorageError> {
-                queries::#put_fn_name(client, self).await
+                let resolution =#operon::schema_base::ResolutionStruct {
+                    ub: self.0,
+                    primary_key: [#(self.#indices_1),*]
+                };
+                client.resolution(#meta).put(resolution).await
             }
         }
     }

@@ -1,4 +1,3 @@
-mod resolution;
 mod ticket;
 
 mod mod_queries;
