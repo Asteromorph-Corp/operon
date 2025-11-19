@@ -21,6 +21,10 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             .as_ref()
             .map(|spawn_dim| get_jobs_repeating_on(spawn_dim, &all_configs.jobs))
             .unwrap_or_default();
+        let spawn_dim_repeating_job_downstream_jobs = spawn_dim_repeating_jobs
+            .iter()
+            .flat_map(|job| get_direct_downstream_jobs(job, &all_configs.jobs))
+            .collect::<Vec<_>>();
         let event_receiving_job_ids = downstream_jobs
             .iter()
             .chain(spawn_dim_repeating_jobs.iter())
@@ -40,8 +44,12 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
         let impl_meta = impl_meta(&all_configs.service_id, job);
 
         let job_rebuilder_def = job_rebuilder_definition(job);
-        let impl_job_rebuilder =
-            impl_job_rebuilder(job, &spawn_dim_repeating_jobs, &downstream_jobs);
+        let impl_job_rebuilder = impl_job_rebuilder(
+            job,
+            &spawn_dim_repeating_jobs,
+            &downstream_jobs,
+            &spawn_dim_repeating_job_downstream_jobs,
+        );
         let impl_rebuilder_meta = impl_rebuilder_meta(job);
 
         let peer_txs_def = peer_txs_definition(&job.id, &event_receiving_job_ids);

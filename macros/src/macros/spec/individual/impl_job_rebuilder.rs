@@ -3,8 +3,8 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    explode_ident, mark_done_ident, operon_ident, raise_dep_ident, rebuilder_ident, ticket_ident,
-    variable_ident,
+    explode_ident, mark_done_ident, operon_ident, raise_dep_ident, raise_quota_ident,
+    rebuilder_ident, ticket_ident, variable_ident,
 };
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -46,6 +46,7 @@ pub fn impl_job_rebuilder(
     job: &JobConfig,
     spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
     downstream_jobs: &IndexSet<&JobConfig>,
+    spawn_dim_repeating_job_downstream_jobs: &[&JobConfig],
 ) -> syn::ItemImpl {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
@@ -57,21 +58,33 @@ pub fn impl_job_rebuilder(
     });
     let mark_done_fn_name = mark_done_ident(&job.id);
 
-    let explode_exprs = if !spawn_dim_repeating_jobs.is_empty() {
-        let spawn_dim = job
-            .spawn_dim
-            .as_ref()
-            .expect("No spawn dimension provided, but repeating jobs are specified");
-        spawn_dim_repeating_jobs
+    let explode_exprs = if let Some(spawn_dim) = &job.spawn_dim {
+        let explode = spawn_dim_repeating_jobs
             .iter()
             .map(|repeating_job| -> syn::Stmt {
                 let explode_fn_name = explode_ident(&repeating_job.id, spawn_dim);
                 parse_quote! { queries::#explode_fn_name(client, resolution).await?; }
-            })
-            .collect::<Vec<_>>()
+            });
+        let raise_quotas = spawn_dim_repeating_job_downstream_jobs.iter().filter_map(
+            |downstream_job| -> Option<syn::Stmt> {
+                if downstream_job.dims.contains(spawn_dim) {
+                    return None;
+                }
+                let raise_quota_fn_name = raise_quota_ident(&downstream_job.id, spawn_dim);
+                Some(parse_quote! { queries::#raise_quota_fn_name(client, resolution).await?; })
+            },
+        );
+        explode.chain(raise_quotas).collect()
+    } else if !spawn_dim_repeating_jobs.is_empty()
+        || !spawn_dim_repeating_job_downstream_jobs.is_empty()
+    {
+        panic!(
+            "`spawn_dim` is `None`, but `spawn_dim_repeating_jobs` or `spawn_dim_repeating_job_downstream_jobs` is not empty"
+        )
     } else {
         vec![]
     };
+
     let raise_dep_exprs = downstream_jobs
         .iter()
         .map(|downstream_job| -> syn::Stmt {
@@ -147,8 +160,17 @@ mod tests {
             .map(|dim| get_jobs_repeating_on(dim, &all_jobs))
             .unwrap_or_default();
         let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
+        let spawn_dim_repeating_job_downstream_jobs = spawn_dim_repeating_jobs
+            .iter()
+            .flat_map(|job| get_direct_downstream_jobs(job, &all_jobs))
+            .collect::<Vec<_>>();
 
-        let item = impl_job_rebuilder(&job, &spawn_dim_repeating_jobs, &downstream_jobs);
+        let item = impl_job_rebuilder(
+            &job,
+            &spawn_dim_repeating_jobs,
+            &downstream_jobs,
+            &spawn_dim_repeating_job_downstream_jobs,
+        );
         assert_item_eq(&item, fixture_path);
     }
 }
