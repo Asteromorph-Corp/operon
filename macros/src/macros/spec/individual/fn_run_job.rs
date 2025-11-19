@@ -7,8 +7,8 @@ use crate::configs::{
     DimensionConfig, DimensionConfigMap, DimensionId, EntityConfig, EntityConfigMap, JobConfig,
 };
 use crate::utils::{
-    batch_get_entity_ident, batch_put_entity_ident, dimension_ident, entity_over_dim_ident,
-    get_entity_ident, job_fn_ident, operon_ident, put_entity_ident, resolution_ident,
+    batch_get_entity_ident, batch_put_entity_ident, dimension_ident, dimension_metadata_ident,
+    entity_over_dim_ident, get_entity_ident, job_fn_ident, operon_ident, put_entity_ident,
     variable_ident,
 };
 
@@ -71,7 +71,7 @@ fn resolution_inserts(
 ) -> impl Iterator<Item = proc_macro2::TokenStream> {
     resolution_index.iter().map(|(&dim, entry)| {
         let operon = operon_ident();
-        let res_ident = resolution_ident(dim);
+        let dim_meta = dimension_metadata_ident(dim);
         let res_map = resolution_map_ident(dim);
         let get_resolution_args = entry
             .config
@@ -97,14 +97,14 @@ fn resolution_inserts(
 
         entry.fetched_over.iter().rfold(
             quote! {
-                let resolution = <schema::#res_ident as #operon::schema_base::ResolutionSql>::get(client, (#(#get_resolution_args,)*))
+                let resolution = client.resolution(metadata::#dim_meta()).get([#(#get_resolution_args),*])
                     .await?
                     .ok_or_else(|| {
                         #operon::meta_storage::MetaStorageError::MissingResolution(
                             format!(#missing_msg, #(#get_resolution_args),*)
                         )
                     })?;
-                #res_map.insert((#(#dep_vars,)*), resolution.0);
+                #res_map.insert((#(#dep_vars,)*), resolution.ub);
             },
             |acc, dep| {
                 let dep_var = variable_ident(dep);
@@ -348,13 +348,17 @@ pub(super) fn fn_run_job(
         Some(_) => batch_put_entity_ident(&job.to),
         None => put_entity_ident(&job.to),
     };
-    let return_value: syn::Expr = match &job.spawn_dim {
-        Some(dim) => {
-            let res_ident = resolution_ident(dim);
-            parse_quote! { schema::#res_ident(#result_ident.len(), #(job.#result_dims),*) }
-        }
-        None => parse_quote! { () },
+
+    let resolution: syn::Expr = if job.spawn_dim.is_some() {
+        parse_quote! { #operon::schema_base::Resolution::new(#result_ident.len(), [#(job.#result_dims),*])  }
+    } else {
+        parse_quote! { () }
     };
+    let maybe_put_resolution: Option<syn::Stmt> = job.spawn_dim.is_some().then(|| {
+        parse_quote! {
+            client.resolution(self.spawn_dim_meta()).put(resolution).await?;
+        }
+    });
 
     parse_quote! {
         async fn run_job(
@@ -373,9 +377,10 @@ pub(super) fn fn_run_job(
                 .#job_fn_name(#(#args),*)
                 .await
                 .map_err(operon::scheduler::SchedulerError::UserError)?;
-            let resolution = #return_value;
+            let resolution = #resolution;
 
             storage.#put_fn_name(#(job.#result_dims,)* #result_ident).await?;
+            #maybe_put_resolution;
             Ok(resolution)
         }
     }

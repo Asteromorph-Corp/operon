@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
 use crate::configs::{DimensionConfig, JobConfig};
-use crate::utils::{
-    explode_ident, operon_ident, resolution_ident, ticket_ident, variable_ident, with_ident,
-};
+use crate::utils::{explode_ident, operon_ident, ticket_ident, variable_ident, with_ident};
 
 /// A helper struct to generate the SQL query for popping tickets to be exploded.
 struct ExplodePopQuery<'a>(&'a JobConfig, &'a DimensionConfig);
@@ -53,7 +51,7 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
     let operon = operon_ident();
     let fn_name = explode_ident(&job.id, &dim.id);
     let ticket_ident = ticket_ident(&job.id);
-    let res_ident = resolution_ident(&dim.id);
+    let res_n = dim.depends_on.len();
     let field_ident = variable_ident(&dim.id);
     let with_fn_name = with_ident(&dim.id);
     let pop_query = ExplodePopQuery(job, dim).to_string();
@@ -61,7 +59,7 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
 
     let indices = dim.depends_on.iter().enumerate().filter_map(|(idx, dim)| {
         if job.dims.contains(dim) {
-            Some(syn::Index::from(idx + 1))
+            Some(idx)
         } else {
             None
         }
@@ -75,12 +73,12 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
     parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            resolution: &schema::#res_ident,
+            resolution: #operon::schema_base::Resolution<#res_n>,
         ) -> Result<Vec<schema::#ticket_ident>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let pop_stmt = format!(#pop_query);
 
-            let rows = client.query(&pop_stmt, &[#(&i64::try_from(resolution.#indices)?,)*]).await?;
+            let rows = client.query(&pop_stmt, &[#(&i64::try_from(resolution.primary_key[#indices])?,)*]).await?;
             let tickets = rows
                 .iter()
                 .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)
@@ -93,7 +91,7 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
             }
             let new_tickets = tickets
                 .iter()
-                .flat_map(|ticket| (0..resolution.0).map(|ub| ticket.clone().#with_fn_name(ub)))
+                .flat_map(|ticket| (0..resolution.ub).map(|ub| ticket.clone().#with_fn_name(ub)))
                 .map(#operon::schema_base::Ticket::update_deps_done)
                 .collect::<Vec<_>>();
 

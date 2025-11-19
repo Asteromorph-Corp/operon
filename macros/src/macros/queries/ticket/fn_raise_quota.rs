@@ -1,7 +1,7 @@
 use syn::parse_quote;
 
 use crate::configs::{DimensionConfig, JobConfig};
-use crate::utils::{operon_ident, raise_quota_ident, resolution_ident, ticket_ident};
+use crate::utils::{operon_ident, raise_quota_ident, ticket_ident};
 
 /// A helper struct to generate the SQL query for popping tickets to be raised.
 struct RaiseQuotaPopQuery<'a>(&'a JobConfig, &'a DimensionConfig);
@@ -53,13 +53,13 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
     let operon = operon_ident();
     let fn_name = raise_quota_ident(&job.id, &dim.id);
     let ticket_ident = ticket_ident(&job.id);
-    let res_ident = resolution_ident(&dim.id);
+    let res_n = dim.depends_on.len();
     let pop_query = RaiseQuotaPopQuery(job, dim).to_string();
     let copy_query = RaiseQuotaCopyInQuery(job).to_string();
 
     let indices = dim.depends_on.iter().enumerate().filter_map(|(idx, dim)| {
         if job.dims.contains(dim) {
-            Some(syn::Index::from(idx + 1))
+            Some(idx)
         } else {
             None
         }
@@ -68,19 +68,19 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
     parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            res: &schema::#res_ident,
+            res: #operon::schema_base::Resolution<#res_n>,
         ) -> Result<Vec<schema::#ticket_ident>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let pop_stmt = format!(#pop_query);
 
-            let rows = client.query(&pop_stmt, &[#(&i64::try_from(res.#indices)?,)*]).await?;
+            let rows = client.query(&pop_stmt, &[#(&i64::try_from(res.primary_key[#indices])?,)*]).await?;
             let tickets = rows
                 .iter()
                 .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)
                 .collect::<Result<Vec<_>, _>>()?;
             let new_tickets = tickets
                 .into_iter()
-                .map(|ticket| #operon::schema_base::Ticket::raise_dependency_quota(ticket, res.0))
+                .map(|ticket| #operon::schema_base::Ticket::raise_dependency_quota(ticket, res.ub))
                 .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);

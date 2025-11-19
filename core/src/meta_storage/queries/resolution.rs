@@ -1,72 +1,77 @@
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema_base::ResolutionStruct;
+use crate::schema_base::{DimensionMetadata, Resolution};
 use crate::utils::{SchemaPrefix, SqlParams};
 
-pub struct ResolutionMeta<const N: usize> {
-    pub id: &'static str,
-    pub deps: [&'static str; N],
-}
-
+/// Helper struct for building SQL queries related to resolutions.
 pub struct ResolutionQueryBuilder<'a, const N: usize> {
     client: &'a MetaClient<'a>,
-    meta: ResolutionMeta<N>,
+    dim_meta: DimensionMetadata<N>,
 }
 
 impl<'a> MetaClient<'a> {
+    /// Helper method to create a `ResolutionQueryBuilder` for a resolution spawned by given job
+    /// metadata.
     pub fn resolution<const N: usize>(
         &'a self,
-        meta: ResolutionMeta<N>,
+        dim_meta: DimensionMetadata<N>,
     ) -> ResolutionQueryBuilder<'a, N> {
-        ResolutionQueryBuilder { client: self, meta }
+        ResolutionQueryBuilder {
+            client: self,
+            dim_meta,
+        }
     }
 }
 
 impl<const N: usize> ResolutionQueryBuilder<'_, N> {
+    /// Initializes the resolution table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
-        let schema_prefix = self.client.schema_prefix();
-        let stmt = InitResolutionQuery(schema_prefix, &self.meta);
+        let schema = self.client.schema_prefix();
+        let stmt = InitResolutionQuery(schema, self.dim_meta);
         self.client.execute_stmt(&stmt, &[]).await?;
         Ok(())
     }
 
+    /// Gets the resolution for the given primary key.
     pub async fn get(
         &self,
         primary_key: [usize; N],
-    ) -> Result<Option<ResolutionStruct<N>>, MetaStorageError> {
+    ) -> Result<Option<Resolution<N>>, MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
-        let stmt = GetResolutionQuery(schema_prefix, &self.meta);
+        let stmt = GetResolutionQuery(schema_prefix, self.dim_meta);
         let params = SqlParams::from_usize(primary_key)?;
         let Some(row) = self.client.query_opt_stmt(&stmt, &params.borrow()).await? else {
             return Ok(None);
         };
         let ub = usize::try_from(row.get::<_, i64>(&"ub"))?;
-        Ok(Some(ResolutionStruct { primary_key, ub }))
+        Ok(Some(Resolution { primary_key, ub }))
     }
 
-    pub async fn put(&self, resolution: ResolutionStruct<N>) -> Result<(), MetaStorageError> {
+    /// Puts the resolution for the given primary key.
+    pub async fn put(&self, resolution: Resolution<N>) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
-        let stmt = PutResolutionQuery(schema_prefix, &self.meta);
+        let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
         let params = resolution.as_insert_params()?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 
+    /// Clears the resolutions table.
     pub async fn clear(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
-        let stmt = ClearResolutionQuery(schema_prefix, &self.meta);
+        let stmt = ClearResolutionQuery(schema_prefix, self.dim_meta);
         self.client.execute_stmt(&stmt, &[]).await?;
         Ok(())
     }
 }
 
 /// Helper struct to generate the SQL query for initializing a dimension's resolution.
-struct InitResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, &'a ResolutionMeta<N>);
+struct InitResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for InitResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = &self.0;
         let id = self.1.id;
-        let deps = &self.1.deps;
+        let deps = self.1.deps;
 
         writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}dimension_{id} (")?;
         for dep in deps {
@@ -85,13 +90,13 @@ impl<const N: usize> std::fmt::Display for InitResolutionQuery<'_, N> {
 }
 
 /// Helper struct to generate the SQL query for getting a dimension's resolution.
-struct GetResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, &'a ResolutionMeta<N>);
+struct GetResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for GetResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = &self.0;
         let id = self.1.id;
-        let deps = &self.1.deps;
+        let deps = self.1.deps;
 
         write!(f, "SELECT ub FROM {schema}dimension_{id}")?;
 
@@ -108,13 +113,13 @@ impl<const N: usize> std::fmt::Display for GetResolutionQuery<'_, N> {
 }
 
 /// Helper struct to generate the SQL query for inserting a resolution into a dimension.
-pub struct PutResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, &'a ResolutionMeta<N>);
+pub struct PutResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for PutResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = &self.0;
         let id = self.1.id;
-        let deps = &self.1.deps;
+        let deps = self.1.deps;
 
         write!(f, "INSERT INTO {schema}dimension_{id} (")?;
         for dep in deps {
@@ -131,7 +136,7 @@ impl<const N: usize> std::fmt::Display for PutResolutionQuery<'_, N> {
 }
 
 /// Helper struct to generate the SQL query for clearing a dimension's resolution.
-struct ClearResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, &'a ResolutionMeta<N>);
+struct ClearResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for ClearResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -149,12 +154,12 @@ mod tests {
 
     use super::*;
 
-    fn dimension_i() -> ResolutionMeta<0> {
-        ResolutionMeta { id: "i", deps: [] }
+    fn dimension_i() -> DimensionMetadata<0> {
+        DimensionMetadata { id: "i", deps: [] }
     }
 
-    fn dimension_j() -> ResolutionMeta<1> {
-        ResolutionMeta {
+    fn dimension_j() -> DimensionMetadata<1> {
+        DimensionMetadata {
             id: "j",
             deps: ["i"],
         }
@@ -186,10 +191,10 @@ mod tests {
     )]
     fn test_init_resolution_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] dim: ResolutionMeta<N>,
+        #[case] metadata: DimensionMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = InitResolutionQuery(schema_prefix, &dim).to_string();
+        let stmt = InitResolutionQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
 
@@ -198,10 +203,10 @@ mod tests {
     #[case::with_dependency(dimension_j(), "SELECT ub FROM test_meta.dimension_j WHERE i = $1;")]
     fn test_get_resolution_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] meta: ResolutionMeta<N>,
+        #[case] metadata: DimensionMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = GetResolutionQuery(schema_prefix, &meta).to_string();
+        let stmt = GetResolutionQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
 
@@ -216,10 +221,10 @@ mod tests {
     )]
     fn test_put_resolution_query_no_dependency<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] meta: ResolutionMeta<N>,
+        #[case] metadata: DimensionMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = PutResolutionQuery(schema_prefix, &meta).to_string();
+        let stmt = PutResolutionQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
 
@@ -227,10 +232,10 @@ mod tests {
     #[case::simple(dimension_i(), "TRUNCATE TABLE test_meta.dimension_i;")]
     fn test_clear_resolution_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] meta: ResolutionMeta<N>,
+        #[case] metadata: DimensionMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = ClearResolutionQuery(schema_prefix, &meta).to_string();
+        let stmt = ClearResolutionQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
 }

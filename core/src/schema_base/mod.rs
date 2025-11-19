@@ -1,3 +1,6 @@
+mod metadata;
+pub use metadata::*;
+
 mod job;
 pub use job::*;
 

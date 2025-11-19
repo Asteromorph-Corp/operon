@@ -7,8 +7,8 @@ use crate::dependency_analysis::{
     get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on,
 };
 use crate::macros::spec::individual::{
-    impl_job_rebuilder, impl_job_spec, impl_peer_txs, job_rebuilder_definition,
-    job_spec_definition, peer_txs_definition,
+    impl_job_rebuilder, impl_job_spec, impl_meta, impl_peer_txs, impl_rebuilder_meta,
+    job_rebuilder_definition, job_spec_definition, peer_txs_definition,
 };
 
 /// Generates the `mod spec` module containing the primary spec and job specs.
@@ -37,10 +37,12 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             &all_configs.entities,
             &all_configs.dimensions,
         );
+        let impl_meta = impl_meta(&all_configs.service_id, job);
 
         let job_rebuilder_def = job_rebuilder_definition(job);
         let impl_job_rebuilder =
             impl_job_rebuilder(job, &spawn_dim_repeating_jobs, &downstream_jobs);
+        let impl_rebuilder_meta = impl_rebuilder_meta(job);
 
         let peer_txs_def = peer_txs_definition(&job.id, &event_receiving_job_ids);
         let impl_peer_txs = impl_peer_txs(&job.id, &event_receiving_job_ids);
@@ -48,9 +50,11 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
         quote! {
             #job_spec_def
             #impl_job_spec
+            #impl_meta
 
             #job_rebuilder_def
             #impl_job_rebuilder
+            #impl_rebuilder_meta
 
             #peer_txs_def
             #impl_peer_txs

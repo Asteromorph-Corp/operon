@@ -29,7 +29,7 @@ pub fn prelude(all_configs: &AllConfig) -> syn::ItemMod {
 
             pub fn #handler_ident<Svc: #service_trait, Sto: #storage_trait>() -> #operon::scheduler::SchedulerHandler<Svc, Sto> {
                 #operon::scheduler::SchedulerHandler::new(vec![
-                    #(Box::new(spec::#specs),)*
+                    #(spec::#specs.into_handler(),)*
                 ])
             }
         }

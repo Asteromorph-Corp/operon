@@ -3,8 +3,8 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    explode_ident, mark_done_ident, operon_ident, raise_dep_ident, rebuilder_ident,
-    resolution_ident, ticket_ident, variable_ident,
+    explode_ident, mark_done_ident, operon_ident, raise_dep_ident, rebuilder_ident, ticket_ident,
+    variable_ident,
 };
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -52,9 +52,8 @@ pub fn impl_job_rebuilder(
     let ticket_ident = ticket_ident(&job.id);
     let job_id = &job.id;
 
-    let maybe_put_resolution = job.spawn_dim.as_ref().map(|dim| -> syn::Stmt {
-        let res_ident = resolution_ident(dim);
-        parse_quote! { <schema::#res_ident as #operon::schema_base::ResolutionSql>::put(&resolution, client).await?; }
+    let maybe_put_resolution = job.spawn_dim.is_some().then(|| -> syn::Stmt {
+        parse_quote! { client.resolution(self.spawn_dim_meta()).put(resolution).await?; }
     });
     let mark_done_fn_name = mark_done_ident(&job.id);
 
@@ -99,6 +98,7 @@ pub fn impl_job_rebuilder(
                 ui_state: &#operon::tokio::sync::RwLock<#operon::ui::UiState>,
             ) -> Result<(), #operon::scheduler::SchedulerError> {
                 for (job, resolution) in &self.0 {
+                    let resolution = *resolution;
                     #maybe_put_resolution
                     queries::#mark_done_fn_name(client, job).await?;
 

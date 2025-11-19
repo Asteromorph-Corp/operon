@@ -8,9 +8,9 @@ use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::operon::RunningState;
 use crate::scheduler::{
     ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, PeerEventReceiver,
-    PeerEventSenderMap, SchedulerError,
+    PeerEventSenderMap, SchedulerError, SpecWithMetadata,
 };
-use crate::schema_base::{JobSql, ResolutionSql, TicketSql};
+use crate::schema_base::{JobSql, TicketSql};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiState;
@@ -91,30 +91,33 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, J, R, T, JS> JobHandler<Svc, Sto> for JS
+impl<Svc, Sto, JS, J, T, const N: usize> JobHandler<Svc, Sto> for SpecWithMetadata<Svc, Sto, JS, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    JS: JobSpec<Svc, Sto, Job = J, Ticket = T> + Clone,
     J: JobSql,
-    R: ResolutionSql,
-    T: TicketSql<Job = J, Resolution = R>,
-    JS: JobSpec<Svc, Sto, Job = J, Resolution = R, Ticket = T> + Clone,
+    T: TicketSql<Job = J>,
 {
     fn job_id(&self) -> &'static str {
         J::id()
     }
 
     fn pool_size(&self) -> usize {
-        JobSpec::pool_size(self)
+        self.spec.pool_size()
     }
 
     async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        R::init_table(client).await?;
+        if let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() {
+            client.resolution(spawn_dim_meta).init().await?;
+        }
         Ok(())
     }
 
     async fn clear_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        R::clear_table(client).await?;
+        if let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() {
+            client.resolution(spawn_dim_meta).clear().await?;
+        }
         Ok(())
     }
 
@@ -143,7 +146,7 @@ where
         storage: &Sto,
         client: MetaClient<'_>,
     ) -> Result<bool, SchedulerError> {
-        JobSpec::check_consistency(self, storage, client).await
+        self.spec.check_consistency(storage, client).await
     }
 
     async fn prepare_rebuild(
@@ -151,7 +154,7 @@ where
         storage: &Sto,
         client: MetaClient<'_>,
     ) -> Result<Box<dyn JobRebuilder>, SchedulerError> {
-        JobSpec::prepare_rebuild(self, storage, client).await
+        self.spec.prepare_rebuild(storage, client).await
     }
 
     #[allow(clippy::too_many_arguments)]

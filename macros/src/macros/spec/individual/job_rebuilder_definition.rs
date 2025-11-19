@@ -1,7 +1,8 @@
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{job_ident, rebuilder_ident, spawn_resolution};
+use crate::macros::spec::individual::resolution_type::resolution_type;
+use crate::utils::{job_ident, rebuilder_ident};
 
 /// Generates a struct definition for a job rebuilder.
 ///
@@ -13,11 +14,11 @@ use crate::utils::{job_ident, rebuilder_ident, spawn_resolution};
 pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
     let rebuilder_ident = rebuilder_ident(&job.id);
     let job_ident = job_ident(&job.id);
-    let res_ident = spawn_resolution(job.spawn_dim.as_ref());
+    let resolution_type = resolution_type(job);
 
     parse_quote! {
         #[derive(Debug)]
-        pub struct #rebuilder_ident(Vec<(schema::#job_ident, #res_ident)>);
+        pub struct #rebuilder_ident(Vec<(schema::#job_ident, #resolution_type)>);
     }
 }
 

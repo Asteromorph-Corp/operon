@@ -23,7 +23,7 @@ pub(super) fn fn_on_receive_explosion(
 
             parse_quote! {
                 schema::#res_enum_ident::#variant_ident(res) => Ok(
-                    queries::#raise_quota_fn_name(client, &res).await?
+                    queries::#raise_quota_fn_name(client, res).await?
                 ),
             }
         });

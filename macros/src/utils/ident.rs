@@ -2,7 +2,6 @@ use heck::{ToPascalCase, ToShoutySnakeCase, ToSnakeCase};
 use once_cell::sync::Lazy;
 use proc_macro_crate::{FoundCrate, crate_name};
 use quote::format_ident;
-use syn::parse_quote;
 
 use crate::configs::{DimensionId, EntityId, JobId};
 
@@ -31,6 +30,14 @@ pub fn sql_storage_ident(service_id: &str) -> syn::Ident {
 
 pub fn get_handler_ident(service_id: &str) -> syn::Ident {
     format_ident!("{}_handler", service_id.to_snake_case())
+}
+
+pub fn job_metadata_ident(job_id: &JobId) -> syn::Ident {
+    format_ident!("job_{}_meta", job_id.to_snake_case())
+}
+
+pub fn dimension_metadata_ident(dimension_id: &DimensionId) -> syn::Ident {
+    format_ident!("dimension_{}_meta", dimension_id.to_snake_case())
 }
 
 pub fn get_entity_ident(entity_id: &EntityId) -> syn::Ident {
@@ -135,10 +142,6 @@ pub fn job_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}Job", job_id.to_pascal_case())
 }
 
-pub fn resolution_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("{}Resolution", dimension_id.to_pascal_case())
-}
-
 pub fn ticket_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}Ticket", job_id.to_pascal_case())
 }
@@ -153,16 +156,6 @@ pub fn rebuilder_ident(job_id: &JobId) -> syn::Ident {
 
 pub fn peer_txs_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}PeerTxs", job_id.to_pascal_case())
-}
-
-pub fn spawn_resolution(spawn_dim: Option<&DimensionId>) -> syn::Type {
-    match spawn_dim {
-        Some(dim) => {
-            let res_ident = resolution_ident(dim);
-            parse_quote! { schema::#res_ident }
-        }
-        None => parse_quote! { () },
-    }
 }
 
 pub fn resolution_enum_ident() -> syn::Ident {

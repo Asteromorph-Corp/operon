@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{
-    get_all_ident, operon_ident, rebuilder_ident, resolution_ident, variable_ident,
-};
+use crate::utils::{get_all_ident, operon_ident, rebuilder_ident, variable_ident};
 
 /// Generates the `prepare_rebuild` function for the implementation of the trait `JobSpec`.
 ///
@@ -44,15 +42,13 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
 
     let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
 
+    let dim_vars = job
+        .dims
+        .iter()
+        .map(|d| variable_ident(d))
+        .collect::<Vec<_>>();
     let resolution_expr: syn::Expr = match job.spawn_dim.as_ref() {
         Some(dim) => {
-            let res_ident = resolution_ident(dim);
-            let dim_vars = job
-                .dims
-                .iter()
-                .map(|d| variable_ident(d))
-                .collect::<Vec<_>>();
-
             let missing_resolution_msg = format!(
                 "No resolution found for {}_{}",
                 dim,
@@ -60,7 +56,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             );
 
             parse_quote! {
-                <schema::#res_ident as #operon::schema_base::ResolutionSql>::get(client, (#(job.#dim_vars,)*))
+                client.resolution(self.spawn_dim_meta()).get([#(job.#dim_vars),*])
                     .await?
                     .ok_or_else(|| {
                         #operon::scheduler::SchedulerError::Other(format!(

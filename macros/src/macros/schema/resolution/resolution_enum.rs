@@ -1,7 +1,8 @@
 use syn::parse_quote;
 
 use crate::configs::DimensionConfigMap;
-use crate::utils::{resolution_enum_ident, resolution_ident, variant_ident};
+use crate::operon_ident;
+use crate::utils::{resolution_enum_ident, variant_ident};
 
 /// Generates an enum representing the resolution of any dimension.
 ///
@@ -15,12 +16,13 @@ use crate::utils::{resolution_enum_ident, resolution_ident, variant_ident};
 /// }
 /// ```
 pub(super) fn resolution_enum(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
+    let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
-    let variants = dimensions.keys().map(|dim| -> syn::Variant {
-        let variant_ident = variant_ident(dim);
-        let inner = resolution_ident(dim);
+    let variants = dimensions.values().map(|dim| -> syn::Variant {
+        let variant_ident = variant_ident(&dim.id);
+        let n = dim.depends_on.len();
         parse_quote! {
-            #variant_ident(#inner)
+            #variant_ident(#operon::schema_base::Resolution<#n>)
         }
     });
 

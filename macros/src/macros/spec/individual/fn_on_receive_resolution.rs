@@ -58,7 +58,7 @@ pub(super) fn fn_on_receive_resolution(
             let stmt: syn::Stmt = parse_quote! {
                 match peer_txs
                     .#sender_ident
-                    .send(#operon::scheduler::PeerEvent::Explosion(res.into()))
+                    .send(#operon::scheduler::PeerEvent::Explosion(schema::#res_enum_ident::#variant_ident(res)))
                     .await
                 {
                     Ok(_) => #operon::log::trace!(#ok_msg),
@@ -71,7 +71,7 @@ pub(super) fn fn_on_receive_resolution(
         parse_quote! {
             schema::#res_enum_ident::#variant_ident(res) => {
                 #(#send_explosions)*
-                Ok(queries::#explode_fn_name(client, &res).await?)
+                Ok(queries::#explode_fn_name(client, res).await?)
             },
         }
     });

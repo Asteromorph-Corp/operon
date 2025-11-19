@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{operon_ident, sender_ident};
+use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, variant_ident};
 
 /// Generates the `send_on_finish` function for the implementation of the trait `JobSpec`.
 ///
@@ -57,10 +57,13 @@ pub(super) fn fn_send_on_finish(
     downstream_jobs: &IndexSet<&JobConfig>,
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
+    let resolution_enum_ident = resolution_enum_ident();
 
     let send_resolutions = spawn_dim_repeating_jobs
         .iter()
         .map(|repeating_job| -> syn::Expr {
+            // TODO: remove unwrap
+            let resolution_variant_ident = variant_ident(job.spawn_dim.as_deref().unwrap());
             let sender_ident = sender_ident(&repeating_job.id);
             let ok_msg = format!(
                 "`{}` sent peer event to `{}`: {{resolution:?}}",
@@ -74,7 +77,7 @@ pub(super) fn fn_send_on_finish(
             parse_quote! {
                 match peer_txs
                     .#sender_ident
-                    .send(#operon::scheduler::PeerEvent::Resolution(resolution.into()))
+                    .send(#operon::scheduler::PeerEvent::Resolution(schema::#resolution_enum_ident::#resolution_variant_ident(resolution)))
                     .await
                 {
                     Ok(_) => #operon::log::trace!(#ok_msg),

@@ -7,9 +7,9 @@ use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
 use crate::operon::RunningState;
 use crate::scheduler::{
     ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
-    PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError,
+    PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError, SpecWithMetadata,
 };
-use crate::schema_base::{JobSql, ResolutionSql, TicketSql, TicketStatus};
+use crate::schema_base::{JobMetadata, JobSql, TicketSql, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiState, UiStateUpdate};
@@ -25,7 +25,7 @@ use crate::ui::{UiState, UiStateUpdate};
 /// * Updating waiting tickets from `Event` messages.
 ///
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Svc, Sto, JS>
+pub struct IndividualScheduler<Svc, Sto, JS, const N: usize>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -35,23 +35,23 @@ where
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
     pub meta_storage: MetaStorage,
+    pub meta: JobMetadata<N>,
     pub pool: Arc<Semaphore>,
     pub pool_size: usize,
     pub ui_state: Arc<RwLock<UiState>>,
 }
 
-impl<Svc, Sto, J, R, T, JS> IndividualScheduler<Svc, Sto, JS>
+impl<Svc, Sto, JS, J, T, const N: usize> IndividualScheduler<Svc, Sto, JS, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    JS: JobSpec<Svc, Sto, Job = J, Ticket = T>,
     J: JobSql,
-    R: ResolutionSql,
-    T: TicketSql<Job = J, Resolution = R>,
-    JS: JobSpec<Svc, Sto, Job = J, Resolution = R, Ticket = T>,
+    T: TicketSql<Job = J>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        spec: JS,
+        spec: SpecWithMetadata<Svc, Sto, JS, N>,
         service: Arc<Svc>,
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
@@ -59,10 +59,11 @@ where
         ui_state: Arc<RwLock<UiState>>,
     ) -> Self {
         Self {
-            spec,
+            spec: spec.spec,
             storage,
             service,
             meta_storage,
+            meta: spec.job_meta,
             pool: Arc::new(Semaphore::new(pool_size)),
             pool_size,
             ui_state,
@@ -254,7 +255,8 @@ where
         let mut ready_tickets: VecDeque<T> = initial_tickets.into();
         let mut got_all_updates = false;
 
-        let (int_tx, mut int_rx) = tokio::sync::mpsc::unbounded_channel::<InternalEvent<J, R>>();
+        let (int_tx, mut int_rx) =
+            tokio::sync::mpsc::unbounded_channel::<InternalEvent<J, JS::Resolution>>();
 
         // Main event loop.
         loop {
@@ -381,11 +383,10 @@ where
                             Ok(resolution) => {
                                 // Mark the ticket as done in the ticket storage
                                 job.mark_done(tx.as_client()).await?;
-                                resolution.put(tx.as_client()).await?;
                                 tx.commit().await?;
 
                                 // Alert the results to the scheduler
-                                int_sender.send(InternalEvent::JobSuccess(job.clone(), resolution.clone()))
+                                int_sender.send(InternalEvent::JobSuccess(job.clone(), resolution))
                                     .map_err(|e| SchedulerError::Other(format!("Failed to send internal event: {e}")))?;
                                 log::trace!(
                                     "{job_id} sent internal event: JobSuccess({job:?}, {resolution:?});",
@@ -493,7 +494,7 @@ where
         &mut self,
         state: &mut RunningState,
         got_all_updates: bool,
-        int_rx: &IntEventReceiver<J, R>,
+        int_rx: &IntEventReceiver<J, JS::Resolution>,
     ) -> Result<bool, SchedulerError> {
         if *state == RunningState::Running {
             log::info!("Pausing `{}` jobs for graceful stop.", J::id());

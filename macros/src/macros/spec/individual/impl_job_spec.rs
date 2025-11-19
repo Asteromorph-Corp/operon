@@ -10,9 +10,10 @@ use crate::macros::spec::individual::fn_pool_size::fn_pool_size;
 use crate::macros::spec::individual::fn_prepare_rebuild::fn_prepare_rebuild;
 use crate::macros::spec::individual::fn_run_job::fn_run_job;
 use crate::macros::spec::individual::fn_send_on_finish::fn_send_on_finish;
+use crate::macros::spec::individual::resolution_type::resolution_type;
 use crate::utils::{
-    job_ident, operon_ident, peer_txs_ident, service_trait_ident, spawn_resolution, spec_ident,
-    storage_trait_ident, ticket_ident,
+    job_ident, operon_ident, peer_txs_ident, service_trait_ident, spec_ident, storage_trait_ident,
+    ticket_ident,
 };
 
 /// Generates the implementation of the `JobSpec` trait for a given job.
@@ -28,7 +29,6 @@ pub fn impl_job_spec(
     let operon = operon_ident();
     let spec_ident = spec_ident(&job.id);
     let job_ident = job_ident(&job.id);
-    let spawn_dim_res: syn::Type = spawn_resolution(job.spawn_dim.as_ref());
     let ticket_ident = ticket_ident(&job.id);
     let peer_txs_ident = peer_txs_ident(&job.id);
 
@@ -44,12 +44,14 @@ pub fn impl_job_spec(
     let fn_on_receive_explosion = fn_on_receive_explosion(job, upstream_jobs);
     let fn_pool_size = fn_pool_size(job);
 
+    let resolution = resolution_type(job);
+
     parse_quote! {
         #[#operon::async_trait::async_trait]
         #[automatically_derived]
         impl<Svc: #svc_ident, Sto: #sto_ident> #operon::scheduler::JobSpec<Svc, Sto> for #spec_ident {
             type Job = schema::#job_ident;
-            type Resolution = #spawn_dim_res;
+            type Resolution = #resolution;
             type Ticket = schema::#ticket_ident;
             type PeerEventSenders = #peer_txs_ident;
 

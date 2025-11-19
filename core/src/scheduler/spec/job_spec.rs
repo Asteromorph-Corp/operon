@@ -1,10 +1,53 @@
+use std::fmt::Debug;
+
 use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
 use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
-use crate::schema_base::{Job, Resolution, Ticket};
+use crate::schema_base::{Job, JobMetadata, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
+
+pub struct SpecWithMetadata<Svc, Sto, JS, const N: usize>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    JS: JobSpec<Svc, Sto>,
+{
+    pub spec: JS,
+    pub job_meta: JobMetadata<N>,
+    _phantom: std::marker::PhantomData<(Svc, Sto)>,
+}
+
+impl<Svc, Sto, JS, const N: usize> SpecWithMetadata<Svc, Sto, JS, N>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    JS: JobSpec<Svc, Sto>,
+{
+    pub fn new(spec: JS, job_meta: JobMetadata<N>) -> Self {
+        Self {
+            spec,
+            job_meta,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Svc, Sto, JS, const N: usize> Clone for SpecWithMetadata<Svc, Sto, JS, N>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    JS: JobSpec<Svc, Sto> + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            spec: self.spec.clone(),
+            job_meta: self.job_meta,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
 
 #[async_trait]
 pub trait JobSpec<Svc, Sto>: Clone + Send + Sync + 'static
@@ -13,8 +56,9 @@ where
     Sto: OperonStorage,
 {
     type Job: Job;
-    type Resolution: Resolution;
-    type Ticket: Ticket<Job = Self::Job, Resolution = Self::Resolution>;
+    type Ticket: Ticket<Job = Self::Job>;
+    // TODO: create custom trait for this
+    type Resolution: Debug + Clone + Copy + Send + Sync + 'static;
     type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;
 
     fn pool_size(&self) -> usize;

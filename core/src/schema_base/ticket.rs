@@ -2,13 +2,12 @@ use async_trait::async_trait;
 use postgres_types::ToSql;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema_base::{Job, Resolution, TicketStatus};
+use crate::schema_base::{Job, TicketStatus};
 
 /// Trait that represents tickets for the jobs.
 #[async_trait]
 pub trait Ticket: std::fmt::Debug + Default + Clone + Sized + Send + Sync + 'static {
     type Job: Job;
-    type Resolution: Resolution;
 
     /// Brand-new ticket, with none of the dimensions resolved.
     /// Return the ticket that should be present at startup time.

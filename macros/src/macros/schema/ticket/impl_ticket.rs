@@ -1,13 +1,12 @@
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{job_ident, operon_ident, spawn_resolution, ticket_ident, variable_ident};
+use crate::utils::{job_ident, operon_ident, ticket_ident, variable_ident};
 
 /// Generates the implementation of the `Ticket` trait for a given job's ticket.
 pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
     let operon = operon_ident();
     let job_ident = job_ident(&job.id);
-    let res_ident = spawn_resolution(job.spawn_dim.as_ref());
     let ticket_ident = ticket_ident(&job.id);
 
     let dim_fields = job
@@ -35,7 +34,6 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
         #[automatically_derived]
         impl #operon::schema_base::Ticket for #ticket_ident {
             type Job = schema::#job_ident;
-            type Resolution = #res_ident;
 
             #[allow(clippy::needless_update)]
             fn new() -> Self {
