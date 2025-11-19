@@ -9,7 +9,9 @@ async fn prepare_rebuild(
             let job = operon::schema_base::Ticket::resolve(&ticket).ok_or_else(|| {
                 operon::scheduler::SchedulerError::Other("Failed to resolve a beta ticket".into())
             })?;
-            let resolution = queries::get_resolution_j(client, job.i)
+            let resolution = client
+                .resolution(self.spawn_dim_meta())
+                .get([job.i])
                 .await?
                 .ok_or_else(|| {
                     operon::scheduler::SchedulerError::Other(format!(

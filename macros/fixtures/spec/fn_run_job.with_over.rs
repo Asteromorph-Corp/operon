@@ -6,12 +6,14 @@ async fn run_job(
     job: &Self::Job,
 ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
     let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
-    let resolution = queries::get_resolution_j(client, job.i)
+    let resolution = client
+        .resolution(metadata::dimension_j_meta())
+        .get([job.i])
         .await?
         .ok_or_else(|| {
             operon::meta_storage::MetaStorageError::MissingResolution(format!("j_{}", job.i))
         })?;
-    resolution_j.insert((), resolution.0);
+    resolution_j.insert((), resolution.ub);
 
     let b_j = {
         let elem = storage.get_all_b_over_j(job.i).await?;

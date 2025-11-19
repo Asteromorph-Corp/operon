@@ -1,17 +1,19 @@
 pub async fn raise_quota_epsilon_j(
     client: operon::meta_storage::MetaClient<'_>,
-    res: &schema::JResolution,
+    res: operon::schema_base::Resolution<1usize>,
 ) -> Result<Vec<schema::EpsilonTicket>, operon::meta_storage::MetaStorageError> {
     let schema_prefix = client.schema_prefix();
     let pop_stmt = format!("DELETE FROM {schema_prefix}ticket_epsilon\nWHERE i = $1\nRETURNING *;");
-    let rows = client.query(&pop_stmt, &[&i64::try_from(res.1)?]).await?;
+    let rows = client
+        .query(&pop_stmt, &[&i64::try_from(res.primary_key[0usize])?])
+        .await?;
     let tickets = rows
         .iter()
         .map(<schema::EpsilonTicket as operon::schema_base::TicketSql>::from_sql_row)
         .collect::<Result<Vec<_>, _>>()?;
     let new_tickets = tickets
         .into_iter()
-        .map(|ticket| operon::schema_base::Ticket::raise_dependency_quota(ticket, res.0))
+        .map(|ticket| operon::schema_base::Ticket::raise_dependency_quota(ticket, res.ub))
         .collect::<Vec<_>>();
     let copy_stmt = format!(
         "COPY {schema_prefix}ticket_epsilon (\n    i, k, resolved, deps_count, deps_quota, deps_done, status\n)\nFROM STDIN WITH (FORMAT csv);"

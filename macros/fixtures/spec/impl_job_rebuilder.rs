@@ -7,7 +7,11 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
         ui_state: &operon::tokio::sync::RwLock<operon::ui::UiState>,
     ) -> Result<(), operon::scheduler::SchedulerError> {
         for (job, resolution) in &self.0 {
-            queries::put_resolution_j(client, resolution).await?;
+            let resolution = *resolution;
+            client
+                .resolution(self.spawn_dim_meta())
+                .put(resolution)
+                .await?;
             queries::mark_done_beta(client, job).await?;
 
             queries::explode_delta_j(client, resolution).await?;

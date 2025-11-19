@@ -6,7 +6,9 @@ async fn send_on_finish(
 ) -> Result<(), operon::scheduler::SchedulerError> {
     match peer_txs
         .to_delta
-        .send(operon::scheduler::PeerEvent::Resolution(resolution.into()))
+        .send(operon::scheduler::PeerEvent::Resolution(
+            schema::ResolutionEnum::J(resolution),
+        ))
         .await
     {
         Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {resolution:?}"),

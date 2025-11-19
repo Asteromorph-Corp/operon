@@ -16,14 +16,18 @@ async fn check_consistency(
     // ...and map them with the dimensions they spawned...
     let mut tags = Vec::new();
     for job in jobs {
-        let Some(res) = queries::get_resolution_j(client, job.i).await? else {
+        let Some(res) = client
+            .resolution(self.spawn_dim_meta())
+            .get([job.i])
+            .await?
+        else {
             operon::log::info!(
                 "No `j` resolution found for `beta_{}` in the metadata storage.",
                 job.i,
             );
             return Ok(false);
         };
-        for j in 0..(res.0) {
+        for j in 0..(res.ub) {
             tags.push((job.i, j));
         }
     }

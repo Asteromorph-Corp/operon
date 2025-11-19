@@ -8,16 +8,20 @@ async fn run_job(
     let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
     let mut resolution_k: std::collections::HashMap<(schema::JDim,), usize> = Default::default();
 
-    let resolution = queries::get_resolution_j(client, job.i)
+    let resolution = client
+        .resolution(metadata::dimension_j_meta())
+        .get([job.i])
         .await?
         .ok_or_else(|| {
             operon::meta_storage::MetaStorageError::MissingResolution(format!("j_{}", job.i))
         })?;
-    resolution_j.insert((), resolution.0);
+    resolution_j.insert((), resolution.ub);
 
     for j in 0..(*resolution_j.get(&()).unwrap_or(&0)) {
         // TODO: Remove unwrap
-        let resolution = queries::get_resolution_k(client, job.i, j)
+        let resolution = client
+            .resolution(metadata::dimension_k_meta())
+            .get([job.i, j])
             .await?
             .ok_or_else(|| {
                 operon::meta_storage::MetaStorageError::MissingResolution(format!(
@@ -25,7 +29,7 @@ async fn run_job(
                     job.i, j
                 ))
             })?;
-        resolution_k.insert((j,), resolution.0);
+        resolution_k.insert((j,), resolution.ub);
     }
 
     let c_j = {
@@ -85,8 +89,12 @@ async fn run_job(
         .epsilon(c_j, d_j_k)
         .await
         .map_err(operon::scheduler::SchedulerError::UserError)?;
-    let resolution = schema::LResolution(e_l.len(), job.i);
+    let resolution = operon::schema_base::Resolution::new(e_l.len(), [job.i]);
 
     storage.put_all_e(job.i, e_l).await?;
+    client
+        .resolution(self.spawn_dim_meta())
+        .put(resolution)
+        .await?;
     Ok(resolution)
 }

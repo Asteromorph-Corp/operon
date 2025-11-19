@@ -14,8 +14,11 @@ async fn run_job(
         .await
         .map_err(operon::scheduler::SchedulerError::UserError)?;
 
-    let resolution = schema::JResolution(b_j.len(), job.i);
+    let resolution = operon::schema_base::Resolution::new(b_j.len(), [job.i]);
     storage.put_all_b(job.i, b_j).await?;
-
+    client
+        .resolution(self.spawn_dim_meta())
+        .put(resolution)
+        .await?;
     Ok(resolution)
 }

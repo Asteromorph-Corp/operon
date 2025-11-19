@@ -2,7 +2,7 @@ async fn get_all_c_over_j(&self) -> Result<Vec<C>, operon::storage::StorageError
     let final_results = {
         let mut results_0 = Vec::new();
         let mut j = 0usize;
-        while let Some(value) = self.get_c(j.into()).await? {
+        while let Some(value) = self.get_c(j).await? {
             results_0.push(value);
             j += 1;
         }
@@ -21,7 +21,7 @@ async fn get_all_d_over_jk(
         while let Some(value) = {
             let mut results_1 = Vec::new();
             let mut k = 0usize;
-            while let Some(value) = self.get_d(i, j.into(), k.into()).await? {
+            while let Some(value) = self.get_d(i, j, k).await? {
                 results_1.push(value);
                 k += 1;
             }

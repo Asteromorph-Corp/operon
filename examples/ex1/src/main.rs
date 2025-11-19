@@ -84,7 +84,11 @@ struct MySplitterService;
 #[async_trait]
 impl SplitterService for MySplitterService {
     async fn get_inputs(&self) -> Result<Vec<Input>, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(vec![Input::from("Hello World"), Input::from("Hello Operon"), Input::from("")])
+        Ok(vec![
+            Input::from("Hello World"),
+            Input::from("Hello Operon"),
+            Input::from(""),
+        ])
     }
 
     async fn get_words(
