@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy)]
 pub struct SchemaPrefix<'a>(pub Option<&'a str>);
 
 impl std::fmt::Display for SchemaPrefix<'_> {

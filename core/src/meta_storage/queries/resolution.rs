@@ -68,7 +68,7 @@ struct InitResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetada
 
 impl<const N: usize> std::fmt::Display for InitResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let schema = &self.0;
+        let schema = self.0;
         let id = self.1.id;
         let deps = self.1.deps;
 
@@ -93,7 +93,7 @@ struct GetResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadat
 
 impl<const N: usize> std::fmt::Display for GetResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let schema = &self.0;
+        let schema = self.0;
         let id = self.1.id;
         let deps = self.1.deps;
 
@@ -116,7 +116,7 @@ pub struct PutResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMet
 
 impl<const N: usize> std::fmt::Display for PutResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let schema = &self.0;
+        let schema = self.0;
         let id = self.1.id;
         let deps = self.1.deps;
 
@@ -139,7 +139,7 @@ struct ClearResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetad
 
 impl<const N: usize> std::fmt::Display for ClearResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let schema = &self.0;
+        let schema = self.0;
         let id = self.1.id;
 
         write!(f, "TRUNCATE TABLE {schema}dimension_{id};")
