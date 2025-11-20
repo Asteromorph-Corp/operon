@@ -9,8 +9,7 @@ pub struct ResolutionQueryBuilder<'a, const N: usize> {
 }
 
 impl<'a> MetaClient<'a> {
-    /// Helper method to create a `ResolutionQueryBuilder` for a resolution spawned by given job
-    /// metadata.
+    /// Helper method to create a `ResolutionQueryBuilder` for a resolution of given dimension.
     pub fn resolution<const N: usize>(
         &'a self,
         dim_meta: DimensionMetadata<N>,

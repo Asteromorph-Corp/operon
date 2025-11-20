@@ -60,57 +60,49 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
         .collect::<Vec<_>>();
     let get_all_fn_name = get_all_ident(&job.id);
     let get_fn_name = get_entity_ident(&job.to);
+
     let corrupt_msg = format!(
         "Some `{}` tickets are corrupt in the metadata storage.",
         job.id
     );
+    let missing_entity_msg = format!("Data storage does not hold `{}_{{:?}}`.", job.to);
 
     let check_res_and_entity = match job.spawn_dim.as_ref() {
         Some(dim) => {
             // let res_ident = resolution_ident(dim);
             let dim_var = variable_ident(dim);
             let missing_res_msg = format!(
-                "No `{}` resolution found for `{}{}` in the metadata storage.",
-                dim,
-                job.id,
-                "_{}".repeat(job.dims.len()),
-            );
-            let missing_entity_msg = format!(
-                "Data storage does not hold `{}_{}`.",
-                job.to,
-                "{},".repeat(job.dims.len() + 1).trim_end_matches(","),
+                "No `{}` resolution found for `{}_{{:?}}` in the metadata storage.",
+                dim, job.id,
             );
 
             quote! {
                 let mut tags = Vec::new();
                 for job in jobs {
-                    let Some(res) = client.resolution(self.spawn_dim_meta()).get([#(job.#field_vars,)*]).await?
+                    let Some(res) = client.resolution(self.spawn_dim_meta()).get(job.primary_key).await?
                     else {
-                        #operon::log::info!(#missing_res_msg, #(job.#field_vars,)*);
+                        #operon::log::info!(#missing_res_msg, job.primary_key);
                         return Ok(false);
                     };
                     for #dim_var in 0..(res.ub) {
-                        tags.push((#(job.#field_vars,)* #dim_var,));
+                        tags.push((job.primary_key, #dim_var));
                     }
                 }
-                for(#(#field_vars,)* #dim_var,) in tags {
+                for ([#(#field_vars),*], #dim_var) in tags {
                     if storage.#get_fn_name(#(#field_vars,)* #dim_var,).await?.is_none() {
-                        #operon::log::info!(#missing_entity_msg, #(#field_vars,)* #dim_var,);
+                        #operon::log::info!(#missing_entity_msg, [#(#field_vars,)* #dim_var]);
                         return Ok(false);
                     }
                 }
             }
         }
         None => {
-            let missing_entity_msg = format!(
-                "Data storage does not hold `{}_{}`.",
-                job.to,
-                "{},".repeat(job.dims.len()).trim_end_matches(","),
-            );
             quote! {
                 for job in jobs {
-                    if storage.#get_fn_name(#(job.#field_vars),*).await?.is_none() {
-                        #operon::log::info!(#missing_entity_msg, #(job.#field_vars,)*);
+                    let [#(#field_vars),*] = job.primary_key;
+
+                    if storage.#get_fn_name(#(#field_vars),*).await?.is_none() {
+                        #operon::log::info!(#missing_entity_msg, [#(#field_vars),*]);
                         return Ok(false);
                     }
                 }

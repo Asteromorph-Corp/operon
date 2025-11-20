@@ -1,7 +1,8 @@
+use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{get_all_ident, operon_ident, rebuilder_ident, variable_ident};
+use crate::utils::{get_all_ident, operon_ident, rebuilder_ident};
 
 /// Generates the `prepare_rebuild` function for the implementation of the trait `JobSpec`.
 ///
@@ -42,32 +43,25 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
 
     let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
 
-    let dim_vars = job
-        .dims
-        .iter()
-        .map(|d| variable_ident(d))
-        .collect::<Vec<_>>();
     let resolution_expr: syn::Expr = match job.spawn_dim.as_ref() {
         Some(dim) => {
-            let missing_resolution_msg = format!(
-                "No resolution found for {}_{}",
-                dim,
-                "{},".repeat(job.dims.len()).trim_end_matches(",")
-            );
-
+            let missing_resolution_msg = format!("No resolution found for {dim}_{{:?}}");
             parse_quote! {
-                client.resolution(self.spawn_dim_meta()).get([#(job.#dim_vars),*])
+                client.resolution(self.spawn_dim_meta()).get(job.primary_key)
                     .await?
                     .ok_or_else(|| {
                         #operon::scheduler::SchedulerError::Other(format!(
                             #missing_resolution_msg,
-                            #(job.#dim_vars,)*
+                            job.primary_key
                         ))
                     })?
             }
         }
         None => parse_quote! { () },
     };
+    let maybe_spawn_dim_meta = job.spawn_dim.is_some().then(|| {
+        quote! { spawn_dim_meta: self.spawn_dim_meta(), }
+    });
 
     parse_quote! {
         async fn prepare_rebuild(
@@ -78,7 +72,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
         {
             let tickets =
                 queries::#get_all_fn_name(client, #operon::schema_base::TicketStatus::Done).await?;
-            let successes = #operon::futures::future::try_join_all(tickets.into_iter().map(
+            let data = #operon::futures::future::try_join_all(tickets.into_iter().map(
                 |ticket| async move {
                     let job = #operon::schema_base::Ticket::resolve(&ticket).ok_or_else(|| {
                         #operon::scheduler::SchedulerError::Other(
@@ -92,7 +86,11 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             ))
             .await?;
 
-            Ok(Box::new(#rebuilder_ident(successes)))
+            Ok(Box::new(#rebuilder_ident {
+                job_meta: self.job_meta(),
+                #maybe_spawn_dim_meta
+                data
+            }))
         }
     }
 }

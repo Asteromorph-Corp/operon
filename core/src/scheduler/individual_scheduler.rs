@@ -9,7 +9,7 @@ use crate::scheduler::{
     ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
     PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError, SpecWithMetadata,
 };
-use crate::schema_base::{JobMetadata, JobSql, TicketSql, TicketStatus};
+use crate::schema_base::{Job, JobMetadata, TicketSql, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiState, UiStateUpdate};
@@ -42,13 +42,12 @@ where
     pub ui_state: Arc<RwLock<UiState>>,
 }
 
-impl<Svc, Sto, JS, J, T, const N: usize> IndividualScheduler<Svc, Sto, JS, N>
+impl<Svc, Sto, JS, T, const N: usize> IndividualScheduler<Svc, Sto, JS, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto, Job = J, Ticket = T>,
-    J: JobSql,
-    T: TicketSql<Job = J>,
+    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = T>,
+    T: TicketSql<Job = Job<N>>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -258,7 +257,7 @@ where
         let mut got_all_updates = false;
 
         let (int_tx, mut int_rx) =
-            tokio::sync::mpsc::unbounded_channel::<InternalEvent<J, JS::Resolution>>();
+            tokio::sync::mpsc::unbounded_channel::<InternalEvent<Job<N>, JS::Resolution>>();
 
         // Main event loop.
         loop {
@@ -368,6 +367,7 @@ where
                     let job = ticket.resolve().ok_or(SchedulerError::Other("Ticket is not ready to run".into()))?;
                     let job_id = self.meta.id;
                     let spec = self.spec.clone();
+                    let job_meta = self.meta;
                     let storage = self.storage.clone();
                     let service = self.service.clone();
                     let meta_storage = self.meta_storage.clone();
@@ -381,14 +381,14 @@ where
                         let _permit = permit;
                         let mut conn = meta_storage.conn().await?;
                         let tx = conn.transaction().await?;
-                        match spec.run_job(&*service, &*storage, tx.as_client(), &job).await {
+                        match spec.run_job(&*service, &*storage, tx.as_client(), job).await {
                             Ok(resolution) => {
                                 // Mark the ticket as done in the ticket storage
-                                job.mark_done(tx.as_client()).await?;
+                                tx.as_client().ticket(job_meta).mark_done(job).await?;
                                 tx.commit().await?;
 
                                 // Alert the results to the scheduler
-                                int_sender.send(InternalEvent::JobSuccess(job.clone(), resolution))
+                                int_sender.send(InternalEvent::JobSuccess(job, resolution))
                                     .map_err(|e| SchedulerError::Other(format!("Failed to send internal event: {e}")))?;
                                 log::trace!(
                                     "{job_id} sent internal event: JobSuccess({job:?}, {resolution:?});",
@@ -499,7 +499,7 @@ where
         &mut self,
         state: &mut RunningState,
         got_all_updates: bool,
-        int_rx: &IntEventReceiver<J, JS::Resolution>,
+        int_rx: &IntEventReceiver<Job<N>, JS::Resolution>,
     ) -> Result<bool, SchedulerError> {
         if *state == RunningState::Running {
             log::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);

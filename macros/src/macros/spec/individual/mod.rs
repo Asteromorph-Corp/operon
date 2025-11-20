@@ -28,6 +28,3 @@ pub(super) use impl_peer_txs::*;
 
 mod impl_meta;
 pub(super) use impl_meta::*;
-
-mod impl_rebuilder_meta;
-pub(super) use impl_rebuilder_meta::*;

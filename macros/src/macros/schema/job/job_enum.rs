@@ -1,7 +1,8 @@
 use syn::parse_quote;
 
 use crate::configs::JobConfigMap;
-use crate::utils::{job_enum_ident, job_ident, variant_ident};
+use crate::operon_ident;
+use crate::utils::{job_enum_ident, variant_ident};
 
 /// Generates an enum representing all jobs in the job configuration map.
 ///
@@ -15,12 +16,13 @@ use crate::utils::{job_enum_ident, job_ident, variant_ident};
 /// }
 /// ```
 pub(super) fn job_enum(jobs: &JobConfigMap) -> syn::ItemEnum {
+    let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
-    let variants = jobs.keys().map(|job| -> syn::Variant {
-        let variant_ident = variant_ident(job);
-        let inner = job_ident(job);
+    let variants = jobs.values().map(|job| -> syn::Variant {
+        let variant_ident = variant_ident(&job.id);
+        let n = job.dims.len();
         parse_quote! {
-            #variant_ident(#inner)
+            #variant_ident(#operon::schema_base::Job<#n>)
         }
     });
     let doc = "An enum representing any job.";

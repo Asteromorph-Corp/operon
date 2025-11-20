@@ -22,7 +22,9 @@ async fn send_on_finish(
     // out-dependencies (delta, epsilon)
     match peer_txs
         .to_delta
-        .send(operon::scheduler::PeerEvent::Job(job.into()))
+        .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+            job,
+        )))
         .await
     {
         Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {job:?}"),
@@ -32,7 +34,9 @@ async fn send_on_finish(
     }
     match peer_txs
         .to_epsilon
-        .send(operon::scheduler::PeerEvent::Job(job.into()))
+        .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+            job,
+        )))
         .await
     {
         Ok(_) => operon::log::trace!("`beta` sent peer event to `epsilon`: {job:?}"),

@@ -6,26 +6,25 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
         client: operon::meta_storage::MetaClient<'_>,
         ui_state: &operon::tokio::sync::RwLock<operon::ui::UiState>,
     ) -> Result<(), operon::scheduler::SchedulerError> {
-        for (job, resolution) in &self.0 {
-            let resolution = *resolution;
+        for (job, resolution) in self.data.iter().cloned() {
             client
-                .resolution(self.spawn_dim_meta())
+                .resolution(self.spawn_dim_meta)
                 .put(resolution)
                 .await?;
-            queries::mark_done_beta(client, job).await?;
+            client.ticket(self.job_meta).mark_done(job).await?;
 
             queries::explode_delta_j(client, resolution).await?;
             queries::raise_quota_epsilon_j(client, resolution).await?;
             queries::raise_dep_delta(
                 client,
-                operon::schema_base::TicketDepCount::some(job.i),
+                operon::schema_base::TicketDepCount::some(job.primary_key[0usize]),
                 operon::schema_base::TicketDepCount::none(),
                 operon::schema_base::TicketDepCount::none(),
             )
             .await?;
             queries::raise_dep_epsilon(
                 client,
-                operon::schema_base::TicketDepCount::some(job.i),
+                operon::schema_base::TicketDepCount::some(job.primary_key[0usize]),
                 operon::schema_base::TicketDepCount::none(),
             )
             .await?;

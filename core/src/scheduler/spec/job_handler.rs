@@ -10,7 +10,7 @@ use crate::scheduler::{
     ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, PeerEventReceiver,
     PeerEventSenderMap, SchedulerError, SpecWithMetadata,
 };
-use crate::schema_base::{JobSql, TicketSql};
+use crate::schema_base::{Job, TicketSql};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiState;
@@ -91,13 +91,12 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, JS, J, T, const N: usize> JobHandler<Svc, Sto> for SpecWithMetadata<Svc, Sto, JS, N>
+impl<Svc, Sto, JS, T, const N: usize> JobHandler<Svc, Sto> for SpecWithMetadata<Svc, Sto, JS, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto, Job = J, Ticket = T> + Clone,
-    J: JobSql,
-    T: TicketSql<Job = J>,
+    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = T> + Clone,
+    T: TicketSql<Job = Job<N>>,
 {
     fn job_id(&self) -> &'static str {
         self.job_meta.id

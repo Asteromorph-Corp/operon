@@ -1,5 +1,4 @@
 use crate::scheduler::SchedulerError;
-use crate::schema_base::Job;
 
 pub type IntEventSender<J, R> = tokio::sync::mpsc::UnboundedSender<InternalEvent<J, R>>;
 pub type IntEventReceiver<J, R> = tokio::sync::mpsc::UnboundedReceiver<InternalEvent<J, R>>;
@@ -9,10 +8,7 @@ pub type IntEventReceiver<J, R> = tokio::sync::mpsc::UnboundedReceiver<InternalE
 /// These are used for communication between individual schedulers and their
 /// child worker coroutines.
 #[derive(Debug)]
-pub enum InternalEvent<J, R>
-where
-    J: Job,
-{
+pub enum InternalEvent<J, R> {
     /// A job successfully finished.
     JobSuccess(J, R),
     /// A job failed.

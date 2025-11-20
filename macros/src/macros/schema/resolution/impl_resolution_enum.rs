@@ -14,6 +14,7 @@ pub(super) fn impl_resolution_enum() -> syn::ItemImpl {
     let res_enum_ident = resolution_enum_ident();
 
     parse_quote! {
+        #[automatically_derived]
         impl #operon::schema_base::ResolutionEnum for #res_enum_ident {}
     }
 }

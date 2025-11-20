@@ -1,7 +1,7 @@
 #[operon::async_trait::async_trait]
 #[automatically_derived]
 impl operon::schema_base::Ticket for BetaTicket {
-    type Job = schema::BetaJob;
+    type Job = operon::schema_base::Job<1usize>;
 
     #[allow(clippy::needless_update)]
     fn new() -> Self {
@@ -40,11 +40,13 @@ impl operon::schema_base::Ticket for BetaTicket {
         self.i.is_some()
     }
 
-    fn resolve(&self) -> Option<schema::BetaJob> {
+    fn resolve(&self) -> Option<Self::Job> {
         if !self.is_ready() {
             return None;
         }
-        let job = schema::BetaJob { i: self.i.0? };
+        let job = operon::schema_base::Job {
+            primary_key: [self.i.0?],
+        };
         Some(job)
     }
 }

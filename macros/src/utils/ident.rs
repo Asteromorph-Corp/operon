@@ -76,10 +76,6 @@ pub fn get_all_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("get_all_{}", job_id.to_snake_case())
 }
 
-pub fn mark_done_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("mark_done_{}", job_id.to_snake_case())
-}
-
 pub fn explode_ident(job_id: &JobId, dimension_id: &DimensionId) -> syn::Ident {
     format_ident!(
         "explode_{}_{}",
@@ -136,10 +132,6 @@ pub fn with_ident(dimension_id: &DimensionId) -> syn::Ident {
 
 pub fn entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("{}", entity_id.to_pascal_case())
-}
-
-pub fn job_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("{}Job", job_id.to_pascal_case())
 }
 
 pub fn ticket_ident(job_id: &JobId) -> syn::Ident {

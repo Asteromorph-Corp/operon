@@ -87,6 +87,7 @@ pub(super) fn fn_send_on_finish(
         });
 
     let send_jobs = downstream_jobs.iter().map(|downstream_job| -> syn::Expr {
+        let job_variant_ident = variant_ident(&job.id);
         let sender_ident = sender_ident(&downstream_job.id);
         let ok_msg = format!(
             "`{}` sent peer event to `{}`: {{job:?}}",
@@ -100,7 +101,7 @@ pub(super) fn fn_send_on_finish(
         parse_quote! {
             match peer_txs
                 .#sender_ident
-                .send(#operon::scheduler::PeerEvent::Job(job.into()))
+                .send(#operon::scheduler::PeerEvent::Job(schema::JobEnum::#job_variant_ident(job)))
                 .await
             {
                 Ok(_) => #operon::log::trace!(#ok_msg),

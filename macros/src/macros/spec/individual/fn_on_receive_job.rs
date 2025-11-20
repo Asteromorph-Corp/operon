@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{job_enum_ident, operon_ident, raise_dep_ident, variable_ident, variant_ident};
+use crate::utils::{job_enum_ident, operon_ident, raise_dep_ident, variant_ident};
 
 /// Generates the `on_receive_job` function for the implementation of the trait `JobSpec`.
 ///
@@ -48,10 +48,9 @@ pub(super) fn fn_on_receive_job(
     let job_arms = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
         let variant_ident = variant_ident(&upstream_job.id);
 
-        let args = job.dims.iter().map(|d| -> syn::Expr {
-            if upstream_job.dims.contains(d) {
-                let field_ident = variable_ident(d);
-                parse_quote! { #operon::schema_base::TicketDepCount::some(job.#field_ident) }
+        let args = job.dims.iter().map(|job_dim| -> syn::Expr {
+            if let Some(index) = upstream_job.dims.iter().position(|d| d == job_dim) {
+                parse_quote! { #operon::schema_base::TicketDepCount::some(job.primary_key[#index]) }
             } else {
                 parse_quote! { #operon::schema_base::TicketDepCount::none() }
             }

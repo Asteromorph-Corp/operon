@@ -1,8 +1,10 @@
+use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::macros::spec::individual::resolution_type::resolution_type;
-use crate::utils::{job_ident, rebuilder_ident};
+use crate::operon_ident;
+use crate::utils::rebuilder_ident;
 
 /// Generates a struct definition for a job rebuilder.
 ///
@@ -12,13 +14,22 @@ use crate::utils::{job_ident, rebuilder_ident};
 /// pub struct BetaRebuilder(Vec<(schema::BetaJob, schema::JResolution)>);
 /// ```
 pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
+    let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
-    let job_ident = job_ident(&job.id);
     let resolution_type = resolution_type(job);
+    let n = job.dims.len();
+
+    let maybe_spawn_dim_meta = job.spawn_dim.is_some().then(|| {
+        quote! { spawn_dim_meta: #operon::schema_base::DimensionMetadata<#n>, }
+    });
 
     parse_quote! {
         #[derive(Debug)]
-        pub struct #rebuilder_ident(Vec<(schema::#job_ident, #resolution_type)>);
+        pub struct #rebuilder_ident {
+            job_meta: #operon::schema_base::JobMetadata<#n>,
+            #maybe_spawn_dim_meta
+            data: Vec<(#operon::schema_base::Job<#n>, #resolution_type)>,
+        }
     }
 }
 

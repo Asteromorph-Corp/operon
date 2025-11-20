@@ -3,8 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    explode_ident, mark_done_ident, operon_ident, raise_dep_ident, raise_quota_ident,
-    rebuilder_ident, ticket_ident, variable_ident,
+    explode_ident, operon_ident, raise_dep_ident, raise_quota_ident, rebuilder_ident, ticket_ident,
 };
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -54,9 +53,8 @@ pub fn impl_job_rebuilder(
     let job_id = &job.id;
 
     let maybe_put_resolution = job.spawn_dim.is_some().then(|| -> syn::Stmt {
-        parse_quote! { client.resolution(self.spawn_dim_meta()).put(resolution).await?; }
+        parse_quote! { client.resolution(self.spawn_dim_meta).put(resolution).await?; }
     });
-    let mark_done_fn_name = mark_done_ident(&job.id);
 
     let explode_exprs = if let Some(spawn_dim) = &job.spawn_dim {
         let explode = spawn_dim_repeating_jobs
@@ -89,10 +87,9 @@ pub fn impl_job_rebuilder(
         .iter()
         .map(|downstream_job| -> syn::Stmt {
             let raise_dep_fn_name = raise_dep_ident(&downstream_job.id);
-            let args = downstream_job.dims.iter().map(|d| -> syn::Expr {
-                if job.dims.contains(d) {
-                    let field_ident = variable_ident(d);
-                    parse_quote! { #operon::schema_base::TicketDepCount::some(job.#field_ident) }
+            let args = downstream_job.dims.iter().map(|downstream_dim| -> syn::Expr {
+                if let Some(index) = job.dims.iter().position(|d| d == downstream_dim) {
+                    parse_quote! { #operon::schema_base::TicketDepCount::some(job.primary_key[#index]) }
                 } else {
                     parse_quote! { #operon::schema_base::TicketDepCount::none() }
                 }
@@ -110,10 +107,9 @@ pub fn impl_job_rebuilder(
                 client: #operon::meta_storage::MetaClient<'_>,
                 ui_state: &#operon::tokio::sync::RwLock<#operon::ui::UiState>,
             ) -> Result<(), #operon::scheduler::SchedulerError> {
-                for (job, resolution) in &self.0 {
-                    let resolution = *resolution;
+                for (job, resolution) in self.data.iter().cloned() {
                     #maybe_put_resolution
-                    queries::#mark_done_fn_name(client, job).await?;
+                    client.ticket(self.job_meta).mark_done(job).await?;
 
                     #(#explode_exprs)*
                     #(#raise_dep_exprs)*

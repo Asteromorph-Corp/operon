@@ -3,25 +3,30 @@ async fn run_job(
     service: &Svc,
     storage: &Sto,
     client: operon::meta_storage::MetaClient<'_>,
-    job: &Self::Job,
+    job: Self::Job,
 ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
     let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
-    let resolution = client
+
+    let pkey = [job.primary_key[0usize]];
+    let Some(resolution) = client
         .resolution(metadata::dimension_j_meta())
-        .get([job.i])
+        .get(pkey)
         .await?
-        .ok_or_else(|| {
-            operon::meta_storage::MetaStorageError::MissingResolution(format!("j_{}", job.i))
-        })?;
+    else {
+        return Err(
+            operon::meta_storage::MetaStorageError::MissingResolution(format!("j_{:?}", pkey))
+                .into(),
+        );
+    };
     resolution_j.insert((), resolution.ub);
 
     let b_j = {
-        let elem = storage.get_all_b_over_j(job.i).await?;
+        let elem = storage.get_all_b_over_j(job.primary_key[0usize]).await?;
         let ub = resolution_j.get(&()).unwrap_or(&0);
         if elem.len() < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
                 "b (i = {}, j = *) expects {} elements, but only {} were found",
-                job.i,
+                job.primary_key[0usize],
                 ub,
                 elem.len()
             ))
@@ -34,13 +39,15 @@ async fn run_job(
             .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
     }?;
     let d_j = {
-        let elem = storage.get_all_d_over_j(job.i, job.k).await?;
+        let elem = storage
+            .get_all_d_over_j(job.primary_key[0usize], job.primary_key[1usize])
+            .await?;
         let ub = resolution_j.get(&()).unwrap_or(&0);
         if elem.len() < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
                 "d (i = {}, j = *, k = {}) expects {} elements, but only {} were found",
-                job.i,
-                job.k,
+                job.primary_key[0usize],
+                job.primary_key[1usize],
                 ub,
                 elem.len()
             ))
@@ -59,6 +66,8 @@ async fn run_job(
         .map_err(operon::scheduler::SchedulerError::UserError)?;
     let resolution = ();
 
-    storage.put_e(job.i, job.k, e).await?;
+    storage
+        .put_e(job.primary_key[0usize], job.primary_key[1usize], e)
+        .await?;
     Ok(resolution)
 }

@@ -1,13 +1,13 @@
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{job_ident, operon_ident, ticket_ident, variable_ident};
+use crate::utils::{operon_ident, ticket_ident, variable_ident};
 
 /// Generates the implementation of the `Ticket` trait for a given job's ticket.
 pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
     let operon = operon_ident();
-    let job_ident = job_ident(&job.id);
     let ticket_ident = ticket_ident(&job.id);
+    let n = job.dims.len();
 
     let dim_fields = job
         .dims
@@ -33,7 +33,7 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
         #[#operon::async_trait::async_trait]
         #[automatically_derived]
         impl #operon::schema_base::Ticket for #ticket_ident {
-            type Job = schema::#job_ident;
+            type Job = #operon::schema_base::Job<#n>;
 
             #[allow(clippy::needless_update)]
             fn new() -> Self {
@@ -72,13 +72,13 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
                 #is_resolved
             }
 
-            fn resolve(&self) -> Option<schema::#job_ident> {
+            fn resolve(&self) -> Option<Self::Job> {
                 if !self.is_ready() {
                     return None;
                 }
 
-                let job = schema::#job_ident {
-                    #(#dim_fields: self.#dim_fields.0?,)*
+                let job = #operon::schema_base::Job {
+                    primary_key: [#(self.#dim_fields.0?,)*]
                 };
                 Some(job)
             }
