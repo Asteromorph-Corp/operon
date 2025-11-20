@@ -21,3 +21,20 @@ pub fn dimension_metadata(dimension: &DimensionConfig) -> syn::ItemFn {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use rstest::rstest;
+
+    use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::dimension_j;
+
+    #[rstest]
+    #[case(dimension_j(), "metadata/dimension.rs")]
+    fn test_dimension_metadata(#[case] job: DimensionConfig, #[case] fixture_path: &str) {
+        let result = dimension_metadata(&job);
+        assert_item_eq(&result, fixture_path);
+    }
+}

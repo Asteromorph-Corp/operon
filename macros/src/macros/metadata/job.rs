@@ -26,3 +26,19 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::job_beta;
+
+    #[rstest]
+    #[case(job_beta(), "metadata/job.rs")]
+    fn test_job_metadata(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let result = job_metadata(&job);
+        assert_item_eq(&result, fixture_path);
+    }
+}
