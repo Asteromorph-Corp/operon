@@ -14,7 +14,7 @@ impl<const N: usize> Resolution<N> {
         Self { coordinate, ub }
     }
 
-    pub fn as_insert_params(&self) -> Result<SqlParams, TryFromIntError> {
+    pub fn as_sql_params(&self) -> Result<SqlParams, TryFromIntError> {
         SqlParams::from_usize(self.coordinate.into_iter().chain([self.ub]))
     }
 }

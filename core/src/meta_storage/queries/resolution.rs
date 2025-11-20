@@ -49,7 +49,7 @@ impl<const N: usize> ResolutionQueryBuilder<'_, N> {
     pub async fn put(&self, resolution: Resolution<N>) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
-        let params = resolution.as_insert_params()?;
+        let params = resolution.as_sql_params()?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }

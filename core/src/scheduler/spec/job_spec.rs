@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
 use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
-use crate::schema_base::{JobMetadata, ResolutionLike, Ticket};
+use crate::schema_base::{JobLike, JobMetadata, ResolutionLike, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -64,7 +64,7 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
 {
-    type Job;
+    type Job: JobLike;
     type Ticket: Ticket<Job = Self::Job>;
     type Resolution: ResolutionLike;
     type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;

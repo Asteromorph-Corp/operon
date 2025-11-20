@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::num::TryFromIntError;
 
 use postgres_types::ToSql;
@@ -16,24 +17,50 @@ impl<T, I: IntoIterator<Item = T>> SplitFirstOwned<T> for I {
     }
 }
 
+pub trait SqlParam: ToSql + Display + Send + Sync + 'static {
+    fn as_param(&self) -> &(dyn ToSql + Sync + 'static);
+}
+
+impl SqlParam for String {
+    fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
+        self
+    }
+}
+impl SqlParam for i64 {
+    fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
+        self
+    }
+}
+
 #[repr(transparent)]
-pub struct SqlParams(Vec<Box<dyn ToSql + Send + Sync + 'static>>);
+pub struct SqlParams(Vec<Box<dyn SqlParam>>);
 
 impl SqlParams {
+    pub fn new(params: Vec<Box<dyn SqlParam>>) -> Self {
+        Self(params)
+    }
+
     pub fn from_usize(items: impl IntoIterator<Item = usize>) -> Result<Self, TryFromIntError> {
         let items = items
             .into_iter()
-            .map(|item| {
-                i64::try_from(item).map(|x| Box::new(x) as Box<dyn ToSql + Send + Sync + 'static>)
-            })
+            .map(|item| i64::try_from(item).map(box_sql))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self(items))
     }
 
     pub fn borrow(&self) -> Vec<&(dyn ToSql + Sync + 'static)> {
+        self.0.iter().map(|x| x.as_param()).collect()
+    }
+
+    pub fn to_copy_string(&self) -> String {
         self.0
             .iter()
-            .map(|x| x.as_ref() as &(dyn ToSql + Sync + 'static))
-            .collect()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
     }
+}
+
+pub fn box_sql<T: SqlParam>(value: T) -> Box<dyn SqlParam> {
+    Box::new(value)
 }
