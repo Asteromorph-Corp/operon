@@ -30,6 +30,14 @@ impl<const N: usize> ResolutionQueryBuilder<'_, N> {
         Ok(())
     }
 
+    /// Clears the resolutions table.
+    pub async fn clear(&self) -> Result<(), MetaStorageError> {
+        let schema_prefix = self.client.schema_prefix();
+        let stmt = ClearResolutionQuery(schema_prefix, self.dim_meta);
+        self.client.execute_stmt(&stmt, &[]).await?;
+        Ok(())
+    }
+
     /// Gets the resolution for the given primary key.
     pub async fn get(
         &self,
@@ -51,14 +59,6 @@ impl<const N: usize> ResolutionQueryBuilder<'_, N> {
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
         let params = resolution.as_sql_params()?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
-        Ok(())
-    }
-
-    /// Clears the resolutions table.
-    pub async fn clear(&self) -> Result<(), MetaStorageError> {
-        let schema_prefix = self.client.schema_prefix();
-        let stmt = ClearResolutionQuery(schema_prefix, self.dim_meta);
-        self.client.execute_stmt(&stmt, &[]).await?;
         Ok(())
     }
 }
