@@ -1,10 +1,8 @@
-use std::fmt::Debug;
-
 use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
 use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
-use crate::schema_base::{Job, JobMetadata, Ticket};
+use crate::schema_base::{Job, JobMetadata, ResolutionLike, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -57,8 +55,7 @@ where
 {
     type Job: Job;
     type Ticket: Ticket<Job = Self::Job>;
-    // TODO: create custom trait for this
-    type Resolution: Debug + Clone + Copy + Send + Sync + 'static;
+    type Resolution: ResolutionLike;
     type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;
 
     fn pool_size(&self) -> usize;

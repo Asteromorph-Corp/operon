@@ -19,4 +19,10 @@ impl<const N: usize> Resolution<N> {
     }
 }
 
+/// A trait that unifies `Resolution<N>` and `()`
+pub trait ResolutionLike: Debug + Clone + Copy + Send + Sync + 'static {}
+
+impl<const N: usize> ResolutionLike for Resolution<N> {}
+impl ResolutionLike for () {}
+
 pub trait ResolutionEnum: Debug + Clone + Send + Sync + 'static {}
