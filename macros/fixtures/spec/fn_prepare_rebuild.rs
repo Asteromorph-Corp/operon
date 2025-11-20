@@ -11,12 +11,12 @@ async fn prepare_rebuild(
             })?;
             let resolution = client
                 .resolution(self.spawn_dim_meta())
-                .get(job.primary_key)
+                .get(job.coordinate)
                 .await?
                 .ok_or_else(|| {
                     operon::scheduler::SchedulerError::Other(format!(
                         "No resolution found for j_{:?}",
-                        job.primary_key
+                        job.coordinate
                     ))
                 })?;
 

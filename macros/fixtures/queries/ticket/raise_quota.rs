@@ -5,7 +5,7 @@ pub async fn raise_quota_epsilon_j(
     let schema_prefix = client.schema_prefix();
     let pop_stmt = format!("DELETE FROM {schema_prefix}ticket_epsilon\nWHERE i = $1\nRETURNING *;");
     let rows = client
-        .query(&pop_stmt, &[&i64::try_from(res.primary_key[0usize])?])
+        .query(&pop_stmt, &[&i64::try_from(res.coordinate[0usize])?])
         .await?;
     let tickets = rows
         .iter()

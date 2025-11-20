@@ -89,7 +89,7 @@ pub fn impl_job_rebuilder(
             let raise_dep_fn_name = raise_dep_ident(&downstream_job.id);
             let args = downstream_job.dims.iter().map(|downstream_dim| -> syn::Expr {
                 if let Some(index) = job.dims.iter().position(|d| d == downstream_dim) {
-                    parse_quote! { #operon::schema_base::TicketDepCount::some(job.primary_key[#index]) }
+                    parse_quote! { #operon::schema_base::TicketDepCount::some(job.coordinate[#index]) }
                 } else {
                     parse_quote! { #operon::schema_base::TicketDepCount::none() }
                 }

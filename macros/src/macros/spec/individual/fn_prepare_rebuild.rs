@@ -47,12 +47,12 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
         Some(dim) => {
             let missing_resolution_msg = format!("No resolution found for {dim}_{{:?}}");
             parse_quote! {
-                client.resolution(self.spawn_dim_meta()).get(job.primary_key)
+                client.resolution(self.spawn_dim_meta()).get(job.coordinate)
                     .await?
                     .ok_or_else(|| {
                         #operon::scheduler::SchedulerError::Other(format!(
                             #missing_resolution_msg,
-                            job.primary_key
+                            job.coordinate
                         ))
                     })?
             }

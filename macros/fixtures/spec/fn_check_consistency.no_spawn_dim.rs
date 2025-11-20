@@ -15,7 +15,7 @@ async fn check_consistency(
     };
     // ...and check if the data storage holds all the data for them.
     for job in jobs {
-        let [i, k] = job.primary_key;
+        let [i, k] = job.coordinate;
         if storage.get_e(i, k).await?.is_none() {
             operon::log::info!("Data storage does not hold `e_{:?}`.", [i, k]);
             return Ok(false);

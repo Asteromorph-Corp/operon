@@ -50,7 +50,7 @@ pub(super) fn fn_on_receive_job(
 
         let args = job.dims.iter().map(|job_dim| -> syn::Expr {
             if let Some(index) = upstream_job.dims.iter().position(|d| d == job_dim) {
-                parse_quote! { #operon::schema_base::TicketDepCount::some(job.primary_key[#index]) }
+                parse_quote! { #operon::schema_base::TicketDepCount::some(job.coordinate[#index]) }
             } else {
                 parse_quote! { #operon::schema_base::TicketDepCount::none() }
             }

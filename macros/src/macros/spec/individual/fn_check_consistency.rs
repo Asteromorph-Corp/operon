@@ -79,13 +79,13 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             quote! {
                 let mut tags = Vec::new();
                 for job in jobs {
-                    let Some(res) = client.resolution(self.spawn_dim_meta()).get(job.primary_key).await?
+                    let Some(res) = client.resolution(self.spawn_dim_meta()).get(job.coordinate).await?
                     else {
-                        #operon::log::info!(#missing_res_msg, job.primary_key);
+                        #operon::log::info!(#missing_res_msg, job.coordinate);
                         return Ok(false);
                     };
                     for #dim_var in 0..(res.ub) {
-                        tags.push((job.primary_key, #dim_var));
+                        tags.push((job.coordinate, #dim_var));
                     }
                 }
                 for ([#(#field_vars),*], #dim_var) in tags {
@@ -99,7 +99,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
         None => {
             quote! {
                 for job in jobs {
-                    let [#(#field_vars),*] = job.primary_key;
+                    let [#(#field_vars),*] = job.coordinate;
 
                     if storage.#get_fn_name(#(#field_vars),*).await?.is_none() {
                         #operon::log::info!(#missing_entity_msg, [#(#field_vars),*]);

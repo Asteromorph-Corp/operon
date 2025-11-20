@@ -23,7 +23,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     pub async fn mark_done(&self, job: Job<N>) -> Result<(), MetaStorageError> {
         let schema = self.client.schema_prefix();
         let stmt = MarkDoneQuery(schema, self.job_meta);
-        let params = SqlParams::from_usize(job.primary_key)?;
+        let params = SqlParams::from_usize(job.coordinate)?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }

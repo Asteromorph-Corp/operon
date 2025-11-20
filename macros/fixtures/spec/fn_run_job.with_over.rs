@@ -7,7 +7,7 @@ async fn run_job(
 ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
     let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
 
-    let pkey = [job.primary_key[0usize]];
+    let pkey = [job.coordinate[0usize]];
     let Some(resolution) = client
         .resolution(metadata::dimension_j_meta())
         .get(pkey)
@@ -21,12 +21,12 @@ async fn run_job(
     resolution_j.insert((), resolution.ub);
 
     let b_j = {
-        let elem = storage.get_all_b_over_j(job.primary_key[0usize]).await?;
+        let elem = storage.get_all_b_over_j(job.coordinate[0usize]).await?;
         let ub = resolution_j.get(&()).unwrap_or(&0);
         if elem.len() < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
                 "b (i = {}, j = *) expects {} elements, but only {} were found",
-                job.primary_key[0usize],
+                job.coordinate[0usize],
                 ub,
                 elem.len()
             ))
@@ -40,14 +40,14 @@ async fn run_job(
     }?;
     let d_j = {
         let elem = storage
-            .get_all_d_over_j(job.primary_key[0usize], job.primary_key[1usize])
+            .get_all_d_over_j(job.coordinate[0usize], job.coordinate[1usize])
             .await?;
         let ub = resolution_j.get(&()).unwrap_or(&0);
         if elem.len() < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
                 "d (i = {}, j = *, k = {}) expects {} elements, but only {} were found",
-                job.primary_key[0usize],
-                job.primary_key[1usize],
+                job.coordinate[0usize],
+                job.coordinate[1usize],
                 ub,
                 elem.len()
             ))
@@ -67,7 +67,7 @@ async fn run_job(
     let resolution = ();
 
     storage
-        .put_e(job.primary_key[0usize], job.primary_key[1usize], e)
+        .put_e(job.coordinate[0usize], job.coordinate[1usize], e)
         .await?;
     Ok(resolution)
 }

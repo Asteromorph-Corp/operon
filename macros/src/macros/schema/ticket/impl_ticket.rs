@@ -78,7 +78,7 @@ pub(super) fn impl_ticket(job: &JobConfig) -> syn::ItemImpl {
                 }
 
                 let job = #operon::schema_base::Job {
-                    primary_key: [#(self.#dim_fields.0?,)*]
+                    coordinate: [#(self.#dim_fields.0?,)*]
                 };
                 Some(job)
             }

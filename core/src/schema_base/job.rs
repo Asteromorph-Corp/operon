@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Job<const N: usize> {
-    pub primary_key: [usize; N],
+    pub coordinate: [usize; N],
 }
 
 pub trait JobLike: Debug + Clone + Copy + Send + Sync + 'static {}

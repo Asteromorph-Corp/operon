@@ -78,7 +78,7 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig) -> syn::ItemFn 
             let schema_prefix = client.schema_prefix();
             let pop_stmt = format!(#pop_query);
 
-            let rows = client.query(&pop_stmt, &[#(&i64::try_from(resolution.primary_key[#indices])?,)*]).await?;
+            let rows = client.query(&pop_stmt, &[#(&i64::try_from(resolution.coordinate[#indices])?,)*]).await?;
             let tickets = rows
                 .iter()
                 .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)

@@ -73,7 +73,7 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
             let schema_prefix = client.schema_prefix();
             let pop_stmt = format!(#pop_query);
 
-            let rows = client.query(&pop_stmt, &[#(&i64::try_from(res.primary_key[#indices])?,)*]).await?;
+            let rows = client.query(&pop_stmt, &[#(&i64::try_from(res.coordinate[#indices])?,)*]).await?;
             let tickets = rows
                 .iter()
                 .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)

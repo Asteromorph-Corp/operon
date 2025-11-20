@@ -18,17 +18,17 @@ async fn check_consistency(
     for job in jobs {
         let Some(res) = client
             .resolution(self.spawn_dim_meta())
-            .get(job.primary_key)
+            .get(job.coordinate)
             .await?
         else {
             operon::log::info!(
                 "No `j` resolution found for `beta_{:?}` in the metadata storage.",
-                job.primary_key
+                job.coordinate
             );
             return Ok(false);
         };
         for j in 0..(res.ub) {
-            tags.push((job.primary_key, j));
+            tags.push((job.coordinate, j));
         }
     }
     // ...and check if the data storage holds all the data for them.

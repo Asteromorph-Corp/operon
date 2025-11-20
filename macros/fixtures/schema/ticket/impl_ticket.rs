@@ -45,7 +45,7 @@ impl operon::schema_base::Ticket for BetaTicket {
             return None;
         }
         let job = operon::schema_base::Job {
-            primary_key: [self.i.0?],
+            coordinate: [self.i.0?],
         };
         Some(job)
     }

@@ -79,7 +79,7 @@ fn resolution_inserts(
             .iter()
             .map(|dep| -> syn::Expr {
                 if let Some(index) = job_dim_set.iter().position(|d| *d == dep) {
-                    parse_quote! { job.primary_key[#index] }
+                    parse_quote! { job.coordinate[#index] }
                 } else {
                     let dep_var = variable_ident(dep);
                     parse_quote! { #dep_var }
@@ -153,10 +153,10 @@ fn arg_def_single(job: &JobConfig, arg_entity: &EntityConfig) -> syn::Stmt {
 
     parse_quote! {
         let Some(#arg_ident) = storage
-            .#get_ident(#(job.primary_key[#get_indices]),*)
+            .#get_ident(#(job.coordinate[#get_indices]),*)
             .await?
         else {
-            return Err(#operon::storage::StorageError::NotFound(format!(#not_found_msg, #(job.primary_key[#get_indices]),*)).into());
+            return Err(#operon::storage::StorageError::NotFound(format!(#not_found_msg, #(job.coordinate[#get_indices]),*)).into());
         };
     }
 }
@@ -214,7 +214,7 @@ fn arg_def_collected(
                     if let Some(index) = job_dim_set.iter().position(|d| *d == arg_dim) {
                         return (
                             format!("{arg_dim} = {{}}"),
-                            Some(parse_quote! { job.primary_key[#index] }),
+                            Some(parse_quote! { job.coordinate[#index] }),
                         );
                     }
                     cnt += 1;
@@ -255,7 +255,7 @@ fn arg_def_collected(
 
     parse_quote! {
         let #arg_ident = {
-            let elem = storage.#get_ident(#(job.primary_key[#get_indices]),*).await?;
+            let elem = storage.#get_ident(#(job.coordinate[#get_indices]),*).await?;
             #check_ub
         }?;
     }
@@ -362,7 +362,7 @@ pub(super) fn fn_run_job(
     };
 
     let resolution: syn::Expr = if job.spawn_dim.is_some() {
-        parse_quote! { #operon::schema_base::Resolution::new(#result_ident.len(), job.primary_key)  }
+        parse_quote! { #operon::schema_base::Resolution::new(#result_ident.len(), job.coordinate)  }
     } else {
         parse_quote! { () }
     };
@@ -393,7 +393,7 @@ pub(super) fn fn_run_job(
                 .map_err(operon::scheduler::SchedulerError::UserError)?;
             let resolution = #resolution;
 
-            storage.#put_fn_name(#(job.primary_key[#indices],)* #result_ident).await?;
+            storage.#put_fn_name(#(job.coordinate[#indices],)* #result_ident).await?;
             #maybe_put_resolution;
             Ok(resolution)
         }

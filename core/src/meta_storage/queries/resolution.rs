@@ -33,16 +33,16 @@ impl<const N: usize> ResolutionQueryBuilder<'_, N> {
     /// Gets the resolution for the given primary key.
     pub async fn get(
         &self,
-        primary_key: [usize; N],
+        coordinate: [usize; N],
     ) -> Result<Option<Resolution<N>>, MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetResolutionQuery(schema_prefix, self.dim_meta);
-        let params = SqlParams::from_usize(primary_key)?;
+        let params = SqlParams::from_usize(coordinate)?;
         let Some(row) = self.client.query_opt_stmt(&stmt, &params.borrow()).await? else {
             return Ok(None);
         };
         let ub = usize::try_from(row.get::<_, i64>(&"ub"))?;
-        Ok(Some(Resolution { primary_key, ub }))
+        Ok(Some(Resolution { coordinate, ub }))
     }
 
     /// Puts the resolution for the given primary key.
