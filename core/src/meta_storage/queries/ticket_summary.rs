@@ -1,5 +1,4 @@
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema_base::Job;
 
 impl MetaClient<'_> {
     pub async fn init_ticket_summary(&self) -> Result<(), MetaStorageError> {
@@ -66,16 +65,19 @@ impl MetaClient<'_> {
         Ok(())
     }
 
-    pub async fn get_ticket_summary<J: Job>(&self) -> Result<(i64, i64, i64), MetaStorageError> {
+    pub async fn get_ticket_summary(
+        &self,
+        // TODO: make a TicketQueryBuilder to replace this.
+        job_id: &'static str,
+    ) -> Result<(i64, i64, i64), MetaStorageError> {
         let schema_prefix = self.schema_prefix();
         let stmt = format!("SELECT * FROM {schema_prefix}ticket_summary WHERE job_id = $1");
 
         let row = self
-            .query_opt(&stmt, &[&J::id()])
+            .query_opt(&stmt, &[&job_id])
             .await?
             .ok_or(MetaStorageError::NotFound(format!(
-                "Ticket summary for job {}",
-                J::id()
+                "Ticket summary for job {job_id}",
             )))?;
 
         let done: i64 = row.get("done");

@@ -4,12 +4,7 @@ use async_trait::async_trait;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
 
-pub trait Job: Debug + Clone + Send + Sync + 'static {
-    fn id() -> &'static str;
-
-    /// Check if this job type is a descendant of the given job type.
-    fn is_descendant_of(other: &str) -> bool;
-}
+pub trait Job: Debug + Clone + Send + Sync + 'static {}
 
 #[async_trait]
 pub trait JobSql: Job {

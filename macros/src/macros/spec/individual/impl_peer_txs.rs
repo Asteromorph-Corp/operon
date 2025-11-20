@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::JobId;
 use crate::utils::{
-    job_enum_ident, job_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident,
+    job_enum_ident, job_id_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident,
 };
 
 /// Generates an implementation of `PeerEventSenders` for a job's peer event senders.
@@ -17,11 +17,11 @@ use crate::utils::{
 ///         mut senders: operon::scheduler::PeerEventSenderMap<schema::JobEnum, schema::ResolutionEnum>,
 ///     ) -> Self {
 ///         BetaPeerTxs {
-///             to_delta: senders.remove(<schema::DeltaJob as operon::scheduler::Job>::id()).unwrap_or_else(|| {
-///                 panic!("No sender for job `{}` found", <schema::DeltaJob as operon::scheduler::Job>::id())
+///             to_delta: senders.remove("delta").unwrap_or_else(|| {
+///                 panic!("No sender for job `{}` found", "delta")
 ///             }),
-///             to_epsilon: senders.remove(<schema::EpsilonJob as operon::scheduler::Job>::id()).unwrap_or_else(|| {
-///                 panic!("No sender for job `{}` found", <schema::EpsilonJob as operon::scheduler::Job>::id())
+///             to_epsilon: senders.remove("epsilon").unwrap_or_else(|| {
+///                 panic!("No sender for job `{}` found", "epsilon")
 ///             }),
 ///         }
 ///     }
@@ -38,18 +38,20 @@ pub fn impl_peer_txs(job_id: &JobId, event_receiving_job_ids: &IndexSet<&JobId>)
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
 
-    let sender_value = event_receiving_job_ids.iter().map(|downstream_job_id| -> syn::FieldValue {
-        let sender_ident = sender_ident(downstream_job_id);
-        let job_ident = job_ident(downstream_job_id);
+    let sender_value = event_receiving_job_ids
+        .iter()
+        .map(|downstream_job_id| -> syn::FieldValue {
+            let sender_ident = sender_ident(downstream_job_id);
+            let downstream_job_id_ident = job_id_ident(downstream_job_id);
 
-        parse_quote! {
-            #sender_ident: senders
-                .remove(<schema::#job_ident as #operon::schema_base::Job>::id())
-                .unwrap_or_else(|| {
-                    panic!("No sender for job `{}` found", <schema::#job_ident as #operon::schema_base::Job>::id())
-                })
-        }
-    });
+            parse_quote! {
+                #sender_ident: senders
+                    .remove(metadata::#downstream_job_id_ident)
+                    .unwrap_or_else(|| {
+                        panic!("No sender for job `{}` found", metadata::#downstream_job_id_ident)
+                    })
+            }
+        });
 
     let senders = event_receiving_job_ids
         .iter()

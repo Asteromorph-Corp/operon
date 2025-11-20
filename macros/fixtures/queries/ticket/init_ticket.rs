@@ -47,12 +47,7 @@ CREATE OR REPLACE TRIGGER ticket_beta_summary_trunc_trg
     );
 
     client.execute(&init_stmt, &[]).await?;
-    client
-        .execute(
-            &summary_stmt,
-            &[&<schema::BetaJob as operon::schema_base::Job>::id()],
-        )
-        .await?;
+    client.execute(&summary_stmt, &[&"beta"]).await?;
     client.batch_execute(&trigger_stmts).await?;
 
     Ok(())

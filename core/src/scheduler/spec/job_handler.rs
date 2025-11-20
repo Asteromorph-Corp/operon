@@ -100,7 +100,7 @@ where
     T: TicketSql<Job = J>,
 {
     fn job_id(&self) -> &'static str {
-        J::id()
+        self.job_meta.id
     }
 
     fn pool_size(&self) -> usize {

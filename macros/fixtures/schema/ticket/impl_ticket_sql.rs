@@ -85,6 +85,6 @@ impl operon::schema_base::TicketSql for BetaTicket {
     async fn get_status(
         client: operon::meta_storage::MetaClient<'_>,
     ) -> Result<(i64, i64, i64), operon::meta_storage::MetaStorageError> {
-        client.get_ticket_summary::<BetaJob>().await
+        client.get_ticket_summary("beta").await
     }
 }

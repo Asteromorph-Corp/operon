@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use syn::{LitStr, parse_quote};
 
 use crate::configs::JobConfig;
-use crate::utils::{init_ticket_ident, job_ident, operon_ident};
+use crate::utils::{init_ticket_ident, operon_ident};
 
 /// Helper struct to generate the SQL query for initializing a ticket table.
 struct InitTicketQuery<'a>(&'a JobConfig);
@@ -148,15 +148,15 @@ impl std::fmt::Display for TicketSummaryTriggerQuery<'_> {
 ///             EXECUTE FUNCTION {schema_prefix}trg_ticket_summary('beta');"
 ///     );
 ///     client.execute(&init_stmt, &[]).await?;
-///     client.execute(&summary_stmt, &[&<schema::BetaJob as operon::schema_base::Job>::id()]).await?;
+///     client.execute(&summary_stmt, &[&"beta"]).await?;
 ///     client.batch_execute(&trigger_stmts).await?;
 ///     Ok(())
 /// }
 /// ```
 pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
+    let job_id = &job.id;
     let fn_ident = init_ticket_ident(&job.id);
-    let job_ident = job_ident(&job.id);
     let init_ticket_query = LitStr::new(&InitTicketQuery(job).to_string(), Span::call_site());
     let ticket_summary_query = LitStr::new(TICKET_SUMMARY_INSERT_QUERY, Span::call_site());
     let ticket_trigger_query = LitStr::new(
@@ -175,7 +175,7 @@ pub(super) fn fn_init_ticket(job: &JobConfig) -> syn::ItemFn {
             let trigger_stmts = format!(#ticket_trigger_query);
 
             client.execute(&init_stmt, &[]).await?;
-            client.execute(&summary_stmt, &[&<schema::#job_ident as #operon::schema_base::Job>::id()]).await?;
+            client.execute(&summary_stmt, &[&#job_id]).await?;
             client.batch_execute(&trigger_stmts).await?;
 
             Ok(())

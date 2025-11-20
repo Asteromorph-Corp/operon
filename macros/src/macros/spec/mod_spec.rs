@@ -4,7 +4,7 @@ use syn::parse_quote;
 
 use crate::configs::AllConfig;
 use crate::dependency_analysis::{
-    get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on,
+    get_direct_downstream_jobs, get_direct_upstream_jobs, get_jobs_repeating_on, get_upstream_jobs,
 };
 use crate::macros::spec::individual::{
     impl_job_rebuilder, impl_job_spec, impl_meta, impl_peer_txs, impl_rebuilder_meta,
@@ -16,6 +16,7 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
     let job_specs = all_configs.jobs.values().map(|job| {
         let upstream_jobs = get_direct_upstream_jobs(job, &all_configs.jobs);
         let downstream_jobs = get_direct_downstream_jobs(job, &all_configs.jobs);
+        let all_upstream_jobs = get_upstream_jobs(job, &all_configs.jobs);
         let spawn_dim_repeating_jobs = job
             .spawn_dim
             .as_ref()
@@ -41,7 +42,7 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             &all_configs.entities,
             &all_configs.dimensions,
         );
-        let impl_meta = impl_meta(&all_configs.service_id, job);
+        let impl_meta = impl_meta(&all_configs.service_id, job, &all_upstream_jobs);
 
         let job_rebuilder_def = job_rebuilder_definition(job);
         let impl_job_rebuilder = impl_job_rebuilder(

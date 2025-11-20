@@ -2,8 +2,8 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    clear_ticket_ident, get_all_ident, init_ticket_ident, job_ident, operon_ident,
-    put_ticket_ident, ticket_ident, variable_ident,
+    clear_ticket_ident, get_all_ident, init_ticket_ident, operon_ident, put_ticket_ident,
+    ticket_ident, variable_ident,
 };
 
 /// Generates the implementation of the `TicketSql` trait for a given job's ticket.
@@ -97,13 +97,13 @@ use crate::utils::{
 ///     async fn get_status(
 ///         client: operon::meta_storage::MetaClient<'_>,
 ///     ) -> Result<(i64, i64, i64), operon::meta_storage::MetaStorageError> {
-///         client.get_ticket_summary::<BetaJob>().await
+///         client.get_ticket_summary("beta").await
 ///     }
 /// }
 pub(super) fn impl_ticket_sql(job: &JobConfig) -> syn::ItemImpl {
     let operon = operon_ident();
+    let job_id = &job.id;
     let ticket_ident = ticket_ident(&job.id);
-    let job_ident = job_ident(&job.id);
     let dim_fields = job
         .dims
         .iter()
@@ -209,7 +209,7 @@ pub(super) fn impl_ticket_sql(job: &JobConfig) -> syn::ItemImpl {
             async fn get_status(
                 client: #operon::meta_storage::MetaClient<'_>,
             ) -> Result<(i64, i64, i64), #operon::meta_storage::MetaStorageError> {
-                client.get_ticket_summary::<#job_ident>().await
+                client.get_ticket_summary(#job_id).await
             }
         }
     }

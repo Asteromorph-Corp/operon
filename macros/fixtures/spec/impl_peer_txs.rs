@@ -6,21 +6,11 @@ impl operon::scheduler::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum
     ) -> Self {
         BetaPeerTxs {
             to_delta: senders
-                .remove(<schema::DeltaJob as operon::schema_base::Job>::id())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "No sender for job `{}` found",
-                        <schema::DeltaJob as operon::schema_base::Job>::id()
-                    )
-                }),
+                .remove(metadata::DELTA_ID)
+                .unwrap_or_else(|| panic!("No sender for job `{}` found", metadata::DELTA_ID)),
             to_epsilon: senders
-                .remove(<schema::EpsilonJob as operon::schema_base::Job>::id())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "No sender for job `{}` found",
-                        <schema::EpsilonJob as operon::schema_base::Job>::id()
-                    )
-                }),
+                .remove(metadata::EPSILON_ID)
+                .unwrap_or_else(|| panic!("No sender for job `{}` found", metadata::EPSILON_ID)),
         }
     }
 

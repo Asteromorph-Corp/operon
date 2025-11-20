@@ -1,3 +1,4 @@
+use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
@@ -7,7 +8,11 @@ use crate::utils::{
 };
 
 /// Generates the implementation of the `JobSpec` trait for a given job.
-pub fn impl_meta(service_id: &str, job: &JobConfig) -> syn::ItemImpl {
+pub fn impl_meta(
+    service_id: &str,
+    job: &JobConfig,
+    all_upstream_jobs: &IndexSet<&JobConfig>,
+) -> syn::ItemImpl {
     let operon = operon_ident();
     let spec_ident = spec_ident(&job.id);
 
@@ -17,6 +22,7 @@ pub fn impl_meta(service_id: &str, job: &JobConfig) -> syn::ItemImpl {
     let n = job.dims.len();
     let fn_job_meta = job_metadata_ident(&job.id);
 
+    let all_upstream_job_ids = all_upstream_jobs.iter().map(|j| &j.id);
     let maybe_spawn_dim_meta: Option<syn::ImplItemFn> = job.spawn_dim.as_ref().map(|dim| {
         let fn_dim_meta = dimension_metadata_ident(dim);
         parse_quote! {
@@ -33,12 +39,22 @@ pub fn impl_meta(service_id: &str, job: &JobConfig) -> syn::ItemImpl {
             }
             #maybe_spawn_dim_meta
 
+            pub fn all_upstream_jobs(&self) -> std::collections::HashSet<&'static str> {
+                std::collections::HashSet::from_iter([
+                    #(#all_upstream_job_ids,)*
+                ])
+            }
+
 
             pub fn into_handler<Svc: #svc_ident, Sto: #sto_ident>(self) -> Box<dyn #operon::scheduler::JobHandler<Svc, Sto>> {
                 let job_meta = self.job_meta();
-                Box::new(
-                    #operon::scheduler::SpecWithMetadata::new(self, job_meta)
-                )
+                let all_upstream_jobs = self.all_upstream_jobs();
+
+                Box::new(#operon::scheduler::SpecWithMetadata::new(
+                    self,
+                    job_meta,
+                    all_upstream_jobs,
+                ))
             }
         }
     }
