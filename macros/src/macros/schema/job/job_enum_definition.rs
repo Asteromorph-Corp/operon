@@ -15,7 +15,7 @@ use crate::utils::{job_enum_ident, variant_ident};
 ///     Gamma(GammaJob),
 /// }
 /// ```
-pub(super) fn job_enum(jobs: &JobConfigMap) -> syn::ItemEnum {
+pub fn job_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
     let variants = jobs.values().map(|job| -> syn::Variant {
@@ -45,8 +45,8 @@ mod tests {
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]
-    fn test_job_enum(all_jobs: JobConfigMap) {
-        let result = job_enum(&all_jobs);
+    fn test_job_enum_definition(all_jobs: JobConfigMap) {
+        let result = job_enum_definition(&all_jobs);
         assert_item_eq(&result, "schema/job/job_enum.rs");
     }
 }

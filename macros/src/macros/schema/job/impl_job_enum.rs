@@ -9,7 +9,7 @@ use crate::utils::{job_enum_ident, operon_ident};
 /// #[automatically_derived]
 /// impl operon::schema_base::JobEnum for JobEnum {}
 /// ```
-pub(super) fn impl_job_enum() -> syn::ItemImpl {
+pub fn impl_job_enum() -> syn::ItemImpl {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
 

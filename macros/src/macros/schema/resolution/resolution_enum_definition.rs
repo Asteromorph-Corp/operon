@@ -15,7 +15,7 @@ use crate::utils::{resolution_enum_ident, variant_ident};
 ///     J(JResolution),
 /// }
 /// ```
-pub(super) fn resolution_enum(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
+pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
     let variants = dimensions.values().map(|dim| -> syn::Variant {
@@ -47,7 +47,7 @@ mod tests {
 
     #[rstest]
     fn test_resolution_enum(all_dimensions: DimensionConfigMap) {
-        let result = resolution_enum(&all_dimensions);
+        let result = resolution_enum_definition(&all_dimensions);
         assert_item_eq(&result, "schema/resolution/resolution_enum.rs");
     }
 }

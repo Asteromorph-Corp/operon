@@ -1,5 +1,5 @@
-mod impl_job_enum;
-mod job_enum;
+mod job_enum_definition;
+pub(super) use job_enum_definition::*;
 
-mod mod_job;
-pub(super) use mod_job::*;
+mod impl_job_enum;
+pub(super) use impl_job_enum::*;

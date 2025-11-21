@@ -1,5 +1,5 @@
-mod impl_resolution_enum;
-mod resolution_enum;
+mod resolution_enum_definition;
+pub(super) use resolution_enum_definition::*;
 
-mod mod_resolution;
-pub(super) use mod_resolution::*;
+mod impl_resolution_enum;
+pub(super) use impl_resolution_enum::*;
