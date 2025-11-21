@@ -1,5 +1,5 @@
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema::{Job, JobMetadata, Ticket, TicketStatus};
+use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
 use crate::utils::{SchemaPrefix, SqlParams};
 
 /// Helper struct for building SQL queries related to tickets.
@@ -78,9 +78,39 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
             .dims
             .iter()
             .zip(upstream_job.coordinate)
-            .filter(|(d, _)| self.job_meta.dims.contains(d))
-            .map(|(_, c)| c);
+            .filter_map(|(d, c)| self.job_meta.dims.contains(d).then_some(c));
         let params = SqlParams::from_usize(params)?;
+
+        let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
+        let tickets = rows
+            .iter()
+            .map(|row| Ticket::from_sql_row(self.job_meta, row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tickets)
+    }
+
+    /// Raises the `deps_quota` count of eligible tickets by resolution's `ub` minus 1.
+    ///
+    /// Returns tickets that are newly `"queued"`.
+    pub async fn raise_deps_quota<const M: usize>(
+        &self,
+        res_meta: DimensionMetadata<M>,
+        res: Resolution<M>,
+    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+        if self.job_meta.dims.contains(&res_meta.id) {
+            log::warn!("Invalid resolution received for raising quota.");
+            return Ok(vec![]);
+        }
+
+        let schema = self.client.schema_prefix();
+        let stmt = RaiseDepsQuotaQuery(schema, self.job_meta, res_meta);
+
+        let params = res_meta
+            .deps
+            .iter()
+            .zip(res.coordinate)
+            .filter_map(|(d, c)| self.job_meta.dims.contains(d).then_some(c));
+        let params = SqlParams::from_usize([res.ub].into_iter().chain(params))?;
 
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
@@ -294,15 +324,54 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsDoneQuery<'_
         writeln!(f, "            ELSE 'waiting'::{schema}ticket_status")?;
         writeln!(f, "        END")?;
         writeln!(f, "    WHERE status = 'waiting'::{schema}ticket_status")?;
-
-        let mut cnt = 1usize;
-        for dim in self.2.dims {
-            if self.1.dims.contains(&dim) {
-                writeln!(f, "        AND {dim} = ${cnt}")?;
-                cnt += 1;
-            }
+        for (idx, dim) in self
+            .2
+            .dims
+            .iter()
+            .filter(|d| self.1.dims.contains(d))
+            .enumerate()
+        {
+            writeln!(f, "        AND {} = ${}", dim, idx + 1)?;
         }
+        writeln!(f, "    RETURNING *")?;
+        writeln!(f, ")")?;
+        writeln!(f, "SELECT *")?;
+        writeln!(f, "FROM updated")?;
+        write!(f, "WHERE status = 'queued'::{schema}ticket_status;")
+    }
+}
 
+/// Helper struct to generate the SQL query for raising `deps_done` count of tickets.
+struct RaiseDepsQuotaQuery<'a, const N: usize, const M: usize>(
+    SchemaPrefix<'a>,
+    JobMetadata<N>,
+    DimensionMetadata<M>,
+);
+
+impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsQuotaQuery<'_, N, M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        writeln!(f, "WITH updated AS (")?;
+        writeln!(f, "    UPDATE {schema}ticket_{id}")?;
+        writeln!(f, "    SET")?;
+        writeln!(f, "        deps_quota = deps_quota + $1 - 1,")?;
+        writeln!(f, "        status = CASE")?;
+        writeln!(f, "            WHEN deps_done >= deps_quota + $1 - 1")?;
+        writeln!(f, "                THEN 'queued'::{schema}ticket_status")?;
+        writeln!(f, "            ELSE 'waiting'::{schema}ticket_status")?;
+        writeln!(f, "        END")?;
+        writeln!(f, "    WHERE status = 'waiting'::{schema}ticket_status")?;
+        for (idx, dim) in self
+            .2
+            .deps
+            .iter()
+            .filter(|d| self.1.dims.contains(d))
+            .enumerate()
+        {
+            writeln!(f, "        AND {} = ${}", dim, idx + 2)?;
+        }
         writeln!(f, "    RETURNING *")?;
         writeln!(f, ")")?;
         writeln!(f, "SELECT *")?;
@@ -536,6 +605,34 @@ mod tests {
         let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job).to_string();
         assert_eq!(stmt, expected);
     }
+
+    // #[rstest]
+    // #[case::simple(job_beta(), dimension_i(), indoc! { "
+    //     WITH updated AS (
+    //         UPDATE test_meta.ticket_beta
+    //         SET
+    //             deps_done = deps_done + 1,
+    //             status = CASE
+    //                 WHEN deps_done + 1 >= deps_quota
+    //                     THEN 'queued'::test_meta.ticket_status
+    //                 ELSE 'waiting'::test_meta.ticket_status
+    //             END
+    //         WHERE status = 'waiting'::test_meta.ticket_status
+    //         RETURNING *
+    //     )
+    //     SELECT *
+    //     FROM updated
+    //     WHERE status = 'queued'::test_meta.ticket_status;"
+    // })]
+    // fn test_raise_deps_quota_query<const N: usize, const M: usize>(
+    //     schema_prefix: SchemaPrefix<'static>,
+    //     #[case] job: JobMetadata<N>,
+    //     #[case] upstream_job: DimensionMetadata<M>,
+    //     #[case] expected: &str,
+    // ) {
+    //     let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job).to_string();
+    //     assert_eq!(stmt, expected);
+    // }
 
     #[rstest]
     #[case::empty(job_alpha(), "UPDATE test_meta.ticket_alpha SET status = 'done';")]

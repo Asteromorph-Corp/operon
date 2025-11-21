@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{operon_ident, raise_quota_ident, resolution_enum_ident, variant_ident};
+use crate::utils::{dimension_metadata_ident, operon_ident, resolution_enum_ident, variant_ident};
 
 pub(super) fn fn_on_receive_explosion(
     job: &JobConfig,
@@ -19,11 +19,13 @@ pub(super) fn fn_on_receive_explosion(
         .into_iter()
         .map(|dim_id| -> syn::Arm {
             let variant_ident = variant_ident(dim_id);
-            let raise_quota_fn_name = raise_quota_ident(job_id, dim_id);
+            let dim_meta = dimension_metadata_ident(dim_id);
 
             parse_quote! {
                 schema::#res_enum_ident::#variant_ident(res) => Ok(
-                    queries::#raise_quota_fn_name(client, res).await?
+                    client.ticket(self.job_meta())
+                        .raise_deps_quota(metadata::#dim_meta(), res)
+                        .await?
                 ),
             }
         });

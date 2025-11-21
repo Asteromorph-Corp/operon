@@ -14,7 +14,10 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
             client.ticket(self.job_meta).mark_done(job).await?;
 
             queries::explode_delta_j(client, resolution).await?;
-            queries::raise_quota_epsilon_j(client, resolution).await?;
+            client
+                .ticket(metadata::job_epsilon_meta())
+                .raise_deps_quota(self.spawn_dim_meta, resolution)
+                .await?;
             client
                 .ticket(metadata::job_delta_meta())
                 .raise_deps_done(self.job_meta, job)
