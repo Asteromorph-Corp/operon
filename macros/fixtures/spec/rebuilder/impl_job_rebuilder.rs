@@ -17,15 +17,15 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
             queries::raise_quota_epsilon_j(client, resolution).await?;
             queries::raise_dep_delta(
                 client,
-                operon::schema_base::OptionCoordinate::some(job.coordinate[0usize]),
-                operon::schema_base::OptionCoordinate::none(),
-                operon::schema_base::OptionCoordinate::none(),
+                operon::schema::OptionCoordinate::some(job.coordinate[0usize]),
+                operon::schema::OptionCoordinate::none(),
+                operon::schema::OptionCoordinate::none(),
             )
             .await?;
             queries::raise_dep_epsilon(
                 client,
-                operon::schema_base::OptionCoordinate::some(job.coordinate[0usize]),
-                operon::schema_base::OptionCoordinate::none(),
+                operon::schema::OptionCoordinate::some(job.coordinate[0usize]),
+                operon::schema::OptionCoordinate::none(),
             )
             .await?;
 

@@ -1,15 +1,13 @@
 pub async fn raise_dep_beta(
     client: operon::meta_storage::MetaClient<'_>,
-    i: operon::schema_base::OptionCoordinate,
-) -> Result<Vec<operon::schema_base::Ticket<1usize>>, operon::meta_storage::MetaStorageError> {
+    i: operon::schema::OptionCoordinate,
+) -> Result<Vec<operon::schema::Ticket<1usize>>, operon::meta_storage::MetaStorageError> {
     let schema_prefix = client.schema_prefix();
     let params = [("i", i)]
         .into_iter()
-        .filter_map(
-            |(name, param): (&str, operon::schema_base::OptionCoordinate)| {
-                param.0.map(|p| (name, p))
-            },
-        )
+        .filter_map(|(name, param): (&str, operon::schema::OptionCoordinate)| {
+            param.0.map(|p| (name, p))
+        })
         .map(|(name, param)| i64::try_from(param).map(|p| (name, p)))
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -45,7 +43,7 @@ RETURNING *;"
         .await?;
     let tickets = rows
         .iter()
-        .map(|row| operon::schema_base::Ticket::from_sql_row(metadata::job_beta_meta(), row))
+        .map(|row| operon::schema::Ticket::from_sql_row(metadata::job_beta_meta(), row))
         .collect::<Result<Vec<_>, _>>()?;
     let new_tickets = tickets
         .into_iter()

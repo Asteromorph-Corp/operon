@@ -362,7 +362,7 @@ pub(super) fn fn_run_job(
     };
 
     let resolution: syn::Expr = if job.spawn_dim.is_some() {
-        parse_quote! { #operon::schema_base::Resolution::new(#result_ident.len(), job.coordinate)  }
+        parse_quote! { #operon::schema::Resolution::new(#result_ident.len(), job.coordinate)  }
     } else {
         parse_quote! { () }
     };

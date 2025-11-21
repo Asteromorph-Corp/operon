@@ -47,7 +47,7 @@ impl std::fmt::Display for ExplodeCopyInQuery<'_> {
     }
 }
 
-// TODO: move this to operon::schema_base::Ticket
+// TODO: move this to operon::schema::Ticket
 pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig, idx: usize) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = explode_ident(&job.id, &dim.id);
@@ -73,15 +73,15 @@ pub(super) fn fn_explode(job: &JobConfig, dim: &DimensionConfig, idx: usize) -> 
     parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            resolution: #operon::schema_base::Resolution<#res_n>,
-        ) -> Result<Vec<#operon::schema_base::Ticket::<#job_n>>, #operon::meta_storage::MetaStorageError> {
+            resolution: #operon::schema::Resolution<#res_n>,
+        ) -> Result<Vec<#operon::schema::Ticket::<#job_n>>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let pop_stmt = format!(#pop_query);
 
             let rows = client.query(&pop_stmt, &[#(&i64::try_from(resolution.coordinate[#indices])?,)*]).await?;
             let tickets = rows
                 .iter()
-                .map(|row| #operon::schema_base::Ticket::from_sql_row(metadata::#job_meta(), row))
+                .map(|row| #operon::schema::Ticket::from_sql_row(metadata::#job_meta(), row))
                 .collect::<Result<Vec<_>, _>>()?;
 
             if tickets.iter().any(|ticket| ticket.coordinate[#idx].is_some()) {

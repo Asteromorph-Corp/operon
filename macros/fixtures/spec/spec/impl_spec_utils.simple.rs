@@ -1,9 +1,9 @@
 impl BetaSpec {
-    pub const fn job_meta(&self) -> operon::schema_base::JobMetadata<1usize> {
+    pub const fn job_meta(&self) -> operon::schema::JobMetadata<1usize> {
         metadata::job_beta_meta()
     }
 
-    pub const fn spawn_dim_meta(&self) -> operon::schema_base::DimensionMetadata<1usize> {
+    pub const fn spawn_dim_meta(&self) -> operon::schema::DimensionMetadata<1usize> {
         metadata::dimension_j_meta()
     }
 

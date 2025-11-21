@@ -26,7 +26,7 @@ pub fn impl_spec_utils(
     let maybe_spawn_dim_meta: Option<syn::ImplItemFn> = job.spawn_dim.as_ref().map(|dim| {
         let fn_dim_meta = dimension_metadata_ident(dim);
         parse_quote! {
-            pub const fn spawn_dim_meta(&self) -> #operon::schema_base::DimensionMetadata<#n> {
+            pub const fn spawn_dim_meta(&self) -> #operon::schema::DimensionMetadata<#n> {
                 metadata::#fn_dim_meta()
             }
         }
@@ -34,7 +34,7 @@ pub fn impl_spec_utils(
 
     parse_quote! {
         impl #spec_ident {
-            pub const fn job_meta(&self) -> #operon::schema_base::JobMetadata<#n> {
+            pub const fn job_meta(&self) -> #operon::schema::JobMetadata<#n> {
                 metadata::#fn_job_meta()
             }
             #maybe_spawn_dim_meta

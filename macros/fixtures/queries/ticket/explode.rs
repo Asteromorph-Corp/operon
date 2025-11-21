@@ -1,7 +1,7 @@
 pub async fn explode_beta_i(
     client: operon::meta_storage::MetaClient<'_>,
-    resolution: operon::schema_base::Resolution<0usize>,
-) -> Result<Vec<operon::schema_base::Ticket<1usize>>, operon::meta_storage::MetaStorageError> {
+    resolution: operon::schema::Resolution<0usize>,
+) -> Result<Vec<operon::schema::Ticket<1usize>>, operon::meta_storage::MetaStorageError> {
     let schema_prefix = client.schema_prefix();
     // Statement to select all tickets that match the *parent dimensions* in the resolution.
     // (In this case, there are none.)
@@ -13,7 +13,7 @@ RETURNING *;"
     let rows = client.query(&pop_stmt, &[]).await?;
     let tickets = rows
         .iter()
-        .map(|row| operon::schema_base::Ticket::from_sql_row(metadata::job_beta_meta(), row))
+        .map(|row| operon::schema::Ticket::from_sql_row(metadata::job_beta_meta(), row))
         .collect::<Result<Vec<_>, _>>()?;
 
     if tickets

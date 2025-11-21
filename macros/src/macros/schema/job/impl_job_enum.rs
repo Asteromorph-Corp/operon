@@ -7,7 +7,7 @@ use crate::utils::{job_enum_ident, operon_ident};
 /// Example:
 /// ```rust,ignore
 /// #[automatically_derived]
-/// impl operon::schema_base::JobEnum for JobEnum {}
+/// impl operon::schema::JobEnum for JobEnum {}
 /// ```
 pub fn impl_job_enum() -> syn::ItemImpl {
     let operon = operon_ident();
@@ -15,7 +15,7 @@ pub fn impl_job_enum() -> syn::ItemImpl {
 
     parse_quote! {
         #[automatically_derived]
-        impl #operon::schema_base::JobEnum for #job_enum_ident {}
+        impl #operon::schema::JobEnum for #job_enum_ident {}
     }
 }
 

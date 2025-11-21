@@ -17,8 +17,8 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
     };
 
     parse_quote! {
-        pub const fn #fn_name() -> #operon::schema_base::JobMetadata<#n> {
-            #operon::schema_base::JobMetadata {
+        pub const fn #fn_name() -> #operon::schema::JobMetadata<#n> {
+            #operon::schema::JobMetadata {
                 id: #id,
                 dims: [#(#dims),*],
                 spawn_dim: #spawn_dim,

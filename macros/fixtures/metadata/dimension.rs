@@ -1,5 +1,5 @@
-pub const fn dimension_j_meta() -> operon::schema_base::DimensionMetadata<1usize> {
-    operon::schema_base::DimensionMetadata {
+pub const fn dimension_j_meta() -> operon::schema::DimensionMetadata<1usize> {
+    operon::schema::DimensionMetadata {
         id: "j",
         deps: ["i"],
     }

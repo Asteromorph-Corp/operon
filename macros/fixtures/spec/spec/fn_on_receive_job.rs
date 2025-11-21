@@ -7,14 +7,14 @@ async fn on_receive_job(
     match job {
         schema::JobEnum::Beta(job) => Ok(queries::raise_dep_epsilon(
             client,
-            operon::schema_base::OptionCoordinate::some(job.coordinate[0usize]),
-            operon::schema_base::OptionCoordinate::none(),
+            operon::schema::OptionCoordinate::some(job.coordinate[0usize]),
+            operon::schema::OptionCoordinate::none(),
         )
         .await?),
         schema::JobEnum::Delta(job) => Ok(queries::raise_dep_epsilon(
             client,
-            operon::schema_base::OptionCoordinate::some(job.coordinate[0usize]),
-            operon::schema_base::OptionCoordinate::some(job.coordinate[2usize]),
+            operon::schema::OptionCoordinate::some(job.coordinate[0usize]),
+            operon::schema::OptionCoordinate::some(job.coordinate[2usize]),
         )
         .await?),
         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(

@@ -16,11 +16,11 @@ use crate::utils::{get_entity_ident, operon_ident, variable_ident};
 ///     // Pull the "done" beta jobs from the metadata storage...
 ///     let Some(jobs) = queries::get_all_beta(
 ///         client,
-///         operon::schema_base::TicketStatus::Done,
+///         operon::schema::TicketStatus::Done,
 ///     )
 ///     .await?
 ///     .iter()
-///     .map(|t| operon::schema_base::Ticket::resolve(t))
+///     .map(|t| operon::schema::Ticket::resolve(t))
 ///     .collect::<Option<Vec<_>>>() else {
 ///         operon::log::info!("Some `beta` tickets are corrupt in the metadata storage.");
 ///         return Ok(false);
@@ -117,7 +117,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
         ) -> Result<bool, #operon::scheduler::SchedulerError> {
             let tickets = client
                 .ticket(self.job_meta())
-                .get_all(#operon::schema_base::TicketStatus::Done)
+                .get_all(#operon::schema::TicketStatus::Done)
                 .await?;
             let Some(jobs) = tickets
                 .iter()

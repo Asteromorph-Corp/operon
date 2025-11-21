@@ -9,8 +9,8 @@ pub fn fn_default_ticket(job: &JobConfig) -> syn::ImplItemFn {
     let initial_quota = job.from.len();
 
     parse_quote! {
-        fn default_ticket(&self) -> #operon::schema_base::Ticket<#n> {
-            #operon::schema_base::Ticket::new(#initial_quota)
+        fn default_ticket(&self) -> #operon::schema::Ticket<#n> {
+            #operon::schema::Ticket::new(#initial_quota)
         }
     }
 }

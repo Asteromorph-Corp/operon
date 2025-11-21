@@ -94,7 +94,7 @@ async fn run_job(
         .epsilon(c_j, d_j_k)
         .await
         .map_err(operon::scheduler::SchedulerError::UserError)?;
-    let resolution = operon::schema_base::Resolution::new(e_l.len(), job.coordinate);
+    let resolution = operon::schema::Resolution::new(e_l.len(), job.coordinate);
 
     storage.put_all_e(job.coordinate[0usize], e_l).await?;
     client

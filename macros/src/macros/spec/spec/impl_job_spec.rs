@@ -50,9 +50,9 @@ pub fn impl_job_spec(
         #[#operon::async_trait::async_trait]
         #[automatically_derived]
         impl<Svc: #svc_ident, Sto: #sto_ident> #operon::scheduler::JobSpec<Svc, Sto> for #spec_ident {
-            type Job = #operon::schema_base::Job<#n>;
+            type Job = #operon::schema::Job<#n>;
             type Resolution = #resolution;
-            type Ticket = #operon::schema_base::Ticket<#n>;
+            type Ticket = #operon::schema::Ticket<#n>;
             type PeerEventSenders = #peer_txs_ident;
 
             #fn_default_ticket

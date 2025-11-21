@@ -22,7 +22,7 @@ pub fn job_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
         let variant_ident = variant_ident(&job.id);
         let n = job.dims.len();
         parse_quote! {
-            #variant_ident(#operon::schema_base::Job<#n>)
+            #variant_ident(#operon::schema::Job<#n>)
         }
     });
     let doc = "An enum representing any job.";

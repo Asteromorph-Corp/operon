@@ -69,15 +69,15 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
     parse_quote! {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
-            res: #operon::schema_base::Resolution<#res_n>,
-        ) -> Result<Vec<#operon::schema_base::Ticket<#job_n>>, #operon::meta_storage::MetaStorageError> {
+            res: #operon::schema::Resolution<#res_n>,
+        ) -> Result<Vec<#operon::schema::Ticket<#job_n>>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let pop_stmt = format!(#pop_query);
 
             let rows = client.query(&pop_stmt, &[#(&i64::try_from(res.coordinate[#indices])?,)*]).await?;
             let tickets = rows
                 .iter()
-                .map(|row| #operon::schema_base::Ticket::from_sql_row(metadata::#job_meta(), row))
+                .map(|row| #operon::schema::Ticket::from_sql_row(metadata::#job_meta(), row))
                 .collect::<Result<Vec<_>, _>>()?;
             let new_tickets = tickets
                 .into_iter()

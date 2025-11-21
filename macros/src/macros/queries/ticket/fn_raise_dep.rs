@@ -40,12 +40,12 @@ impl std::fmt::Display for RaiseDepCopyInQuery<'_> {
 /// ```rust,ignore
 /// pub async fn raise_dep_beta(
 ///     client: operon::meta_storage::MetaClient<'_>,
-///     i: &operon::schema_base::OptionCoordinate,
+///     i: &operon::schema::OptionCoordinate,
 /// ) -> Result<Vec<schema::BetaTicket>, operon::meta_storage::MetaStorageError> {
 ///     let schema_prefix = client.schema_prefix();
 ///     let params = [("i", i),]
 ///         .into_iter()
-///         .filter_map(|(name, param): (&str, #operon::schema_base::OptionCoordinate)| param.0.map(|p| (name, p)))
+///         .filter_map(|(name, param): (&str, #operon::schema::OptionCoordinate)| param.0.map(|p| (name, p)))
 ///         .map(|(name, param)| i64::try_from(param).map(|p| (name, p)))
 ///         .collect::<Result<Vec<_>, _>>()?;
 ///
@@ -71,12 +71,12 @@ impl std::fmt::Display for RaiseDepCopyInQuery<'_> {
 ///     ).await?;
 ///     let tickets = rows
 ///         .iter()
-///         .map(<schema::BetaTicket as operon::schema_base::TicketSql>::from_sql_row)
+///         .map(<schema::BetaTicket as operon::schema::TicketSql>::from_sql_row)
 ///         .collect::<Result<Vec<_>, _>>()?;
 ///     let new_tickets = operon::futures::future::try_join_all(
 ///         tickets
 ///             .into_iter()
-///             .map(|ticket| operon::schema_base::Ticket::raise_dependency_count(ticket, client))
+///             .map(|ticket| operon::schema::Ticket::raise_dependency_count(ticket, client))
 ///     )
 ///     .await?;
 ///
@@ -86,7 +86,7 @@ impl std::fmt::Display for RaiseDepCopyInQuery<'_> {
 ///     for ticket in &new_tickets {
 ///         operon::futures::SinkExt::feed(
 ///             &mut sink,
-///             operon::schema_base::TicketSql::to_sql_copy_params(ticket)?.into(),
+///             operon::schema::TicketSql::to_sql_copy_params(ticket)?.into(),
 ///         )
 ///         .await?;
 ///     }
@@ -94,7 +94,7 @@ impl std::fmt::Display for RaiseDepCopyInQuery<'_> {
 ///
 ///     let ready_tickets = new_tickets
 ///         .into_iter()
-///         .filter(operon::schema_base::Ticket::is_ready)
+///         .filter(operon::schema::Ticket::is_ready)
 ///         .collect::<Vec<_>>();
 ///     Ok(ready_tickets)
 /// }
@@ -111,7 +111,7 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
     let args = job.dims.iter().map(|dim| -> syn::FnArg {
         let arg = variable_ident(dim);
         parse_quote! {
-            #arg: #operon::schema_base::OptionCoordinate
+            #arg: #operon::schema::OptionCoordinate
         }
     });
     let params = job.dims.iter().map(|dim| -> syn::Expr {
@@ -125,13 +125,13 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             #(#args,)*
-        ) -> Result<Vec<#operon::schema_base::Ticket<#n>>, #operon::meta_storage::MetaStorageError> {
+        ) -> Result<Vec<#operon::schema::Ticket<#n>>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let params = [
                 #(#params,)*
             ]
             .into_iter()
-            .filter_map(|(name, param): (&str, #operon::schema_base::OptionCoordinate)| param.0.map(|p| (name, p)))
+            .filter_map(|(name, param): (&str, #operon::schema::OptionCoordinate)| param.0.map(|p| (name, p)))
             .map(|(name, param)| i64::try_from(param).map(|p| (name, p)))
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -155,7 +155,7 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
             ).await?;
             let tickets = rows
                 .iter()
-                .map(|row| #operon::schema_base::Ticket::from_sql_row(metadata::#job_meta(), row))
+                .map(|row| #operon::schema::Ticket::from_sql_row(metadata::#job_meta(), row))
                 .collect::<Result<Vec<_>, _>>()?;
             let new_tickets = tickets
                 .into_iter()

@@ -24,15 +24,15 @@ use crate::utils::{
 ///             queries::explode_delta_j(client, resolution).await?;
 ///             queries::raise_dep_delta(
 ///                 client,
-///                 &operon::schema_base::OptionCoordinate::some(job.i),
-///                 &operon::schema_base::OptionCoordinate::none(),
-///                 &operon::schema_base::OptionCoordinate::none(),
+///                 &operon::schema::OptionCoordinate::some(job.i),
+///                 &operon::schema::OptionCoordinate::none(),
+///                 &operon::schema::OptionCoordinate::none(),
 ///             )
 ///             .await?;
 ///             queries::raise_dep_epsilon(
 ///                 client,
-///                 &operon::schema_base::OptionCoordinate::some(job.i),
-///                 &operon::schema_base::OptionCoordinate::none(),
+///                 &operon::schema::OptionCoordinate::some(job.i),
+///                 &operon::schema::OptionCoordinate::none(),
 ///             )
 ///             .await?;
 ///         }
@@ -88,9 +88,9 @@ pub fn impl_job_rebuilder(
             let raise_dep_fn_name = raise_dep_ident(&downstream_job.id);
             let args = downstream_job.dims.iter().map(|downstream_dim| -> syn::Expr {
                 if let Some(index) = job.dims.iter().position(|d| d == downstream_dim) {
-                    parse_quote! { #operon::schema_base::OptionCoordinate::some(job.coordinate[#index]) }
+                    parse_quote! { #operon::schema::OptionCoordinate::some(job.coordinate[#index]) }
                 } else {
-                    parse_quote! { #operon::schema_base::OptionCoordinate::none() }
+                    parse_quote! { #operon::schema::OptionCoordinate::none() }
                 }
             });
             parse_quote! { queries::#raise_dep_fn_name(client, #(#args,)*).await?; }

@@ -7,7 +7,7 @@ use crate::utils::{operon_ident, resolution_enum_ident};
 /// Example:
 /// ```rust, ignore
 /// #[automatically_derived]
-/// impl operon::schema_base::ResolutionEnum for ResolutionEnum {}
+/// impl operon::schema::ResolutionEnum for ResolutionEnum {}
 /// ```
 pub fn impl_resolution_enum() -> syn::ItemImpl {
     let operon = operon_ident();
@@ -15,7 +15,7 @@ pub fn impl_resolution_enum() -> syn::ItemImpl {
 
     parse_quote! {
         #[automatically_derived]
-        impl #operon::schema_base::ResolutionEnum for #res_enum_ident {}
+        impl #operon::schema::ResolutionEnum for #res_enum_ident {}
     }
 }
 

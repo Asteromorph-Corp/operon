@@ -1,5 +1,5 @@
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema_base::{Job, JobMetadata, Ticket, TicketStatus};
+use crate::schema::{Job, JobMetadata, Ticket, TicketStatus};
 use crate::utils::{SchemaPrefix, SqlParams};
 
 /// Helper struct for building SQL queries related to tickets.
@@ -284,7 +284,7 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use super::*;
-    use crate::schema_base::JobMetadata;
+    use crate::schema::JobMetadata;
 
     fn job_alpha() -> JobMetadata<0> {
         JobMetadata {

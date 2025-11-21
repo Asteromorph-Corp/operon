@@ -20,15 +20,15 @@ pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
     let n = job.dims.len();
 
     let maybe_spawn_dim_meta = job.spawn_dim.is_some().then(|| {
-        quote! { spawn_dim_meta: #operon::schema_base::DimensionMetadata<#n>, }
+        quote! { spawn_dim_meta: #operon::schema::DimensionMetadata<#n>, }
     });
 
     parse_quote! {
         #[derive(Debug)]
         pub struct #rebuilder_ident {
-            job_meta: #operon::schema_base::JobMetadata<#n>,
+            job_meta: #operon::schema::JobMetadata<#n>,
             #maybe_spawn_dim_meta
-            data: Vec<(#operon::schema_base::Job<#n>, #resolution_type)>,
+            data: Vec<(#operon::schema::Job<#n>, #resolution_type)>,
         }
     }
 }

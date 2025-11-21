@@ -1,7 +1,7 @@
 pub async fn raise_quota_epsilon_j(
     client: operon::meta_storage::MetaClient<'_>,
-    res: operon::schema_base::Resolution<1usize>,
-) -> Result<Vec<operon::schema_base::Ticket<2usize>>, operon::meta_storage::MetaStorageError> {
+    res: operon::schema::Resolution<1usize>,
+) -> Result<Vec<operon::schema::Ticket<2usize>>, operon::meta_storage::MetaStorageError> {
     let schema_prefix = client.schema_prefix();
     let pop_stmt = format!("DELETE FROM {schema_prefix}ticket_epsilon\nWHERE i = $1\nRETURNING *;");
     let rows = client
@@ -9,7 +9,7 @@ pub async fn raise_quota_epsilon_j(
         .await?;
     let tickets = rows
         .iter()
-        .map(|row| operon::schema_base::Ticket::from_sql_row(metadata::job_epsilon_meta(), row))
+        .map(|row| operon::schema::Ticket::from_sql_row(metadata::job_epsilon_meta(), row))
         .collect::<Result<Vec<_>, _>>()?;
     let new_tickets = tickets
         .into_iter()

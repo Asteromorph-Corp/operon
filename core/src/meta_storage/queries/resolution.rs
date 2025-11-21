@@ -1,5 +1,5 @@
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema_base::{DimensionMetadata, Resolution};
+use crate::schema::{DimensionMetadata, Resolution};
 use crate::utils::{SchemaPrefix, SqlParams};
 
 /// Helper struct for building SQL queries related to resolutions.

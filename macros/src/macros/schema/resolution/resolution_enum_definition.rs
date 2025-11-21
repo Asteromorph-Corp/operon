@@ -22,7 +22,7 @@ pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemE
         let variant_ident = variant_ident(&dim.id);
         let n = dim.depends_on.len();
         parse_quote! {
-            #variant_ident(#operon::schema_base::Resolution<#n>)
+            #variant_ident(#operon::schema::Resolution<#n>)
         }
     });
 

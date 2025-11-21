@@ -13,10 +13,10 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     storage: &Sto,
 ///     client: operon::meta_storage::MetaClient<'_>,
 /// ) -> Result<Box<dyn operon::scheduler::JobRebuilder>, operon::scheduler::SchedulerError> {
-///     let tickets = queries::get_all_beta(client, operon::schema_base::TicketStatus::Done).await?;
+///     let tickets = queries::get_all_beta(client, operon::schema::TicketStatus::Done).await?;
 ///     let successes =
 ///         operon::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
-///             let job = operon::schema_base::Ticket::resolve(&ticket).ok_or_else(|| {
+///             let job = operon::schema::Ticket::resolve(&ticket).ok_or_else(|| {
 ///                 operon::scheduler::SchedulerError::Other("Failed to resolve a beta ticket".into())
 ///             })?;
 ///             let resolution = queries::get_resolution_j(client, job.i)
@@ -70,7 +70,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
         {
             let tickets = client
                 .ticket(self.job_meta())
-                .get_all(#operon::schema_base::TicketStatus::Done)
+                .get_all(#operon::schema::TicketStatus::Done)
                 .await?;
             let data = #operon::futures::future::try_join_all(tickets.into_iter().map(
                 |ticket| async move {

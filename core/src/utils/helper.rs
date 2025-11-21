@@ -3,7 +3,7 @@ use std::num::TryFromIntError;
 
 use postgres_types::ToSql;
 
-use crate::schema_base::TicketStatus;
+use crate::schema::TicketStatus;
 
 pub trait SplitFirstOwned<T> {
     fn split_first_owned(self) -> Option<(T, Vec<T>)>;

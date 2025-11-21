@@ -5,7 +5,7 @@ async fn check_consistency(
 ) -> Result<bool, operon::scheduler::SchedulerError> {
     let tickets = client
         .ticket(self.job_meta())
-        .get_all(operon::schema_base::TicketStatus::Done)
+        .get_all(operon::schema::TicketStatus::Done)
         .await?;
     // Pull the "done" beta jobs from the metadata storage...
     let Some(jobs) = tickets

@@ -1,5 +1,5 @@
 impl EpsilonSpec {
-    pub const fn job_meta(&self) -> operon::schema_base::JobMetadata<2usize> {
+    pub const fn job_meta(&self) -> operon::schema::JobMetadata<2usize> {
         metadata::job_epsilon_meta()
     }
 

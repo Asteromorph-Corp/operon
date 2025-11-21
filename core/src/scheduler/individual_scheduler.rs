@@ -9,7 +9,7 @@ use crate::scheduler::{
     ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
     PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError, SpecWithMetadata,
 };
-use crate::schema_base::{Job, JobMetadata, Ticket, TicketStatus};
+use crate::schema::{Job, JobMetadata, Ticket, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiState, UiStateUpdate};

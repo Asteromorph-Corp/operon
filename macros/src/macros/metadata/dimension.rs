@@ -13,8 +13,8 @@ pub fn dimension_metadata(dimension: &DimensionConfig) -> syn::ItemFn {
     let deps = &dimension.depends_on;
 
     parse_quote! {
-        pub const fn #fn_name() -> #operon::schema_base::DimensionMetadata<#n> {
-            #operon::schema_base::DimensionMetadata {
+        pub const fn #fn_name() -> #operon::schema::DimensionMetadata<#n> {
+            #operon::schema::DimensionMetadata {
                 id: #id,
                 deps: [#(#deps),*],
             }

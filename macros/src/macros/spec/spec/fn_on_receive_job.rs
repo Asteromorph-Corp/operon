@@ -18,16 +18,16 @@ use crate::utils::{job_enum_ident, operon_ident, raise_dep_ident, variant_ident}
 ///         schema::JobEnum::Beta(job) => Ok(
 ///             queries::raise_dep_epsilon(
 ///                 client,
-///                 &operon::schema_base::OptionCoordinate::some(job.i),
-///                 &operon::schema_base::OptionCoordinate::none(),
+///                 &operon::schema::OptionCoordinate::some(job.i),
+///                 &operon::schema::OptionCoordinate::none(),
 ///             )
 ///             .await?
 ///         ),
 ///         schema::JobEnum::Delta(job) => Ok(
 ///             queries::raise_dep_epsilon(
 ///                 client,
-///                 &operon::schema_base::OptionCoordinate::some(job.i),
-///                 &operon::schema_base::OptionCoordinate::some(job.k),
+///                 &operon::schema::OptionCoordinate::some(job.i),
+///                 &operon::schema::OptionCoordinate::some(job.k),
 ///             )
 ///             .await?
 ///         ),
@@ -50,9 +50,9 @@ pub(super) fn fn_on_receive_job(
 
         let args = job.dims.iter().map(|job_dim| -> syn::Expr {
             if let Some(index) = upstream_job.dims.iter().position(|d| d == job_dim) {
-                parse_quote! { #operon::schema_base::OptionCoordinate::some(job.coordinate[#index]) }
+                parse_quote! { #operon::schema::OptionCoordinate::some(job.coordinate[#index]) }
             } else {
-                parse_quote! { #operon::schema_base::OptionCoordinate::none() }
+                parse_quote! { #operon::schema::OptionCoordinate::none() }
             }
         });
 

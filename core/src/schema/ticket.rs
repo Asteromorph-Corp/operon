@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio_postgres::Row;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema_base::{Job, JobMetadata, OptionCoordinate, TicketStatus};
+use crate::schema::{Job, JobMetadata, OptionCoordinate, TicketStatus};
 use crate::utils::{SqlParams, box_sql};
 
 #[derive(Debug, Clone, Copy)]

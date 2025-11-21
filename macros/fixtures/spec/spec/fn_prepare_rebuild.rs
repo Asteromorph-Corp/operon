@@ -5,7 +5,7 @@ async fn prepare_rebuild(
 ) -> Result<Box<dyn operon::scheduler::JobRebuilder>, operon::scheduler::SchedulerError> {
     let tickets = client
         .ticket(self.job_meta())
-        .get_all(operon::schema_base::TicketStatus::Done)
+        .get_all(operon::schema::TicketStatus::Done)
         .await?;
     let data =
         operon::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
