@@ -68,10 +68,6 @@ pub fn explode_ident(job_id: &JobId, dimension_id: &DimensionId) -> syn::Ident {
     )
 }
 
-pub fn raise_dep_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("raise_dep_{}", job_id.to_snake_case())
-}
-
 pub fn raise_quota_ident(job_id: &JobId, dim_id: &DimensionId) -> syn::Ident {
     format_ident!(
         "raise_quota_{}_{}",

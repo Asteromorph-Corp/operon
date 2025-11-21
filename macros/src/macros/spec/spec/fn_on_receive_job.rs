@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{job_enum_ident, operon_ident, raise_dep_ident, variant_ident};
+use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, variant_ident};
 
 /// Generates the `on_receive_job` function for the implementation of the trait `JobSpec`.
 ///
@@ -43,22 +43,13 @@ pub(super) fn fn_on_receive_job(
     let job_enum_ident = job_enum_ident();
     let job_id = &job.id;
 
-    let raise_dep_fn_name = raise_dep_ident(&job.id);
-
     let job_arms = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
+        let upstream_job_meta = job_metadata_ident(&upstream_job.id);
         let variant_ident = variant_ident(&upstream_job.id);
-
-        let args = job.dims.iter().map(|job_dim| -> syn::Expr {
-            if let Some(index) = upstream_job.dims.iter().position(|d| d == job_dim) {
-                parse_quote! { #operon::schema::OptionCoordinate::some(job.coordinate[#index]) }
-            } else {
-                parse_quote! { #operon::schema::OptionCoordinate::none() }
-            }
-        });
 
         parse_quote! {
             schema::#job_enum_ident::#variant_ident(job) => Ok(
-                queries::#raise_dep_fn_name(client, #(#args,)*).await?
+                client.ticket(self.job_meta()).raise_deps_done(metadata::#upstream_job_meta(), job).await?
             ),
         }
     });

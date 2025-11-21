@@ -39,11 +39,6 @@ impl<const N: usize> Ticket<N> {
         self
     }
 
-    pub const fn raise_deps_done(mut self) -> Self {
-        self.deps_done += 1;
-        self.update_status()
-    }
-
     pub const fn raise_deps_quota(mut self, explosion_ub: usize) -> Self {
         self.deps_quota = self.deps_quota + explosion_ub - 1;
         self.update_status()

@@ -47,11 +47,11 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetAllTicketQuery(schema_prefix, self.job_meta);
         let rows = self.client.query_stmt(&stmt, &[&status]).await?;
-        let jobs = rows
+        let tickets = rows
             .iter()
             .map(|row| Ticket::from_sql_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(jobs)
+        Ok(tickets)
     }
 
     /// Puts a ticket into the table.
@@ -61,6 +61,33 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         let params = ticket.as_sql_params()?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
+    }
+
+    /// Raises the `deps_done` count of eligible tickets by 1.
+    ///
+    /// Returns tickets that are newly `"queued"`.
+    pub async fn raise_deps_done<const M: usize>(
+        &self,
+        upstream_meta: JobMetadata<M>,
+        upstream_job: Job<M>,
+    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+        let schema = self.client.schema_prefix();
+        let stmt = RaiseDepsDoneQuery(schema, self.job_meta, upstream_meta);
+
+        let params = upstream_meta
+            .dims
+            .iter()
+            .zip(upstream_job.coordinate)
+            .filter(|(d, _)| self.job_meta.dims.contains(d))
+            .map(|(_, c)| c);
+        let params = SqlParams::from_usize(params)?;
+
+        let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
+        let tickets = rows
+            .iter()
+            .map(|row| Ticket::from_sql_row(self.job_meta, row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tickets)
     }
 
     /// Marks the ticket corresponding to a given job as done.
@@ -245,6 +272,45 @@ impl<const N: usize> std::fmt::Display for PutTicketQuery<'_, N> {
     }
 }
 
+/// Helper struct to generate the SQL query for raising `deps_done` count of tickets.
+struct RaiseDepsDoneQuery<'a, const N: usize, const M: usize>(
+    SchemaPrefix<'a>,
+    JobMetadata<N>,
+    JobMetadata<M>,
+);
+
+impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsDoneQuery<'_, N, M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        writeln!(f, "WITH updated AS (")?;
+        writeln!(f, "    UPDATE {schema}ticket_{id}")?;
+        writeln!(f, "    SET")?;
+        writeln!(f, "        deps_done = deps_done + 1,")?;
+        writeln!(f, "        status = CASE")?;
+        writeln!(f, "            WHEN deps_done + 1 >= deps_quota")?;
+        writeln!(f, "                THEN 'queued'::{schema}ticket_status")?;
+        writeln!(f, "            ELSE 'waiting'::{schema}ticket_status")?;
+        writeln!(f, "        END")?;
+        writeln!(f, "    WHERE status = 'waiting'::{schema}ticket_status")?;
+
+        let mut cnt = 1usize;
+        for dim in self.2.dims {
+            if self.1.dims.contains(&dim) {
+                writeln!(f, "        AND {dim} = ${cnt}")?;
+                cnt += 1;
+            }
+        }
+
+        writeln!(f, "    RETURNING *")?;
+        writeln!(f, ")")?;
+        writeln!(f, "SELECT *")?;
+        writeln!(f, "FROM updated")?;
+        write!(f, "WHERE status = 'queued'::{schema}ticket_status;")
+    }
+}
+
 /// An helper struct to generate the SQL query for marking a ticket as done for a given job.
 struct MarkDoneQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
 
@@ -281,6 +347,7 @@ impl<'a> std::fmt::Display for GetStatusQuery<'a> {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use pretty_assertions::assert_eq;
     use rstest::{fixture, rstest};
 
     use super::*;
@@ -439,6 +506,34 @@ mod tests {
         #[case] expected: &str,
     ) {
         let stmt = PutTicketQuery(schema_prefix, job).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(job_beta(), job_alpha(), indoc! { "
+        WITH updated AS (
+            UPDATE test_meta.ticket_beta
+            SET
+                deps_done = deps_done + 1,
+                status = CASE
+                    WHEN deps_done + 1 >= deps_quota
+                        THEN 'queued'::test_meta.ticket_status
+                    ELSE 'waiting'::test_meta.ticket_status
+                END
+            WHERE status = 'waiting'::test_meta.ticket_status
+            RETURNING *
+        )
+        SELECT *
+        FROM updated
+        WHERE status = 'queued'::test_meta.ticket_status;"
+    })]
+    fn test_raise_deps_done_query<const N: usize, const M: usize>(
+        schema_prefix: SchemaPrefix<'static>,
+        #[case] job: JobMetadata<N>,
+        #[case] upstream_job: JobMetadata<M>,
+        #[case] expected: &str,
+    ) {
+        let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job).to_string();
         assert_eq!(stmt, expected);
     }
 

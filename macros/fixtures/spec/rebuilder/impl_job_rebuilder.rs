@@ -15,19 +15,14 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
 
             queries::explode_delta_j(client, resolution).await?;
             queries::raise_quota_epsilon_j(client, resolution).await?;
-            queries::raise_dep_delta(
-                client,
-                operon::schema::OptionCoordinate::some(job.coordinate[0usize]),
-                operon::schema::OptionCoordinate::none(),
-                operon::schema::OptionCoordinate::none(),
-            )
-            .await?;
-            queries::raise_dep_epsilon(
-                client,
-                operon::schema::OptionCoordinate::some(job.coordinate[0usize]),
-                operon::schema::OptionCoordinate::none(),
-            )
-            .await?;
+            client
+                .ticket(metadata::job_delta_meta())
+                .raise_deps_done(self.job_meta, job)
+                .await?;
+            client
+                .ticket(metadata::job_epsilon_meta())
+                .raise_deps_done(self.job_meta, job)
+                .await?;
 
             let mut ui_state = ui_state.write().await;
             let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;

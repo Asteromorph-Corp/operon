@@ -149,6 +149,7 @@ impl<const N: usize> std::fmt::Display for ClearResolutionQuery<'_, N> {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use pretty_assertions::assert_eq;
     use rstest::{fixture, rstest};
 
     use super::*;

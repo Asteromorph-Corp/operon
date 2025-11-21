@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    explode_ident, operon_ident, raise_dep_ident, raise_quota_ident, rebuilder_ident,
+    explode_ident, job_metadata_ident, operon_ident, raise_quota_ident, rebuilder_ident,
 };
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -85,15 +85,12 @@ pub fn impl_job_rebuilder(
     let raise_dep_exprs = downstream_jobs
         .iter()
         .map(|downstream_job| -> syn::Stmt {
-            let raise_dep_fn_name = raise_dep_ident(&downstream_job.id);
-            let args = downstream_job.dims.iter().map(|downstream_dim| -> syn::Expr {
-                if let Some(index) = job.dims.iter().position(|d| d == downstream_dim) {
-                    parse_quote! { #operon::schema::OptionCoordinate::some(job.coordinate[#index]) }
-                } else {
-                    parse_quote! { #operon::schema::OptionCoordinate::none() }
-                }
-            });
-            parse_quote! { queries::#raise_dep_fn_name(client, #(#args,)*).await?; }
+            let downstream_job_meta = job_metadata_ident(&downstream_job.id);
+            parse_quote! {
+                client.ticket(metadata::#downstream_job_meta())
+                    .raise_deps_done(self.job_meta, job)
+                    .await?;
+            }
         })
         .collect::<Vec<_>>();
 

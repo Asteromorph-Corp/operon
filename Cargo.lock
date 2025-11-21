@@ -914,6 +914,7 @@ dependencies = [
  "log",
  "operon-macros",
  "postgres-types",
+ "pretty_assertions",
  "ratatui",
  "rstest",
  "secrecy",
