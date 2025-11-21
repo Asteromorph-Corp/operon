@@ -3,11 +3,14 @@ async fn check_consistency(
     storage: &Sto,
     client: operon::meta_storage::MetaClient<'_>,
 ) -> Result<bool, operon::scheduler::SchedulerError> {
+    let tickets = client
+        .ticket(self.job_meta())
+        .get_all(operon::schema_base::TicketStatus::Done)
+        .await?;
     // Pull the "done" beta jobs from the metadata storage...
-    let Some(jobs) = queries::get_all_epsilon(client, operon::schema_base::TicketStatus::Done)
-        .await?
+    let Some(jobs) = tickets
         .iter()
-        .map(|t| operon::schema_base::Ticket::resolve(t))
+        .map(|ticket| ticket.resolve())
         .collect::<Option<Vec<_>>>()
     else {
         operon::log::info!("Some `epsilon` tickets are corrupt in the metadata storage.");

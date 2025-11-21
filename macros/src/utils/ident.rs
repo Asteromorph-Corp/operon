@@ -60,22 +60,6 @@ pub fn batch_put_entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("put_all_{}", entity_id.to_snake_case())
 }
 
-pub fn init_ticket_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("init_ticket_{}", job_id.to_snake_case())
-}
-
-pub fn clear_ticket_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("clear_ticket_{}", job_id.to_snake_case())
-}
-
-pub fn put_ticket_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("put_ticket_{}", job_id.to_snake_case())
-}
-
-pub fn get_all_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("get_all_{}", job_id.to_snake_case())
-}
-
 pub fn explode_ident(job_id: &JobId, dimension_id: &DimensionId) -> syn::Ident {
     format_ident!(
         "explode_{}_{}",
@@ -126,16 +110,8 @@ pub fn sender_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("to_{}", job_id.to_snake_case())
 }
 
-pub fn with_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("with_{}", dimension_id.to_snake_case())
-}
-
 pub fn entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("{}", entity_id.to_pascal_case())
-}
-
-pub fn ticket_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("{}Ticket", job_id.to_pascal_case())
 }
 
 pub fn spec_ident(job_id: &JobId) -> syn::Ident {

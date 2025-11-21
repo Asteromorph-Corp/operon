@@ -3,10 +3,13 @@ async fn prepare_rebuild(
     storage: &Sto,
     client: operon::meta_storage::MetaClient<'_>,
 ) -> Result<Box<dyn operon::scheduler::JobRebuilder>, operon::scheduler::SchedulerError> {
-    let tickets = queries::get_all_beta(client, operon::schema_base::TicketStatus::Done).await?;
+    let tickets = client
+        .ticket(self.job_meta())
+        .get_all(operon::schema_base::TicketStatus::Done)
+        .await?;
     let data =
         operon::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
-            let job = operon::schema_base::Ticket::resolve(&ticket).ok_or_else(|| {
+            let job = ticket.resolve().ok_or_else(|| {
                 operon::scheduler::SchedulerError::Other("Failed to resolve a beta ticket".into())
             })?;
             let resolution = client

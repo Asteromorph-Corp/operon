@@ -10,8 +10,8 @@ pub use resolution::*;
 mod ticket;
 pub use ticket::*;
 
+mod option_coordinate;
+pub use option_coordinate::*;
+
 mod ticket_status;
 pub use ticket_status::*;
-
-mod ticket_dep_count;
-pub use ticket_dep_count::*;

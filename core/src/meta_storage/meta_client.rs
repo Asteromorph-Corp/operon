@@ -82,17 +82,6 @@ pub enum MetaClient<'a> {
     Transaction(&'a TransactionWithSchema<'a>),
 }
 
-pub struct TicketStatusType<'a>(Option<&'a str>);
-
-impl std::fmt::Display for TicketStatusType<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(schema) = self.0 {
-            write!(f, "{schema}.")?;
-        }
-        write!(f, "ticket_status")
-    }
-}
-
 impl MetaClient<'_> {
     impl_meta_client!(batch_execute(query: &str) -> ());
     impl_meta_client!(execute(query: &str, params: &[&ToSql]) -> u64);
@@ -141,10 +130,6 @@ impl MetaClient<'_> {
 
     pub fn schema_prefix(&self) -> SchemaPrefix<'_> {
         SchemaPrefix(self.schema())
-    }
-
-    pub fn ticket_status_type(&self) -> TicketStatusType<'_> {
-        TicketStatusType(self.schema())
     }
 }
 

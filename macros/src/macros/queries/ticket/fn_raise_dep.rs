@@ -1,7 +1,7 @@
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{dimension_ident, operon_ident, raise_dep_ident, ticket_ident, variable_ident};
+use crate::utils::{job_metadata_ident, operon_ident, raise_dep_ident, variable_ident};
 
 /// A helper struct to generate the SQL query for popping tickets to be raised.
 struct RaiseDepPopQuery<'a>(&'a JobConfig);
@@ -28,7 +28,7 @@ impl std::fmt::Display for RaiseDepCopyInQuery<'_> {
         for dim in &self.0.dims {
             write!(f, "{dim}, ")?;
         }
-        writeln!(f, "resolved, deps_count, deps_quota, deps_done, status")?;
+        writeln!(f, "deps_done, deps_quota, status")?;
         writeln!(f, ")")?;
         write!(f, "FROM STDIN WITH (FORMAT csv);")
     }
@@ -40,12 +40,12 @@ impl std::fmt::Display for RaiseDepCopyInQuery<'_> {
 /// ```rust,ignore
 /// pub async fn raise_dep_beta(
 ///     client: operon::meta_storage::MetaClient<'_>,
-///     i: &operon::schema_base::TicketDepCount<schema::IDim>,
+///     i: &operon::schema_base::OptionCoordinate,
 /// ) -> Result<Vec<schema::BetaTicket>, operon::meta_storage::MetaStorageError> {
 ///     let schema_prefix = client.schema_prefix();
 ///     let params = [("i", i),]
 ///         .into_iter()
-///         .filter_map(|(name, param): (&str, #operon::schema_base::TicketDepCount<usize>)| param.0.map(|p| (name, p)))
+///         .filter_map(|(name, param): (&str, #operon::schema_base::OptionCoordinate)| param.0.map(|p| (name, p)))
 ///         .map(|(name, param)| i64::try_from(param).map(|p| (name, p)))
 ///         .collect::<Result<Vec<_>, _>>()?;
 ///
@@ -103,16 +103,15 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
     // TODO: only define raise_dep for a valid combination of jobs.
     let operon = operon_ident();
     let fn_name = raise_dep_ident(&job.id);
-    let ticket_ident = ticket_ident(&job.id);
+    let n = job.dims.len();
+    let job_meta = job_metadata_ident(&job.id);
     let pop_query = RaiseDepPopQuery(job).to_string();
     let copy_query = RaiseDepCopyInQuery(job).to_string();
 
     let args = job.dims.iter().map(|dim| -> syn::FnArg {
         let arg = variable_ident(dim);
-        let dim_ident = dimension_ident(dim);
-
         parse_quote! {
-            #arg: #operon::schema_base::TicketDepCount<schema::#dim_ident>
+            #arg: #operon::schema_base::OptionCoordinate
         }
     });
     let params = job.dims.iter().map(|dim| -> syn::Expr {
@@ -126,13 +125,13 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             #(#args,)*
-        ) -> Result<Vec<schema::#ticket_ident>, #operon::meta_storage::MetaStorageError> {
+        ) -> Result<Vec<#operon::schema_base::Ticket<#n>>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let params = [
                 #(#params,)*
             ]
             .into_iter()
-            .filter_map(|(name, param): (&str, #operon::schema_base::TicketDepCount<usize>)| param.0.map(|p| (name, p)))
+            .filter_map(|(name, param): (&str, #operon::schema_base::OptionCoordinate)| param.0.map(|p| (name, p)))
             .map(|(name, param)| i64::try_from(param).map(|p| (name, p)))
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -156,11 +155,11 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
             ).await?;
             let tickets = rows
                 .iter()
-                .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)
+                .map(|row| #operon::schema_base::Ticket::from_sql_row(metadata::#job_meta(), row))
                 .collect::<Result<Vec<_>, _>>()?;
             let new_tickets = tickets
                 .into_iter()
-                .map(|ticket| #operon::schema_base::Ticket::raise_dependency_count(ticket))
+                .map(|ticket| ticket.raise_deps_done())
                 .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);
@@ -169,7 +168,7 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
             for ticket in &new_tickets {
                 #operon::futures::SinkExt::feed(
                     &mut sink,
-                    #operon::schema_base::TicketSql::to_sql_copy_params(ticket)?.into(),
+                    ticket.to_copy_string()?.into(),
                 )
                 .await?;
             }
@@ -177,7 +176,7 @@ pub(super) fn fn_raise_dep(job: &JobConfig) -> syn::ItemFn {
 
             let ready_tickets = new_tickets
                 .into_iter()
-                .filter(#operon::schema_base::Ticket::is_ready)
+                .filter(|ticket| ticket.is_ready())
                 .collect::<Vec<_>>();
             Ok(ready_tickets)
         }

@@ -3,6 +3,8 @@ use std::num::TryFromIntError;
 
 use postgres_types::ToSql;
 
+use crate::schema_base::TicketStatus;
+
 pub trait SplitFirstOwned<T> {
     fn split_first_owned(self) -> Option<(T, Vec<T>)>;
 }
@@ -31,6 +33,11 @@ impl SqlParam for i64 {
         self
     }
 }
+impl SqlParam for TicketStatus {
+    fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
+        self
+    }
+}
 
 #[repr(transparent)]
 pub struct SqlParams(Vec<Box<dyn SqlParam>>);
@@ -48,16 +55,24 @@ impl SqlParams {
         Ok(Self(items))
     }
 
+    pub fn extend(mut self, params: Vec<Box<dyn SqlParam>>) -> Self {
+        self.0.extend(params);
+        self
+    }
+
     pub fn borrow(&self) -> Vec<&(dyn ToSql + Sync + 'static)> {
         self.0.iter().map(|x| x.as_param()).collect()
     }
 
     pub fn to_copy_string(&self) -> String {
-        self.0
+        let mut out = self
+            .0
             .iter()
             .map(|x| x.to_string())
             .collect::<Vec<_>>()
-            .join(",")
+            .join(",");
+        out.push('\n');
+        out
     }
 }
 

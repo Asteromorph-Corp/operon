@@ -10,7 +10,7 @@ use crate::scheduler::{
     ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, PeerEventReceiver,
     PeerEventSenderMap, SchedulerError, SpecWithMetadata,
 };
-use crate::schema_base::{Job, TicketSql};
+use crate::schema_base::{Job, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiState;
@@ -91,12 +91,11 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, JS, T, const N: usize> JobHandler<Svc, Sto> for SpecWithMetadata<Svc, Sto, JS, N>
+impl<Svc, Sto, JS, const N: usize> JobHandler<Svc, Sto> for SpecWithMetadata<Svc, Sto, JS, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = T> + Clone,
-    T: TicketSql<Job = Job<N>>,
+    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = Ticket<N>> + Clone,
 {
     fn job_id(&self) -> &'static str {
         self.job_meta.id
@@ -121,22 +120,23 @@ where
     }
 
     async fn init_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        T::init_table(client).await?;
+        client.ticket(self.job_meta).init().await?;
         Ok(())
     }
 
     async fn clear_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        T::clear_table(client).await?;
+        client.ticket(self.job_meta).clear().await?;
         Ok(())
     }
 
     async fn put_default_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        T::new().put(client).await?;
+        let default_ticket = self.spec.default_ticket();
+        client.ticket(self.job_meta).put(default_ticket).await?;
         Ok(())
     }
 
     async fn get_status(&self, client: MetaClient<'_>) -> Result<(i64, i64, i64), SchedulerError> {
-        let status = T::get_status(client).await?;
+        let status = client.ticket(self.job_meta).get_status().await?;
         Ok(status)
     }
 

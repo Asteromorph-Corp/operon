@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
 use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
-use crate::schema_base::{JobLike, JobMetadata, ResolutionLike, Ticket};
+use crate::schema_base::{JobLike, JobMetadata, ResolutionLike, TicketLike};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -65,11 +65,13 @@ where
     Sto: OperonStorage,
 {
     type Job: JobLike;
-    type Ticket: Ticket<Job = Self::Job>;
     type Resolution: ResolutionLike;
+    type Ticket: TicketLike;
     type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;
 
     fn pool_size(&self) -> usize;
+
+    fn default_ticket(&self) -> Self::Ticket;
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
     /// Return `true` if the data storage holds all needed data to restore, `false` if it does not.

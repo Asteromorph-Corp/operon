@@ -9,7 +9,7 @@ use crate::scheduler::{
     ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
     PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError, SpecWithMetadata,
 };
-use crate::schema_base::{Job, JobMetadata, TicketSql, TicketStatus};
+use crate::schema_base::{Job, JobMetadata, Ticket, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiState, UiStateUpdate};
@@ -42,12 +42,11 @@ where
     pub ui_state: Arc<RwLock<UiState>>,
 }
 
-impl<Svc, Sto, JS, T, const N: usize> IndividualScheduler<Svc, Sto, JS, N>
+impl<Svc, Sto, JS, const N: usize> IndividualScheduler<Svc, Sto, JS, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = T>,
-    T: TicketSql<Job = Job<N>>,
+    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = Ticket<N>>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -77,7 +76,7 @@ where
         returning: bool,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
-        let (done, queued, waiting) = T::get_status(client).await?;
+        let (done, queued, waiting) = client.ticket(self.meta).get_status().await?;
         if queued + waiting == 0 && *state != RunningState::Finished {
             log::info!("All `{}` jobs are finished.", self.meta.id);
             *state = RunningState::Finished
@@ -104,9 +103,12 @@ where
         Ok(())
     }
 
-    async fn initial_ready_tickets(&self) -> Result<Vec<T>, MetaStorageError> {
+    async fn initial_ready_tickets(&self) -> Result<Vec<Ticket<N>>, MetaStorageError> {
         let conn = self.meta_storage.conn().await?;
-        T::get_all(conn.as_client(), TicketStatus::Queued).await
+        conn.as_client()
+            .ticket(self.meta)
+            .get_all(TicketStatus::Queued)
+            .await
     }
 
     /// Handle a received event.
@@ -117,7 +119,7 @@ where
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum>,
         state: &mut RunningState,
         peer_txs: &JS::PeerEventSenders,
-    ) -> Result<Vec<T>, SchedulerError> {
+    ) -> Result<Vec<Ticket<N>>, SchedulerError> {
         let mut conn = self.meta_storage.conn_static().await?;
         let tx = conn.transaction().await?;
         let ready_tickets = match event {
@@ -138,7 +140,7 @@ where
         Ok(ready_tickets)
     }
 
-    fn check_initial_data(&self, tickets: &[T]) -> bool {
+    fn check_initial_data(&self, tickets: &[Ticket<N>]) -> bool {
         let mut all_ready = true;
         for ticket in tickets.iter().filter(|t| !t.is_ready()) {
             log::error!(
@@ -161,10 +163,7 @@ where
         peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         ctrl_rx: ControlEventReceiver,
         clean: bool,
-    ) -> RunningState
-    where
-        T: TicketSql,
-    {
+    ) -> RunningState {
         // Create an internal channel for `InternalEvent`s.
         let mut peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
 
@@ -245,7 +244,7 @@ where
 
     async fn run_internal(
         &mut self,
-        initial_tickets: Vec<T>,
+        initial_tickets: Vec<Ticket<N>>,
         peer_txs: &JS::PeerEventSenders,
         mut peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
         mut ctrl_rx: ControlEventReceiver,
@@ -253,7 +252,7 @@ where
     ) -> Result<(), SchedulerError> {
         let pool = self.pool.clone();
 
-        let mut ready_tickets: VecDeque<T> = initial_tickets.into();
+        let mut ready_tickets: VecDeque<Ticket<N>> = initial_tickets.into();
         let mut got_all_updates = false;
 
         let (int_tx, mut int_rx) =

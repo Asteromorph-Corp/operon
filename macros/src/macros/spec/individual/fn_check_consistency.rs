@@ -2,7 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{get_all_ident, get_entity_ident, operon_ident, variable_ident};
+use crate::utils::{get_entity_ident, operon_ident, variable_ident};
 
 /// Generates the `check_consistency` function for the implementation of the trait `JobSpec`.
 ///
@@ -58,7 +58,6 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
         .iter()
         .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
-    let get_all_fn_name = get_all_ident(&job.id);
     let get_fn_name = get_entity_ident(&job.to);
 
     let corrupt_msg = format!(
@@ -116,17 +115,17 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             storage: &Sto,
             client: #operon::meta_storage::MetaClient<'_>,
         ) -> Result<bool, #operon::scheduler::SchedulerError> {
-            let Some(jobs) = queries::#get_all_fn_name(
-                client,
-                #operon::schema_base::TicketStatus::Done,
-            )
-            .await?
-            .iter()
-            .map(|t| #operon::schema_base::Ticket::resolve(t))
-            .collect::<Option<Vec<_>>>() else {
-                #operon::log::info!(#corrupt_msg);
-                return Ok(false);
-            };
+            let tickets = client
+                .ticket(self.job_meta())
+                .get_all(#operon::schema_base::TicketStatus::Done)
+                .await?;
+            let Some(jobs) = tickets
+                .iter()
+                .map(|ticket| ticket.resolve())
+                .collect::<Option<Vec<_>>>() else {
+                    #operon::log::info!(#corrupt_msg);
+                    return Ok(false);
+                };
 
             #check_res_and_entity
 

@@ -2,7 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{get_all_ident, operon_ident, rebuilder_ident};
+use crate::utils::{operon_ident, rebuilder_ident};
 
 /// Generates the `prepare_rebuild` function for the implementation of the trait `JobSpec`.
 ///
@@ -39,8 +39,6 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
 
-    let get_all_fn_name = get_all_ident(&job.id);
-
     let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
 
     let resolution_expr: syn::Expr = match job.spawn_dim.as_ref() {
@@ -70,11 +68,13 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             client: #operon::meta_storage::MetaClient<'_>,
         ) -> Result<Box<dyn #operon::scheduler::JobRebuilder>, #operon::scheduler::SchedulerError>
         {
-            let tickets =
-                queries::#get_all_fn_name(client, #operon::schema_base::TicketStatus::Done).await?;
+            let tickets = client
+                .ticket(self.job_meta())
+                .get_all(#operon::schema_base::TicketStatus::Done)
+                .await?;
             let data = #operon::futures::future::try_join_all(tickets.into_iter().map(
                 |ticket| async move {
-                    let job = #operon::schema_base::Ticket::resolve(&ticket).ok_or_else(|| {
+                    let job = ticket.resolve().ok_or_else(|| {
                         #operon::scheduler::SchedulerError::Other(
                             #resolve_fail_msg.into()
                         )

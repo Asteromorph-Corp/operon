@@ -1,7 +1,7 @@
 use syn::parse_quote;
 
 use crate::configs::{DimensionConfig, JobConfig};
-use crate::utils::{operon_ident, raise_quota_ident, ticket_ident};
+use crate::utils::{job_metadata_ident, operon_ident, raise_quota_ident};
 
 /// A helper struct to generate the SQL query for popping tickets to be raised.
 struct RaiseQuotaPopQuery<'a>(&'a JobConfig, &'a DimensionConfig);
@@ -42,7 +42,7 @@ impl std::fmt::Display for RaiseQuotaCopyInQuery<'_> {
         for dim in &self.0.dims {
             write!(f, "{dim}, ")?;
         }
-        writeln!(f, "resolved, deps_count, deps_quota, deps_done, status")?;
+        writeln!(f, "deps_done, deps_quota, status")?;
         writeln!(f, ")")?;
         write!(f, "FROM STDIN WITH (FORMAT csv);")
     }
@@ -52,7 +52,8 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
     // TODO: only define raise_dep for a valid combination of jobs.
     let operon = operon_ident();
     let fn_name = raise_quota_ident(&job.id, &dim.id);
-    let ticket_ident = ticket_ident(&job.id);
+    let job_meta = job_metadata_ident(&job.id);
+    let job_n = job.dims.len();
     let res_n = dim.depends_on.len();
     let pop_query = RaiseQuotaPopQuery(job, dim).to_string();
     let copy_query = RaiseQuotaCopyInQuery(job).to_string();
@@ -69,18 +70,18 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
         pub async fn #fn_name(
             client: #operon::meta_storage::MetaClient<'_>,
             res: #operon::schema_base::Resolution<#res_n>,
-        ) -> Result<Vec<schema::#ticket_ident>, #operon::meta_storage::MetaStorageError> {
+        ) -> Result<Vec<#operon::schema_base::Ticket<#job_n>>, #operon::meta_storage::MetaStorageError> {
             let schema_prefix = client.schema_prefix();
             let pop_stmt = format!(#pop_query);
 
             let rows = client.query(&pop_stmt, &[#(&i64::try_from(res.coordinate[#indices])?,)*]).await?;
             let tickets = rows
                 .iter()
-                .map(<schema::#ticket_ident as #operon::schema_base::TicketSql>::from_sql_row)
+                .map(|row| #operon::schema_base::Ticket::from_sql_row(metadata::#job_meta(), row))
                 .collect::<Result<Vec<_>, _>>()?;
             let new_tickets = tickets
                 .into_iter()
-                .map(|ticket| #operon::schema_base::Ticket::raise_dependency_quota(ticket, res.ub))
+                .map(|ticket| ticket.raise_deps_quota(res.ub))
                 .collect::<Vec<_>>();
 
             let copy_stmt = format!(#copy_query);
@@ -89,7 +90,7 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
             for ticket in &new_tickets {
                 #operon::futures::SinkExt::feed(
                     &mut sink,
-                    #operon::schema_base::TicketSql::to_sql_copy_params(ticket)?.into(),
+                    ticket.to_copy_string()?.into(),
                 )
                 .await?;
             }
@@ -97,7 +98,7 @@ pub(super) fn fn_raise_quota(job: &JobConfig, dim: &DimensionConfig) -> syn::Ite
 
             let ready_tickets = new_tickets
                 .into_iter()
-                .filter(#operon::schema_base::Ticket::is_ready)
+                .filter(|ticket| ticket.is_ready())
                 .collect::<Vec<_>>();
             Ok(ready_tickets)
         }

@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    explode_ident, operon_ident, raise_dep_ident, raise_quota_ident, rebuilder_ident, ticket_ident,
+    explode_ident, operon_ident, raise_dep_ident, raise_quota_ident, rebuilder_ident,
 };
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -24,15 +24,15 @@ use crate::utils::{
 ///             queries::explode_delta_j(client, resolution).await?;
 ///             queries::raise_dep_delta(
 ///                 client,
-///                 &operon::schema_base::TicketDepCount::some(job.i),
-///                 &operon::schema_base::TicketDepCount::none(),
-///                 &operon::schema_base::TicketDepCount::none(),
+///                 &operon::schema_base::OptionCoordinate::some(job.i),
+///                 &operon::schema_base::OptionCoordinate::none(),
+///                 &operon::schema_base::OptionCoordinate::none(),
 ///             )
 ///             .await?;
 ///             queries::raise_dep_epsilon(
 ///                 client,
-///                 &operon::schema_base::TicketDepCount::some(job.i),
-///                 &operon::schema_base::TicketDepCount::none(),
+///                 &operon::schema_base::OptionCoordinate::some(job.i),
+///                 &operon::schema_base::OptionCoordinate::none(),
 ///             )
 ///             .await?;
 ///         }
@@ -49,7 +49,6 @@ pub fn impl_job_rebuilder(
 ) -> syn::ItemImpl {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
-    let ticket_ident = ticket_ident(&job.id);
     let job_id = &job.id;
 
     let maybe_put_resolution = job.spawn_dim.is_some().then(|| -> syn::Stmt {
@@ -89,9 +88,9 @@ pub fn impl_job_rebuilder(
             let raise_dep_fn_name = raise_dep_ident(&downstream_job.id);
             let args = downstream_job.dims.iter().map(|downstream_dim| -> syn::Expr {
                 if let Some(index) = job.dims.iter().position(|d| d == downstream_dim) {
-                    parse_quote! { #operon::schema_base::TicketDepCount::some(job.coordinate[#index]) }
+                    parse_quote! { #operon::schema_base::OptionCoordinate::some(job.coordinate[#index]) }
                 } else {
-                    parse_quote! { #operon::schema_base::TicketDepCount::none() }
+                    parse_quote! { #operon::schema_base::OptionCoordinate::none() }
                 }
             });
             parse_quote! { queries::#raise_dep_fn_name(client, #(#args,)*).await?; }
@@ -116,7 +115,7 @@ pub fn impl_job_rebuilder(
 
                     // FIXME: I would rather not do this, but every other way of doing this would require massive update of the UI logic
                     let mut ui_state = ui_state.write().await;
-                    let (done, queued, waiting) = <schema::#ticket_ident as #operon::schema_base::TicketSql>::get_status(client).await?;
+                    let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
                     let state = if queued + waiting == 0 {
                         #operon::operon::RunningState::Finished
                     } else {
