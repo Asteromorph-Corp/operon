@@ -39,11 +39,6 @@ impl<const N: usize> Ticket<N> {
         self
     }
 
-    pub const fn raise_deps_quota(mut self, explosion_ub: usize) -> Self {
-        self.deps_quota = self.deps_quota + explosion_ub - 1;
-        self.update_status()
-    }
-
     pub const fn with_coordinate<const IDX: usize>(mut self, coordinate: usize) -> Self {
         const { assert!(IDX < N) }
         self.coordinate[IDX] = OptionCoordinate::some(coordinate);
