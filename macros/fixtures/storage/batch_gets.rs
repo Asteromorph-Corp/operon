@@ -1,4 +1,4 @@
-async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::storage::StorageError> {
+async fn get_all_b_over_j(&self, i: usize) -> Result<Vec<B>, operon::storage::StorageError> {
     let conn = self.pool.get().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
     let stmt = format!("SELECT value, j\nFROM {schema_prefix}b\nWHERE i = $1\nORDER BY j");
@@ -13,7 +13,7 @@ async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::stor
     Ok(result)
 }
 
-async fn get_all_c_over_k(&self, i: schema::IDim) -> Result<Vec<C>, operon::storage::StorageError> {
+async fn get_all_c_over_k(&self, i: usize) -> Result<Vec<C>, operon::storage::StorageError> {
     let conn = self.pool.get().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
     let stmt = format!("SELECT value, k\nFROM {schema_prefix}c\nWHERE i = $1\nORDER BY k");
@@ -28,8 +28,8 @@ async fn get_all_c_over_k(&self, i: schema::IDim) -> Result<Vec<C>, operon::stor
 
 async fn get_all_d_over_j(
     &self,
-    i: schema::IDim,
-    k: schema::KDim,
+    i: usize,
+    k: usize,
 ) -> Result<Vec<D>, operon::storage::StorageError> {
     let conn = self.pool.get().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
@@ -48,7 +48,7 @@ async fn get_all_d_over_j(
     Ok(result)
 }
 
-async fn get_all_e_over_k(&self, i: schema::IDim) -> Result<Vec<E>, operon::storage::StorageError> {
+async fn get_all_e_over_k(&self, i: usize) -> Result<Vec<E>, operon::storage::StorageError> {
     let conn = self.pool.get().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
     let stmt = format!("SELECT value, k\nFROM {schema_prefix}e\nWHERE i = $1\nORDER BY k");

@@ -1,4 +1,4 @@
-async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::storage::StorageError> {
+async fn get_all_b_over_j(&self, i: usize) -> Result<Vec<B>, operon::storage::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut j = 0usize;
@@ -11,7 +11,7 @@ async fn get_all_b_over_j(&self, i: schema::IDim) -> Result<Vec<B>, operon::stor
     Ok(final_results.unwrap_or_default())
 }
 
-async fn get_all_c_over_k(&self, i: schema::IDim) -> Result<Vec<C>, operon::storage::StorageError> {
+async fn get_all_c_over_k(&self, i: usize) -> Result<Vec<C>, operon::storage::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut k = 0usize;
@@ -26,8 +26,8 @@ async fn get_all_c_over_k(&self, i: schema::IDim) -> Result<Vec<C>, operon::stor
 
 async fn get_all_d_over_j(
     &self,
-    i: schema::IDim,
-    k: schema::KDim,
+    i: usize,
+    k: usize,
 ) -> Result<Vec<D>, operon::storage::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
@@ -41,7 +41,7 @@ async fn get_all_d_over_j(
     Ok(final_results.unwrap_or_default())
 }
 
-async fn get_all_e_over_k(&self, i: schema::IDim) -> Result<Vec<E>, operon::storage::StorageError> {
+async fn get_all_e_over_k(&self, i: usize) -> Result<Vec<E>, operon::storage::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut k = 0usize;

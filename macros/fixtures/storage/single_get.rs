@@ -1,8 +1,4 @@
-async fn get_b(
-    &self,
-    i: schema::IDim,
-    j: schema::JDim,
-) -> Result<Option<B>, operon::storage::StorageError> {
+async fn get_b(&self, i: usize, j: usize) -> Result<Option<B>, operon::storage::StorageError> {
     let conn = self.pool.get().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
     let stmt = format!("SELECT value FROM {schema_prefix}b WHERE i = $1 AND j = $2;");

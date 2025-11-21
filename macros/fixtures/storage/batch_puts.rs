@@ -31,11 +31,7 @@ async fn put_all_a(&self, values: Vec<A>) -> Result<(), operon::storage::Storage
     Ok(())
 }
 
-async fn put_all_b(
-    &self,
-    i: schema::IDim,
-    values: Vec<B>,
-) -> Result<(), operon::storage::StorageError> {
+async fn put_all_b(&self, i: usize, values: Vec<B>) -> Result<(), operon::storage::StorageError> {
     let mut conn = self.pool.get().await?;
     let tx = conn.transaction().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
@@ -68,11 +64,7 @@ async fn put_all_b(
     Ok(())
 }
 
-async fn put_all_c(
-    &self,
-    i: schema::IDim,
-    values: Vec<C>,
-) -> Result<(), operon::storage::StorageError> {
+async fn put_all_c(&self, i: usize, values: Vec<C>) -> Result<(), operon::storage::StorageError> {
     let mut conn = self.pool.get().await?;
     let tx = conn.transaction().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());

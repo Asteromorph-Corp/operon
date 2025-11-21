@@ -11,10 +11,7 @@ async fn get_all_c_over_j(&self) -> Result<Vec<C>, operon::storage::StorageError
     Ok(final_results.unwrap_or_default())
 }
 
-async fn get_all_d_over_jk(
-    &self,
-    i: schema::IDim,
-) -> Result<Vec<Vec<D>>, operon::storage::StorageError> {
+async fn get_all_d_over_jk(&self, i: usize) -> Result<Vec<Vec<D>>, operon::storage::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut j = 0usize;

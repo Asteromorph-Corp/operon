@@ -5,8 +5,8 @@ async fn run_job(
     client: operon::meta_storage::MetaClient<'_>,
     job: Self::Job,
 ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
-    let mut resolution_j: std::collections::HashMap<(), usize> = Default::default();
-    let mut resolution_k: std::collections::HashMap<(schema::JDim,), usize> = Default::default();
+    let mut resolution_j: std::collections::HashMap<[usize; 0usize], usize> = Default::default();
+    let mut resolution_k: std::collections::HashMap<[usize; 1usize], usize> = Default::default();
 
     let pkey = [job.coordinate[0usize]];
     let Some(resolution) = client
@@ -19,9 +19,9 @@ async fn run_job(
                 .into(),
         );
     };
-    resolution_j.insert((), resolution.ub);
+    resolution_j.insert([], resolution.ub);
 
-    for j in 0..(*resolution_j.get(&()).unwrap_or(&0)) {
+    for j in 0..(*resolution_j.get(&[]).unwrap_or(&0)) {
         // TODO: Remove unwrap
         let pkey = [job.coordinate[0usize], j];
         let Some(resolution) = client
@@ -34,12 +34,12 @@ async fn run_job(
                     .into(),
             );
         };
-        resolution_k.insert((j,), resolution.ub);
+        resolution_k.insert([j], resolution.ub);
     }
 
     let c_j = {
         let elem = storage.get_all_c_over_j().await?;
-        let ub = resolution_j.get(&()).unwrap_or(&0);
+        let ub = resolution_j.get(&[]).unwrap_or(&0);
         if elem.len() < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
                 "c (j = *) expects {} elements, but only {} were found",
@@ -56,7 +56,7 @@ async fn run_job(
     }?;
     let d_j_k = {
         let elem = storage.get_all_d_over_jk(job.coordinate[0usize]).await?;
-        let ub = resolution_j.get(&()).unwrap_or(&0);
+        let ub = resolution_j.get(&[]).unwrap_or(&0);
         if elem.len() < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
                 "d (i = {}, j = *, k = _) expects {} elements, but only {} were found",
@@ -70,7 +70,7 @@ async fn run_job(
             .take(*ub)
             .enumerate()
             .map(|(j, elem)| {
-                let ub = resolution_k.get(&(j,)).unwrap_or(&0);
+                let ub = resolution_k.get(&[j]).unwrap_or(&0);
                 if elem.len() < *ub {
                     return Err(operon::storage::StorageError::NotFound(format!(
                         "d (i = {}, j = {}, k = *) expects {} elements, but only {} were found",

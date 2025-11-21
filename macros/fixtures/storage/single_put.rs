@@ -1,9 +1,4 @@
-async fn put_b(
-    &self,
-    i: schema::IDim,
-    j: schema::JDim,
-    value: B,
-) -> Result<(), operon::storage::StorageError> {
+async fn put_b(&self, i: usize, j: usize, value: B) -> Result<(), operon::storage::StorageError> {
     let conn = self.pool.get().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
     let stmt = format!(
