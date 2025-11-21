@@ -2,16 +2,16 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::configs::{DimensionConfigMap, EntityConfigMap, JobConfig};
-use crate::macros::spec::individual::fn_check_consistency::fn_check_consistency;
-use crate::macros::spec::individual::fn_default_ticket::fn_default_ticket;
-use crate::macros::spec::individual::fn_on_receive_explosion::fn_on_receive_explosion;
-use crate::macros::spec::individual::fn_on_receive_job::fn_on_receive_job;
-use crate::macros::spec::individual::fn_on_receive_resolution::fn_on_receive_resolution;
-use crate::macros::spec::individual::fn_pool_size::fn_pool_size;
-use crate::macros::spec::individual::fn_prepare_rebuild::fn_prepare_rebuild;
-use crate::macros::spec::individual::fn_run_job::fn_run_job;
-use crate::macros::spec::individual::fn_send_on_finish::fn_send_on_finish;
-use crate::macros::spec::individual::resolution_type::resolution_type;
+use crate::macros::spec::resolution_type::resolution_type;
+use crate::macros::spec::spec::fn_check_consistency::fn_check_consistency;
+use crate::macros::spec::spec::fn_default_ticket::fn_default_ticket;
+use crate::macros::spec::spec::fn_on_receive_explosion::fn_on_receive_explosion;
+use crate::macros::spec::spec::fn_on_receive_job::fn_on_receive_job;
+use crate::macros::spec::spec::fn_on_receive_resolution::fn_on_receive_resolution;
+use crate::macros::spec::spec::fn_pool_size::fn_pool_size;
+use crate::macros::spec::spec::fn_prepare_rebuild::fn_prepare_rebuild;
+use crate::macros::spec::spec::fn_run_job::fn_run_job;
+use crate::macros::spec::spec::fn_send_on_finish::fn_send_on_finish;
 use crate::utils::{
     operon_ident, peer_txs_ident, service_trait_ident, spec_ident, storage_trait_ident,
 };

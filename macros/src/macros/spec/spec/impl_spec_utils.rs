@@ -8,7 +8,7 @@ use crate::utils::{
 };
 
 /// Generates the implementation of the `JobSpec` trait for a given job.
-pub fn impl_meta(
+pub fn impl_spec_utils(
     service_id: &str,
     job: &JobConfig,
     all_upstream_jobs: &IndexSet<&JobConfig>,

@@ -2,7 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::macros::spec::individual::resolution_type::resolution_type;
+use crate::macros::spec::resolution_type::resolution_type;
 use crate::operon_ident;
 use crate::utils::rebuilder_ident;
 
