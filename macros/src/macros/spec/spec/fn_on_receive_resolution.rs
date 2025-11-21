@@ -103,7 +103,7 @@ mod tests {
     use crate::test_utils::simple_pipeline::{all_jobs, job_delta};
 
     #[rstest]
-    #[case::simple(job_delta(), "spec/fn_on_receive_resolution.rs")]
+    #[case::simple(job_delta(), "spec/spec/fn_on_receive_resolution.rs")]
     fn test_fn_on_receive_resolution(
         all_jobs: JobConfigMap,
         #[case] job: JobConfig,

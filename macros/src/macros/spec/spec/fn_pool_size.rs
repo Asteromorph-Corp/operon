@@ -21,7 +21,7 @@ mod tests {
     use crate::test_utils::simple_pipeline::job_beta;
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/fn_pool_size.rs")]
+    #[case::simple(job_beta(), "spec/spec/fn_pool_size.rs")]
     fn test_fn_pool_size(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let item = fn_pool_size(&job);
         assert_item_eq(&item, fixture_path);

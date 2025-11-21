@@ -48,6 +48,6 @@ mod tests {
     #[rstest]
     fn test_resolution_enum(all_dimensions: DimensionConfigMap) {
         let result = resolution_enum_definition(&all_dimensions);
-        assert_item_eq(&result, "schema/resolution/resolution_enum.rs");
+        assert_item_eq(&result, "schema/resolution/resolution_enum_definition.rs");
     }
 }

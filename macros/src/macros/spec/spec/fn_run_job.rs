@@ -417,19 +417,19 @@ mod tests {
         all_entities(),
         all_dimensions(),
         job_beta(),
-        "spec/fn_run_job.simple.rs"
+        "spec/spec/fn_run_job.simple.rs"
     )]
     #[case::with_over(
         all_entities(),
         all_dimensions(),
         job_epsilon(),
-        "spec/fn_run_job.with_over.rs"
+        "spec/spec/fn_run_job.with_over.rs"
     )]
     #[case::multiple_over(
         all_entities_complicated(),
         all_dimensions_complicated(),
         job_multiple_over(),
-        "spec/fn_run_job.multiple_over.rs"
+        "spec/spec/fn_run_job.multiple_over.rs"
     )]
     fn test_fn_run_job(
         #[case] all_entities: EntityConfigMap,

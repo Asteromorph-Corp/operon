@@ -104,7 +104,7 @@ mod tests {
     use crate::test_utils::simple_pipeline::job_beta;
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/fn_prepare_rebuild.rs")]
+    #[case::simple(job_beta(), "spec/spec/fn_prepare_rebuild.rs")]
     fn test_fn_prepare_rebuild(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let item = fn_prepare_rebuild(&job);
         assert_item_eq(&item, fixture_path);

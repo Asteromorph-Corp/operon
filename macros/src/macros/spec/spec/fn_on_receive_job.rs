@@ -89,7 +89,7 @@ mod tests {
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]
-    #[case::simple("epsilon", "spec/fn_on_receive_job.rs")]
+    #[case::simple("epsilon", "spec/spec/fn_on_receive_job.rs")]
     fn test_fn_on_receive_job(
         all_jobs: JobConfigMap,
         #[case] job_id: &str,

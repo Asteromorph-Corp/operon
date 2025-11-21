@@ -14,3 +14,19 @@ pub fn fn_default_ticket(job: &JobConfig) -> syn::ImplItemFn {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::job_beta;
+
+    #[rstest]
+    #[case::simple(job_beta(), "spec/spec/fn_default_ticket.rs")]
+    fn test_fn_default_ticket(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let item = fn_default_ticket(&job);
+        assert_item_eq(&item, fixture_path)
+    }
+}

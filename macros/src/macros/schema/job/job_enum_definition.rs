@@ -47,6 +47,6 @@ mod tests {
     #[rstest]
     fn test_job_enum_definition(all_jobs: JobConfigMap) {
         let result = job_enum_definition(&all_jobs);
-        assert_item_eq(&result, "schema/job/job_enum.rs");
+        assert_item_eq(&result, "schema/job/job_enum_definition.rs");
     }
 }

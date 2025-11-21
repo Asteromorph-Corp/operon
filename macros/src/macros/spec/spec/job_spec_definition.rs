@@ -27,7 +27,7 @@ mod tests {
     use crate::test_utils::assert_item_eq;
 
     #[rstest]
-    #[case::simple("beta", "spec/job_spec_definition.rs")]
+    #[case::simple("beta", "spec/spec/job_spec_definition.rs")]
     fn test_job_spec_definition(#[case] job_id: &str, #[case] fixture_path: &str) {
         let job_id = JobId::from(job_id);
         let item = job_spec_definition(&job_id);

@@ -42,7 +42,7 @@ mod tests {
     use crate::test_utils::simple_pipeline::job_beta;
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/job_rebuilder_definition.rs")]
+    #[case::simple(job_beta(), "spec/rebuilder/job_rebuilder_definition.rs")]
     fn test_job_rebuilder_definition(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let item = job_rebuilder_definition(&job);
         assert_item_eq(&item, fixture_path);

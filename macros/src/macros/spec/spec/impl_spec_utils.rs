@@ -59,3 +59,28 @@ pub fn impl_spec_utils(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+    use crate::configs::JobConfigMap;
+    use crate::dependency_analysis::get_upstream_jobs;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_jobs, job_beta, job_epsilon, service_id};
+
+    #[rstest]
+    #[case::simple(job_beta(), "spec/spec/impl_spec_utils.simple.rs")]
+    #[case::no_spawn_dim(job_epsilon(), "spec/spec/impl_spec_utils.no_spawn_dim.rs")]
+    fn test_impl_spec_utils(
+        service_id: &str,
+        all_jobs: JobConfigMap,
+        #[case] job: JobConfig,
+        #[case] fixture_path: &str,
+    ) {
+        let all_upstream_jobs = get_upstream_jobs(&job, &all_jobs);
+        let item = impl_spec_utils(service_id, &job, &all_upstream_jobs);
+        assert_item_eq(&item, fixture_path)
+    }
+}

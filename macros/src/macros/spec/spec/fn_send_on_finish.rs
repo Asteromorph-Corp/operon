@@ -135,7 +135,7 @@ mod tests {
     use crate::test_utils::simple_pipeline::{all_jobs, job_beta};
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/fn_send_on_finish.rs")]
+    #[case::simple(job_beta(), "spec/spec/fn_send_on_finish.rs")]
     fn test_fn_send_on_finish(
         all_jobs: JobConfigMap,
         #[case] job: JobConfig,

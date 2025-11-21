@@ -143,8 +143,8 @@ mod tests {
     use crate::test_utils::simple_pipeline::{job_beta, job_epsilon};
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/fn_check_consistency.simple.rs")]
-    #[case::no_spawn_dim(job_epsilon(), "spec/fn_check_consistency.no_spawn_dim.rs")]
+    #[case::simple(job_beta(), "spec/spec/fn_check_consistency.simple.rs")]
+    #[case::no_spawn_dim(job_epsilon(), "spec/spec/fn_check_consistency.no_spawn_dim.rs")]
     fn test_fn_check_consistency(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let item = fn_check_consistency(&job);
         assert_item_eq(&item, fixture_path)

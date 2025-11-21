@@ -87,7 +87,7 @@ mod tests {
     use crate::test_utils::assert_item_eq;
 
     #[rstest]
-    #[case::simple("beta", vec!["delta", "epsilon"], "spec/impl_peer_txs.rs")]
+    #[case::simple("beta", vec!["delta", "epsilon"], "spec/peer_txs/impl_peer_txs.rs")]
     fn test_impl_peer_event_senders(
         #[case] job_id: &str,
         #[case] event_receiving_job_ids: Vec<&str>,

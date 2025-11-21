@@ -143,7 +143,7 @@ mod tests {
     use crate::test_utils::simple_pipeline::{all_jobs, job_beta};
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/impl_job_rebuilder.rs")]
+    #[case::simple(job_beta(), "spec/rebuilder/impl_job_rebuilder.rs")]
     fn test_impl_job_rebuilder(
         all_jobs: JobConfigMap,
         #[case] job: JobConfig,
