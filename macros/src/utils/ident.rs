@@ -60,14 +60,6 @@ pub fn batch_put_entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("put_all_{}", entity_id.to_snake_case())
 }
 
-pub fn explode_ident(job_id: &JobId, dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!(
-        "explode_{}_{}",
-        job_id.to_snake_case(),
-        dimension_id.to_snake_case()
-    )
-}
-
 pub fn job_fn_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}", job_id.to_snake_case())
 }

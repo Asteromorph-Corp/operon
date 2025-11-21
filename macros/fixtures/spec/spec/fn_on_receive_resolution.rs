@@ -6,7 +6,10 @@ async fn on_receive_resolution(
     resolution: schema::ResolutionEnum,
 ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
     match resolution {
-        schema::ResolutionEnum::I(res) => Ok(queries::explode_delta_i(client, res).await?),
+        schema::ResolutionEnum::I(res) => Ok(client
+            .ticket(self.job_meta())
+            .explode::<_, 0usize>(metadata::dimension_i_meta(), res)
+            .await?),
         schema::ResolutionEnum::J(res) => {
             match peer_txs
                 .to_epsilon
@@ -24,9 +27,15 @@ async fn on_receive_resolution(
                     )
                 }
             }
-            Ok(queries::explode_delta_j(client, res).await?)
+            Ok(client
+                .ticket(self.job_meta())
+                .explode::<_, 1usize>(metadata::dimension_j_meta(), res)
+                .await?)
         }
-        schema::ResolutionEnum::K(res) => Ok(queries::explode_delta_k(client, res).await?),
+        schema::ResolutionEnum::K(res) => Ok(client
+            .ticket(self.job_meta())
+            .explode::<_, 2usize>(metadata::dimension_k_meta(), res)
+            .await?),
         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
             "resolution",
             "delta",

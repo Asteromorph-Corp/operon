@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{explode_ident, job_metadata_ident, operon_ident, rebuilder_ident};
+use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident};
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
 ///
@@ -57,8 +57,20 @@ pub fn impl_job_rebuilder(
         let explode = spawn_dim_repeating_jobs
             .iter()
             .map(|repeating_job| -> syn::Stmt {
-                let explode_fn_name = explode_ident(&repeating_job.id, spawn_dim);
-                parse_quote! { queries::#explode_fn_name(client, resolution).await?; }
+                let Some(idx) = repeating_job.dims.iter().position(|d| d == spawn_dim) else {
+                    panic!(
+                        "{} not found in repeating job {}",
+                        spawn_dim, repeating_job.id
+                    );
+                };
+                let job_meta = job_metadata_ident(&repeating_job.id);
+
+                parse_quote! {
+                    client
+                        .ticket(metadata::#job_meta())
+                        .explode::<_, #idx>(self.spawn_dim_meta, resolution)
+                        .await?;
+                }
             });
         let raise_quotas = spawn_dim_repeating_job_downstream_jobs.iter().filter_map(
             |downstream_job| -> Option<syn::Stmt> {

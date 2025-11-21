@@ -1,3 +1,6 @@
+use bytes::Bytes;
+use futures::SinkExt;
+
 use crate::meta_storage::{MetaClient, MetaStorageError};
 use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
 use crate::utils::{SchemaPrefix, SqlParams};
@@ -118,6 +121,72 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
             .map(|row| Ticket::from_sql_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
+    }
+
+    /// Explodes the ticket along a dimension at a given coordinate.
+    ///
+    /// Returns tickets that are newly `"queued"`.
+    pub async fn explode<const M: usize, const IDX: usize>(
+        &self,
+        res_meta: DimensionMetadata<M>,
+        res: Resolution<M>,
+    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+        const { assert!(IDX < N) }
+        if self.job_meta.dims[IDX] != res_meta.id {
+            log::warn!("Invalid resolution received for explosion.");
+            return Ok(vec![]);
+        }
+
+        let schema_prefix = self.client.schema_prefix();
+        let pop_stmt = ExplodePopQuery(schema_prefix, self.job_meta, res_meta);
+
+        let params = res_meta
+            .deps
+            .iter()
+            .zip(res.coordinate)
+            .filter_map(|(d, c)| self.job_meta.dims.contains(d).then_some(c));
+        let params = SqlParams::from_usize(params)?;
+
+        let rows = self.client.query_stmt(&pop_stmt, &params.borrow()).await?;
+        let tickets = rows
+            .iter()
+            .map(|row| Ticket::from_sql_row(self.job_meta, row))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let err_msg = format!(
+            "Called `explode({})` on `{}`, but `{}` was resolved",
+            res_meta.id, self.job_meta.id, res_meta.id
+        );
+
+        if tickets
+            .iter()
+            .any(|ticket| ticket.coordinate[IDX].is_some())
+        {
+            return Err(MetaStorageError::InvalidExplosion(err_msg));
+        }
+
+        let new_tickets = tickets
+            .iter()
+            .flat_map(|ticket| (0..res.ub).map(|x| ticket.with_coordinate::<IDX>(x)))
+            .map(|ticket| ticket.update_status())
+            .collect::<Vec<_>>();
+
+        let copy_stmt = CopyInQuery(schema_prefix, self.job_meta);
+        let sink = self
+            .client
+            .copy_in::<_, Bytes>(&copy_stmt.to_string())
+            .await?;
+        let mut sink = Box::pin(sink);
+        for ticket in &new_tickets {
+            sink.feed(ticket.to_copy_string()?.into()).await?;
+        }
+        sink.close().await?;
+
+        let ready_tickets = new_tickets
+            .into_iter()
+            .filter(|ticket| ticket.is_ready())
+            .collect::<Vec<_>>();
+        Ok(ready_tickets)
     }
 
     /// Marks the ticket corresponding to a given job as done.
@@ -380,6 +449,57 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsQuotaQuery<'
     }
 }
 
+/// A helper struct to generate the SQL query for popping tickets to be exploded.
+struct ExplodePopQuery<'a, const N: usize, const M: usize>(
+    SchemaPrefix<'a>,
+    JobMetadata<N>,
+    DimensionMetadata<M>,
+);
+
+impl<const N: usize, const M: usize> std::fmt::Display for ExplodePopQuery<'_, N, M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let job_id = self.1.id;
+
+        writeln!(f, "DELETE FROM {schema}ticket_{job_id}")?;
+        for (idx, dep) in self
+            .2
+            .deps
+            .iter()
+            .filter(|dim| self.1.dims.contains(dim))
+            .enumerate()
+        {
+            if idx == 0 {
+                write!(f, "WHERE")?;
+            } else {
+                write!(f, "    AND")?;
+            }
+            writeln!(f, " {} = ${}", dep, idx + 1)?;
+        }
+        write!(f, "RETURNING *;")
+    }
+}
+
+/// A helper struct to generate the SQL query for copying tickets into the database.
+struct CopyInQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+
+impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+        let dims = self.1.dims;
+
+        writeln!(f, "COPY {schema}ticket_{id} (")?;
+        write!(f, "    ")?;
+        for dim in dims {
+            write!(f, "{dim}, ")?;
+        }
+        writeln!(f, "deps_done, deps_quota, status")?;
+        writeln!(f, ")")?;
+        write!(f, "FROM STDIN WITH (FORMAT csv);")
+    }
+}
+
 /// An helper struct to generate the SQL query for marking a ticket as done for a given job.
 struct MarkDoneQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
 
@@ -631,6 +751,34 @@ mod tests {
     //     #[case] expected: &str,
     // ) {
     //     let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job).to_string();
+    //     assert_eq!(stmt, expected);
+    // }
+    //
+    // #[rstest]
+    // #[case::simple(
+    //     job_beta(),
+    //     dimension_i(),
+    //     indoc! { "
+    //         DELETE FROM test_meta.ticket_beta
+    //         RETURNING *;"
+    //     }
+    // )]
+    // #[case::multiple(
+    //     job_epsilon(),
+    //     dimension_k(),
+    //     indoc! {"
+    //         DELETE FROM test_meta.ticket_epsilon
+    //         WHERE i = $1
+    //         RETURNING *;"
+    //     }
+    // )]
+    // fn test_explode_pop_query<const N: usize, const M: usize>(
+    //     schema_prefix: SchemaPrefix<'static>,
+    //     #[case] job: JobMetadata<N>,
+    //     #[case] dim: DimensionMetadata<M>,
+    //     #[case] expected: &str,
+    // ) {
+    //     let stmt = ExplodePopQuery(schema_prefix, job, dim).to_string();
     //     assert_eq!(stmt, expected);
     // }
 
