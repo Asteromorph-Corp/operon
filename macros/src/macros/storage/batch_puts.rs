@@ -1,9 +1,7 @@
 use syn::parse_quote;
 
 use crate::configs::{JobConfig, JobConfigMap};
-use crate::utils::{
-    batch_put_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident,
-};
+use crate::utils::{batch_put_entity_ident, entity_ident, operon_ident, variable_ident};
 
 struct BatchPutTempTableQuery<'a>(&'a JobConfig);
 
@@ -73,18 +71,12 @@ pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn>
         let insert_query = BatchPutInsertQuery(job).to_string();
 
         let entity_ident = entity_ident(&job.to);
-        let dim_args = job.dims.iter()
-            .map(|d| -> syn::FnArg {
-                let arg_ident = variable_ident(d);
-                let arg_ty = dimension_ident(d);
-                parse_quote! { #arg_ident: schema::#arg_ty }
-            });
-        let dim_vars = job.dims.iter().map(|d| variable_ident(d));
+        let args = job.dims.iter().map(|d| variable_ident(d)).collect::<Vec<_>>();
         let spawn_dim_var = variable_ident(spawn_dim);
         let batch_put_fn_name = batch_put_entity_ident(&job.to);
 
         Some(parse_quote! {
-            async fn #batch_put_fn_name(&self, #(#dim_args,)* values: Vec<#entity_ident>) -> Result<(), #operon::storage::StorageError> {
+            async fn #batch_put_fn_name(&self, #(#args: usize,)* values: Vec<#entity_ident>) -> Result<(), #operon::storage::StorageError> {
                 let mut conn = self.pool.get().await?;
                 let tx = conn.transaction().await?;
                 let schema_prefix = #operon::utils::SchemaPrefix(self.schema.as_deref());
@@ -96,7 +88,7 @@ pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn>
                     .has_headers(false)
                     .from_writer(vec![]);
                 for (#spawn_dim_var, value) in values.iter().enumerate() {
-                    writer.serialize((#(#dim_vars,)* #spawn_dim_var, #operon::serde_json::to_value(value)?.to_string()))?;
+                    writer.serialize((#(#args,)* #spawn_dim_var, #operon::serde_json::to_value(value)?.to_string()))?;
                 }
                 let copy_stmt = #copy_query;
                 let sink = tx.copy_in(copy_stmt).await?;

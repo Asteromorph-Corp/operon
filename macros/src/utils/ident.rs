@@ -94,10 +94,6 @@ pub fn entity_over_dim_ident(entity_id: &EntityId, over: &[DimensionId]) -> syn:
     )
 }
 
-pub fn dimension_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("{}Dim", dimension_id.to_pascal_case())
-}
-
 pub fn variant_ident(id: &str) -> syn::Ident {
     format_ident!("{}", id.to_pascal_case())
 }

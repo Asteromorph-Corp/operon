@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::{EntityConfig, EntityConfigMap};
 use crate::utils::{
-    dimension_ident, entity_ident, get_entity_ident, operon_ident, put_entity_ident, variable_ident,
+    entity_ident, get_entity_ident, operon_ident, put_entity_ident, variable_ident,
 };
 
 struct SelectEntityQuery<'a>(&'a EntityConfig);
@@ -62,18 +62,6 @@ impl std::fmt::Display for InsertEntityQuery<'_> {
     }
 }
 
-fn dim_args(entity: &EntityConfig) -> impl Iterator<Item = syn::FnArg> {
-    entity.dims.iter().map(|d| -> syn::FnArg {
-        let arg_ident = variable_ident(d);
-        let arg_ty = dimension_ident(d);
-        parse_quote! { #arg_ident: schema::#arg_ty }
-    })
-}
-
-fn query_params(entity: &EntityConfig) -> impl Iterator<Item = syn::Ident> {
-    entity.dims.iter().map(|d| variable_ident(d))
-}
-
 fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
     let entity_ident = entity_ident(&entity.id);
@@ -82,15 +70,18 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let get_fn_name = get_entity_ident(&entity.id);
     let get_query = SelectEntityQuery(entity).to_string();
 
-    let dim_args = dim_args(entity);
-    let query_params = query_params(entity);
+    let args = entity
+        .dims
+        .iter()
+        .map(|d| variable_ident(d))
+        .collect::<Vec<_>>();
 
     parse_quote! {
-        async fn #get_fn_name(&self, #(#dim_args),*) -> Result<Option<#entity_ident>, operon::storage::StorageError> {
+        async fn #get_fn_name(&self, #(#args: usize),*) -> Result<Option<#entity_ident>, operon::storage::StorageError> {
             let conn = self.pool.get().await?;
             let schema_prefix = #operon::utils::SchemaPrefix(self.schema.as_deref());
             let stmt = format!(#get_query);
-            let row = conn.query_opt(&stmt, &[#(&i64::try_from(#query_params)?),*]).await?;
+            let row = conn.query_opt(&stmt, &[#(&i64::try_from(#args)?),*]).await?;
 
             let Some(row) = row else {
                 return Ok(None);
@@ -109,16 +100,19 @@ fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let put_fn_name = put_entity_ident(&entity.id);
     let put_query = InsertEntityQuery(entity).to_string();
 
-    let dim_args = dim_args(entity);
-    let query_params = query_params(entity);
+    let args = entity
+        .dims
+        .iter()
+        .map(|d| variable_ident(d))
+        .collect::<Vec<_>>();
 
     parse_quote! {
-        async fn #put_fn_name(&self, #(#dim_args,)* value: #entity_ident) -> Result<(), operon::storage::StorageError> {
+        async fn #put_fn_name(&self, #(#args: usize,)* value: #entity_ident) -> Result<(), operon::storage::StorageError> {
             let conn = self.pool.get().await?;
             let schema_prefix = #operon::utils::SchemaPrefix(self.schema.as_deref());
             let stmt = format!(#put_query);
             let value: #generic = value.into();
-            conn.execute(&stmt, &[#(&i64::try_from(#query_params)?,)* &#operon::serde_json::to_value(value)?]).await?;
+            conn.execute(&stmt, &[#(&i64::try_from(#args)?,)* &#operon::serde_json::to_value(value)?]).await?;
             Ok(())
         }
     }

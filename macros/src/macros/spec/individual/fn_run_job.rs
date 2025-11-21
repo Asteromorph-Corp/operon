@@ -7,7 +7,7 @@ use crate::configs::{
     DimensionConfig, DimensionConfigMap, DimensionId, EntityConfig, EntityConfigMap, JobConfig,
 };
 use crate::utils::{
-    batch_get_entity_ident, batch_put_entity_ident, dimension_ident, dimension_metadata_ident,
+    batch_get_entity_ident, batch_put_entity_ident, dimension_metadata_ident,
     entity_over_dim_ident, get_entity_ident, job_fn_ident, operon_ident, put_entity_ident,
     variable_ident,
 };
@@ -102,7 +102,7 @@ fn resolution_inserts(
                         format!(#missing_msg, pkey)
                     ).into());
                 };
-                #res_map.insert((#(#dep_vars,)*), resolution.ub);
+                #res_map.insert([#(#dep_vars),*], resolution.ub);
             },
             |acc, dep| {
                 let dep_var = variable_ident(dep);
@@ -117,7 +117,7 @@ fn resolution_inserts(
                     .map(|d| variable_ident(d));
 
                 quote! {
-                    for #dep_var in 0..(*#dep_res_map.get(&(#(#dep_ub_key,)*)).unwrap_or(&0)) { // TODO: Remove unwrap
+                    for #dep_var in 0..(*#dep_res_map.get(&[#(#dep_ub_key),*]).unwrap_or(&0)) { // TODO: Remove unwrap
                         #acc
                     }
                 }
@@ -239,7 +239,7 @@ fn arg_def_collected(
             let msg_params: Vec<syn::Expr> = msg_params.into_iter().flatten().collect();
 
             quote! {
-                let ub = #res_map_ident.get(&(#(#res_map_key,)*)).unwrap_or(&0); // TODO: Handle this better
+                let ub = #res_map_ident.get(&[#(#res_map_key,)*]).unwrap_or(&0); // TODO: Handle this better
                 if elem.len() < *ub {
                     return Err(#operon::storage::StorageError::NotFound(
                         format!(#not_found_msg, #(#msg_params,)* ub, elem.len())
@@ -333,9 +333,9 @@ pub(super) fn fn_run_job(
 
     let resolution_defs = resolution_index.iter().map(|(dim, entry)| -> syn::Stmt {
         let res_map_var = resolution_map_ident(dim);
-        let key_ty = entry.fetched_over.iter().map(|dep| dimension_ident(dep));
+        let n = entry.fetched_over.len();
         let ty: syn::Type = parse_quote! {
-            std::collections::HashMap<(#(schema::#key_ty,)*), usize>
+            std::collections::HashMap<[usize; #n], usize>
         };
         parse_quote! { let mut #res_map_var: #ty = Default::default(); }
     });

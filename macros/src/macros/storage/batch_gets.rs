@@ -2,9 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::{EntityConfig, EntityConfigMap, JobArg, JobConfigMap};
-use crate::utils::{
-    batch_get_entity_ident, dimension_ident, entity_ident, operon_ident, variable_ident,
-};
+use crate::utils::{batch_get_entity_ident, entity_ident, operon_ident, variable_ident};
 
 struct BatchGetQuery<'a>(&'a JobArg, &'a EntityConfig);
 
@@ -71,12 +69,7 @@ pub fn batch_gets(
         );
 
         let arg_dims = arg_config.dims.iter().filter(|d| !arg.over.contains(d)).collect::<Vec<_>>();
-        let fn_args = arg_dims.iter().map(|d| -> syn::FnArg {
-            let arg_ident = variable_ident(d);
-            let arg_ty = dimension_ident(d);
-            parse_quote! { #arg_ident: schema::#arg_ty }
-        });
-        let query_params = arg_dims.iter().map(|d| variable_ident(d));
+        let args = arg_dims.iter().map(|d| variable_ident(d)).collect::<Vec<_>>();
 
         let insert_results = arg.over.iter().enumerate().map(|(i, d)| {
             let dim_var = variable_ident(d);
@@ -98,12 +91,12 @@ pub fn batch_gets(
         });
 
         parse_quote! {
-            async fn #batch_get_fn_name(&self, #(#fn_args),*) -> Result<#return_ty, #operon::storage::StorageError> {
+            async fn #batch_get_fn_name(&self, #(#args: usize),*) -> Result<#return_ty, #operon::storage::StorageError> {
                 let conn = self.pool.get().await?;
                 let schema_prefix = #operon::utils::SchemaPrefix(self.schema.as_deref());
                 let stmt = format!(#batch_get_query);
                 let rows = conn
-                    .query(&stmt, &[#(&i64::try_from(#query_params)?),*])
+                    .query(&stmt, &[#(&i64::try_from(#args)?),*])
                     .await?;
 
                 let mut result: #return_ty = Default::default();
