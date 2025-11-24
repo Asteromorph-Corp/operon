@@ -1,5 +1,29 @@
 pub fn normalize_string(input: &str) -> String {
-    normalize_raw_string_newlines(input)
+    let newline_normalized = normalize_raw_string_newlines(input);
+    remove_trailing_commas(&newline_normalized)
+}
+
+pub fn remove_trailing_commas(s: &str) -> String {
+    let mut chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+
+    while i + 1 < chars.len() {
+        if chars[i] == ',' {
+            let mut j = i + 1;
+            // Skip whitespace after the comma
+            while j < chars.len() && chars[j].is_whitespace() {
+                j += 1;
+            }
+            // If next significant char is a closing delimiter → remove comma (+ whitespace)
+            if j < chars.len() && matches!(chars[j], ')' | ']' | '}') {
+                chars.drain(i..j);
+                continue; // re-process index i since characters shifted
+            }
+        }
+        i += 1;
+    }
+
+    chars.into_iter().collect()
 }
 
 fn normalize_raw_string_newlines(input: &str) -> String {
