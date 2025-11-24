@@ -123,7 +123,7 @@ impl<const N: usize> std::fmt::Display for GetResolutionQuery<'_, N> {
     }
 }
 
-/// Helper struct to generate the SQL query for inserting a resolution into a dimension.
+/// Helper struct to generate the SQL query for inserting a resolution for a dimension.
 pub struct PutResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for PutResolutionQuery<'_, N> {

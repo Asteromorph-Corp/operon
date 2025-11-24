@@ -4,22 +4,22 @@ use serde::de::DeserializeOwned;
 use crate::schema::{Entity, EntityMetadata};
 use crate::storage::StorageError;
 use crate::storage::psql::StorageClient;
-use crate::utils::{SchemaPrefix, SqlParams};
+use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams};
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
 impl<T> PsqlEntity for T where T: Serialize + DeserializeOwned + Send + Sync + 'static {}
 
 /// Helper struct for building SQL queries related to entities.
 pub struct EntityQueryBuilder<'a, const N: usize, T: PsqlEntity> {
-    client: &'a StorageClient<'a>,
+    client: StorageClient<'a>,
     entity_meta: EntityMetadata<N, T>,
 }
 
 impl<'a> StorageClient<'a> {
     pub fn entity<const N: usize, T: PsqlEntity>(
-        &self,
+        self,
         entity_meta: EntityMetadata<N, T>,
-    ) -> EntityQueryBuilder<'_, N, T> {
+    ) -> EntityQueryBuilder<'a, N, T> {
         EntityQueryBuilder {
             client: self,
             entity_meta,
@@ -63,6 +63,47 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         let params = SqlParams::from_usize(entity.coordinate)?
             .extend(vec![Box::new(serde_json::to_value(&entity.value)?)]);
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        Ok(())
+    }
+
+    /// Puts a vector of entity into the table.
+    pub async fn batch_put<const M: usize>(
+        &mut self,
+        entity: Entity<M, Vec<T>>,
+    ) -> Result<(), StorageError> {
+        const { assert!(M + 1 == N) }
+
+        let schema_prefix = self.client.schema_prefix().into_owned();
+        let tx = self.client.transaction().await?;
+
+        let temp_table_stmt = BatchPutTempTableQuery(&schema_prefix, self.entity_meta).to_string();
+        tx.execute(&temp_table_stmt, &[]).await?;
+
+        let mut writer = crate::csv::WriterBuilder::new()
+            .has_headers(false)
+            .from_writer(vec![]);
+        for (idx, value) in entity.value.iter().enumerate() {
+            let mut record: Vec<String> = Vec::with_capacity(M + 2);
+            record.extend(entity.coordinate.iter().map(|c| c.to_string()));
+            record.push(idx.to_string());
+            record.push(serde_json::to_value(value)?.to_string());
+            writer.write_record(&record)?;
+        }
+
+        let copy_stmt = BatchPutCopyQuery(self.entity_meta).to_string();
+        let sink = tx.copy_in(&copy_stmt).await?;
+        let mut sink = Box::pin(sink);
+        crate::futures::sink::SinkExt::send(
+            &mut sink,
+            crate::bytes::Bytes::from(writer.into_inner()?),
+        )
+        .await?;
+        crate::futures::sink::SinkExt::close(&mut sink).await?;
+
+        let insert_stmt = BatchPutInsertQuery(&schema_prefix, self.entity_meta).to_string();
+        tx.execute(&insert_stmt, &[]).await?;
+
+        tx.commit().await?;
         Ok(())
     }
 }
@@ -123,6 +164,7 @@ impl<const N: usize, T> std::fmt::Display for ClearEntityQuery<'_, N, T> {
     }
 }
 
+/// A helper struct to generate SQL query for getting an entity.
 struct GetEntityQuery<'a, const N: usize, T>(SchemaPrefix<'a>, EntityMetadata<N, T>);
 
 impl<const N: usize, T> std::fmt::Display for GetEntityQuery<'_, N, T> {
@@ -145,6 +187,7 @@ impl<const N: usize, T> std::fmt::Display for GetEntityQuery<'_, N, T> {
     }
 }
 
+/// A helper struct to generate SQL query for inserting an entity.
 struct PutEntityQuery<'a, const N: usize, T>(SchemaPrefix<'a>, EntityMetadata<N, T>);
 
 impl<const N: usize, T> std::fmt::Display for PutEntityQuery<'_, N, T> {
@@ -174,6 +217,63 @@ impl<const N: usize, T> std::fmt::Display for PutEntityQuery<'_, N, T> {
         } else {
             write!(f, "id")?;
         }
+        write!(f, ") DO UPDATE SET value = EXCLUDED.value;")
+    }
+}
+
+/// A helper struct to generate SQL query for creating temp tables for batch insertion.
+struct BatchPutTempTableQuery<'a, const N: usize, T>(&'a SchemaPrefixOwned, EntityMetadata<N, T>);
+
+impl<const N: usize, T> std::fmt::Display for BatchPutTempTableQuery<'_, N, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        writeln!(f, "CREATE TEMP TABLE temp (")?;
+        writeln!(f, "    LIKE {schema}{id} INCLUDING ALL")?;
+        writeln!(f, ")")?;
+        write!(f, "ON COMMIT DROP;")
+    }
+}
+
+/// A helper struct to generate SQL query for inserting data into temp tables for batch insertion.
+struct BatchPutCopyQuery<const N: usize, T>(EntityMetadata<N, T>);
+
+impl<const N: usize, T> std::fmt::Display for BatchPutCopyQuery<N, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dims = self.0.dims;
+
+        write!(f, "COPY temp (")?;
+        for dim in dims {
+            write!(f, "{dim}, ")?;
+        }
+        write!(f, "value) FROM STDIN WITH (FORMAT csv);")
+    }
+}
+
+/// A helper struct to generate SQL query for inserting data from temp table to main table for batch
+/// insertion.
+struct BatchPutInsertQuery<'a, const N: usize, T>(&'a SchemaPrefixOwned, EntityMetadata<N, T>);
+
+impl<const N: usize, T> std::fmt::Display for BatchPutInsertQuery<'_, N, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+        let dims = self.1.dims;
+
+        write!(f, "INSERT INTO {schema}{id} (")?;
+        for dim in dims {
+            write!(f, "{dim}, ")?;
+        }
+        writeln!(f, "value)")?;
+
+        write!(f, "SELECT ")?;
+        for dim in dims {
+            write!(f, "{dim}, ")?;
+        }
+        writeln!(f, "value FROM temp")?;
+        write!(f, "ON CONFLICT (")?;
+        write!(f, "{}", dims.join(", "))?;
         write!(f, ") DO UPDATE SET value = EXCLUDED.value;")
     }
 }
@@ -278,5 +378,52 @@ mod test {
     ) {
         let stmt = PutEntityQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(
+        entity_b(),
+        indoc! {"
+            CREATE TEMP TABLE temp (
+                LIKE test_meta.b INCLUDING ALL
+            )
+            ON COMMIT DROP;"
+        }
+    )]
+    fn test_batch_put_temp_table_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'_>,
+        #[case] metadata: EntityMetadata<N, ()>,
+        #[case] expected: &str,
+    ) {
+        let stmt = BatchPutTempTableQuery(&schema_prefix.into_owned(), metadata).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(entity_b(), "COPY temp (i, value) FROM STDIN WITH (FORMAT csv);")]
+    fn test_batch_put_copy_query<const N: usize>(
+        #[case] metadata: EntityMetadata<N, ()>,
+        #[case] expected: &str,
+    ) {
+        let stmt = BatchPutCopyQuery(metadata).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(
+        entity_b(),
+        indoc! {"
+            INSERT INTO test_meta.b (i, value)
+            SELECT i, value FROM temp
+            ON CONFLICT (i) DO UPDATE SET value = EXCLUDED.value;"
+        }
+    )]
+    fn test_batch_put_insert_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'_>,
+        #[case] metadata: EntityMetadata<N, ()>,
+        #[case] expected: &str,
+    ) {
+        let query = BatchPutInsertQuery(&schema_prefix.into_owned(), metadata).to_string();
+        assert_eq!(query, expected);
     }
 }

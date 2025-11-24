@@ -341,7 +341,7 @@ impl<const N: usize> std::fmt::Display for GetAllTicketQuery<'_, N> {
     }
 }
 
-/// Helper struct to generate the SQL query for inserting default tickets for a job.
+/// Helper struct to generate the SQL query for inserting tickets for a job.
 struct PutTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for PutTicketQuery<'_, N> {

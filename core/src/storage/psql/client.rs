@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt::Display;
 
 use bytes::Buf;
+use deadpool_postgres::Transaction;
 use tokio_postgres::{CopyInSink, ToStatement};
 
 use crate::storage::StorageError;
@@ -82,5 +83,10 @@ impl<'a> StorageClient<'a> {
 
     pub fn schema_prefix(&self) -> SchemaPrefix<'_> {
         SchemaPrefix(self.schema())
+    }
+
+    pub async fn transaction(&mut self) -> Result<Transaction<'_>, StorageError> {
+        let tx = self.client.transaction().await?;
+        Ok(tx)
     }
 }
