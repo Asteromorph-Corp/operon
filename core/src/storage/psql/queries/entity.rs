@@ -66,6 +66,25 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         Ok(())
     }
 
+    /// Gets a vector of entity from the table.
+    pub async fn batch_get<const M: usize, const K: usize>(
+        &self,
+        coordinate: [usize; M],
+        over: [&'static str; K],
+    ) -> Result<Vec<T>, StorageError> {
+        const { assert!(M + K == N) }
+
+        let schema_prefix = self.client.schema_prefix();
+        let stmt = BatchGetQuery(schema_prefix, self.entity_meta, over);
+        let params = SqlParams::from_usize(coordinate)?;
+        let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
+        let entities = rows
+            .into_iter()
+            .map(|r| serde_json::from_value::<T>(r.get(0)))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(entities)
+    }
+
     /// Puts a vector of entity into the table.
     pub async fn batch_put<const M: usize>(
         &mut self,
@@ -218,6 +237,53 @@ impl<const N: usize, T> std::fmt::Display for PutEntityQuery<'_, N, T> {
             write!(f, "id")?;
         }
         write!(f, ") DO UPDATE SET value = EXCLUDED.value;")
+    }
+}
+
+/// A helper struct to generate SQL query for creating temp tables for batch get.
+struct BatchGetQuery<'a, const N: usize, const M: usize, T>(
+    SchemaPrefix<'a>,
+    EntityMetadata<N, T>,
+    [&'static str; M],
+);
+
+impl<const N: usize, const M: usize, T> std::fmt::Display for BatchGetQuery<'_, N, M, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+        let dims = self.1.dims;
+        let over_dims = self.2;
+
+        write!(f, "SELECT value")?;
+        for over_dim in over_dims {
+            write!(f, ", {over_dim}")?;
+        }
+        writeln!(f)?;
+
+        writeln!(f, "FROM {schema}{id}")?;
+
+        for (idx, dim) in dims
+            .iter()
+            .filter(|dim| !over_dims.contains(dim))
+            .enumerate()
+        {
+            if idx == 0 {
+                write!(f, "WHERE")?;
+            } else {
+                write!(f, " AND")?;
+            }
+            write!(f, " {} = ${}", dim, idx + 1)?;
+        }
+        writeln!(f)?;
+
+        for (idx, dim) in over_dims.iter().enumerate() {
+            if idx == 0 {
+                write!(f, "ORDER BY {dim}")?;
+            } else {
+                write!(f, ", {dim}")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -379,6 +445,29 @@ mod test {
         let stmt = PutEntityQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
+
+    // #[rstest]
+    // #[case::simple(
+    //     JobArg {
+    //         id: "d".to_string(),
+    //         over: vec!["j".to_string()],
+    //     },
+    //     entity_d(),
+    //     indoc! {"
+    //         SELECT value, j
+    //         FROM {schema_prefix}d
+    //         WHERE i = $1 AND k = $2
+    //         ORDER BY j"
+    //     },
+    // )]
+    // fn test_batch_get_query(
+    //     #[case] job_arg: JobArg,
+    //     #[case] entity: EntityConfig,
+    //     #[case] expected: &str,
+    // ) {
+    //     let stmt = BatchGetQuery(&job_arg, &entity).to_string();
+    //     assert_eq!(stmt, expected);
+    // }
 
     #[rstest]
     #[case::simple(
