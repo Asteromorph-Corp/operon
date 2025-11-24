@@ -5,9 +5,7 @@
 use crate::meta_storage::{MetaClient, MetaStorageError};
 
 impl MetaClient<'_> {
-    /// Initialize the footprint table.
-    /// Note that this function is idempotent, i.e. calling it multiple times,
-    /// or calling it on an already-initialized storage will do nothing.
+    /// Initializes the footprint table.
     pub async fn init_footprint(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.schema_prefix();
 
@@ -21,7 +19,16 @@ impl MetaClient<'_> {
         Ok(())
     }
 
-    /// Get a footprint value by key.
+    /// Clears the footprint table.
+    pub async fn clear_footprint(&self) -> Result<(), MetaStorageError> {
+        let schema_prefix = self.schema_prefix();
+
+        let stmt = format!("TRUNCATE TABLE {schema_prefix}footprint");
+        self.execute(&stmt, &[]).await?;
+        Ok(())
+    }
+
+    /// Gets a footprint value by key.
     pub async fn get_footprint(
         &self,
         key: &'static str,
@@ -33,7 +40,7 @@ impl MetaClient<'_> {
         Ok(row.map(|r| r.get::<_, &str>(0).to_string()))
     }
 
-    /// Set a footprint key-value pair.
+    /// Sets a footprint key-value pair.
     pub async fn put_footprint(
         &self,
         key: &'static str,
@@ -47,15 +54,6 @@ impl MetaClient<'_> {
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
         );
         self.execute(&stmt, &[&key, &value]).await?;
-        Ok(())
-    }
-
-    /// Clear the footprint table.
-    pub async fn clear_footprint(&self) -> Result<(), MetaStorageError> {
-        let schema_prefix = self.schema_prefix();
-
-        let stmt = format!("TRUNCATE TABLE {schema_prefix}footprint");
-        self.execute(&stmt, &[]).await?;
         Ok(())
     }
 }

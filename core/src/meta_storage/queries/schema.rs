@@ -1,7 +1,7 @@
 use crate::meta_storage::{MetaClient, MetaStorageError};
 
 impl MetaClient<'_> {
-    /// If the meta storage schema is specified, initialize the schema in the database.
+    /// Initializes the metadata storage schema, if specified.
     pub async fn init_schema(&self) -> Result<(), MetaStorageError> {
         let Some(schema) = self.schema() else {
             return Ok(());
@@ -11,6 +11,7 @@ impl MetaClient<'_> {
         Ok(())
     }
 
+    /// Initializes the `ticket_status` type.
     pub async fn init_ticket_status_type(&self) -> Result<(), MetaStorageError> {
         let schema = self.schema_prefix();
         let create_status_type = format!(
@@ -28,6 +29,7 @@ impl MetaClient<'_> {
         Ok(())
     }
 
+    /// Initializes the ticket summary table.
     pub async fn init_ticket_summary(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.schema_prefix();
         let stmt = format!(
