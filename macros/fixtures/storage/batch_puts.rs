@@ -1,4 +1,8 @@
-async fn put_all_a(&self, values: Vec<A>) -> Result<(), operon::storage::StorageError> {
+async fn put_all_a(
+    &self,
+    entity: operon::schema::Entity<0usize, Vec<A>>,
+) -> Result<(), operon::storage::StorageError> {
+    let [] = entity.coordinate;
     let mut conn = self.pool.get().await?;
     let tx = conn.transaction().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
@@ -10,7 +14,7 @@ async fn put_all_a(&self, values: Vec<A>) -> Result<(), operon::storage::Storage
     let mut writer = operon::csv::WriterBuilder::new()
         .has_headers(false)
         .from_writer(vec![]);
-    for (i, value) in values.iter().enumerate() {
+    for (i, value) in entity.value.iter().enumerate() {
         writer.serialize((i, operon::serde_json::to_value(value)?.to_string()))?;
     }
     let copy_stmt = "COPY temp (i, value) FROM STDIN WITH (FORMAT csv);";
@@ -31,7 +35,12 @@ async fn put_all_a(&self, values: Vec<A>) -> Result<(), operon::storage::Storage
     Ok(())
 }
 
-async fn put_all_b(&self, i: usize, values: Vec<B>) -> Result<(), operon::storage::StorageError> {
+async fn put_all_b(
+    &self,
+    entity: operon::schema::Entity<1usize, Vec<B>>,
+) -> Result<(), operon::storage::StorageError> {
+    let [i] = entity.coordinate;
+
     let mut conn = self.pool.get().await?;
     let tx = conn.transaction().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
@@ -43,7 +52,7 @@ async fn put_all_b(&self, i: usize, values: Vec<B>) -> Result<(), operon::storag
     let mut writer = operon::csv::WriterBuilder::new()
         .has_headers(false)
         .from_writer(vec![]);
-    for (j, value) in values.iter().enumerate() {
+    for (j, value) in entity.value.iter().enumerate() {
         writer.serialize((i, j, operon::serde_json::to_value(value)?.to_string()))?;
     }
     let copy_stmt = "COPY temp (i, j, value) FROM STDIN WITH (FORMAT csv);";
@@ -64,7 +73,12 @@ async fn put_all_b(&self, i: usize, values: Vec<B>) -> Result<(), operon::storag
     Ok(())
 }
 
-async fn put_all_c(&self, i: usize, values: Vec<C>) -> Result<(), operon::storage::StorageError> {
+async fn put_all_c(
+    &self,
+    entity: operon::schema::Entity<1usize, Vec<C>>,
+) -> Result<(), operon::storage::StorageError> {
+    let [i] = entity.coordinate;
+
     let mut conn = self.pool.get().await?;
     let tx = conn.transaction().await?;
     let schema_prefix = operon::utils::SchemaPrefix(self.schema.as_deref());
@@ -74,7 +88,7 @@ async fn put_all_c(&self, i: usize, values: Vec<C>) -> Result<(), operon::storag
     let mut writer = operon::csv::WriterBuilder::new()
         .has_headers(false)
         .from_writer(vec![]);
-    for (k, value) in values.iter().enumerate() {
+    for (k, value) in entity.value.iter().enumerate() {
         writer.serialize((i, k, operon::serde_json::to_value(value)?.to_string()))?;
     }
     let copy_stmt = "COPY temp (i, k, value) FROM STDIN WITH (FORMAT csv);";

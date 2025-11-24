@@ -1,8 +1,7 @@
-async fn put_b(&self, i: usize, j: usize, value: B) -> Result<(), operon::storage::StorageError> {
-    let entity = operon::schema::Entity {
-        coordinate: [i, j],
-        value,
-    };
+async fn put_b(
+    &self,
+    entity: operon::schema::Entity<2usize, B>,
+) -> Result<(), operon::storage::StorageError> {
     self.conn()
         .await?
         .entity(self.entities_meta.b)

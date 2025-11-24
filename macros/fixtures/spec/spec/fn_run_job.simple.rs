@@ -5,20 +5,23 @@ async fn run_job(
     client: operon::meta_storage::MetaClient<'_>,
     job: Self::Job,
 ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
-    let Some(a) = storage.get_a(job.coordinate[0usize]).await? else {
-        return Err(operon::storage::StorageError::NotFound(format!(
-            "a_{}",
-            job.coordinate[0usize]
-        ))
-        .into());
+    let [i] = job.coordinate;
+
+    let Some(a) = storage.get_a([i]).await? else {
+        return Err(operon::storage::StorageError::NotFound(format!("a (i = {i})")).into());
     };
+
     let b_j = service
         .beta(a)
         .await
         .map_err(operon::scheduler::SchedulerError::UserError)?;
+    let entity = operon::schema::Entity {
+        coordinate: job.coordinate,
+        value: b_j,
+    };
+    let resolution = operon::schema::Resolution::new(entity.value.len(), job.coordinate);
 
-    let resolution = operon::schema::Resolution::new(b_j.len(), job.coordinate);
-    storage.put_all_b(job.coordinate[0usize], b_j).await?;
+    storage.put_all_b(entity).await?;
     client
         .resolution(self.spawn_dim_meta())
         .put(resolution)

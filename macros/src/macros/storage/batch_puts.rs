@@ -64,19 +64,23 @@ impl std::fmt::Display for BatchPutInsertQuery<'_> {
 pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
     jobs.values().filter_map(|job| -> Option<syn::TraitItemFn> {
         let operon = operon_ident();
-        let spawn_dim = job.spawn_dim.as_ref()?;
+        let spawn_dim =job.spawn_dim.as_ref()?;
 
         let temp_table_query = BatchPutTempTableQuery(job).to_string();
         let copy_query = BatchPutCopyQuery(job).to_string();
         let insert_query = BatchPutInsertQuery(job).to_string();
 
-        let entity_ident = entity_ident(&job.to);
-        let args = job.dims.iter().map(|d| variable_ident(d)).collect::<Vec<_>>();
-        let spawn_dim_var = variable_ident(spawn_dim);
         let batch_put_fn_name = batch_put_entity_ident(&job.to);
+        let coord_vars = job.dims.iter().map(|d| variable_ident(d)).collect::<Vec<_>>();
+        let spawn_dim_var = variable_ident(spawn_dim);
+
+        let n = job.dims.len();
+        let t = entity_ident(&job.to);
 
         Some(parse_quote! {
-            async fn #batch_put_fn_name(&self, #(#args: usize,)* values: Vec<#entity_ident>) -> Result<(), #operon::storage::StorageError> {
+            async fn #batch_put_fn_name(&self, entity: #operon::schema::Entity<#n, Vec<#t>>) -> Result<(), #operon::storage::StorageError> {
+                let [#(#coord_vars),*] = entity.coordinate;
+
                 let mut conn = self.pool.get().await?;
                 let tx = conn.transaction().await?;
                 let schema_prefix = #operon::utils::SchemaPrefix(self.schema.as_deref());
@@ -87,8 +91,8 @@ pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn>
                 let mut writer = #operon::csv::WriterBuilder::new()
                     .has_headers(false)
                     .from_writer(vec![]);
-                for (#spawn_dim_var, value) in values.iter().enumerate() {
-                    writer.serialize((#(#args,)* #spawn_dim_var, #operon::serde_json::to_value(value)?.to_string()))?;
+                for (#spawn_dim_var, value) in entity.value.iter().enumerate() {
+                    writer.serialize((#(#coord_vars,)* #spawn_dim_var, #operon::serde_json::to_value(value)?.to_string()))?;
                 }
                 let copy_stmt = #copy_query;
                 let sink = tx.copy_in(copy_stmt).await?;

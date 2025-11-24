@@ -71,6 +71,8 @@ pub fn batch_gets(
         let arg_dims = arg_config.dims.iter().filter(|d| !arg.over.contains(d)).collect::<Vec<_>>();
         let args = arg_dims.iter().map(|d| variable_ident(d)).collect::<Vec<_>>();
 
+        let n = args.len();
+
         let insert_results = arg.over.iter().enumerate().map(|(i, d)| {
             let dim_var = variable_ident(d);
             let i_plus_1 = i + 1;
@@ -91,7 +93,7 @@ pub fn batch_gets(
         });
 
         parse_quote! {
-            async fn #batch_get_fn_name(&self, #(#args: usize),*) -> Result<#return_ty, #operon::storage::StorageError> {
+            async fn #batch_get_fn_name(&self, [#(#args),*]: [usize; #n]) -> Result<#return_ty, #operon::storage::StorageError> {
                 let conn = self.pool.get().await?;
                 let schema_prefix = #operon::utils::SchemaPrefix(self.schema.as_deref());
                 let stmt = format!(#batch_get_query);

@@ -1,9 +1,10 @@
-async fn get_b(&self, i: usize, j: usize) -> Result<Option<B>, operon::storage::StorageError> {
-    let entity = self
-        .conn()
+async fn get_b(
+    &self,
+    coordinate: [usize; 2usize],
+) -> Result<Option<B>, operon::storage::StorageError> {
+    self.conn()
         .await?
         .entity(self.entities_meta.b)
-        .get([i, j])
-        .await?;
-    Ok(entity.map(|e| e.value))
+        .get(coordinate)
+        .await
 }

@@ -88,7 +88,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
                     }
                 }
                 for ([#(#field_vars),*], #dim_var) in tags {
-                    if storage.#get_fn_name(#(#field_vars,)* #dim_var,).await?.is_none() {
+                    if storage.#get_fn_name([#(#field_vars,)* #dim_var]).await?.is_none() {
                         #operon::log::info!(#missing_entity_msg, [#(#field_vars,)* #dim_var]);
                         return Ok(false);
                     }
@@ -98,10 +98,8 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
         None => {
             quote! {
                 for job in jobs {
-                    let [#(#field_vars),*] = job.coordinate;
-
-                    if storage.#get_fn_name(#(#field_vars),*).await?.is_none() {
-                        #operon::log::info!(#missing_entity_msg, [#(#field_vars),*]);
+                    if storage.#get_fn_name(job.coordinate).await?.is_none() {
+                        #operon::log::info!(#missing_entity_msg, job.coordinate);
                         return Ok(false);
                     }
                 }

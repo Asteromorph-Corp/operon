@@ -5,17 +5,18 @@ async fn run_job(
     client: operon::meta_storage::MetaClient<'_>,
     job: Self::Job,
 ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
+    let [i] = job.coordinate;
+
     let mut resolution_j: std::collections::HashMap<[usize; 0usize], usize> = Default::default();
     let mut resolution_k: std::collections::HashMap<[usize; 1usize], usize> = Default::default();
 
-    let pkey = [job.coordinate[0usize]];
     let Some(resolution) = client
         .resolution(metadata::dimension_j_meta())
-        .get(pkey)
+        .get([i])
         .await?
     else {
         return Err(
-            operon::meta_storage::MetaStorageError::MissingResolution(format!("j_{:?}", pkey))
+            operon::meta_storage::MetaStorageError::MissingResolution(format!("j (i = {i})"))
                 .into(),
         );
     };
@@ -23,28 +24,28 @@ async fn run_job(
 
     for j in 0..(*resolution_j.get(&[]).unwrap_or(&0)) {
         // TODO: Remove unwrap
-        let pkey = [job.coordinate[0usize], j];
         let Some(resolution) = client
             .resolution(metadata::dimension_k_meta())
-            .get(pkey)
+            .get([i, j])
             .await?
         else {
             return Err(
-                operon::meta_storage::MetaStorageError::MissingResolution(format!("k_{:?}", pkey))
-                    .into(),
+                operon::meta_storage::MetaStorageError::MissingResolution(format!(
+                    "k (i = {i}, j = {j})",
+                ))
+                .into(),
             );
         };
         resolution_k.insert([j], resolution.ub);
     }
 
     let c_j = {
-        let elem = storage.get_all_c_over_j().await?;
+        let elem = storage.get_all_c_over_j([]).await?;
+        let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
-        if elem.len() < *ub {
+        if len < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
-                "c (j = *) expects {} elements, but only {} were found",
-                ub,
-                elem.len()
+                "c (j = *) expects {ub} elements, but only {len} were found"
             ))
             .into());
         }
@@ -55,14 +56,12 @@ async fn run_job(
             .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
     }?;
     let d_j_k = {
-        let elem = storage.get_all_d_over_jk(job.coordinate[0usize]).await?;
+        let elem = storage.get_all_d_over_jk([i]).await?;
+        let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
-        if elem.len() < *ub {
+        if len < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
-                "d (i = {}, j = *, k = _) expects {} elements, but only {} were found",
-                job.coordinate[0usize],
-                ub,
-                elem.len()
+                "d (i = {i}, j = *, k = _) expects {ub} elements, but only {len} were found"
             ))
             .into());
         }
@@ -70,14 +69,11 @@ async fn run_job(
             .take(*ub)
             .enumerate()
             .map(|(j, elem)| {
+                let len = elem.len();
                 let ub = resolution_k.get(&[j]).unwrap_or(&0);
-                if elem.len() < *ub {
+                if len < *ub {
                     return Err(operon::storage::StorageError::NotFound(format!(
-                        "d (i = {}, j = {}, k = *) expects {} elements, but only {} were found",
-                        job.coordinate[0usize],
-                        j,
-                        ub,
-                        elem.len()
+                        "d (i = {i}, j = {j}, k = *) expects {ub} elements, but only {len} were found"
                     ))
                     .into());
                 }
@@ -94,9 +90,13 @@ async fn run_job(
         .epsilon(c_j, d_j_k)
         .await
         .map_err(operon::scheduler::SchedulerError::UserError)?;
-    let resolution = operon::schema::Resolution::new(e_l.len(), job.coordinate);
+    let entity = operon::schema::Entity {
+        coordinate: job.coordinate,
+        value: e_l,
+    };
+    let resolution = operon::schema::Resolution::new(entity.value.len(), job.coordinate);
 
-    storage.put_all_e(job.coordinate[0usize], e_l).await?;
+    storage.put_all_e(entity).await?;
     client
         .resolution(self.spawn_dim_meta())
         .put(resolution)

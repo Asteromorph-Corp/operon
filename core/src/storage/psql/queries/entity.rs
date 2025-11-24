@@ -45,7 +45,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 
     /// Gets the entity for the given primary key.
-    pub async fn get(&self, coordinate: [usize; N]) -> Result<Option<Entity<N, T>>, StorageError> {
+    pub async fn get(&self, coordinate: [usize; N]) -> Result<Option<T>, StorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetEntityQuery(schema_prefix, self.entity_meta);
         let params = SqlParams::from_usize(coordinate)?;
@@ -53,7 +53,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
             return Ok(None);
         };
         let value = serde_json::from_value::<T>(row.get(0))?;
-        Ok(Some(Entity { coordinate, value }))
+        Ok(Some(value))
     }
 
     /// Puts an entity into the table.

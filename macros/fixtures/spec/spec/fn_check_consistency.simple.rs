@@ -36,7 +36,7 @@ async fn check_consistency(
     }
     // ...and check if the data storage holds all the data for them.
     for ([i], j) in tags {
-        if storage.get_b(i, j).await?.is_none() {
+        if storage.get_b([i, j]).await?.is_none() {
             operon::log::info!("Data storage does not hold `b_{:?}`.", [i, j]);
             return Ok(false);
         }

@@ -7,7 +7,7 @@ use crate::configs::{
     DimensionConfig, DimensionConfigMap, DimensionId, EntityConfig, EntityConfigMap, JobConfig,
 };
 use crate::utils::{
-    batch_get_entity_ident, batch_put_entity_ident, dimension_metadata_ident,
+    batch_get_entity_ident, batch_put_entity_ident, dim_msg, dimension_metadata_ident,
     entity_over_dim_ident, get_entity_ident, job_fn_ident, operon_ident, put_entity_ident,
     variable_ident,
 };
@@ -67,39 +67,27 @@ fn build_resolution_index<'a>(
 /// Generates the code that fetches and inserts the resolution entries into the resolution map.
 fn resolution_inserts(
     resolution_index: &IndexMap<&DimensionId, ResolutionIndexEntry>,
-    job_dim_set: &IndexSet<&DimensionId>,
 ) -> impl Iterator<Item = proc_macro2::TokenStream> {
     resolution_index.iter().map(|(&dim, entry)| {
         let operon = operon_ident();
         let dim_meta = dimension_metadata_ident(dim);
         let res_map = resolution_map_ident(dim);
-        let get_resolution_args = entry
+
+        let get_args = entry
             .config
             .depends_on
             .iter()
-            .map(|dep| -> syn::Expr {
-                if let Some(index) = job_dim_set.iter().position(|d| *d == dep) {
-                    parse_quote! { job.coordinate[#index] }
-                } else {
-                    let dep_var = variable_ident(dep);
-                    parse_quote! { #dep_var }
-                }
-            })
-            .collect::<Vec<_>>();
+            .map(|d| variable_ident(d));
         let dep_vars = entry.fetched_over.iter().map(|dep| variable_ident(dep));
 
-        let missing_msg = if entry.config.depends_on.is_empty() {
-            dim.clone()
-        } else {
-            format!("{dim}_{{:?}}")
-        };
+        let dim_msgs = entry.config.depends_on.iter().map(dim_msg).collect::<Vec<_>>();
+        let not_found_msg = format!("{} ({})", dim, dim_msgs.join(", "));
 
         entry.fetched_over.iter().rfold(
             quote! {
-                let pkey = [#(#get_resolution_args),*];
-                let Some(resolution) = client.resolution(metadata::#dim_meta()).get(pkey).await? else {
+                let Some(resolution) = client.resolution(metadata::#dim_meta()).get([#(#get_args),*]).await? else {
                     return Err(#operon::meta_storage::MetaStorageError::MissingResolution(
-                        format!(#missing_msg, pkey)
+                        format!(#not_found_msg)
                     ).into());
                 };
                 #res_map.insert([#(#dep_vars),*], resolution.ub);
@@ -127,43 +115,34 @@ fn resolution_inserts(
 }
 
 /// Generates the code for defining a single argument entity in the `run_job` function.
-fn arg_def_single(job: &JobConfig, arg_entity: &EntityConfig) -> syn::Stmt {
+fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
     let operon = operon_ident();
     let arg_ident = entity_over_dim_ident(&arg_entity.id, &[]);
     let get_ident = get_entity_ident(&arg_entity.id);
 
     // All arg dimension are passed to the get function
     // These dimensions are expected to be present in the job struct
-    let get_indices = arg_entity
+    let get_args = arg_entity
         .dims
         .iter()
-        .map(|arg_dim| {
-            job.dims
-                .iter()
-                .position(|d| d == arg_dim)
-                .unwrap_or_else(|| panic!("Missing dimension {} in job {}", arg_dim, job.id))
-        })
+        .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
 
-    let not_found_msg = format!(
-        "{}_{}",
-        arg_entity.id,
-        "{},".repeat(arg_entity.dims.len()).trim_end_matches(",")
-    );
+    let dim_msgs = arg_entity.dims.iter().map(dim_msg).collect::<Vec<_>>();
+    let not_found_msg = format!("{} ({})", arg_entity.id, dim_msgs.join(", "));
 
     parse_quote! {
         let Some(#arg_ident) = storage
-            .#get_ident(#(job.coordinate[#get_indices]),*)
+            .#get_ident([#(#get_args),*])
             .await?
         else {
-            return Err(#operon::storage::StorageError::NotFound(format!(#not_found_msg, #(job.coordinate[#get_indices]),*)).into());
+            return Err(#operon::storage::StorageError::NotFound(format!(#not_found_msg)).into());
         };
     }
 }
 
 /// Generates the code for defining a collected argument entity in the `run_job` function.
 fn arg_def_collected(
-    job: &JobConfig,
     arg_entity: &EntityConfig,
     over: &[DimensionId],
     resolution_index: &IndexMap<&DimensionId, ResolutionIndexEntry>,
@@ -175,16 +154,11 @@ fn arg_def_collected(
 
     // Only arg dimensions that are not part of the `over` dimensions are passed to the get function
     // These dimensions are expected to be present in the job struct
-    let get_indices = arg_entity
+    let get_args = arg_entity
         .dims
         .iter()
-        .filter(|dim| !over.contains(dim))
-        .map(|arg_dim| {
-            job.dims
-                .iter()
-                .position(|d| d == arg_dim)
-                .unwrap_or_else(|| panic!("Missing dimension {} in job {}", arg_dim, job.id))
-        })
+        .filter(|d| !over.contains(d))
+        .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
 
     let check_ub = over
@@ -207,42 +181,35 @@ fn arg_def_collected(
                 .map(|d| variable_ident(d));
 
             let mut cnt = 0;
-            let (msg_dims, msg_params): (Vec<_>, Vec<_>) = arg_entity
+            let dim_msgs = arg_entity
                 .dims
                 .iter()
                 .map(|arg_dim| {
-                    if let Some(index) = job_dim_set.iter().position(|d| *d == arg_dim) {
-                        return (
-                            format!("{arg_dim} = {{}}"),
-                            Some(parse_quote! { job.coordinate[#index] }),
-                        );
+                    if job_dim_set.contains(arg_dim) {
+                        return dim_msg(arg_dim);
                     }
                     cnt += 1;
                     if cnt <= i {
-                        let var_ident = variable_ident(arg_dim);
-                        (
-                            format!("{arg_dim} = {{}}"),
-                            Some(parse_quote! { #var_ident }),
-                        )
+                        dim_msg(arg_dim)
                     } else if cnt == i + 1 {
-                        (format!("{arg_dim} = *"), None)
+                        format!("{arg_dim} = *")
                     } else {
-                        (format!("{arg_dim} = _"), None)
+                        format!("{arg_dim} = _")
                     }
                 })
-                .unzip();
+                .collect::<Vec<_>>();
             let not_found_msg = format!(
-                "{} ({}) expects {{}} elements, but only {{}} were found",
+                "{} ({}) expects {{ub}} elements, but only {{len}} were found",
                 arg_entity.id,
-                msg_dims.join(", ")
+                dim_msgs.join(", ")
             );
-            let msg_params: Vec<syn::Expr> = msg_params.into_iter().flatten().collect();
 
             quote! {
+                let len = elem.len();
                 let ub = #res_map_ident.get(&[#(#res_map_key,)*]).unwrap_or(&0); // TODO: Handle this better
-                if elem.len() < *ub {
+                if len < *ub {
                     return Err(#operon::storage::StorageError::NotFound(
-                        format!(#not_found_msg, #(#msg_params,)* ub, elem.len())
+                        format!(#not_found_msg)
                     ).into());
                 }
                 elem.into_iter()
@@ -255,7 +222,7 @@ fn arg_def_collected(
 
     parse_quote! {
         let #arg_ident = {
-            let elem = storage.#get_ident(#(job.coordinate[#get_indices]),*).await?;
+            let elem = storage.#get_ident([#(#get_args),*]).await?;
             #check_ub
         }?;
     }
@@ -331,6 +298,7 @@ pub(super) fn fn_run_job(
     let job_dim_set: IndexSet<&DimensionId> = job.dims.iter().collect();
     let resolution_index = build_resolution_index(job, &job_dim_set, dimensions);
 
+    let job_coord_vars = job_dim_set.iter().map(|d| variable_ident(d));
     let resolution_defs = resolution_index.iter().map(|(dim, entry)| -> syn::Stmt {
         let res_map_var = resolution_map_ident(dim);
         let n = entry.fetched_over.len();
@@ -339,7 +307,7 @@ pub(super) fn fn_run_job(
         };
         parse_quote! { let mut #res_map_var: #ty = Default::default(); }
     });
-    let resolution_inserts = resolution_inserts(&resolution_index, &job_dim_set);
+    let resolution_inserts = resolution_inserts(&resolution_index);
 
     let job_fn_name = job_fn_ident(&job.id);
     let args = job
@@ -349,9 +317,9 @@ pub(super) fn fn_run_job(
     let arg_defs = job.from.iter().map(|arg| -> syn::Stmt {
         let entity = entities.get(&arg.id).expect("Entity not found in config");
         if arg.over.is_empty() {
-            arg_def_single(job, entity)
+            arg_def_single(entity)
         } else {
-            arg_def_collected(job, entity, &arg.over, &resolution_index, &job_dim_set)
+            arg_def_collected(entity, &arg.over, &resolution_index, &job_dim_set)
         }
     });
 
@@ -361,18 +329,23 @@ pub(super) fn fn_run_job(
         None => put_entity_ident(&job.to),
     };
 
+    let entity: syn::Expr = parse_quote! {
+        #operon::schema::Entity {
+            coordinate: job.coordinate,
+            value: #result_ident,
+        }
+    };
     let resolution: syn::Expr = if job.spawn_dim.is_some() {
-        parse_quote! { #operon::schema::Resolution::new(#result_ident.len(), job.coordinate)  }
+        parse_quote! { #operon::schema::Resolution::new(entity.value.len(), job.coordinate)  }
     } else {
         parse_quote! { () }
     };
+
     let maybe_put_resolution: Option<syn::Stmt> = job.spawn_dim.is_some().then(|| {
         parse_quote! {
             client.resolution(self.spawn_dim_meta()).put(resolution).await?;
         }
     });
-
-    let indices = 0..job.dims.len();
 
     parse_quote! {
         async fn run_job(
@@ -382,6 +355,7 @@ pub(super) fn fn_run_job(
             client: #operon::meta_storage::MetaClient<'_>,
             job: Self::Job,
         ) -> Result<Self::Resolution, #operon::scheduler::SchedulerError> {
+            let [#(#job_coord_vars),*] = job.coordinate;
             #(#resolution_defs)*
             #(#resolution_inserts)*
 
@@ -391,9 +365,10 @@ pub(super) fn fn_run_job(
                 .#job_fn_name(#(#args),*)
                 .await
                 .map_err(operon::scheduler::SchedulerError::UserError)?;
+            let entity = #entity;
             let resolution = #resolution;
 
-            storage.#put_fn_name(#(job.coordinate[#indices],)* #result_ident).await?;
+            storage.#put_fn_name(entity).await?;
             #maybe_put_resolution;
             Ok(resolution)
         }

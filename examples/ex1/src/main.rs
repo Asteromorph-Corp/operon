@@ -193,8 +193,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // we can retrieve the results from the storage.
     // As a side note, we could use `println!` here
     // since the UI is exited at this point.
-    println!("{:?}", storage.get_intermediate(0, 0).await?);
-    println!("{:?}", storage.get_output(0, 0, 0).await?);
+    println!("{:?}", storage.get_intermediate([0, 0]).await?);
+    println!("{:?}", storage.get_output([0, 0, 0]).await?);
 
     Ok(())
 }

@@ -9,44 +9,30 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let id = variable_ident(&entity.id);
     let get_fn_name = get_entity_ident(&entity.id);
 
-    let args = entity
-        .dims
-        .iter()
-        .map(|d| variable_ident(d))
-        .collect::<Vec<_>>();
+    let n = entity.dims.len();
 
     parse_quote! {
-        async fn #get_fn_name(&self, #(#args: usize),*) -> Result<Option<#entity_ident>, operon::storage::StorageError> {
-            let entity = self
+        async fn #get_fn_name(&self, coordinate: [usize; #n]) -> Result<Option<#entity_ident>, operon::storage::StorageError> {
+            self
                 .conn()
                 .await?
                 .entity(self.entities_meta.#id)
-                .get([#(#args),*])
-                .await?;
-            Ok(entity.map(|e| e.value))
+                .get(coordinate)
+                .await
         }
     }
 }
 
 fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
-    let entity_ident = entity_ident(&entity.id);
     let id = variable_ident(&entity.id);
     let put_fn_name = put_entity_ident(&entity.id);
 
-    let args = entity
-        .dims
-        .iter()
-        .map(|d| variable_ident(d))
-        .collect::<Vec<_>>();
+    let n = entity.dims.len();
+    let t = entity_ident(&entity.id);
 
     parse_quote! {
-        async fn #put_fn_name(&self, #(#args: usize,)* value: #entity_ident) -> Result<(), operon::storage::StorageError> {
-            let entity = #operon::schema::Entity {
-                coordinate: [#(#args),*],
-                value,
-            };
-
+        async fn #put_fn_name(&self, entity: #operon::schema::Entity<#n, #t>) -> Result<(), operon::storage::StorageError> {
             self
                 .conn()
                 .await?
