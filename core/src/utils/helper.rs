@@ -33,6 +33,11 @@ impl SqlParam for i64 {
         self
     }
 }
+impl SqlParam for serde_json::Value {
+    fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
+        self
+    }
+}
 impl SqlParam for TicketStatus {
     fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
         self

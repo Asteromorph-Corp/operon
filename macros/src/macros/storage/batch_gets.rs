@@ -59,7 +59,7 @@ pub fn batch_gets(
 
         let arg_config = entities.get(&arg.id)
             .unwrap_or_else(|| panic!("Entity {} not found in entities", arg.id));
-        let generic = &arg_config.generic;
+        let arg_id = entity_ident(&arg.id);
         let batch_get_query = BatchGetQuery(arg, arg_config).to_string();
 
         let entity_ident = entity_ident(&arg.id);
@@ -101,7 +101,7 @@ pub fn batch_gets(
 
                 let mut result: #return_ty = Default::default();
                 for row in rows {
-                    let value = #operon::serde_json::from_value::<#generic>(row.get(0))?;
+                    let value = #operon::serde_json::from_value::<#arg_id>(row.get(0))?;
                     #(#insert_results)*
                 }
                 Ok(result)

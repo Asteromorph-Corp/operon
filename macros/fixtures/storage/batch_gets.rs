@@ -6,7 +6,7 @@ async fn get_all_b_over_j(&self, i: usize) -> Result<Vec<B>, operon::storage::St
 
     let mut result: Vec<B> = Default::default();
     for row in rows {
-        let value = operon::serde_json::from_value::<B_>(row.get(0))?;
+        let value = operon::serde_json::from_value::<B>(row.get(0))?;
         result.push(value.into());
     }
 
@@ -20,7 +20,7 @@ async fn get_all_c_over_k(&self, i: usize) -> Result<Vec<C>, operon::storage::St
     let rows = conn.query(&stmt, &[&i64::try_from(i)?]).await?;
     let mut result: Vec<C> = Default::default();
     for row in rows {
-        let value = operon::serde_json::from_value::<C_>(row.get(0))?;
+        let value = operon::serde_json::from_value::<C>(row.get(0))?;
         result.push(value.into());
     }
     Ok(result)
@@ -41,7 +41,7 @@ async fn get_all_d_over_j(
 
     let mut result: Vec<D> = Default::default();
     for row in rows {
-        let value = operon::serde_json::from_value::<D_>(row.get(0))?;
+        let value = operon::serde_json::from_value::<D>(row.get(0))?;
         result.push(value.into());
     }
 
@@ -55,7 +55,7 @@ async fn get_all_e_over_k(&self, i: usize) -> Result<Vec<E>, operon::storage::St
     let rows = conn.query(&stmt, &[&i64::try_from(i)?]).await?;
     let mut result: Vec<E> = Default::default();
     for row in rows {
-        let value = operon::serde_json::from_value::<E_>(row.get(0))?;
+        let value = operon::serde_json::from_value::<E>(row.get(0))?;
         result.push(value.into());
     }
     Ok(result)

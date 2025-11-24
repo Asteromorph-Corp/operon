@@ -1,4 +1,5 @@
 mod dimension;
+mod entity;
 mod job;
 mod job_id;
 

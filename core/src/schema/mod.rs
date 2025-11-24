@@ -10,6 +10,9 @@ pub use resolution::*;
 mod ticket;
 pub use ticket::*;
 
+mod entity;
+pub use entity::*;
+
 mod option_coordinate;
 pub use option_coordinate::*;
 

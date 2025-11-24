@@ -24,6 +24,10 @@ pub fn storage_trait_ident(service_id: &str) -> syn::Ident {
     format_ident!("{}Storage", service_id.to_pascal_case())
 }
 
+pub fn entities_ident(service_id: &str) -> syn::Ident {
+    format_ident!("{}Entities", service_id.to_pascal_case())
+}
+
 pub fn sql_storage_ident(service_id: &str) -> syn::Ident {
     format_ident!("Psql{}Storage", service_id.to_pascal_case())
 }
@@ -38,6 +42,10 @@ pub fn job_metadata_ident(job_id: &JobId) -> syn::Ident {
 
 pub fn dimension_metadata_ident(dimension_id: &DimensionId) -> syn::Ident {
     format_ident!("dimension_{}_meta", dimension_id.to_snake_case())
+}
+
+pub fn entity_metadata_ident(entity_id: &JobId) -> syn::Ident {
+    format_ident!("entity_{}_meta", entity_id.to_snake_case())
 }
 
 pub fn get_entity_ident(entity_id: &EntityId) -> syn::Ident {
