@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Display;
 
 use bytes::Buf;
 use tokio_postgres::{CopyInSink, ToStatement};
@@ -81,17 +82,6 @@ pub enum MetaClient<'a> {
     Transaction(&'a TransactionWithSchema<'a>),
 }
 
-pub struct TicketStatusType<'a>(Option<&'a str>);
-
-impl std::fmt::Display for TicketStatusType<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(schema) = self.0 {
-            write!(f, "{schema}.")?;
-        }
-        write!(f, "ticket_status")
-    }
-}
-
 impl MetaClient<'_> {
     impl_meta_client!(batch_execute(query: &str) -> ());
     impl_meta_client!(execute(query: &str, params: &[&ToSql]) -> u64);
@@ -103,6 +93,34 @@ impl MetaClient<'_> {
               U: Buf + 'static + Send + Sync
     );
 
+    pub async fn batch_execute_stmt(&self, stmt: &impl Display) -> Result<(), MetaStorageError> {
+        self.batch_execute(&stmt.to_string()).await
+    }
+
+    pub async fn execute_stmt(
+        &self,
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<u64, MetaStorageError> {
+        self.execute(&stmt.to_string(), params).await
+    }
+
+    pub async fn query_stmt(
+        &self,
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<Vec<tokio_postgres::Row>, MetaStorageError> {
+        self.query(&stmt.to_string(), params).await
+    }
+
+    pub async fn query_opt_stmt(
+        &self,
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<Option<tokio_postgres::Row>, MetaStorageError> {
+        self.query_opt(&stmt.to_string(), params).await
+    }
+
     pub fn schema(&self) -> Option<&str> {
         match self {
             MetaClient::Object(ConnectionWithSchema { schema, .. }) => schema.as_deref(),
@@ -112,10 +130,6 @@ impl MetaClient<'_> {
 
     pub fn schema_prefix(&self) -> SchemaPrefix<'_> {
         SchemaPrefix(self.schema())
-    }
-
-    pub fn ticket_status_type(&self) -> TicketStatusType<'_> {
-        TicketStatusType(self.schema())
     }
 }
 

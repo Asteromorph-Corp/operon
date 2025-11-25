@@ -1,16 +1,20 @@
 use syn::parse_quote;
 
 use crate::configs::AllConfig;
-use crate::macros::storage::data_storage_definition::data_storage_definition;
-use crate::macros::storage::impl_new::impl_new;
+use crate::macros::storage::entities_definition::entities_definition;
+use crate::macros::storage::impl_entities_default::impl_entities_default;
+use crate::macros::storage::impl_entities_queries::impl_entities_queries;
 use crate::macros::storage::impl_service_storage::impl_service_storage;
-use crate::macros::storage::impl_storage::impl_storage;
+use crate::macros::storage::storage_definition::storage_definition;
 
 pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
-    let data_storage_definition =
-        data_storage_definition(&all_configs.service_id, &all_configs.entities);
-    let impl_new = impl_new(&all_configs.service_id, &all_configs.entities);
-    let impl_storage = impl_storage(&all_configs.service_id, &all_configs.entities);
+    let entities_definition = entities_definition(&all_configs.service_id, &all_configs.entities);
+    let data_storage_definition = storage_definition(&all_configs.service_id);
+
+    let impl_entities_default =
+        impl_entities_default(&all_configs.service_id, &all_configs.entities);
+    let impl_entities_queries =
+        impl_entities_queries(&all_configs.service_id, &all_configs.entities);
     let impl_service_storage = impl_service_storage(
         &all_configs.service_id,
         &all_configs.jobs,
@@ -21,9 +25,11 @@ pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
         mod storage {
             use super::*;
 
+            #entities_definition
             #data_storage_definition
-            #impl_new
-            #impl_storage
+
+            #impl_entities_default
+            #impl_entities_queries
             #impl_service_storage
         }
     }

@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 
 use crate::scheduler::SchedulerError;
-use crate::schema_base::{JobEnum, ResolutionEnum};
+use crate::schema::{JobEnum, ResolutionEnum};
 
 /// `IndividualScheduler`-`IndividualScheduler` communication events.
 ///

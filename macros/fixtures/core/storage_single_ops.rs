@@ -1,60 +1,59 @@
-async fn get_a(&self, i: schema::IDim) -> Result<Option<A>, operon::storage::StorageError>;
+async fn get_a(
+    &self,
+    coordinate: [usize; 1usize],
+) -> Result<Option<A>, operon::storage::StorageError>;
 
-async fn put_a(&self, i: schema::IDim, value: A) -> Result<(), operon::storage::StorageError>;
+async fn put_a(
+    &self,
+    entity: operon::schema::Entity<1usize, A>,
+) -> Result<(), operon::storage::StorageError>;
 
 async fn get_b(
     &self,
-    i: schema::IDim,
-    j: schema::JDim,
+    coordinate: [usize; 2usize],
 ) -> Result<Option<B>, operon::storage::StorageError>;
 
 async fn put_b(
     &self,
-    i: schema::IDim,
-    j: schema::JDim,
-    value: B,
+    entity: operon::schema::Entity<2usize, B>,
 ) -> Result<(), operon::storage::StorageError>;
 
 async fn get_c(
     &self,
-    i: schema::IDim,
-    k: schema::KDim,
+    coordinate: [usize; 2usize],
 ) -> Result<Option<C>, operon::storage::StorageError>;
 
 async fn put_c(
     &self,
-    i: schema::IDim,
-    k: schema::KDim,
-    value: C,
+    entity: operon::schema::Entity<2usize, C>,
 ) -> Result<(), operon::storage::StorageError>;
 
 async fn get_d(
     &self,
-    i: schema::IDim,
-    j: schema::JDim,
-    k: schema::KDim,
+    coordinate: [usize; 3usize],
 ) -> Result<Option<D>, operon::storage::StorageError>;
 
 async fn put_d(
     &self,
-    i: schema::IDim,
-    j: schema::JDim,
-    k: schema::KDim,
-    value: D,
+    entity: operon::schema::Entity<3usize, D>,
 ) -> Result<(), operon::storage::StorageError>;
 
 async fn get_e(
     &self,
-    i: schema::IDim,
-    k: schema::KDim,
+    coordinate: [usize; 2usize],
 ) -> Result<Option<E>, operon::storage::StorageError>;
 
 async fn put_e(
     &self,
-    i: schema::IDim,
-    k: schema::KDim,
-    value: E,
+    entity: operon::schema::Entity<2usize, E>,
 ) -> Result<(), operon::storage::StorageError>;
 
-async fn get_f(&self, i: schema::IDim) -> Result<Option<F>, operon::storage::StorageError>;
-async fn put_f(&self, i: schema::IDim, value: F) -> Result<(), operon::storage::StorageError>;
+async fn get_f(
+    &self,
+    coordinate: [usize; 1usize],
+) -> Result<Option<F>, operon::storage::StorageError>;
+
+async fn put_f(
+    &self,
+    entity: operon::schema::Entity<1usize, F>,
+) -> Result<(), operon::storage::StorageError>;

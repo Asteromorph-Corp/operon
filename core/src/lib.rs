@@ -3,7 +3,7 @@ pub use operon_macros::*;
 pub mod meta_storage;
 pub mod operon;
 pub mod scheduler;
-pub mod schema_base;
+pub mod schema;
 pub mod service;
 pub mod storage;
 pub mod ui;

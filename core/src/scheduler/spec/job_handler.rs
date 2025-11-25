@@ -8,9 +8,9 @@ use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::operon::RunningState;
 use crate::scheduler::{
     ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, PeerEventReceiver,
-    PeerEventSenderMap, SchedulerError,
+    PeerEventSenderMap, SchedulerError, SpecWithMetadata,
 };
-use crate::schema_base::{JobSql, ResolutionSql, TicketSql};
+use crate::schema::{Job, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiState;
@@ -91,50 +91,52 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, J, R, T, JS> JobHandler<Svc, Sto> for JS
+impl<Svc, Sto, JS, const N: usize> JobHandler<Svc, Sto> for SpecWithMetadata<Svc, Sto, JS, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    J: JobSql,
-    R: ResolutionSql,
-    T: TicketSql<Job = J, Resolution = R>,
-    JS: JobSpec<Svc, Sto, Job = J, Resolution = R, Ticket = T> + Clone,
+    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = Ticket<N>> + Clone,
 {
     fn job_id(&self) -> &'static str {
-        J::id()
+        self.job_meta.id
     }
 
     fn pool_size(&self) -> usize {
-        JobSpec::pool_size(self)
+        self.spec.pool_size()
     }
 
     async fn init_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        R::init_table(client).await?;
+        if let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() {
+            client.resolution(spawn_dim_meta).init().await?;
+        }
         Ok(())
     }
 
     async fn clear_resolution(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        R::clear_table(client).await?;
+        if let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() {
+            client.resolution(spawn_dim_meta).clear().await?;
+        }
         Ok(())
     }
 
     async fn init_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        T::init_table(client).await?;
+        client.ticket(self.job_meta).init().await?;
         Ok(())
     }
 
     async fn clear_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        T::clear_table(client).await?;
+        client.ticket(self.job_meta).clear().await?;
         Ok(())
     }
 
     async fn put_default_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        T::new().put(client).await?;
+        let default_ticket = self.spec.default_ticket();
+        client.ticket(self.job_meta).put(default_ticket).await?;
         Ok(())
     }
 
     async fn get_status(&self, client: MetaClient<'_>) -> Result<(i64, i64, i64), SchedulerError> {
-        let status = T::get_status(client).await?;
+        let status = client.ticket(self.job_meta).get_status().await?;
         Ok(status)
     }
 
@@ -143,7 +145,7 @@ where
         storage: &Sto,
         client: MetaClient<'_>,
     ) -> Result<bool, SchedulerError> {
-        JobSpec::check_consistency(self, storage, client).await
+        self.spec.check_consistency(storage, client).await
     }
 
     async fn prepare_rebuild(
@@ -151,7 +153,7 @@ where
         storage: &Sto,
         client: MetaClient<'_>,
     ) -> Result<Box<dyn JobRebuilder>, SchedulerError> {
-        JobSpec::prepare_rebuild(self, storage, client).await
+        self.spec.prepare_rebuild(storage, client).await
     }
 
     #[allow(clippy::too_many_arguments)]

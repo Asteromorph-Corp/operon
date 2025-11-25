@@ -1,0 +1,35 @@
+async fn prepare_rebuild(
+    &self,
+    storage: &Sto,
+    client: operon::meta_storage::MetaClient<'_>,
+) -> Result<Box<dyn operon::scheduler::JobRebuilder>, operon::scheduler::SchedulerError> {
+    let tickets = client
+        .ticket(self.job_meta())
+        .get_all(operon::schema::TicketStatus::Done)
+        .await?;
+    let data =
+        operon::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
+            let job = ticket.resolve().ok_or_else(|| {
+                operon::scheduler::SchedulerError::Other("Failed to resolve a beta ticket".into())
+            })?;
+            let resolution = client
+                .resolution(self.spawn_dim_meta())
+                .get(job.coordinate)
+                .await?
+                .ok_or_else(|| {
+                    operon::scheduler::SchedulerError::Other(format!(
+                        "No resolution found for j_{:?}",
+                        job.coordinate
+                    ))
+                })?;
+
+            Ok::<_, operon::scheduler::SchedulerError>((job, resolution))
+        }))
+        .await?;
+
+    Ok(Box::new(BetaRebuilder {
+        job_meta: self.job_meta(),
+        spawn_dim_meta: self.spawn_dim_meta(),
+        data,
+    }))
+}

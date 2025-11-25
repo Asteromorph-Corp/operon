@@ -1,5 +1,5 @@
 mod core;
-mod queries;
+mod metadata;
 mod schema;
 mod spec;
 mod storage;

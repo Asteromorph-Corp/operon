@@ -84,7 +84,11 @@ struct MySplitterService;
 #[async_trait]
 impl SplitterService for MySplitterService {
     async fn get_inputs(&self) -> Result<Vec<Input>, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(vec![Input::from("Hello World"), Input::from("Hello Operon"), Input::from("")])
+        Ok(vec![
+            Input::from("Hello World"),
+            Input::from("Hello Operon"),
+            Input::from(""),
+        ])
     }
 
     async fn get_words(
@@ -189,8 +193,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // we can retrieve the results from the storage.
     // As a side note, we could use `println!` here
     // since the UI is exited at this point.
-    println!("{:?}", storage.get_intermediate(0, 0).await?);
-    println!("{:?}", storage.get_output(0, 0, 0).await?);
+    println!("{:?}", storage.get_intermediate([0, 0]).await?);
+    println!("{:?}", storage.get_output([0, 0, 0]).await?);
 
     Ok(())
 }

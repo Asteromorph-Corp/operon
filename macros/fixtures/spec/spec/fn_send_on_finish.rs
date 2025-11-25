@@ -1,0 +1,48 @@
+async fn send_on_finish(
+    &self,
+    peer_txs: &Self::PeerEventSenders,
+    job: Self::Job,
+    resolution: Self::Resolution,
+) -> Result<(), operon::scheduler::SchedulerError> {
+    match peer_txs
+        .to_delta
+        .send(operon::scheduler::PeerEvent::Resolution(
+            schema::ResolutionEnum::J(resolution),
+        ))
+        .await
+    {
+        Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
+        // Verbosity should be low here, since this can happen
+        // an arbitrary number of times
+        // if a descendant scheduler errored out.
+        Err(_) => operon::log::trace!(
+            "`delta`'s peer channel closed before handling `beta`'s {resolution:?}"
+        ),
+    }
+    // out-dependencies (delta, epsilon)
+    match peer_txs
+        .to_delta
+        .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+            job,
+        )))
+        .await
+    {
+        Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {job:?}"),
+        Err(_) => {
+            operon::log::trace!("`delta`'s peer channel closed before handling `beta`'s {job:?}")
+        }
+    }
+    match peer_txs
+        .to_epsilon
+        .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+            job,
+        )))
+        .await
+    {
+        Ok(_) => operon::log::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
+        Err(_) => {
+            operon::log::trace!("`epsilon`'s peer channel closed before handling `beta`'s {job:?}")
+        }
+    }
+    Ok(())
+}

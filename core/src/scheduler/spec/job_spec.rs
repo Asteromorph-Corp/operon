@@ -1,10 +1,62 @@
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
 use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
-use crate::schema_base::{Job, Resolution, Ticket};
+use crate::schema::{JobLike, JobMetadata, ResolutionLike, TicketLike};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
+
+pub struct SpecWithMetadata<Svc, Sto, JS, const N: usize>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    JS: JobSpec<Svc, Sto>,
+{
+    pub spec: JS,
+    pub job_meta: JobMetadata<N>,
+    // TODO: this is here to make `JobMetadata` `Copy`-able, maybe there is a better way to handle
+    // this.
+    pub all_upstream_jobs: HashSet<&'static str>,
+    _phantom: std::marker::PhantomData<(Svc, Sto)>,
+}
+
+impl<Svc, Sto, JS, const N: usize> SpecWithMetadata<Svc, Sto, JS, N>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    JS: JobSpec<Svc, Sto>,
+{
+    pub fn new(
+        spec: JS,
+        job_meta: JobMetadata<N>,
+        all_upstream_jobs: HashSet<&'static str>,
+    ) -> Self {
+        Self {
+            spec,
+            job_meta,
+            all_upstream_jobs,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Svc, Sto, JS, const N: usize> Clone for SpecWithMetadata<Svc, Sto, JS, N>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    JS: JobSpec<Svc, Sto> + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            spec: self.spec.clone(),
+            job_meta: self.job_meta,
+            all_upstream_jobs: self.all_upstream_jobs.clone(),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
 
 #[async_trait]
 pub trait JobSpec<Svc, Sto>: Clone + Send + Sync + 'static
@@ -12,12 +64,14 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
 {
-    type Job: Job;
-    type Resolution: Resolution;
-    type Ticket: Ticket<Job = Self::Job, Resolution = Self::Resolution>;
+    type Job: JobLike;
+    type Resolution: ResolutionLike;
+    type Ticket: TicketLike;
     type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;
 
     fn pool_size(&self) -> usize;
+
+    fn default_ticket(&self) -> Self::Ticket;
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
     /// Return `true` if the data storage holds all needed data to restore, `false` if it does not.
@@ -43,7 +97,7 @@ where
         service: &Svc,
         storage: &Sto,
         client: MetaClient<'_>,
-        job: &Self::Job,
+        job: Self::Job,
     ) -> Result<Self::Resolution, SchedulerError>;
 
     async fn send_on_finish(

@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 
-use crate::meta_storage::{MetaClient, MetaStorage, clear_footprint, get_footprint, put_footprint};
+use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::operon::RunningState;
 use crate::scheduler::{
     ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
@@ -171,7 +171,7 @@ where
 
         // Get footprints from both storages.
         let data_footprint = self.storage.get_footprint().await?;
-        let meta_footprint = get_footprint(meta_conn.as_client(), "global").await?;
+        let meta_footprint = meta_conn.as_client().get_footprint("global").await?;
         // Early return if the state can be inferred through the footprints.
         match (&data_footprint, &meta_footprint) {
             (Some(df), Some(mf)) if df == mf => {
@@ -258,7 +258,7 @@ where
             // ...and to the metadata storage.
             let mut conn = self.meta_storage.conn().await?;
             let tx = conn.transaction().await?;
-            put_footprint(tx.as_client(), "global", footprint).await?;
+            tx.as_client().put_footprint("global", footprint).await?;
             tx.commit().await?;
         }
         log::info!("All jobs closed in: {:?}.", start.elapsed());
@@ -273,7 +273,7 @@ where
         self.handler.clear_resolution(tx.as_client()).await?;
         self.handler.clear_tickets(tx.as_client()).await?;
         self.handler.put_default_tickets(tx.as_client()).await?;
-        clear_footprint(tx.as_client()).await?;
+        tx.as_client().clear_footprint().await?;
         tx.commit().await?;
 
         let handles = self
@@ -313,7 +313,7 @@ where
 
         self.handler.clear_resolution(tx.as_client()).await?;
         self.handler.clear_tickets(tx.as_client()).await?;
-        clear_footprint(tx.as_client()).await?;
+        tx.as_client().clear_footprint().await?;
 
         self.handler.put_default_tickets(tx.as_client()).await?;
         self.update_ui(tx.as_client()).await?;
@@ -355,7 +355,7 @@ where
         {
             let mut conn = meta_storage.conn().await?;
             let tx = conn.transaction().await?;
-            clear_footprint(tx.as_client()).await?;
+            tx.as_client().clear_footprint().await?;
             tx.commit().await?;
         }
 
