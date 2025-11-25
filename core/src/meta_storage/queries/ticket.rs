@@ -73,9 +73,10 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         &self,
         upstream_meta: JobMetadata<M>,
         upstream_job: Job<M>,
+        aggregate_dims: &[&'static str],
     ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
         let schema = self.client.schema_prefix();
-        let stmt = RaiseDepsDoneQuery(schema, self.job_meta, upstream_meta);
+        let stmt = RaiseDepsDoneQuery(schema, self.job_meta, upstream_meta, aggregate_dims);
 
         let params = upstream_meta
             .dims
@@ -376,12 +377,16 @@ struct RaiseDepsDoneQuery<'a, const N: usize, const M: usize>(
     SchemaPrefix<'a>,
     JobMetadata<N>,
     JobMetadata<M>,
+    &'a [&'static str],
 );
 
 impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsDoneQuery<'_, N, M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let self_dims = self.1.dims;
+        let received_dims = self.2.dims;
+        let aggregate_dims = self.3;
 
         writeln!(f, "WITH updated AS (")?;
         writeln!(f, "    UPDATE {schema}ticket_{id}")?;
@@ -393,11 +398,9 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsDoneQuery<'_
         writeln!(f, "            ELSE 'waiting'::{schema}ticket_status")?;
         writeln!(f, "        END")?;
         writeln!(f, "    WHERE status = 'waiting'::{schema}ticket_status")?;
-        for (idx, dim) in self
-            .2
-            .dims
+        for (idx, dim) in received_dims
             .iter()
-            .filter(|d| self.1.dims.contains(d))
+            .filter(|d| self_dims.contains(d) && !aggregate_dims.contains(d))
             .enumerate()
         {
             writeln!(f, "        AND {} = ${}", dim, idx + 1)?;
@@ -699,7 +702,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case::simple(job_beta(), job_alpha(), indoc! { "
+    #[case::simple(job_beta(), job_alpha(), &[], indoc! { "
         WITH updated AS (
             UPDATE test_meta.ticket_beta
             SET
@@ -720,9 +723,10 @@ mod tests {
         schema_prefix: SchemaPrefix<'static>,
         #[case] job: JobMetadata<N>,
         #[case] upstream_job: JobMetadata<M>,
+        #[case] aggregate_dims: &[&'static str],
         #[case] expected: &str,
     ) {
-        let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job).to_string();
+        let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job, aggregate_dims).to_string();
         assert_eq!(stmt, expected);
     }
 

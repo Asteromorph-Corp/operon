@@ -46,10 +46,20 @@ pub(super) fn fn_on_receive_job(
     let job_arms = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
         let upstream_job_meta = job_metadata_ident(&upstream_job.id);
         let variant_ident = variant_ident(&upstream_job.id);
+        let affected_args = job.from.iter().filter(|arg| arg.id == upstream_job.to);
+
+        let raise_deps_done = affected_args.map(|arg| -> syn::Expr {
+            let aggregate_dims = &arg.over;
+            parse_quote! {
+                client.ticket(self.job_meta()).raise_deps_done(metadata::#upstream_job_meta(), job, &[#(#aggregate_dims),*]).await?
+            }
+        });
 
         parse_quote! {
             schema::#job_enum_ident::#variant_ident(job) => Ok(
-                client.ticket(self.job_meta()).raise_deps_done(metadata::#upstream_job_meta(), job).await?
+                [
+                    #(#raise_deps_done,)*
+                ].concat()
             ),
         }
     });

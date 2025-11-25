@@ -1,7 +1,8 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::{JobConfig, JobConfigMap};
+use crate::dependency_analysis::get_direct_downstream_jobs;
 use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident};
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
@@ -43,7 +44,7 @@ pub fn impl_job_rebuilder(
     job: &JobConfig,
     spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
     downstream_jobs: &IndexSet<&JobConfig>,
-    spawn_dim_repeating_job_downstream_jobs: &[&JobConfig],
+    all_jobs: &JobConfigMap,
 ) -> syn::ItemImpl {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
@@ -72,39 +73,43 @@ pub fn impl_job_rebuilder(
                         .await?;
                 }
             });
-        let raise_quotas = spawn_dim_repeating_job_downstream_jobs.iter().filter_map(
-            |downstream_job| -> Option<syn::Stmt> {
-                let downstream_job_meta = job_metadata_ident(&downstream_job.id);
-                if downstream_job.dims.contains(spawn_dim) {
-                    return None;
-                }
-                Some(parse_quote! {
-                    client.ticket(metadata::#downstream_job_meta())
-                        .raise_deps_quota(self.spawn_dim_meta, resolution)
-                        .await?;
+        let raise_quotas = spawn_dim_repeating_jobs.iter().flat_map(|repeating_job| {
+            get_direct_downstream_jobs(repeating_job, all_jobs)
+                .into_iter()
+                .flat_map(|downstream_job| {
+                    let downstream_job_meta = job_metadata_ident(&downstream_job.id);
+                    let cnt = downstream_job
+                        .from
+                        .iter()
+                        .filter(|arg| arg.id == repeating_job.to && arg.over.contains(spawn_dim))
+                        .count();
+                    let stmt: syn::Stmt = parse_quote! {
+                        client.ticket(metadata::#downstream_job_meta())
+                            .raise_deps_quota(self.spawn_dim_meta, resolution)
+                            .await?;
+                    };
+                    std::iter::repeat_n(stmt, cnt)
                 })
-            },
-        );
+        });
         explode.chain(raise_quotas).collect()
-    } else if !spawn_dim_repeating_jobs.is_empty()
-        || !spawn_dim_repeating_job_downstream_jobs.is_empty()
-    {
-        panic!(
-            "`spawn_dim` is `None`, but `spawn_dim_repeating_jobs` or `spawn_dim_repeating_job_downstream_jobs` is not empty"
-        )
+    } else if !spawn_dim_repeating_jobs.is_empty() {
+        panic!("`spawn_dim` is `None`, but `spawn_dim_repeating_jobs` is not empty")
     } else {
         vec![]
     };
 
     let raise_dep_exprs = downstream_jobs
         .iter()
-        .map(|downstream_job| -> syn::Stmt {
-            let downstream_job_meta = job_metadata_ident(&downstream_job.id);
-            parse_quote! {
-                client.ticket(metadata::#downstream_job_meta())
-                    .raise_deps_done(self.job_meta, job)
-                    .await?;
-            }
+        .flat_map(|downstream_job| {
+            let affected_args = downstream_job.from.iter().filter(|arg| arg.id == job.to);
+            affected_args.map(|arg| -> syn::Stmt {
+                let downstream_job_meta = job_metadata_ident(&downstream_job.id);
+                let aggregate_dims = &arg.over;
+
+                parse_quote! {
+                    client.ticket(metadata::#downstream_job_meta()).raise_deps_done(self.job_meta, job, &[#(#aggregate_dims),*]).await?;
+                }
+            })
         })
         .collect::<Vec<_>>();
 
@@ -166,17 +171,8 @@ mod tests {
             .map(|dim| get_jobs_repeating_on(dim, &all_jobs))
             .unwrap_or_default();
         let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
-        let spawn_dim_repeating_job_downstream_jobs = spawn_dim_repeating_jobs
-            .iter()
-            .flat_map(|job| get_direct_downstream_jobs(job, &all_jobs))
-            .collect::<Vec<_>>();
 
-        let item = impl_job_rebuilder(
-            &job,
-            &spawn_dim_repeating_jobs,
-            &downstream_jobs,
-            &spawn_dim_repeating_job_downstream_jobs,
-        );
+        let item = impl_job_rebuilder(&job, &spawn_dim_repeating_jobs, &downstream_jobs, &all_jobs);
         assert_item_eq(&item, fixture_path);
     }
 }

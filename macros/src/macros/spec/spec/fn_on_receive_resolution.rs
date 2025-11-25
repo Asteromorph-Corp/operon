@@ -41,10 +41,8 @@ pub(super) fn fn_on_receive_resolution(
     let explode_arms = job.dims.iter().enumerate().map(|(idx, dim)| -> syn::Arm {
         let variant_ident = variant_ident(dim);
         let dim_meta = dimension_metadata_ident(dim);
-        let send_explosions = downstream_jobs.iter().filter_map(|downstream_job| {
-            if downstream_job.dims.contains(dim) {
-                return None;
-            }
+        let send_explosions = downstream_jobs.iter().flat_map(|downstream_job| {
+            let cnt = downstream_job.from.iter().filter(|arg| arg.id == job.to && arg.over.contains(dim)).count();
             let sender_ident = sender_ident(&downstream_job.id);
             let ok_msg = format!(
                 "`{}` sent peer event to `{}`: {{resolution:?}}",
@@ -54,7 +52,6 @@ pub(super) fn fn_on_receive_resolution(
                 "`{}`'s peer channel closed before handling `{}`'s {{resolution:?}}",
                 downstream_job.id, job.id
             );
-
             let stmt: syn::Stmt = parse_quote! {
                 match peer_txs
                     .#sender_ident
@@ -65,7 +62,7 @@ pub(super) fn fn_on_receive_resolution(
                     Err(_) => #operon::log::trace!(#err_msg),
                 }
             };
-            Some(stmt)
+            std::iter::repeat_n(stmt, cnt)
         });
 
         parse_quote! {

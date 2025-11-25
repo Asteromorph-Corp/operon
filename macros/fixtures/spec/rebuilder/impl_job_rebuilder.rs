@@ -23,11 +23,11 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                 .await?;
             client
                 .ticket(metadata::job_delta_meta())
-                .raise_deps_done(self.job_meta, job)
+                .raise_deps_done(self.job_meta, job, &[])
                 .await?;
             client
                 .ticket(metadata::job_epsilon_meta())
-                .raise_deps_done(self.job_meta, job)
+                .raise_deps_done(self.job_meta, job, &["j"])
                 .await?;
 
             let mut ui_state = ui_state.write().await;

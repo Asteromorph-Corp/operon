@@ -21,10 +21,6 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             .as_ref()
             .map(|spawn_dim| get_jobs_repeating_on(spawn_dim, &all_configs.jobs))
             .unwrap_or_default();
-        let spawn_dim_repeating_job_downstream_jobs = spawn_dim_repeating_jobs
-            .iter()
-            .flat_map(|job| get_direct_downstream_jobs(job, &all_configs.jobs))
-            .collect::<Vec<_>>();
         let event_receiving_job_ids = downstream_jobs
             .iter()
             .chain(spawn_dim_repeating_jobs.iter())
@@ -48,7 +44,7 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
             job,
             &spawn_dim_repeating_jobs,
             &downstream_jobs,
-            &spawn_dim_repeating_job_downstream_jobs,
+            &all_configs.jobs,
         );
 
         let peer_txs_def = peer_txs_definition(&job.id, &event_receiving_job_ids);
