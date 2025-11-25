@@ -11,8 +11,6 @@
 //! }
 //! ```
 
-use quote::format_ident;
-
 use crate::configs::{
     AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
     JobConfig, JobConfigMap,
@@ -145,7 +143,6 @@ pub fn entity_a() -> EntityConfig {
     EntityConfig {
         id: "a".to_string(),
         dims: vec![],
-        generic: format_ident!("A_"),
     }
 }
 
@@ -153,7 +150,6 @@ pub fn entity_b() -> EntityConfig {
     EntityConfig {
         id: "b".to_string(),
         dims: vec!["i".to_string()],
-        generic: format_ident!("B_"),
     }
 }
 
@@ -161,7 +157,6 @@ pub fn entity_c() -> EntityConfig {
     EntityConfig {
         id: "c".to_string(),
         dims: vec!["j".to_string()],
-        generic: format_ident!("C_"),
     }
 }
 
@@ -169,7 +164,6 @@ pub fn entity_d() -> EntityConfig {
     EntityConfig {
         id: "d".to_string(),
         dims: vec!["i".to_string(), "j".to_string(), "k".to_string()],
-        generic: format_ident!("D_"),
     }
 }
 
@@ -177,7 +171,6 @@ pub fn entity_e() -> EntityConfig {
     EntityConfig {
         id: "e".to_string(),
         dims: vec!["l".to_string()],
-        generic: format_ident!("E_"),
     }
 }
 

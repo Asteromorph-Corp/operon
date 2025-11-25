@@ -10,14 +10,6 @@ use crate::configs::{
     AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
     JobConfig, JobConfigMap,
 };
-use crate::utils::DedupHasher;
-
-fn create_generic_ident(id: &str, hasher: &mut DedupHasher) -> proc_macro2::Ident {
-    proc_macro2::Ident::new(
-        &format!("{}_{:0>11}", id, base62::encode(hasher.hash(id)),),
-        proc_macro2::Span::call_site(),
-    )
-}
 
 fn validate_downwards_closed(dims: &[String], configs: &DimensionConfigMap) -> Result<(), String> {
     let dims_set: HashSet<_, RandomState> = HashSet::from_iter(dims.iter());
@@ -43,7 +35,7 @@ impl Parse for AllConfig {
         let mut dimensions: DimensionConfigMap = IndexMap::new();
         let mut entities: EntityConfigMap = IndexMap::new();
         let mut jobs: JobConfigMap = IndexMap::new();
-        let mut hasher = DedupHasher::new();
+
         for job in config_decl.jobs {
             let new_entity = job.spawned_entity;
             let job_id = job.id.to_string().to_snake_case();
@@ -188,7 +180,6 @@ impl Parse for AllConfig {
             let new_entity_config = EntityConfig {
                 id: new_entity_id.clone(),
                 dims: new_entity_dims,
-                generic: create_generic_ident(&new_entity_id, &mut hasher),
             };
             entities.insert(new_entity_id.clone(), new_entity_config);
             if let Some(dim) = new_entity.dims.first() {
@@ -241,20 +232,6 @@ impl Parse for AllConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_create_generic_ident() {
-        let mut hasher = DedupHasher::new();
-        let ids = vec!["a", "b", "c"];
-        let mut generic_ids = Vec::new();
-        for id in ids {
-            generic_ids.push(create_generic_ident(id, &mut hasher));
-        }
-        assert_eq!(generic_ids.len(), 3);
-        // for generic_id in generic_ids {
-        //     println!("{generic_id}");
-        // }
-    }
 
     #[test]
     fn test_parse_config() {
