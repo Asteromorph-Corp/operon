@@ -103,8 +103,6 @@ impl Parse for AllConfig {
                         .iter()
                         .map(|d| d.to_string().to_snake_case()),
                 );
-                let c_set: HashSet<String, RandomState> =
-                    HashSet::from_iter(dims.iter().map(|d| d.to_string().to_snake_case()));
                 // Constraint 4b: B ⊆ A.
                 for dim in &arg_entity.dims {
                     if !a_set.contains(&dim.to_string().to_snake_case()) {
@@ -113,17 +111,6 @@ impl Parse for AllConfig {
                             format!("Dimension '{dim}' is not part of entity '{arg_entity_id}'"),
                         ));
                     }
-                }
-                // Constraint 4c: A \ B ⊆ C (or, equivalently, A ⊆ B ∪ C).
-                let b_u_c = b_set.union(&c_set).cloned().collect::<HashSet<_>>();
-                if !a_set.is_subset(&b_u_c) {
-                    let hanging_dims = a_set.difference(&b_u_c).collect::<Vec<_>>();
-                    return Err(syn::Error::new(
-                        arg_entity._span,
-                        format!(
-                            "Entity '{arg_entity_id}' has hanging dimensions: {hanging_dims:?}"
-                        ),
-                    ));
                 }
                 // Constraint 4d: A \ B must be downwards closed.
                 if let Err(err) = validate_downwards_closed(
@@ -146,6 +133,41 @@ impl Parse for AllConfig {
                     ));
                 }
             }
+            // Constraint 6: \mathcal{F} = \bigcup_i \Sigma(\tau_{in,i}) \setminus
+            // \mathcal{E}_{in,i}
+            let bigcup = args
+                .iter()
+                .map(|arg| -> syn::Result<_> {
+                    let arg_id = arg.id.to_string().to_pascal_case();
+                    let Some(arg_config) = entities.get(&arg_id) else {
+                        return Err(syn::Error::new(
+                            arg._span,
+                            format!("Undefined entity '{arg_id}'"),
+                        ));
+                    };
+                    let a_set: HashSet<String> =
+                        HashSet::from_iter(arg_config.dims.iter().cloned());
+                    let b_set: HashSet<String> =
+                        HashSet::from_iter(arg.dims.iter().map(|d| d.to_string().to_snake_case()));
+
+                    Ok(a_set.difference(&b_set).cloned().collect::<Vec<_>>())
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .collect::<HashSet<_>>();
+            let job_dims = HashSet::from_iter(dims.iter().map(|d| d.to_string().to_snake_case()));
+
+            if job_dims != bigcup {
+                let expected = bigcup.iter().map(String::as_str).collect::<Vec<_>>();
+                let err_msg = if expected.is_empty() {
+                    "No dimensions expected".to_string()
+                } else {
+                    format!("Dimensions do not match, should be: {}", expected.join(","))
+                };
+                return Err(syn::Error::new(job._span, err_msg));
+            }
+
             if let Err(err) = validate_downwards_closed(
                 &dims
                     .iter()
