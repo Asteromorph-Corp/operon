@@ -19,7 +19,7 @@ pub enum OperonError {
     Scheduler(SchedulerError),
     /// Error in a user function
     #[error("User function error: {0}")]
-    User(Box<dyn std::error::Error + Send + Sync>),
+    User(UserError),
     /// Error in a storage operation
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError),
@@ -39,6 +39,8 @@ pub enum OperonError {
     #[error("Scheduler loop join error: {0}")]
     SchedulerJoinError(#[from] tokio::task::JoinError),
 }
+
+pub type UserError = Box<dyn std::error::Error + Send + Sync>;
 
 impl OperonError {
     pub fn not_found(data: impl Into<String>) -> Self {

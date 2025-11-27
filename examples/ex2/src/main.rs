@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage, cooking_handler};
 use operon::async_trait::async_trait;
-use operon::operon::{Operon, OperonOptions};
+use operon::operon::{Operon, OperonOptions, UserError};
 use operon::service::OperonService;
 use operon::storage::StorageOptions;
 use rand::Rng;
@@ -14,11 +14,11 @@ struct ExampleService;
 
 #[async_trait]
 impl CookingService for ExampleService {
-    async fn alpha(&self) -> Result<Vec<A>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn alpha(&self) -> Result<Vec<A>, UserError> {
         Ok((0..100).map(|i| A(format!("A ({i})"))).collect())
     }
 
-    async fn beta(&self, a: A) -> Result<Vec<B>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn beta(&self, a: A) -> Result<Vec<B>, UserError> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -33,7 +33,7 @@ impl CookingService for ExampleService {
         Ok(result)
     }
 
-    async fn gamma(&self, a: A) -> Result<Vec<C>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn gamma(&self, a: A) -> Result<Vec<C>, UserError> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -49,7 +49,7 @@ impl CookingService for ExampleService {
         Ok(result)
     }
 
-    async fn delta(&self, a: A, b: B, c: C) -> Result<D, Box<dyn std::error::Error + Send + Sync>> {
+    async fn delta(&self, a: A, b: B, c: C) -> Result<D, UserError> {
         // // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -66,11 +66,7 @@ impl CookingService for ExampleService {
         Ok(d)
     }
 
-    async fn epsilon(
-        &self,
-        b_j: Vec<B>,
-        d_j: Vec<D>,
-    ) -> Result<E, Box<dyn std::error::Error + Send + Sync>> {
+    async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, UserError> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -83,11 +79,7 @@ impl CookingService for ExampleService {
         Ok(e)
     }
 
-    async fn zeta(
-        &self,
-        c_k: Vec<C>,
-        e_k: Vec<E>,
-    ) -> Result<F, Box<dyn std::error::Error + Send + Sync>> {
+    async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, UserError> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {

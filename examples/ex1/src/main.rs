@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use operon::async_trait::async_trait;
 use operon::define_operon;
-use operon::operon::{Operon, OperonOptions};
+use operon::operon::{Operon, OperonOptions, UserError};
 use operon::serde::{Deserialize, Serialize};
 use operon::service::OperonService;
 use operon::storage::StorageOptions;
@@ -83,7 +83,7 @@ struct MySplitterService;
 // to see what methods are required.
 #[async_trait]
 impl SplitterService for MySplitterService {
-    async fn get_inputs(&self) -> Result<Vec<Input>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_inputs(&self) -> Result<Vec<Input>, UserError> {
         Ok(vec![
             Input::from("Hello World"),
             Input::from("Hello Operon"),
@@ -91,20 +91,14 @@ impl SplitterService for MySplitterService {
         ])
     }
 
-    async fn get_words(
-        &self,
-        input: Input,
-    ) -> Result<Vec<Intermediate>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_words(&self, input: Input) -> Result<Vec<Intermediate>, UserError> {
         Ok(input
             .split_whitespace()
             .map(|s| Intermediate(s.to_string()))
             .collect())
     }
 
-    async fn get_chars(
-        &self,
-        intermediate: Intermediate,
-    ) -> Result<Vec<Output>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_chars(&self, intermediate: Intermediate) -> Result<Vec<Output>, UserError> {
         // To print something to the UI,
         // we can use the `log` crate directly,
         // or use the provided `operon::log` module.
