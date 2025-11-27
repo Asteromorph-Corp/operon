@@ -4,8 +4,8 @@ use crate::utils::{operon_ident, resolution_enum_ident};
 
 /// Generates an implementation of the `ResolutionEnum` trait for a given resolution enum.
 ///
-/// Example:
-/// ```rust, ignore
+/// # Example
+/// ```rust,ignore
 /// #[automatically_derived]
 /// impl operon::schema::ResolutionEnum for ResolutionEnum {}
 /// ```

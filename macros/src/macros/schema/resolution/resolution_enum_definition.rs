@@ -6,13 +6,13 @@ use crate::utils::{resolution_enum_ident, variant_ident};
 
 /// Generates an enum representing the resolution of any dimension.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
-/// #[doc = "An enum representing the resolution of any dimension."]
 /// #[derive(Debug, Clone)]
 /// pub enum ResolutionEnum {
-///     I(IResolution),
-///     J(JResolution),
+///     I(operon::schema::Resolution<0usize>),
+///     J(operon::schema::Resolution<1usize>),
+///     K(operon::schema::Resolution<1usize>),
 /// }
 /// ```
 pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemEnum {

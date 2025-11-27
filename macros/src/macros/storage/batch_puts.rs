@@ -3,6 +3,21 @@ use syn::parse_quote;
 use crate::configs::JobConfigMap;
 use crate::utils::{batch_put_entity_ident, entity_ident, operon_ident, variable_ident};
 
+/// Generates the batch put function for the implementation of the storage trait.
+///
+/// # Example
+/// ```rust,ignore
+/// async fn put_all_a(
+///     &self,
+///     entity: operon::schema::Entity<0usize, Vec<A>>,
+/// ) -> Result<(), operon::storage::StorageError> {
+///     self.conn()
+///         .await?
+///         .entity(self.entities_meta.a)
+///         .batch_put(entity)
+///         .await
+/// }
+/// ```
 pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
     jobs.values().filter_map(|job| -> Option<syn::TraitItemFn> {
         let operon = operon_ident();

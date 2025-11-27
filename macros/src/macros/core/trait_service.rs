@@ -9,18 +9,19 @@ use crate::utils::{
 
 /// Generates a trait for the service based on the provided AllConfig.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// #[operon::async_trait::async_trait]
 /// #[automatically_derived]
 /// pub trait CookingService:
 ///     operon::service::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum>
 /// {
-///     async fn beta(&self, a: A,) -> Result<Vec<B>, Box<dyn std::error::Error + Send + Sync>>;
-///     async fn gamma(&self, a: A,) -> Result<Vec<C>, Box<dyn std::error::Error + Send + Sync>>;
-///     async fn delta(&self, a: A,b: B, c: C,) -> Result<D, Box<dyn std::error::Error + Send + Sync>>;
-///     async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>,) -> Result<E, Box<dyn std::error::Error + Send + Sync>>;
-///     async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>,) -> Result<F, Box<dyn std::error::Error + Send + Sync>>;
+///     async fn alpha(&self) -> Result<Vec<A>, operon::operon::UserError>;
+///     async fn beta(&self, a: A) -> Result<Vec<B>, operon::operon::UserError>;
+///     async fn gamma(&self, a: A) -> Result<Vec<C>, operon::operon::UserError>;
+///     async fn delta(&self, a: A, b: B, c: C) -> Result<D, operon::operon::UserError>;
+///     async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, operon::operon::UserError>;
+///     async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, operon::operon::UserError>;
 /// }
 /// ```
 pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
@@ -48,12 +49,12 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
         );
         (
             format!(
-                "async fn {fn_name}(&self, {}) -> Result<{}, Box<dyn std::error::Error + Send + Sync>>;",
+                "async fn {fn_name}(&self, {}) -> Result<{}, operon::operon::UserError>;",
                 args.clone().map(|arg| arg.to_token_stream().to_string()).collect::<Vec<_>>().join(", "),
                 return_ty.to_token_stream().to_string().replace(" ", "")
             ),
             parse_quote! {
-                async fn #fn_name(&self, #(#args),*) -> Result<#return_ty, Box<dyn std::error::Error + Send + Sync>>;
+                async fn #fn_name(&self, #(#args),*) -> Result<#return_ty, #operon::operon::UserError>;
             },
         )
     }).unzip::<_, _, Vec<_>, Vec<_>>();

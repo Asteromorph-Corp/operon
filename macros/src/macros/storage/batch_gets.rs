@@ -4,7 +4,29 @@ use syn::parse_quote;
 use crate::configs::{EntityConfigMap, JobConfigMap};
 use crate::utils::{batch_get_entity_ident, entity_ident, operon_ident, variable_ident};
 
-/// A helper function to generate batch get functions for each job.
+/// Generates the batch get function for the implementation of the storage trait.
+///
+/// # Example
+/// ```rust,ignore
+/// async fn get_all_b_over_j(
+///     &self,
+///     [i]: [usize; 1usize],
+/// ) -> Result<Vec<B>, operon::storage::StorageError> {
+///     let entities = self
+///         .conn()
+///         .await?
+///         .entity(self.entities_meta.b)
+///         .batch_get([i], ["j"])
+///         .await?;
+///
+///     let mut result: Vec<B> = Default::default();
+///     for entity in entities {
+///         result.push(entity);
+///     }
+///
+///     Ok(result)
+/// }
+/// ```
 pub fn batch_gets(
     jobs: &JobConfigMap,
     entities: &EntityConfigMap,

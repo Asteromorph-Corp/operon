@@ -2,6 +2,12 @@ use syn::parse_quote;
 
 use crate::utils::{entities_ident, operon_ident, sql_storage_ident};
 
+/// Generates a type alias for the psql storage.
+///
+/// # Example
+/// ```rust,ignore
+/// pub type PsqlCookingStorage = operon::storage::psql::PsqlStorage<CookingEntities>;
+/// ```
 pub(super) fn storage_definition(service_id: &str) -> syn::ItemType {
     let operon = operon_ident();
     let sql_storage_ident = sql_storage_ident(service_id);

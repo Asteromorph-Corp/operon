@@ -4,6 +4,21 @@ use crate::configs::{EntityConfig, EntityConfigMap};
 use crate::operon_ident;
 use crate::utils::{entity_ident, get_entity_ident, put_entity_ident, variable_ident};
 
+/// Generates a get function for the implementation of the storage trait.
+///
+/// # Example
+/// ```rust,ignore
+/// async fn get_b(
+///     &self,
+///     coordinate: [usize; 2usize],
+/// ) -> Result<Option<B>, operon::storage::StorageError> {
+///     self.conn()
+///         .await?
+///         .entity(self.entities_meta.b)
+///         .get(coordinate)
+///         .await
+/// }
+/// ```
 fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let entity_ident = entity_ident(&entity.id);
     let id = variable_ident(&entity.id);
@@ -23,6 +38,21 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     }
 }
 
+/// Generates a put function for the implementation of the storage trait.
+///
+/// # Example
+/// ```rust,ignore
+/// async fn put_b(
+///     &self,
+///     entity: operon::schema::Entity<2usize, B>,
+/// ) -> Result<(), operon::storage::StorageError> {
+///     self.conn()
+///         .await?
+///         .entity(self.entities_meta.b)
+///         .put(entity)
+///         .await
+/// }
+/// ```
 fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
     let id = variable_ident(&entity.id);

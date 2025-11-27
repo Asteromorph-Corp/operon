@@ -3,6 +3,14 @@ use syn::parse_quote;
 use crate::configs::JobConfig;
 use crate::operon_ident;
 
+/// Generates the `default_ticket` function for the implementation of the trait `JobSpec`.
+///
+/// # Example
+/// ```rust,ignore
+/// fn default_ticket(&self) -> operon::schema::Ticket<1usize> {
+///     operon::schema::Ticket::new(1usize)
+/// }
+/// ```
 pub fn fn_default_ticket(job: &JobConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
     let n = job.dims.len();

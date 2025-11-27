@@ -6,13 +6,16 @@ use crate::utils::{job_enum_ident, variant_ident};
 
 /// Generates an enum representing all jobs in the job configuration map.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
-/// #[doc = "An enum representing any job."]
 /// #[derive(Debug, Clone)]
 /// pub enum JobEnum {
-///     Beta(BetaJob),
-///     Gamma(GammaJob),
+///     Alpha(operon::schema::Job<0usize>),
+///     Beta(operon::schema::Job<1usize>),
+///     Gamma(operon::schema::Job<1usize>),
+///     Delta(operon::schema::Job<3usize>),
+///     Epsilon(operon::schema::Job<2usize>),
+///     Zeta(operon::schema::Job<1usize>),
 /// }
 /// ```
 pub fn job_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {

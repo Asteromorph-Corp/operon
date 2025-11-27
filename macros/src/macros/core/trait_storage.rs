@@ -8,6 +8,19 @@ use crate::utils::{
 };
 
 /// A helper function to generate single operation functions for each entity.
+///
+/// # Example
+/// ```rust,ignore
+/// async fn get_a(
+///     &self,
+///     coordinate: [usize; 1usize],
+/// ) -> Result<Option<A>, operon::storage::StorageError>;
+///
+/// async fn put_a(
+///     &self,
+///     entity: operon::schema::Entity<1usize, A>,
+/// ) -> Result<(), operon::storage::StorageError>;
+/// ```
 fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
     entities.values().flat_map(|entity| -> [syn::TraitItemFn; 2] {
         let operon = operon_ident();
@@ -28,6 +41,25 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItem
 }
 
 /// A helper function to generate batch get functions for each job.
+///
+/// # Example
+/// ```rust,ignore
+/// async fn get_all_b_over_j(
+///     &self,
+///     [i]: [usize; 1usize],
+/// ) -> Result<Vec<B>, operon::storage::StorageError> {
+///     let final_results = {
+///         let mut results_0 = Vec::new();
+///         let mut j = 0usize;
+///         while let Some(value) = self.get_b([i, j]).await? {
+///             results_0.push(value);
+///             j += 1;
+///         }
+///         (!results_0.is_empty()).then_some(results_0)
+///     };
+///     Ok(final_results.unwrap_or_default())
+/// }
+/// ```
 fn batch_gets(
     jobs: &JobConfigMap,
     entities: &EntityConfigMap,
@@ -96,6 +128,24 @@ fn batch_gets(
 }
 
 /// A helper function to generate batch insert functions for each job.
+///
+/// # Example
+/// ```rust,ignore
+/// async fn put_all_a(
+///     &self,
+///     entity: operon::schema::Entity<0usize, Vec<A>>,
+/// ) -> Result<(), operon::storage::StorageError> {
+///     let [] = entity.coordinate;
+///     for (i, value) in entity.value.into_iter().enumerate() {
+///         let entity_single = operon::schema::Entity {
+///             coordinate: [i],
+///             value,
+///         };
+///         self.put_a(entity_single).await?;
+///     }
+///     Ok(())
+/// }
+/// ```
 fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
     jobs.values().filter_map(|job| -> Option<syn::TraitItemFn> {
         let operon = operon_ident();
@@ -127,18 +177,6 @@ fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> 
 }
 
 /// Generates a trait for the storage required for the service.
-///
-/// Example:
-/// ```rust,ignore
-/// #[operon::async_trait::async_trait]
-/// pub trait CookingStorage: operon::service::OperonService {
-///     async fn get_a(&self, i: schema::IDim) -> Result<Option<A>, operon::storage::StorageError>;
-///     async fn put_a(&self, i: schema::IDim, value: A) -> Result<(), operon::storage::StorageError>;
-///
-///     async fn get_b(&self, i: schema::IDim, j: schema::JDim) -> Result<Option<B>, operon::storage::StorageError>;
-///     async fn put_b(&self, i: schema::IDim, j: schema::JDim, value: B) -> Result<(), operon::storage::StorageError>;
-/// }
-/// ```
 pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
     let operon = operon_ident();
     let storage_ident = storage_trait_ident(&all_configs.service_id);

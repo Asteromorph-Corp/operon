@@ -4,6 +4,17 @@ use crate::configs::DimensionConfig;
 use crate::operon_ident;
 use crate::utils::dimension_metadata_ident;
 
+/// Generates a metadata function for a dimension.
+///
+/// # Example
+/// ```rust,ignore
+/// pub const fn dimension_j_meta() -> operon::schema::DimensionMetadata<1usize> {
+///     operon::schema::DimensionMetadata {
+///         id: "j",
+///         deps: ["i"],
+///     }
+/// }
+/// ```
 pub fn dimension_metadata(dimension: &DimensionConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = dimension_metadata_ident(&dimension.id);

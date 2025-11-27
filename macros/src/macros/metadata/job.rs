@@ -4,6 +4,18 @@ use crate::configs::JobConfig;
 use crate::operon_ident;
 use crate::utils::job_metadata_ident;
 
+/// Generates a metadata function for a job.
+///
+/// # Example
+/// ```rust,ignore
+/// pub const fn job_beta_meta() -> operon::schema::JobMetadata<1usize> {
+///     operon::schema::JobMetadata {
+///         id: "beta",
+///         dims: ["i"],
+///         spawn_dim: Some("j"),
+///     }
+/// }
+/// ```
 pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = job_metadata_ident(&job.id);

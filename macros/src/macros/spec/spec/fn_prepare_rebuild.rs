@@ -6,25 +6,30 @@ use crate::utils::{operon_ident, rebuilder_ident};
 
 /// Generates the `prepare_rebuild` function for the implementation of the trait `JobSpec`.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// async fn prepare_rebuild(
 ///     &self,
 ///     storage: &Sto,
 ///     client: operon::meta_storage::MetaClient<'_>,
 /// ) -> Result<Box<dyn operon::scheduler::JobRebuilder>, operon::scheduler::SchedulerError> {
-///     let tickets = queries::get_all_beta(client, operon::schema::TicketStatus::Done).await?;
-///     let successes =
+///     let tickets = client
+///         .ticket(self.job_meta())
+///         .get_all(operon::schema::TicketStatus::Done)
+///         .await?;
+///     let data =
 ///         operon::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
-///             let job = operon::schema::Ticket::resolve(&ticket).ok_or_else(|| {
+///             let job = ticket.resolve().ok_or_else(|| {
 ///                 operon::scheduler::SchedulerError::Other("Failed to resolve a beta ticket".into())
 ///             })?;
-///             let resolution = queries::get_resolution_j(client, job.i)
+///             let resolution = client
+///                 .resolution(self.spawn_dim_meta())
+///                 .get(job.coordinate)
 ///                 .await?
 ///                 .ok_or_else(|| {
 ///                     operon::scheduler::SchedulerError::Other(format!(
-///                         "No resolution found for j_{}",
-///                         job.i,
+///                         "No resolution found for j_{:?}",
+///                         job.coordinate
 ///                     ))
 ///                 })?;
 ///
@@ -32,7 +37,11 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///         }))
 ///         .await?;
 ///
-///     Ok(Box::new(BetaRebuilder(successes)))
+///     Ok(Box::new(BetaRebuilder {
+///         job_meta: self.job_meta(),
+///         spawn_dim_meta: self.spawn_dim_meta(),
+///         data,
+///     }))
 /// }
 /// ```
 pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {

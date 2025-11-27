@@ -6,9 +6,9 @@ use crate::utils::job_id_ident;
 
 /// Generates a constant variable for the given job ID.
 ///
-/// Example:
+/// # Example:
 /// ```rust,ignore
-/// const BETA_ID: &str = "beta";
+/// pub const BETA_ID: &str = "beta";
 /// ```
 pub(super) fn job_id(job_id: &JobId) -> syn::ItemConst {
     let id_ident = job_id_ident(job_id);

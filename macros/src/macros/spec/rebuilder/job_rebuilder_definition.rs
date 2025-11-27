@@ -8,10 +8,17 @@ use crate::utils::rebuilder_ident;
 
 /// Generates a struct definition for a job rebuilder.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// #[derive(Debug)]
-/// pub struct BetaRebuilder(Vec<(schema::BetaJob, schema::JResolution)>);
+/// pub struct BetaRebuilder {
+///     job_meta: operon::schema::JobMetadata<1usize>,
+///     spawn_dim_meta: operon::schema::DimensionMetadata<1usize>,
+///     data: Vec<(
+///         operon::schema::Job<1usize>,
+///         operon::schema::Resolution<1usize>,
+///     )>,
+/// }
 /// ```
 pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
     let operon = operon_ident();

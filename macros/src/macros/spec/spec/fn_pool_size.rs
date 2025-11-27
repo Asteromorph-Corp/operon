@@ -2,6 +2,14 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 
+/// Generates the `pool_size` function for the implementation of the trait `JobSpec`.
+///
+/// # Example
+/// ```rust,ignore
+/// fn pool_size(&self) -> usize {
+///     8usize
+/// }
+/// ```
 pub(super) fn fn_pool_size(job: &JobConfig) -> syn::ImplItemFn {
     let pool_size = job.pool_size;
 

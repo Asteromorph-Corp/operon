@@ -4,6 +4,18 @@ use crate::configs::EntityConfig;
 use crate::operon_ident;
 use crate::utils::{entity_ident, entity_metadata_ident};
 
+/// Generates a metadata function for an entity.
+///
+/// # Example
+/// ```rust,ignore
+/// pub const fn entity_a_meta() -> operon::schema::EntityMetadata<1usize, A> {
+///     operon::schema::EntityMetadata {
+///         id: "a",
+///         dims: ["i"],
+///         _phantom: std::marker::PhantomData,
+///     }
+/// }
+/// ```
 pub fn entity_metadata(entity: &EntityConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = entity_metadata_ident(&entity.id);

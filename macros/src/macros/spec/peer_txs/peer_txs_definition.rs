@@ -8,10 +8,10 @@ use crate::utils::{
 
 /// Generates a struct definition for peer event senders.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// #[derive(Debug)]
-/// pub struct BetaPeerEventSenders {
+/// pub struct BetaPeerTxs {
 ///     pub to_delta: operon::scheduler::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
 ///     pub to_epsilon: operon::scheduler::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
 /// }

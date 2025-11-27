@@ -4,7 +4,7 @@ use crate::utils::{job_enum_ident, operon_ident};
 
 /// Generates an implementation of the `JobEnum` trait for the `JobEnum` type.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// #[automatically_derived]
 /// impl operon::schema::JobEnum for JobEnum {}

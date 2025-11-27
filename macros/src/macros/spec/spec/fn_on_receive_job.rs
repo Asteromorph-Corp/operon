@@ -6,7 +6,7 @@ use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, variant_ide
 
 /// Generates the `on_receive_job` function for the implementation of the trait `JobSpec`.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// #[allow(unused_variables, clippy::match_single_binding)]
 /// async fn on_receive_job(
@@ -15,23 +15,19 @@ use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, variant_ide
 ///     job: schema::JobEnum,
 /// ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
 ///     match job {
-///         schema::JobEnum::Beta(job) => Ok(
-///             queries::raise_dep_epsilon(
-///                 client,
-///                 &operon::schema::OptionCoordinate::some(job.i),
-///                 &operon::schema::OptionCoordinate::none(),
-///             )
-///             .await?
-///         ),
-///         schema::JobEnum::Delta(job) => Ok(
-///             queries::raise_dep_epsilon(
-///                 client,
-///                 &operon::schema::OptionCoordinate::some(job.i),
-///                 &operon::schema::OptionCoordinate::some(job.k),
-///             )
-///             .await?
-///         ),
-///         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived("job", "epsilon")),
+///         schema::JobEnum::Beta(job) => Ok([client
+///             .ticket(self.job_meta())
+///             .raise_deps_done(metadata::job_beta_meta(), job, &["j"])
+///             .await?]
+///         .concat()),
+///         schema::JobEnum::Delta(job) => Ok([client
+///             .ticket(self.job_meta())
+///             .raise_deps_done(metadata::job_delta_meta(), job, &["j"])
+///             .await?]
+///         .concat()),
+///         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+///             "job", "epsilon",
+///         )),
 ///     }
 /// }
 /// ```

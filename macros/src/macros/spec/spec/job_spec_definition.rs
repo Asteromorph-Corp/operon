@@ -5,7 +5,7 @@ use crate::utils::spec_ident;
 
 /// Generates a struct definition for a job specification.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// #[derive(Debug, Clone, Copy)]
 /// pub struct BetaSpec;

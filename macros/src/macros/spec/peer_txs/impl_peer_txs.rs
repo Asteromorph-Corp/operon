@@ -8,7 +8,7 @@ use crate::utils::{
 
 /// Generates an implementation of `PeerEventSenders` for a job's peer event senders.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// #[operon::async_trait::async_trait]
 /// #[automatically_derived]
@@ -17,12 +17,12 @@ use crate::utils::{
 ///         mut senders: operon::scheduler::PeerEventSenderMap<schema::JobEnum, schema::ResolutionEnum>,
 ///     ) -> Self {
 ///         BetaPeerTxs {
-///             to_delta: senders.remove("delta").unwrap_or_else(|| {
-///                 panic!("No sender for job `{}` found", "delta")
-///             }),
-///             to_epsilon: senders.remove("epsilon").unwrap_or_else(|| {
-///                 panic!("No sender for job `{}` found", "epsilon")
-///             }),
+///             to_delta: senders
+///                 .remove(metadata::DELTA_ID)
+///                 .unwrap_or_else(|| panic!("No sender for job `{}` found", metadata::DELTA_ID)),
+///             to_epsilon: senders
+///                 .remove(metadata::EPSILON_ID)
+///                 .unwrap_or_else(|| panic!("No sender for job `{}` found", metadata::EPSILON_ID)),
 ///         }
 ///     }
 ///

@@ -6,7 +6,7 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, variant_id
 
 /// Generates the `send_on_finish` function for the implementation of the trait `JobSpec`.
 ///
-/// Example:
+/// # Example
 /// ```rust,ignore
 /// async fn send_on_finish(
 ///     &self,
@@ -16,7 +16,9 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, variant_id
 /// ) -> Result<(), operon::scheduler::SchedulerError> {
 ///     match peer_txs
 ///         .to_delta
-///         .send(operon::scheduler::PeerEvent::Resolution(resolution.into()))
+///         .send(operon::scheduler::PeerEvent::Resolution(
+///             schema::ResolutionEnum::J(resolution),
+///         ))
 ///         .await
 ///     {
 ///         Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
@@ -30,23 +32,27 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, variant_id
 ///     // out-dependencies (delta, epsilon)
 ///     match peer_txs
 ///         .to_delta
-///         .send(operon::scheduler::PeerEvent::Job(job.into()))
+///         .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+///             job,
+///         )))
 ///         .await
 ///     {
 ///         Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {job:?}"),
-///         Err(_) => operon::log::trace!(
-///             "`delta`'s peer channel closed before handling `beta`'s {job:?}"
-///         ),
+///         Err(_) => {
+///             operon::log::trace!("`delta`'s peer channel closed before handling `beta`'s {job:?}")
+///         }
 ///     }
 ///     match peer_txs
 ///         .to_epsilon
-///         .send(operon::scheduler::PeerEvent::Job(job.into()))
+///         .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+///             job,
+///         )))
 ///         .await
 ///     {
 ///         Ok(_) => operon::log::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
-///         Err(_) => operon::log::trace!(
-///             "`epsilon`'s peer channel closed before handling `beta`'s {job:?}"
-///         ),
+///         Err(_) => {
+///             operon::log::trace!("`epsilon`'s peer channel closed before handling `beta`'s {job:?}")
+///         }
 ///     }
 ///     Ok(())
 /// }
