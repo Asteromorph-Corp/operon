@@ -1,4 +1,4 @@
-# define_operon!
+# The define_operon! macro
 
 `define_operon!` — declare a workflow pipeline with DAG-based task execution
 
@@ -55,7 +55,7 @@ The `pipeline_name` must be a valid Rust identifier in `snake_case`. This name i
 
 Each task declaration specifies the transformation from input entities to output entities:
 
-```
+```text
 OutputEntity = task_function ( InputEntity [, ...] ) for [ ( concurrency ) ] dimensional_context;
 ```
 
@@ -149,7 +149,8 @@ Note that input entities **can** be aggregated by the context. When a slice list
 
 ```rust
 operon::define_operon! {
-    text_processor = |Document<doc_id>| {
+    text_processor = {
+        Document<doc_id> = fetch_documents();
         Sentence<sentence_id> = extract_sentences(Document) for doc_id;
         Word<word_id> = tokenize(Sentence) for doc_id, sentence_id;
         Token = analyze(Word) for doc_id, sentence_id, word_id;
@@ -167,7 +168,8 @@ This creates a pipeline where:
 
 ```rust
 operon::define_operon! {
-    data_aggregator = |RawData<batch_id>| {
+    data_aggregator = {
+        RawData<batch_id> = fetch_raw_data();
         ProcessedData<item_id> = process(RawData) for batch_id;
         Summary = aggregate(ProcessedData<item_id>) for batch_id;
     }
@@ -180,7 +182,8 @@ The `aggregate` task consumes all `ProcessedData` entities across the `item_id` 
 
 ```rust
 operon::define_operon! {
-    ml_pipeline = |Dataset<dataset_id>| {
+    ml_pipeline = {
+        Dataset<dataset_id> = load_datasets();
         TrainSplit<fold_id> = create_folds(Dataset) for dataset_id;
         TestSplit<sample_id> = create_test_split(Dataset) for dataset_id;
         Model = train_model(TrainSplit<fold_id>) for dataset_id;
@@ -200,7 +203,8 @@ This demonstrates:
 
 ```rust
 operon::define_operon! {
-    cooking = |A<i>| {
+    cooking = {
+        A<i> = alpha();
         B<j> = beta(A) for(8) i;
         C<k> = gamma(A) for(8) i;
         D    = delta(A, B<j>, C) for(4) i, j, k;
@@ -250,13 +254,22 @@ The `{PipelineName}Storage` trait provides entity persistence methods:
 ```rust
 #[async_trait::async_trait]
 pub trait ExampleStorage: OperonStorage {
-    async fn get_output_entity(&self, dim1: usize, dim2: usize, ...) -> Result<Option<OutputEntity>, Self::Error>;
-    async fn put_output_entity(&self, dim1: usize, dim2: usize, ... , entity: OutputEntity) -> Result<(), Self::Error>;
+    async fn get_output_entity(&self, coordinate: [usize; N]) -> Result<Option<OutputEntity>, Self::Error>;
+    async fn put_output_entity(&self, entity: operon::schema::Entity<N, OutputEntity>) -> Result<(), Self::Error>;
     // ... methods for each entity type
 }
 ```
 
-Dimension parameters are passed in the canonical order.
+where `N` is a constant representing the total number of dimensions in the pipeline and `operon::schema::Entity<N, T>` is defined as the following:
+
+```rust
+pub struct Entity<const N: usize, T> {
+    pub coordinate: [usize; N],
+    pub value: T,
+}
+```
+
+Coordinate parameters are passed in the canonical order of dimensions.
 
 The `Psql{PipelineName}Storage` struct implementing the `{PipelineName}Storage` using the PostgreSQL backend will also be generated, serving as the default storage.
 
@@ -299,7 +312,7 @@ The `define_operon!` macro performs validations at macro expansion time, especia
 The macro validates case conventions for identifiers and generates items using standardized casing:
 
 - Pipelines: `snake_case` (e.g., `text_processor`)
-- Entities: `PascalCase  (e.g., `Document`, `Token`)
+- Entities: `PascalCase` (e.g., `Document`, `Token`)
 - Tasks (functions): `snake_case` (e.g., `extract_sentences`)
 - Dimensions: `snake_case` (e.g., `doc_id`, `word_id`)
 
@@ -350,4 +363,4 @@ operon.run(my_pipeline_handler()).await?;
 
 ## Limitations
 
-- Two or more dimensions cannot be spawned by a single task
+- Two or more dimensions cannot be spawned by a single task.
