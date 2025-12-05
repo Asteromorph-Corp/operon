@@ -9,7 +9,7 @@
 // `POSTGRES_URI=<database_uri> cargo run --release`
 //
 // This example is meant to be run as a binary,
-// and was tested with Rust 1.90.0-nightly and PostgreSQL 17.5.
+// and was tested with Rust 1.91.1 and PostgreSQL 16+.
 
 use std::sync::Arc;
 
@@ -144,26 +144,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_log_buffer_size(16384) // How many log messages should the UI remember?
         .with_log_level(operon::log::Level::Info) // What should be the minimum log level to show in the UI?
         .with_log_dump(Some("./logs".to_string())); // Optionally, which directory should all logs be dumped to?
-
-    // //# —————————————————————— Initializing Data —————————————————————— #//
-    // // It is good practice to initialize the storage before touching the data.
-    // // NOTE THAT if there is a predefined table in the database
-    // // that matches the name but not the exact dimensions defined in the macro,
-    // // the initialization will not overwrite it, resulting in an error.
-    // // This happens when you shift around the definitions in the macro
-    // // after you had already run the pipeline once or more.
-    // // In this case, you might want to drop the related tables manually
-    // // (i.e., run `DROP SCHEMA ex1_data CASCADE;` in the database),
-    // // or point to a different, fresh schema in `StorageOptions`.
-    // storage.init().await?;
-
-    // // The primary entities (`Input`s in this case) MUST be in the storage before running Operon.
-    // // It is possible to prepare the data externally
-    // // as long as the storage is persistent and the data is in the expected format,
-    // // but if unsure, we recommend using the built-in `put_*` methods as shown below.
-    // storage.put_input(0, "Hello World".to_string()).await?;
-    // storage.put_input(1, "Hello Operon".to_string()).await?;
-    // storage.put_input(2, "".to_string()).await?;
 
     //# ———————————————————————— Running Operon ——————————————————————— #//
     // Now we finally run Operon.

@@ -1,5 +1,7 @@
 # Operon
 
+[![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](arxiv.org/abs/2511.16080)
+
 A Rust-native workflow engine designed for parallel, incremental scheduling of [DAG-defined](#running-dag-defined-tasks) [multiplex](#multiplexing) tasks.
 Powered by a PostgreSQL-based transactional backend, Operon specializes in orchestrating complex and long-running workflows with minimal downtime, flexible recovery, and high parallelism.
 
@@ -36,9 +38,9 @@ You can find more examples in the [examples](examples/) directory of this reposi
 
 You will need the following to run Operon:
 
-- [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.88+)
+- [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.91+)
 - A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
-    - A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
+  - A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
 
 We also recommend having [`tokio`](https://crates.io/crates/tokio) in your `Cargo.toml` dependencies.
 
@@ -71,7 +73,7 @@ This DAG's validity is checked at macro-expansion time.
 Tasks in Operon are _multiplex_, meaning that one task may produce multiple entities of the same type (as a Rust `Vec`).
 From another perspective, allowing multiplexing means that a task of a single type may be run multiple times, each using different input entities.
 In this sense, a single node in the DAG represents a unique task _type_ that can be run repeatedly, where the number of individual tasks of that type cannot be known until upstream tasks produce the necessary entities.
-Due to this, the number of tasks are quantified using an abstraction called [_named dimensions_](docs/dimension_system.md) instead of a simple count.
+Due to this, the number of tasks are quantified using an abstraction called _named dimensions_ instead of a simple count.
 
 ### Incremental Scheduling
 
@@ -180,7 +182,8 @@ The following is an example of a pipeline definition using the `define_operon!` 
 // In examples/ex1/src/main.rs:
 
 operon::define_operon! {
-    splitter = |Input<input_no>| {
+    splitter = {
+        Input = get_inputs();
         Intermediate<word_no> = get_words(Input) for input_no;
         Output<char_no> = get_chars(Intermediate) for input_no, word_no;
     }
@@ -204,20 +207,20 @@ The pipeline must follow a few rules that are enforced at macro-expansion time:
 - Each task takes a list of "arguments" or "inputs" that must be entities that were defined earlier in the pipeline.
   Each task input must be either a single entity (`EntityType`) or a slice across dimensions (`EntityType<dim1, dim2, ...>`).
 - Each task must return one of the following two options:
-    - A single entity, denoted `SpawnedEntityType`.
-    - A 1D vector of entities, denoted `SpawnedEntityType<spawned_dimension_name>`.
-      In this case, this task spawns a dimension that can be iterated over in subsequent tasks.
-- The dimension specifications must be "well-formed," as thoroughly described in the [dimension system documentation](docs/dimension_system.md).
-    - For illustration, take the list of `Intermediate`s as shown in [Figure 1](docs/figures/figure1.svg): `[["Good", "morning"], ["Bonjour"], ["Buenos", "días"]]`.
-    - Writing `Intermediate<word_no>` represents a vector/slice of `Intermediate` entities indexed by `word_no`, which we will have for each `input_no` "coordinate."
-      `["Good", "morning"]` or `["Bonjour"]` would be a valid example of such a vector.
-    - However, writing `Intermediate<input_no>` would not be feasible.
-      If we apply the same logic with above, we need a vector of `Intermediate` entities indexed by `input_no` "for each `word_no` coordinate."
-      When `word_no` is `0`, we would have `["Good", "Bonjour", "Buenos"]`, but when `word_no` is `1`, what would we have — `["morning", ???, "días"]`?
-      The range of `word_no` is unknown until the coordinate of `input_no` is fixed, so we cannot implicitly iterate over `word_no` while collapsing `input_no`.
+  - A single entity, denoted `SpawnedEntityType`.
+  - A 1D vector of entities, denoted `SpawnedEntityType<spawned_dimension_name>`.
+    In this case, this task spawns a dimension that can be iterated over in subsequent tasks.
+- The dimension specifications must be "well-formed," as thoroughly described in [our technical report](https://arxiv.org/abs/2511.16080).
+  - For illustration, take the list of `Intermediate`s as shown in [Figure 1](docs/figures/figure1.svg): `[["Good", "morning"], ["Bonjour"], ["Buenos", "días"]]`.
+  - Writing `Intermediate<word_no>` represents a vector/slice of `Intermediate` entities indexed by `word_no`, which we will have for each `input_no` "coordinate."
+  `["Good", "morning"]` or `["Bonjour"]` would be a valid example of such a vector.
+  - However, writing `Intermediate<input_no>` would not be feasible.
+  If we apply the same logic with above, we need a vector of `Intermediate` entities indexed by `input_no` "for each `word_no` coordinate."
+  When `word_no` is `0`, we would have `["Good", "Bonjour", "Buenos"]`, but when `word_no` is `1`, what would we have — `["morning", ???, "días"]`?
+  The range of `word_no` is unknown until the coordinate of `input_no` is fixed, so we cannot implicitly iterate over `word_no` while collapsing `input_no`.
 
 We provide brief diagnostics for violations of these rules.
-If you need further information, refer to the [`define_operon!` documentation](docs/define_operon_dsl.md) and the [dimension system documentation](docs/dimension_system.md) for more details on the system.
+If you need further information, refer to the [`define_operon!` documentation](docs/define_operon_dsl.md) and the [technical report](https://arxiv.org/abs/2511.16080) for more details on the system.
 
 ### Implementing the Service
 
@@ -236,6 +239,13 @@ impl OperonService for MySplitterService {
 }
 #[async_trait]
 impl SplitterService for MySplitterService {
+    async fn get_inputs(&self) -> Result<Vec<Input>, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(vec![
+            Input::from("Good morning"),
+            Input::from("Bonjour"),
+            Input::from("Buenos días"),
+        ])
+    }
     async fn get_words(
         &self,
         input: Input,
@@ -360,9 +370,8 @@ Commands:
 
 Operon is under active development. Planned features and improvements include:
 
-- Adding documentation for the dimension system.
 - Updating the UI to scale better with larger workflows.
-- Adding support for running the engine without a UI, potentially outside a binary-executable context.
+- Adding support for headless operation mode.
 - Implementing alternative backends for the entity storage and the metadata storage.
 
 Please reach out via [opening an issue](https://github.com/Asteromorph-Corp/operon/issues) if you have any suggestions or feature requests.
