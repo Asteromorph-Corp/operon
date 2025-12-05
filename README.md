@@ -1,6 +1,6 @@
 # Operon
 
-[![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](arxiv.org/abs/2511.16080)
+[![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](https://arxiv.org/abs/2511.16080)
 
 A Rust-native workflow engine designed for parallel, incremental scheduling of [DAG-defined](#running-dag-defined-tasks) [multiplex](#multiplexing) tasks.
 Powered by a PostgreSQL-based transactional backend, Operon specializes in orchestrating complex and long-running workflows with minimal downtime, flexible recovery, and high parallelism.
