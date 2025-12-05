@@ -183,7 +183,7 @@ The following is an example of a pipeline definition using the `define_operon!` 
 
 operon::define_operon! {
     splitter = {
-        Input = get_inputs();
+        Input<input_no> = get_inputs();
         Intermediate<word_no> = get_words(Input) for input_no;
         Output<char_no> = get_chars(Intermediate) for input_no, word_no;
     }
