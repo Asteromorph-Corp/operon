@@ -1,8 +1,9 @@
 use indexmap::IndexSet;
+use quote::format_ident;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, variant_ident};
+use crate::utils::{as_lit_str, job_enum_ident, job_metadata_ident, operon_ident, variant_ident};
 
 /// Generates the `on_receive_job` function for the implementation of the trait `JobSpec`.
 ///
@@ -41,13 +42,16 @@ pub(super) fn fn_on_receive_job(
 
     let job_arms = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
         let upstream_job_meta = job_metadata_ident(&upstream_job.id);
-        let variant_ident = variant_ident(&upstream_job.id);
+        let variant_ident = variant_ident(&format_ident!("{}", upstream_job.id));
         let affected_args = job.from.iter().filter(|arg| arg.id == upstream_job.to);
 
         let raise_deps_done = affected_args.map(|arg| -> syn::Expr {
-            let aggregate_dims = &arg.over;
+            let aggregate_dims = arg.over.iter().map(as_lit_str);
             parse_quote! {
-                client.ticket(self.job_meta()).raise_deps_done(metadata::#upstream_job_meta(), job, &[#(#aggregate_dims),*]).await?
+                client
+                    .ticket(self.job_meta())
+                    .raise_deps_done(metadata::#upstream_job_meta(), job, &[#(#aggregate_dims),*])
+                    .await?
             }
         });
 

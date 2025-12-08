@@ -1,19 +1,21 @@
 use heck::ToSnakeCase;
 use indexmap::{IndexMap, IndexSet};
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::{
-    DimensionConfig, DimensionConfigMap, DimensionId, EntityConfig, EntityConfigMap, JobConfig,
+    DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobConfig,
 };
 use crate::utils::{
     batch_get_entity_ident, batch_put_entity_ident, dim_msg, dimension_metadata_ident,
     entity_over_dim_ident, get_entity_ident, job_fn_ident, operon_ident, put_entity_ident,
-    variable_ident,
 };
 
-fn resolution_map_ident(dim: &DimensionId) -> syn::Ident {
-    format_ident!("resolution_{}", dim.to_snake_case())
+fn resolution_map_ident(dim: &syn::Ident) -> syn::Ident {
+    syn::Ident::new(
+        &format!("resolution_{}", dim.to_string().to_snake_case()),
+        dim.span(),
+    )
 }
 
 struct ResolutionIndexEntry<'a> {
@@ -23,7 +25,7 @@ struct ResolutionIndexEntry<'a> {
     /// Note that this is a subset of, but not identical to `config.depends_on`,
     /// as dimensions not included here are already part of the job dimensions
     /// so we need to only fetch the resolution for the specific value of that dimension.
-    fetched_over: Vec<&'a DimensionId>,
+    fetched_over: Vec<&'a syn::Ident>,
 }
 
 /// Builds an index map that contains the resolution entries which needs to be fetched from a
@@ -33,9 +35,9 @@ struct ResolutionIndexEntry<'a> {
 /// configuration and the dependencies that need to be collected over.
 fn build_resolution_index<'a>(
     job: &'a JobConfig,
-    job_dim_set: &'a IndexSet<&'a DimensionId>,
+    job_dim_set: &'a IndexSet<&'a syn::Ident>,
     dimensions: &'a DimensionConfigMap,
-) -> IndexMap<&'a DimensionId, ResolutionIndexEntry<'a>> {
+) -> IndexMap<&'a syn::Ident, ResolutionIndexEntry<'a>> {
     job.from
         .iter()
         .flat_map(|arg| {
@@ -66,19 +68,17 @@ fn build_resolution_index<'a>(
 
 /// Generates the code that fetches and inserts the resolution entries into the resolution map.
 fn resolution_inserts(
-    resolution_index: &IndexMap<&DimensionId, ResolutionIndexEntry>,
+    resolution_index: &IndexMap<&syn::Ident, ResolutionIndexEntry>,
 ) -> impl Iterator<Item = proc_macro2::TokenStream> {
     resolution_index.iter().map(|(&dim, entry)| {
         let operon = operon_ident();
         let dim_meta = dimension_metadata_ident(dim);
         let res_map = resolution_map_ident(dim);
 
-        let get_args = entry
+        let get_args = &entry
             .config
-            .depends_on
-            .iter()
-            .map(|d| variable_ident(d));
-        let dep_vars = entry.fetched_over.iter().map(|dep| variable_ident(dep));
+            .depends_on;
+        let dep_vars = &entry.fetched_over;
 
         let dim_msgs = entry.config.depends_on.iter().map(dim_msg).collect::<Vec<_>>();
         let not_found_msg = format!("{} ({})", dim, dim_msgs.join(", "));
@@ -93,19 +93,14 @@ fn resolution_inserts(
                 #res_map.insert([#(#dep_vars),*], resolution.ub);
             },
             |acc, dep| {
-                let dep_var = variable_ident(dep);
+                let Some(dep_config) = resolution_index.get(dep) else {
+                    panic!("Dimension `{dep}` not found in resolution index");
+                };
                 let dep_res_map = resolution_map_ident(dep);
-                let dep_ub_key = resolution_index
-                    .get(dep)
-                    .unwrap_or_else(|| {
-                        panic!("Dimension `{dep}` not found in resolution index");
-                    })
-                    .fetched_over
-                    .iter()
-                    .map(|d| variable_ident(d));
+                let dep_ub_key = &dep_config.fetched_over;
 
                 quote! {
-                    for #dep_var in 0..(*#dep_res_map.get(&[#(#dep_ub_key),*]).unwrap_or(&0)) { // TODO: Remove unwrap
+                    for #dep in 0..(*#dep_res_map.get(&[#(#dep_ub_key),*]).unwrap_or(&0)) { // TODO: Remove unwrap
                         #acc
                     }
                 }
@@ -122,11 +117,7 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
 
     // All arg dimension are passed to the get function
     // These dimensions are expected to be present in the job struct
-    let get_args = arg_entity
-        .dims
-        .iter()
-        .map(|d| variable_ident(d))
-        .collect::<Vec<_>>();
+    let get_args = &arg_entity.dims;
 
     let dim_msgs = arg_entity.dims.iter().map(dim_msg).collect::<Vec<_>>();
     let not_found_msg = format!("{} ({})", arg_entity.id, dim_msgs.join(", "));
@@ -144,9 +135,9 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
 /// Generates the code for defining a collected argument entity in the `run_job` function.
 fn arg_def_collected(
     arg_entity: &EntityConfig,
-    over: &[DimensionId],
-    resolution_index: &IndexMap<&DimensionId, ResolutionIndexEntry>,
-    job_dim_set: &IndexSet<&DimensionId>,
+    over: &[syn::Ident],
+    resolution_index: &IndexMap<&syn::Ident, ResolutionIndexEntry>,
+    job_dim_set: &IndexSet<&syn::Ident>,
 ) -> syn::Stmt {
     let operon = operon_ident();
     let arg_ident = entity_over_dim_ident(&arg_entity.id, over);
@@ -158,7 +149,6 @@ fn arg_def_collected(
         .dims
         .iter()
         .filter(|d| !over.contains(d))
-        .map(|d| variable_ident(d))
         .collect::<Vec<_>>();
 
     let check_ub = over
@@ -171,14 +161,12 @@ fn arg_def_collected(
                 quote! { { #acc } }
             };
 
-            let dep_var = variable_ident(dim);
             let res_map_ident = resolution_map_ident(dim);
             let res_map_key = resolution_index
                 .get(dim)
                 .expect("Dimension not found in resolution index")
                 .fetched_over
-                .iter()
-                .map(|d| variable_ident(d));
+                .iter();
 
             let mut cnt = 0;
             let dim_msgs = arg_entity
@@ -215,7 +203,7 @@ fn arg_def_collected(
                 elem.into_iter()
                     .take(*ub)
                     .enumerate()
-                    .map(|(#dep_var, elem)| #acc)
+                    .map(|(#dim, elem)| #acc)
                     .collect::<Result<Vec<_>, #operon::scheduler::SchedulerError>>()
             }
         });
@@ -270,10 +258,10 @@ pub(super) fn fn_run_job(
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
 
-    let job_dim_set: IndexSet<&DimensionId> = job.dims.iter().collect();
+    let job_dim_set: IndexSet<&syn::Ident> = job.dims.iter().collect();
     let resolution_index = build_resolution_index(job, &job_dim_set, dimensions);
 
-    let job_coord_vars = job_dim_set.iter().map(|d| variable_ident(d));
+    let job_coord_vars = job_dim_set.iter();
     let resolution_defs = resolution_index.iter().map(|(dim, entry)| -> syn::Stmt {
         let res_map_var = resolution_map_ident(dim);
         let n = entry.fetched_over.len();

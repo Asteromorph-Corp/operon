@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::EntityConfig;
 use crate::operon_ident;
-use crate::utils::{entity_ident, entity_metadata_ident};
+use crate::utils::{as_lit_str, entity_ident, entity_metadata_ident};
 
 /// Generates a metadata function for an entity.
 ///
@@ -23,7 +23,7 @@ pub fn entity_metadata(entity: &EntityConfig) -> syn::ItemFn {
 
     let n = entity.dims.len();
     let id = &entity.id;
-    let dims = &entity.dims;
+    let dims = entity.dims.iter().map(as_lit_str);
 
     parse_quote! {
         pub const fn #fn_name() -> #operon::schema::EntityMetadata<#n, #t> {

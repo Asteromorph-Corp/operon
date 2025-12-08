@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::hash::RandomState;
 
 use heck::{ToPascalCase, ToSnakeCase};
 use indexmap::IndexMap;
@@ -11,10 +10,13 @@ use crate::configs::{
     JobConfig, JobConfigMap,
 };
 
-fn validate_downwards_closed(dims: &[String], configs: &DimensionConfigMap) -> Result<(), String> {
-    let dims_set: HashSet<_, RandomState> = HashSet::from_iter(dims.iter());
-    for dim in dims {
-        let Some(config) = configs.get(dim) else {
+fn validate_downwards_closed<'a>(
+    dims: impl IntoIterator<Item = &'a syn::Ident>,
+    configs: &DimensionConfigMap,
+) -> Result<(), String> {
+    let dims_set: HashSet<&syn::Ident> = HashSet::from_iter(dims);
+    for dim in &dims_set {
+        let Some(config) = configs.get(*dim) else {
             return Err(format!("Dimension '{dim}' is not defined"));
         };
         for dep in &config.depends_on {
@@ -61,7 +63,7 @@ impl Parse for AllConfig {
             }
             // Constraint 2: Spawned dimension must not conflict with existing dimensions
             if let Some(new_dim) = new_entity.dims.first()
-                && dimensions.contains_key(&new_dim.to_string())
+                && dimensions.contains_key(new_dim)
             {
                 return Err(syn::Error::new(
                     new_entity._span,
@@ -87,41 +89,31 @@ impl Parse for AllConfig {
                 };
                 // Constraint 4b–d. Let A = arg_entity_config.dims, B = arg_entity.dims, C =
                 // job.dims. Use HashSet for set operations.
-                let a_set: HashSet<String, RandomState> =
-                    HashSet::from_iter(arg_entity_config.dims.iter().cloned());
-                let b_set: HashSet<String, RandomState> = HashSet::from_iter(
-                    arg_entity
-                        .dims
-                        .iter()
-                        .map(|d| d.to_string().to_snake_case()),
-                );
+                let a_set: HashSet<&syn::Ident> = HashSet::from_iter(&arg_entity_config.dims);
+                let b_set: HashSet<&syn::Ident> = HashSet::from_iter(&arg_entity.dims);
                 // Constraint 4b: B ⊆ A.
                 for dim in &arg_entity.dims {
-                    if !a_set.contains(&dim.to_string().to_snake_case()) {
+                    if !a_set.contains(dim) {
                         return Err(syn::Error::new(
                             dim.span(),
                             format!("Dimension '{dim}' is not part of entity '{arg_entity_id}'"),
                         ));
                     }
                 }
+
                 // Constraint 4d: A \ B must be downwards closed.
-                if let Err(err) = validate_downwards_closed(
-                    &a_set
-                        .difference(&b_set)
-                        .map(|d| d.to_string())
-                        .collect::<Vec<_>>(),
-                    &dimensions,
-                ) {
+                if let Err(err) =
+                    validate_downwards_closed(a_set.difference(&b_set).cloned(), &dimensions)
+                {
                     return Err(syn::Error::new(arg_entity._span, err));
                 }
             }
             // Constraint 5: Dimensions must be predefined and downwards closed.
             for dim in &dims {
-                let dim_id = dim.to_string().to_snake_case();
-                if !dimensions.contains_key(&dim_id) {
+                if !dimensions.contains_key(dim) {
                     return Err(syn::Error::new(
                         dim.span(),
-                        format!("Dimension '{dim_id}' is not defined"),
+                        format!("Dimension '{dim}' is not defined"),
                     ));
                 }
             }
@@ -137,21 +129,18 @@ impl Parse for AllConfig {
                             format!("Undefined entity '{arg_id}'"),
                         ));
                     };
-                    let a_set: HashSet<String> =
-                        HashSet::from_iter(arg_config.dims.iter().cloned());
-                    let b_set: HashSet<String> =
-                        HashSet::from_iter(arg.dims.iter().map(|d| d.to_string().to_snake_case()));
-
+                    let a_set: HashSet<&syn::Ident> = HashSet::from_iter(&arg_config.dims);
+                    let b_set: HashSet<&syn::Ident> = HashSet::from_iter(&arg.dims);
                     Ok(a_set.difference(&b_set).cloned().collect::<Vec<_>>())
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .flatten()
                 .collect::<HashSet<_>>();
-            let job_dims = HashSet::from_iter(dims.iter().map(|d| d.to_string().to_snake_case()));
+            let job_dims: HashSet<&syn::Ident> = HashSet::from_iter(&dims);
 
             if job_dims != bigcup {
-                let expected = bigcup.iter().map(String::as_str).collect::<Vec<_>>();
+                let expected = bigcup.iter().map(|d| d.to_string()).collect::<Vec<_>>();
                 let err_msg = if expected.is_empty() {
                     "No dimensions expected".to_string()
                 } else {
@@ -160,13 +149,7 @@ impl Parse for AllConfig {
                 return Err(syn::Error::new(job._span, err_msg));
             }
 
-            if let Err(err) = validate_downwards_closed(
-                &dims
-                    .iter()
-                    .map(|d| d.to_string().to_snake_case())
-                    .collect::<Vec<_>>(),
-                &dimensions,
-            ) {
+            if let Err(err) = validate_downwards_closed(&dims, &dimensions) {
                 return Err(syn::Error::new(job._span, err));
             }
 
@@ -175,7 +158,7 @@ impl Parse for AllConfig {
             let new_entity_dims = dims
                 .iter()
                 .chain(new_entity.dims.iter())
-                .map(|d| d.to_string().to_snake_case())
+                .cloned()
                 .collect::<Vec<_>>();
             let new_entity_config = EntityConfig {
                 id: new_entity_id.clone(),
@@ -183,15 +166,11 @@ impl Parse for AllConfig {
             };
             entities.insert(new_entity_id.clone(), new_entity_config);
             if let Some(dim) = new_entity.dims.first() {
-                let new_dim_id = dim.to_string().to_snake_case();
                 let new_dim_config = DimensionConfig {
-                    id: new_dim_id.clone(),
-                    depends_on: dims
-                        .iter()
-                        .map(|d| d.to_string().to_snake_case())
-                        .collect::<Vec<_>>(),
+                    id: dim.clone(),
+                    depends_on: dims.iter().cloned().collect::<Vec<_>>(),
                 };
-                dimensions.insert(new_dim_id, new_dim_config);
+                dimensions.insert(dim.clone(), new_dim_config);
             }
             let job_config = JobConfig {
                 id: job_id.clone(),
@@ -199,22 +178,12 @@ impl Parse for AllConfig {
                     .iter()
                     .map(|e| JobArg {
                         id: e.id.to_string().to_pascal_case(),
-                        over: e
-                            .dims
-                            .iter()
-                            .map(|d| d.to_string().to_snake_case())
-                            .collect::<Vec<_>>(),
+                        over: e.dims.clone(),
                     })
                     .collect::<Vec<_>>(),
                 to: new_entity_id,
-                dims: dims
-                    .iter()
-                    .map(|d| d.to_string().to_snake_case())
-                    .collect::<Vec<_>>(),
-                spawn_dim: new_entity
-                    .dims
-                    .first()
-                    .map(|d| d.to_string().to_snake_case()),
+                dims: dims.clone(),
+                spawn_dim: new_entity.dims.first().cloned(),
                 pool_size: pool,
             };
             jobs.insert(job_id, job_config);

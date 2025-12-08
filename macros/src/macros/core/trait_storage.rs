@@ -4,7 +4,7 @@ use syn::parse_quote;
 use crate::configs::{AllConfig, EntityConfigMap, JobConfigMap};
 use crate::utils::{
     batch_get_entity_ident, batch_put_entity_ident, entity_ident, get_entity_ident, operon_ident,
-    put_entity_ident, storage_trait_ident, variable_ident,
+    put_entity_ident, storage_trait_ident,
 };
 
 /// A helper function to generate single operation functions for each entity.
@@ -89,11 +89,9 @@ fn batch_gets(
             .dims
             .iter()
             .filter(|d| !arg.over.contains(d))
-            .map(|d| variable_ident(d))
             .collect::<Vec<_>>();
 
-        let get_args = arg_config.dims.iter().map(|d| variable_ident(d));
-
+        let get_args = &arg_config.dims;
         let n = args.len();
 
         let body = arg.over.iter().enumerate().rfold(
@@ -102,15 +100,14 @@ fn batch_gets(
             },
             |acc, (i, over)| {
                 let results_ident = format_ident!("results_{i}");
-                let over_var = variable_ident(over);
 
                 quote! {
                     {
                         let mut #results_ident = Vec::new();
-                        let mut #over_var = 0usize;
+                        let mut #over = 0usize;
                         while let Some(value) = #acc {
                             #results_ident.push(value);
-                            #over_var += 1;
+                            #over += 1;
                         }
                         (!#results_ident.is_empty()).then_some(#results_ident)
                     }
@@ -153,8 +150,7 @@ fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> 
 
         let batch_put_fn_name = batch_put_entity_ident(&job.to);
         let put_fn_name = put_entity_ident(&job.to);
-        let coord_vars = job.dims.iter().map(|d| variable_ident(d)).collect::<Vec<_>>();
-        let spawn_dim_var = variable_ident(spawn_dim);
+        let coord_vars = &job.dims;
 
         let n = job.dims.len();
         let t = entity_ident(&job.to);
@@ -163,9 +159,9 @@ fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> 
             async fn #batch_put_fn_name(&self, entity: #operon::schema::Entity<#n, Vec<#t>>) -> Result<(), #operon::storage::StorageError> {
                 let [#(#coord_vars),*] = entity.coordinate;
 
-                for (#spawn_dim_var, value) in entity.value.into_iter().enumerate() {
+                for (#spawn_dim, value) in entity.value.into_iter().enumerate() {
                     let entity_single = #operon::schema::Entity {
-                        coordinate: [#(#coord_vars,)* #spawn_dim_var],
+                        coordinate: [#(#coord_vars,)* #spawn_dim],
                         value,
                     };
                     self.#put_fn_name(entity_single).await?;

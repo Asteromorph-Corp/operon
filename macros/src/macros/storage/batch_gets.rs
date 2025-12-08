@@ -2,7 +2,9 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::{EntityConfigMap, JobConfigMap};
-use crate::utils::{batch_get_entity_ident, entity_ident, operon_ident, variable_ident};
+use crate::utils::{
+    as_lit_str, batch_get_entity_ident, entity_ident, operon_ident, variable_ident,
+};
 
 /// Generates the batch get function for the implementation of the storage trait.
 ///
@@ -54,13 +56,11 @@ pub fn batch_gets(
         );
 
         let arg_dims = arg_config.dims.iter().filter(|d| !arg.over.contains(d)).collect::<Vec<_>>();
-        let args = arg_dims.iter().map(|d| variable_ident(d)).collect::<Vec<_>>();
-        let over_dims = &arg.over;
+        let over_dims = arg.over.iter().map(as_lit_str);
 
-        let n = args.len();
+        let n = arg_dims.len();
 
         let insert_results = arg.over.iter().enumerate().map(|(i, d)| {
-            let dim_var = variable_ident(d);
             let i_plus_1 = i + 1;
 
             if i_plus_1 == arg.over.len() {
@@ -69,22 +69,22 @@ pub fn batch_gets(
                 }
             } else {
                 quote! {
-                    let #dim_var = usize::try_from(row.get::<_, i64>(#i_plus_1))?; // TODO: Handle None case
-                    while result.len() <= #dim_var {
+                    let #d = usize::try_from(row.get::<_, i64>(#i_plus_1))?; // TODO: Handle None case
+                    while result.len() <= #d {
                         result.push(Default::default());
                     }
-                    let mut result = &mut result[#dim_var];
+                    let mut result = &mut result[#d];
                 }
             }
         });
 
         parse_quote! {
-            async fn #batch_get_fn_name(&self, [#(#args),*]: [usize; #n]) -> Result<#return_ty, #operon::storage::StorageError> {
+            async fn #batch_get_fn_name(&self, [#(#arg_dims),*]: [usize; #n]) -> Result<#return_ty, #operon::storage::StorageError> {
                 let entities = self
                     .conn()
                     .await?
                     .entity(self.entities_meta.#id)
-                    .batch_get([#(#args),*], [#(#over_dims),*])
+                    .batch_get([#(#arg_dims),*], [#(#over_dims),*])
                     .await?;
 
                 let mut result: #return_ty = Default::default();

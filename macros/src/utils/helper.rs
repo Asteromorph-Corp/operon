@@ -1,5 +1,3 @@
-use crate::configs::DimensionId;
-
-pub fn dim_msg(dim: &DimensionId) -> String {
+pub fn dim_msg(dim: &syn::Ident) -> String {
     format!("{dim} = {{{dim}}}")
 }

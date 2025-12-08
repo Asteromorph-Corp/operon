@@ -1,13 +1,13 @@
 use indexmap::IndexMap;
 
-use crate::configs::{DimensionId, EntityId};
+use crate::configs::EntityId;
 
 pub type JobId = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JobArg {
     pub id: EntityId,
-    pub over: Vec<DimensionId>,
+    pub over: Vec<syn::Ident>,
 }
 
 /// An Operon job, which defines a transformation from one entity to another.
@@ -20,9 +20,9 @@ pub struct JobConfig {
     /// Entities this job produces.
     pub to: EntityId,
     /// Dimensions this job repeat on.
-    pub dims: Vec<DimensionId>,
+    pub dims: Vec<syn::Ident>,
     /// Dimension this job spawns.
-    pub spawn_dim: Option<DimensionId>,
+    pub spawn_dim: Option<syn::Ident>,
     /// The pool size for this job.
     pub pool_size: usize,
 }

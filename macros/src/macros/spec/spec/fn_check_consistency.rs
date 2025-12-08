@@ -2,7 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{get_entity_ident, operon_ident, variable_ident};
+use crate::utils::{get_entity_ident, operon_ident};
 
 /// Generates the `check_consistency` function for the implementation of the trait `JobSpec`.
 ///
@@ -40,11 +40,7 @@ use crate::utils::{get_entity_ident, operon_ident, variable_ident};
 pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
 
-    let field_vars = job
-        .dims
-        .iter()
-        .map(|d| variable_ident(d))
-        .collect::<Vec<_>>();
+    let field_vars = &job.dims;
     let get_fn_name = get_entity_ident(&job.to);
 
     let corrupt_msg = format!(
@@ -54,12 +50,11 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
     let missing_entity_msg = format!("Data storage does not hold `{}_{{:?}}`.", job.to);
 
     let check_res_and_entity = match job.spawn_dim.as_ref() {
-        Some(dim) => {
+        Some(spawn_dim) => {
             // let res_ident = resolution_ident(dim);
-            let dim_var = variable_ident(dim);
             let missing_res_msg = format!(
                 "No `{}` resolution found for `{}_{{:?}}` in the metadata storage.",
-                dim, job.id,
+                spawn_dim, job.id,
             );
 
             quote! {
@@ -70,13 +65,13 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
                         #operon::log::info!(#missing_res_msg, job.coordinate);
                         return Ok(false);
                     };
-                    for #dim_var in 0..(res.ub) {
-                        tags.push((job.coordinate, #dim_var));
+                    for #spawn_dim in 0..(res.ub) {
+                        tags.push((job.coordinate, #spawn_dim));
                     }
                 }
-                for ([#(#field_vars),*], #dim_var) in tags {
-                    if storage.#get_fn_name([#(#field_vars,)* #dim_var]).await?.is_none() {
-                        #operon::log::info!(#missing_entity_msg, [#(#field_vars,)* #dim_var]);
+                for ([#(#field_vars),*], #spawn_dim) in tags {
+                    if storage.#get_fn_name([#(#field_vars,)* #spawn_dim]).await?.is_none() {
+                        #operon::log::info!(#missing_entity_msg, [#(#field_vars,)* #spawn_dim]);
                         return Ok(false);
                     }
                 }

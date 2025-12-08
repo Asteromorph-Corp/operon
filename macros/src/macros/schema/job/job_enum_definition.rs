@@ -1,3 +1,4 @@
+use quote::format_ident;
 use syn::parse_quote;
 
 use crate::configs::JobConfigMap;
@@ -22,7 +23,8 @@ pub fn job_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
     let variants = jobs.values().map(|job| -> syn::Variant {
-        let variant_ident = variant_ident(&job.id);
+        // TODO: Fix this
+        let variant_ident = variant_ident(&format_ident!("{}", job.id));
         let n = job.dims.len();
         parse_quote! {
             #variant_ident(#operon::schema::Job<#n>)

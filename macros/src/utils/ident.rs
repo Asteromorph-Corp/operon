@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use proc_macro_crate::{FoundCrate, crate_name};
 use quote::format_ident;
 
-use crate::configs::{DimensionId, EntityId, JobId};
+use crate::configs::{EntityId, JobId};
 
 static CRATE_NAME: Lazy<Result<FoundCrate, proc_macro_crate::Error>> =
     Lazy::new(|| crate_name("operon"));
@@ -40,8 +40,12 @@ pub fn job_metadata_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("job_{}_meta", job_id.to_snake_case())
 }
 
-pub fn dimension_metadata_ident(dimension_id: &DimensionId) -> syn::Ident {
-    format_ident!("dimension_{}_meta", dimension_id.to_snake_case())
+pub fn dimension_metadata_ident(dimension_id: &syn::Ident) -> syn::Ident {
+    let name = format!(
+        "dimension_{}_meta",
+        dimension_id.to_string().to_snake_case()
+    );
+    syn::Ident::new(&name, dimension_id.span())
 }
 
 pub fn entity_metadata_ident(entity_id: &JobId) -> syn::Ident {
@@ -56,11 +60,13 @@ pub fn put_entity_ident(entity_id: &EntityId) -> syn::Ident {
     format_ident!("put_{}", entity_id.to_snake_case())
 }
 
-pub fn batch_get_entity_ident(entity_id: &EntityId, over: &[DimensionId]) -> syn::Ident {
+pub fn batch_get_entity_ident(entity_id: &EntityId, over: &[syn::Ident]) -> syn::Ident {
     format_ident!(
         "get_all_{}_over_{}",
         entity_id.to_snake_case(),
-        over.iter().map(|d| d.to_snake_case()).collect::<String>()
+        over.iter()
+            .map(|d| d.to_string().to_snake_case())
+            .collect::<String>()
     )
 }
 
@@ -72,18 +78,18 @@ pub fn job_fn_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}", job_id.to_snake_case())
 }
 
-pub fn entity_over_dim_ident(entity_id: &EntityId, over: &[DimensionId]) -> syn::Ident {
+pub fn entity_over_dim_ident(entity_id: &EntityId, over: &[syn::Ident]) -> syn::Ident {
     format_ident!(
         "{}{}",
         entity_id.to_snake_case(),
         over.iter()
-            .map(|d| format!("_{}", d.to_snake_case()))
+            .map(|d| format!("_{}", d.to_string().to_snake_case()))
             .collect::<String>()
     )
 }
 
-pub fn variant_ident(id: &str) -> syn::Ident {
-    format_ident!("{}", id.to_pascal_case())
+pub fn variant_ident(id: &syn::Ident) -> syn::Ident {
+    syn::Ident::new(&id.to_string().to_pascal_case(), id.span())
 }
 
 pub fn variable_ident(id: &str) -> syn::Ident {
@@ -120,4 +126,8 @@ pub fn job_enum_ident() -> syn::Ident {
 
 pub fn job_id_ident(job_id: &JobId) -> syn::Ident {
     format_ident!("{}_ID", job_id.to_shouty_snake_case())
+}
+
+pub fn as_lit_str(ident: &syn::Ident) -> syn::LitStr {
+    syn::LitStr::new(&ident.to_string(), ident.span())
 }
