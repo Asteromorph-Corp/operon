@@ -2,7 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{get_entity_ident, operon_ident};
+use crate::utils::{clear_span, get_entity_ident, operon_ident};
 
 /// Generates the `check_consistency` function for the implementation of the trait `JobSpec`.
 ///
@@ -40,7 +40,7 @@ use crate::utils::{get_entity_ident, operon_ident};
 pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
 
-    let field_vars = &job.dims;
+    let field_vars = job.dims.iter().map(clear_span).collect::<Vec<_>>();
     let get_fn_name = get_entity_ident(&job.to);
 
     let corrupt_msg = format!(
@@ -51,7 +51,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
 
     let check_res_and_entity = match job.spawn_dim.as_ref() {
         Some(spawn_dim) => {
-            // let res_ident = resolution_ident(dim);
+            let spawn_dim = clear_span(spawn_dim);
             let missing_res_msg = format!(
                 "No `{}` resolution found for `{}_{{:?}}` in the metadata storage.",
                 spawn_dim, job.id,

@@ -51,8 +51,8 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
     let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
 
     let resolution_expr: syn::Expr = match job.spawn_dim.as_ref() {
-        Some(dim) => {
-            let missing_resolution_msg = format!("No resolution found for {dim}_{{:?}}");
+        Some(spawn_dim) => {
+            let missing_resolution_msg = format!("No resolution found for {spawn_dim}_{{:?}}");
             parse_quote! {
                 client.resolution(self.spawn_dim_meta()).get(job.coordinate)
                     .await?

@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::{AllConfig, EntityConfigMap, JobConfigMap};
 use crate::utils::{
-    batch_get_entity_ident, batch_put_entity_ident, get_entity_ident, operon_ident,
+    batch_get_entity_ident, batch_put_entity_ident, clear_span, get_entity_ident, operon_ident,
     put_entity_ident, storage_trait_ident, to_type,
 };
 
@@ -83,6 +83,7 @@ fn batch_gets(
             .dims
             .iter()
             .filter(|d| !arg.over.contains(d))
+            .map(clear_span)
             .collect::<Vec<_>>();
         let return_ty: syn::Type = arg.over.iter().fold(
             to_type(&arg.id),
@@ -91,13 +92,14 @@ fn batch_gets(
         let n = args.len();
 
         let get_fn_name = get_entity_ident(&arg.id);
-        let get_args = &arg_config.dims;
+        let get_args = arg_config.dims.iter().map(clear_span);
 
         let body = arg.over.iter().enumerate().rfold(
             quote! {
                 self.#get_fn_name([#(#get_args),*]).await?
             },
             |acc, (i, over)| {
+                let over = clear_span(over);
                 let results_ident = format_ident!("results_{i}");
 
                 quote! {
@@ -150,8 +152,8 @@ fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> 
         let ty = to_type(&job.to);
 
         let put_fn_name = put_entity_ident(&job.to);
-        let coord_vars = &job.dims;
-        let spawn_dim = job.spawn_dim.as_ref()?;
+        let coord_vars = job.dims.iter().map(clear_span).collect::<Vec<_>>();
+        let spawn_dim = clear_span(job.spawn_dim.as_ref()?);
 
         Some(parse_quote! {
             async fn #fn_name(&self, entity: #operon::schema::Entity<#n, Vec<#ty>>) -> Result<(), #operon::storage::StorageError> {

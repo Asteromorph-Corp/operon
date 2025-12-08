@@ -2,7 +2,9 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::{EntityConfigMap, JobConfigMap};
-use crate::utils::{batch_get_entity_ident, operon_ident, to_lit_str, to_snake_case, to_type};
+use crate::utils::{
+    batch_get_entity_ident, clear_span, operon_ident, to_lit_str, to_snake_case, to_type,
+};
 
 /// Generates the batch get function for the implementation of the storage trait.
 ///
@@ -52,12 +54,13 @@ pub fn batch_gets(
             |acc, _| parse_quote! { Vec<#acc> },
         );
 
-        let arg_dims = arg_config.dims.iter().filter(|d| !arg.over.contains(d)).collect::<Vec<_>>();
+        let arg_dims = arg_config.dims.iter().filter(|d| !arg.over.contains(d)).map(clear_span).collect::<Vec<_>>();
         let over_dims = arg.over.iter().map(to_lit_str);
 
         let n = arg_dims.len();
 
-        let insert_results = arg.over.iter().enumerate().map(|(i, d)| {
+        let insert_results = arg.over.iter().enumerate().map(|(i, over)| {
+            let over = clear_span(over);
             let i_plus_1 = i + 1;
 
             if i_plus_1 == arg.over.len() {
@@ -66,11 +69,11 @@ pub fn batch_gets(
                 }
             } else {
                 quote! {
-                    let #d = usize::try_from(row.get::<_, i64>(#i_plus_1))?; // TODO: Handle None case
-                    while result.len() <= #d {
+                    let #over = usize::try_from(row.get::<_, i64>(#i_plus_1))?; // TODO: Handle None case
+                    while result.len() <= #over {
                         result.push(Default::default());
                     }
-                    let mut result = &mut result[#d];
+                    let mut result = &mut result[#over];
                 }
             }
         });

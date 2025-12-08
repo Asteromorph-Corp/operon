@@ -1,21 +1,18 @@
 use heck::ToSnakeCase;
 use indexmap::{IndexMap, IndexSet};
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::parse_quote;
 
 use crate::configs::{
     DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobConfig,
 };
 use crate::utils::{
-    batch_get_entity_ident, batch_put_entity_ident, dim_msg, dimension_metadata_ident,
+    batch_get_entity_ident, batch_put_entity_ident, clear_span, dim_msg, dimension_metadata_ident,
     entity_over_dim_ident, get_entity_ident, operon_ident, put_entity_ident,
 };
 
 fn resolution_map_ident(dim: &syn::Ident) -> syn::Ident {
-    syn::Ident::new(
-        &format!("resolution_{}", dim.to_string().to_snake_case()),
-        dim.span(),
-    )
+    format_ident!("resolution_{}", dim.to_string().to_snake_case())
 }
 
 struct ResolutionIndexEntry<'a> {
@@ -75,10 +72,12 @@ fn resolution_inserts(
         let dim_meta = dimension_metadata_ident(dim);
         let res_map = resolution_map_ident(dim);
 
-        let get_args = &entry
+        let get_args = entry
             .config
-            .depends_on;
-        let dep_vars = &entry.fetched_over;
+            .depends_on
+            .iter()
+            .map(clear_span);
+        let dep_vars = entry.fetched_over.iter().cloned().map(clear_span);
 
         let dim_msgs = entry.config.depends_on.iter().map(dim_msg).collect::<Vec<_>>();
         let not_found_msg = format!("{} ({})", dim, dim_msgs.join(", "));
@@ -97,7 +96,8 @@ fn resolution_inserts(
                     panic!("Dimension `{dep}` not found in resolution index");
                 };
                 let dep_res_map = resolution_map_ident(dep);
-                let dep_ub_key = &dep_config.fetched_over;
+                let dep = clear_span(dep);
+                let dep_ub_key = dep_config.fetched_over.iter().cloned().map(clear_span);
 
                 quote! {
                     for #dep in 0..(*#dep_res_map.get(&[#(#dep_ub_key),*]).unwrap_or(&0)) { // TODO: Remove unwrap
@@ -117,7 +117,7 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
 
     // All arg dimension are passed to the get function
     // These dimensions are expected to be present in the job struct
-    let get_args = &arg_entity.dims;
+    let get_args = arg_entity.dims.iter().map(clear_span);
 
     let dim_msgs = arg_entity.dims.iter().map(dim_msg).collect::<Vec<_>>();
     let not_found_msg = format!("{} ({})", arg_entity.id, dim_msgs.join(", "));
@@ -149,6 +149,7 @@ fn arg_def_collected(
         .dims
         .iter()
         .filter(|d| !over.contains(d))
+        .map(clear_span)
         .collect::<Vec<_>>();
 
     let check_ub = over
@@ -160,10 +161,11 @@ fn arg_def_collected(
             } else {
                 quote! { { #acc } }
             };
+            let dim = clear_span(&dim);
 
-            let res_map_ident = resolution_map_ident(dim);
+            let res_map_ident = resolution_map_ident(&dim);
             let res_map_key = resolution_index
-                .get(dim)
+                .get(&dim)
                 .expect("Dimension not found in resolution index")
                 .fetched_over
                 .iter();
@@ -261,7 +263,7 @@ pub(super) fn fn_run_job(
     let job_dim_set: IndexSet<&syn::Ident> = job.dims.iter().collect();
     let resolution_index = build_resolution_index(job, &job_dim_set, dimensions);
 
-    let job_coord_vars = job_dim_set.iter();
+    let job_coord_vars = job_dim_set.iter().cloned().map(clear_span);
     let resolution_defs = resolution_index.iter().map(|(dim, entry)| -> syn::Stmt {
         let res_map_var = resolution_map_ident(dim);
         let n = entry.fetched_over.len();
@@ -272,7 +274,7 @@ pub(super) fn fn_run_job(
     });
     let resolution_inserts = resolution_inserts(&resolution_index);
 
-    let job_fn_name = &job.id;
+    let job_fn_name = clear_span(&job.id);
     let args = job
         .from
         .iter()
