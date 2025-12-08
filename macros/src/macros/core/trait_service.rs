@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::AllConfig;
 use crate::utils::{
-    entity_ident, entity_over_dim_ident, job_enum_ident, job_fn_ident, operon_ident,
+    as_type, entity_over_dim_ident, job_enum_ident, job_fn_ident, operon_ident,
     resolution_enum_ident, service_trait_ident,
 };
 
@@ -34,18 +34,18 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
         let fn_name = job_fn_ident(&job.id);
         let args = job.from.iter().map(|arg| -> syn::FnArg {
             let arg_ident = entity_over_dim_ident(&arg.id, &arg.over);
-            let entity_ident = entity_ident(&arg.id);
-            let ty: syn::Type = arg.over.iter().fold(
-                parse_quote! { #entity_ident },
+            let arg_ty: syn::Type = arg.over.iter().fold(
+                as_type(&arg.id),
                 |acc, _| parse_quote! { Vec<#acc> },
             );
-
-            parse_quote! { #arg_ident: #ty }
+            parse_quote! { #arg_ident: #arg_ty }
         });
-        let entity_ident = entity_ident(&job.to);
         let return_ty: syn::Type = job.spawn_dim.as_ref().map_or_else(
-            || parse_quote! { #entity_ident },
-            |_| parse_quote! { Vec<#entity_ident> },
+            || as_type(&job.to),
+            |_| {
+                let unit_ty = as_type(&job.to);
+                parse_quote! { Vec<#unit_ty> }
+            },
         );
         (
             format!(

@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::{AllConfig, EntityConfigMap, JobConfigMap};
 use crate::utils::{
-    batch_get_entity_ident, batch_put_entity_ident, entity_ident, get_entity_ident, operon_ident,
+    as_type, batch_get_entity_ident, batch_put_entity_ident, get_entity_ident, operon_ident,
     put_entity_ident, storage_trait_ident,
 };
 
@@ -24,16 +24,16 @@ use crate::utils::{
 fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
     entities.values().flat_map(|entity| -> [syn::TraitItemFn; 2] {
         let operon = operon_ident();
+        let n = entity.dims.len();
+        let ty = &entity.id;
         let get_fn_name = get_entity_ident(&entity.id);
         let put_fn_name = put_entity_ident(&entity.id);
-        let n = entity.dims.len();
-        let t = entity_ident(&entity.id);
 
         let get_fn = parse_quote! {
-            async fn #get_fn_name(&self, coordinate: [usize; #n]) -> Result<Option<#t>, #operon::storage::StorageError>;
+            async fn #get_fn_name(&self, coordinate: [usize; #n]) -> Result<Option<#ty>, #operon::storage::StorageError>;
         };
         let put_fn = parse_quote! {
-            async fn #put_fn_name(&self, entity: #operon::schema::Entity<#n, #t>) -> Result<(), #operon::storage::StorageError>;
+            async fn #put_fn_name(&self, entity: #operon::schema::Entity<#n, #ty>) -> Result<(), #operon::storage::StorageError>;
         };
 
         [get_fn, put_fn]
@@ -69,8 +69,8 @@ fn batch_gets(
         .flat_map(|job| job.from.iter().filter(|arg| !arg.over.is_empty()))
         .collect::<Vec<_>>();
 
-    targets.sort_by_key(|arg| arg.id.as_str());
-    targets.dedup_by_key(|arg| arg.id.as_str());
+    targets.sort_by_key(|arg| &arg.id);
+    targets.dedup_by_key(|arg| &arg.id);
 
     targets.into_iter().map(|arg| -> syn::TraitItemFn {
         let operon = operon_ident();
@@ -78,21 +78,20 @@ fn batch_gets(
         let arg_config = entities.get(&arg.id)
             .unwrap_or_else(|| panic!("Entity {} not found in entities", arg.id));
 
-        let entity_ident = entity_ident(&arg.id);
-        let return_ty: syn::Type = arg.over.iter().fold(
-            parse_quote! { #entity_ident },
-            |acc, _| parse_quote! { Vec<#acc> },
-        );
-        let batch_get_fn_name = batch_get_entity_ident(&arg.id, &arg.over);
-        let get_fn_name = get_entity_ident(&arg.id);
+        let fn_name = batch_get_entity_ident(&arg.id, &arg.over);
         let args = arg_config
             .dims
             .iter()
             .filter(|d| !arg.over.contains(d))
             .collect::<Vec<_>>();
-
-        let get_args = &arg_config.dims;
+        let return_ty: syn::Type = arg.over.iter().fold(
+            as_type(&arg.id),
+            |acc, _| parse_quote! { Vec<#acc> },
+        );
         let n = args.len();
+
+        let get_fn_name = get_entity_ident(&arg.id);
+        let get_args = &arg_config.dims;
 
         let body = arg.over.iter().enumerate().rfold(
             quote! {
@@ -116,7 +115,7 @@ fn batch_gets(
         );
 
         parse_quote! {
-            async fn #batch_get_fn_name(&self, [#(#args),*]: [usize; #n]) -> Result<#return_ty, #operon::storage::StorageError> {
+            async fn #fn_name(&self, [#(#args),*]: [usize; #n]) -> Result<#return_ty, #operon::storage::StorageError> {
                 let final_results = #body;
                 Ok(final_results.unwrap_or_default())
             }
@@ -146,17 +145,16 @@ fn batch_gets(
 fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
     jobs.values().filter_map(|job| -> Option<syn::TraitItemFn> {
         let operon = operon_ident();
-        let spawn_dim = job.spawn_dim.as_ref()?;
+        let fn_name = batch_put_entity_ident(&job.to);
+        let n = job.dims.len();
+        let ty = as_type(&job.to);
 
-        let batch_put_fn_name = batch_put_entity_ident(&job.to);
         let put_fn_name = put_entity_ident(&job.to);
         let coord_vars = &job.dims;
-
-        let n = job.dims.len();
-        let t = entity_ident(&job.to);
+        let spawn_dim = job.spawn_dim.as_ref()?;
 
         Some(parse_quote! {
-            async fn #batch_put_fn_name(&self, entity: #operon::schema::Entity<#n, Vec<#t>>) -> Result<(), #operon::storage::StorageError> {
+            async fn #fn_name(&self, entity: #operon::schema::Entity<#n, Vec<#ty>>) -> Result<(), #operon::storage::StorageError> {
                 let [#(#coord_vars),*] = entity.coordinate;
 
                 for (#spawn_dim, value) in entity.value.into_iter().enumerate() {

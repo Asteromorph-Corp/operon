@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use heck::{ToPascalCase, ToSnakeCase};
+use heck::ToSnakeCase;
 use indexmap::IndexMap;
 use syn::parse::{Parse, ParseBuffer};
 
@@ -55,7 +55,7 @@ impl Parse for AllConfig {
 
             // Deduplicate and verify
             // Constraint 1: Defining entity must not conflict with existing entities
-            if entities.contains_key(&new_entity.id.to_string()) {
+            if entities.contains_key(&new_entity.id) {
                 return Err(syn::Error::new(
                     new_entity._span,
                     format!("Entity '{}' is already defined", new_entity.id),
@@ -79,12 +79,11 @@ impl Parse for AllConfig {
             }
             // Constraint 4: Arguments must be already-defined, valid entities
             for arg_entity in &args {
-                let arg_entity_id = arg_entity.id.to_string().to_pascal_case();
                 // Constraint 4a: Argument entity must be defined
-                let Some(arg_entity_config) = entities.get(&arg_entity_id) else {
+                let Some(arg_entity_config) = entities.get(&arg_entity.id) else {
                     return Err(syn::Error::new(
                         arg_entity._span,
-                        format!("Undefined entity '{arg_entity_id}'"),
+                        format!("Undefined entity '{}'", arg_entity.id),
                     ));
                 };
                 // Constraint 4b–d. Let A = arg_entity_config.dims, B = arg_entity.dims, C =
@@ -96,7 +95,10 @@ impl Parse for AllConfig {
                     if !a_set.contains(dim) {
                         return Err(syn::Error::new(
                             dim.span(),
-                            format!("Dimension '{dim}' is not part of entity '{arg_entity_id}'"),
+                            format!(
+                                "Dimension '{dim}' is not part of entity '{}'",
+                                arg_entity.id
+                            ),
                         ));
                     }
                 }
@@ -122,11 +124,10 @@ impl Parse for AllConfig {
             let bigcup = args
                 .iter()
                 .map(|arg| -> syn::Result<_> {
-                    let arg_id = arg.id.to_string().to_pascal_case();
-                    let Some(arg_config) = entities.get(&arg_id) else {
+                    let Some(arg_config) = entities.get(&arg.id) else {
                         return Err(syn::Error::new(
                             arg._span,
-                            format!("Undefined entity '{arg_id}'"),
+                            format!("Undefined entity '{}'", arg.id),
                         ));
                     };
                     let a_set: HashSet<&syn::Ident> = HashSet::from_iter(&arg_config.dims);
@@ -154,17 +155,16 @@ impl Parse for AllConfig {
             }
 
             // Add the new configs
-            let new_entity_id = new_entity.id.to_string().to_pascal_case();
             let new_entity_dims = dims
                 .iter()
                 .chain(new_entity.dims.iter())
                 .cloned()
                 .collect::<Vec<_>>();
             let new_entity_config = EntityConfig {
-                id: new_entity_id.clone(),
+                id: new_entity.id.clone(),
                 dims: new_entity_dims,
             };
-            entities.insert(new_entity_id.clone(), new_entity_config);
+            entities.insert(new_entity.id.clone(), new_entity_config);
             if let Some(dim) = new_entity.dims.first() {
                 let new_dim_config = DimensionConfig {
                     id: dim.clone(),
@@ -175,13 +175,13 @@ impl Parse for AllConfig {
             let job_config = JobConfig {
                 id: job_id.clone(),
                 from: args
-                    .iter()
+                    .into_iter()
                     .map(|e| JobArg {
-                        id: e.id.to_string().to_pascal_case(),
-                        over: e.dims.clone(),
+                        id: e.id,
+                        over: e.dims,
                     })
                     .collect::<Vec<_>>(),
-                to: new_entity_id,
+                to: new_entity.id,
                 dims: dims.clone(),
                 spawn_dim: new_entity.dims.first().cloned(),
                 pool_size: pool,

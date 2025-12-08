@@ -1,12 +1,10 @@
 use indexmap::IndexMap;
 
-use crate::configs::EntityId;
-
 pub type JobId = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JobArg {
-    pub id: EntityId,
+    pub id: syn::Ident,
     pub over: Vec<syn::Ident>,
 }
 
@@ -18,7 +16,7 @@ pub struct JobConfig {
     /// Entities this job operates on.
     pub from: Vec<JobArg>,
     /// Entities this job produces.
-    pub to: EntityId,
+    pub to: syn::Ident,
     /// Dimensions this job repeat on.
     pub dims: Vec<syn::Ident>,
     /// Dimension this job spawns.

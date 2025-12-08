@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use indexmap::IndexSet;
 
-use crate::configs::{EntityId, JobConfig, JobConfigMap};
+use crate::configs::{JobConfig, JobConfigMap};
 
 /// Returns a mapping from job `to` entity to job `id`.
-fn build_upstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, &JobConfig> {
-    let mut index: HashMap<&EntityId, &JobConfig> = HashMap::new();
+fn build_upstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&syn::Ident, &JobConfig> {
+    let mut index: HashMap<&syn::Ident, &JobConfig> = HashMap::new();
 
     for job in jobs.values() {
         if let Some(dup) = index.get(&job.to) {

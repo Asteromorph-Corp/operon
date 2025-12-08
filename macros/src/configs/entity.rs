@@ -1,14 +1,12 @@
 use indexmap::IndexMap;
 
-pub type EntityId = String;
-
 /// An Operon entity, which can be a struct or an enum.
 #[derive(Debug, Clone)]
 pub struct EntityConfig {
     /// Unique identifier for the entity.
-    pub id: EntityId,
+    pub id: syn::Ident,
     /// Dimensions this entity repeat on.
     pub dims: Vec<syn::Ident>,
 }
 
-pub type EntityConfigMap = IndexMap<EntityId, EntityConfig>;
+pub type EntityConfigMap = IndexMap<syn::Ident, EntityConfig>;

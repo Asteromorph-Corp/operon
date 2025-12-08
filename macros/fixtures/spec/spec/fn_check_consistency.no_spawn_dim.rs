@@ -19,7 +19,8 @@ async fn check_consistency(
     // ...and check if the data storage holds all the data for them.
     for job in jobs {
         if storage.get_e(job.coordinate).await?.is_none() {
-            operon::log::info!("Data storage does not hold `e_{:?}`.", job.coordinate);
+            // TODO: improve error message coordinate display
+            operon::log::info!("Data storage does not hold `E_{:?}`.", job.coordinate);
             return Ok(false);
         }
     }

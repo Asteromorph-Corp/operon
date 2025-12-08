@@ -19,7 +19,6 @@ use crate::utils::{as_lit_str, job_metadata_ident};
 pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = job_metadata_ident(&job.id);
-
     let n = job.dims.len();
     let id = &job.id;
     let dims = job.dims.iter().map(as_lit_str);

@@ -24,7 +24,7 @@ pub fn job_alpha() -> JobConfig {
     JobConfig {
         id: "alpha".to_string(),
         from: vec![],
-        to: "a".to_string(),
+        to: format_ident!("A"),
         dims: vec![],
         spawn_dim: Some(format_ident!("i")),
         pool_size: 1,
@@ -35,10 +35,10 @@ pub fn job_beta() -> JobConfig {
     JobConfig {
         id: "beta".to_string(),
         from: vec![JobArg {
-            id: "a".to_string(),
+            id: format_ident!("A"),
             over: vec![],
         }],
-        to: "b".to_string(),
+        to: format_ident!("B"),
         dims: vec![format_ident!("i")],
         spawn_dim: Some(format_ident!("j")),
         pool_size: 8,
@@ -49,10 +49,10 @@ pub fn job_gamma() -> JobConfig {
     JobConfig {
         id: "gamma".to_string(),
         from: vec![JobArg {
-            id: "a".to_string(),
+            id: format_ident!("A"),
             over: vec![],
         }],
-        to: "c".to_string(),
+        to: format_ident!("C"),
         dims: vec![format_ident!("i")],
         spawn_dim: Some(format_ident!("k")),
         pool_size: 8,
@@ -64,19 +64,19 @@ pub fn job_delta() -> JobConfig {
         id: "delta".to_string(),
         from: vec![
             JobArg {
-                id: "a".to_string(),
+                id: format_ident!("A"),
                 over: vec![],
             },
             JobArg {
-                id: "b".to_string(),
+                id: format_ident!("B"),
                 over: vec![],
             },
             JobArg {
-                id: "c".to_string(),
+                id: format_ident!("C"),
                 over: vec![],
             },
         ],
-        to: "d".to_string(),
+        to: format_ident!("D"),
         dims: vec![format_ident!("i"), format_ident!("j"), format_ident!("k")],
         spawn_dim: None,
         pool_size: 4,
@@ -88,15 +88,15 @@ pub fn job_epsilon() -> JobConfig {
         id: "epsilon".to_string(),
         from: vec![
             JobArg {
-                id: "b".to_string(),
+                id: format_ident!("B"),
                 over: vec![format_ident!("j")],
             },
             JobArg {
-                id: "d".to_string(),
+                id: format_ident!("D"),
                 over: vec![format_ident!("j")],
             },
         ],
-        to: "e".to_string(),
+        to: format_ident!("E"),
         dims: vec![format_ident!("i"), format_ident!("k")],
         spawn_dim: None,
         pool_size: 4,
@@ -108,15 +108,15 @@ pub fn job_zeta() -> JobConfig {
         id: "zeta".to_string(),
         from: vec![
             JobArg {
-                id: "c".to_string(),
+                id: format_ident!("C"),
                 over: vec![format_ident!("k")],
             },
             JobArg {
-                id: "e".to_string(),
+                id: format_ident!("E"),
                 over: vec![format_ident!("k")],
             },
         ],
-        to: "f".to_string(),
+        to: format_ident!("F"),
         dims: vec![format_ident!("i")],
         spawn_dim: None,
         pool_size: 1,
@@ -167,42 +167,42 @@ pub fn all_dimensions() -> DimensionConfigMap {
 
 pub fn entity_a() -> EntityConfig {
     EntityConfig {
-        id: "a".to_string(),
+        id: format_ident!("A"),
         dims: vec![format_ident!("i")],
     }
 }
 
 pub fn entity_b() -> EntityConfig {
     EntityConfig {
-        id: "b".to_string(),
+        id: format_ident!("B"),
         dims: vec![format_ident!("i"), format_ident!("j")],
     }
 }
 
 pub fn entity_c() -> EntityConfig {
     EntityConfig {
-        id: "c".to_string(),
+        id: format_ident!("C"),
         dims: vec![format_ident!("i"), format_ident!("k")],
     }
 }
 
 pub fn entity_d() -> EntityConfig {
     EntityConfig {
-        id: "d".to_string(),
+        id: format_ident!("D"),
         dims: vec![format_ident!("i"), format_ident!("j"), format_ident!("k")],
     }
 }
 
 pub fn entity_e() -> EntityConfig {
     EntityConfig {
-        id: "e".to_string(),
+        id: format_ident!("E"),
         dims: vec![format_ident!("i"), format_ident!("k")],
     }
 }
 
 pub fn entity_f() -> EntityConfig {
     EntityConfig {
-        id: "f".to_string(),
+        id: format_ident!("F"),
         dims: vec![format_ident!("i")],
     }
 }
@@ -210,12 +210,12 @@ pub fn entity_f() -> EntityConfig {
 #[fixture]
 pub fn all_entities() -> EntityConfigMap {
     EntityConfigMap::from_iter([
-        ("a".to_string(), entity_a()),
-        ("b".to_string(), entity_b()),
-        ("c".to_string(), entity_c()),
-        ("d".to_string(), entity_d()),
-        ("e".to_string(), entity_e()),
-        ("f".to_string(), entity_f()),
+        (format_ident!("A"), entity_a()),
+        (format_ident!("B"), entity_b()),
+        (format_ident!("C"), entity_c()),
+        (format_ident!("D"), entity_d()),
+        (format_ident!("E"), entity_e()),
+        (format_ident!("F"), entity_f()),
     ])
 }
 

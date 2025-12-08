@@ -1,7 +1,7 @@
 use syn::parse_quote;
 
 use crate::configs::JobConfigMap;
-use crate::utils::{batch_put_entity_ident, entity_ident, operon_ident, variable_ident};
+use crate::utils::{as_type, batch_put_entity_ident, operon_ident, variable_ident};
 
 /// Generates the batch put function for the implementation of the storage trait.
 ///
@@ -27,10 +27,10 @@ pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn>
         let batch_put_fn_name = batch_put_entity_ident(&job.to);
 
         let n = job.dims.len();
-        let t = entity_ident(&job.to);
+        let ty = as_type(&job.to);
 
         Some(parse_quote! {
-            async fn #batch_put_fn_name(&self, entity: #operon::schema::Entity<#n, Vec<#t>>) -> Result<(), #operon::storage::StorageError> {
+            async fn #batch_put_fn_name(&self, entity: #operon::schema::Entity<#n, Vec<#ty>>) -> Result<(), #operon::storage::StorageError> {
                 self
                     .conn()
                     .await?

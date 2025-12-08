@@ -2,9 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::{EntityConfigMap, JobConfigMap};
-use crate::utils::{
-    as_lit_str, batch_get_entity_ident, entity_ident, operon_ident, variable_ident,
-};
+use crate::utils::{as_lit_str, as_type, batch_get_entity_ident, operon_ident, variable_ident};
 
 /// Generates the batch get function for the implementation of the storage trait.
 ///
@@ -38,8 +36,8 @@ pub fn batch_gets(
         .flat_map(|job| job.from.iter().filter(|arg| !arg.over.is_empty()))
         .collect::<Vec<_>>();
 
-    targets.sort_by_key(|arg| arg.id.as_str());
-    targets.dedup_by_key(|arg| arg.id.as_str());
+    targets.sort_by_key(|arg| &arg.id);
+    targets.dedup_by_key(|arg| &arg.id);
 
     targets.into_iter().map(|arg| -> syn::TraitItemFn {
         let operon = operon_ident();
@@ -49,9 +47,8 @@ pub fn batch_gets(
         let arg_config = entities.get(&arg.id)
             .unwrap_or_else(|| panic!("Entity {} not found in entities", arg.id));
 
-        let entity_ident = entity_ident(&arg.id);
         let return_ty: syn::Type = arg.over.iter().fold(
-            parse_quote! { #entity_ident },
+            as_type(&arg.id),
             |acc, _| parse_quote! { Vec<#acc> },
         );
 
