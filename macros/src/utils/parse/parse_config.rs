@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use heck::ToSnakeCase;
 use indexmap::IndexMap;
 use syn::parse::{Parse, ParseBuffer};
 
@@ -40,7 +39,6 @@ impl Parse for AllConfig {
 
         for job in config_decl.jobs {
             let new_entity = job.spawned_entity;
-            let job_id = job.id.to_string().to_snake_case();
             let args = job.args;
             let pool = job
                 .pool
@@ -71,10 +69,10 @@ impl Parse for AllConfig {
                 ));
             }
             // Constraint 3: Job name must be unique as a snake_case identifier
-            if jobs.contains_key(&job_id) {
+            if jobs.contains_key(&job.id) {
                 return Err(syn::Error::new(
                     job._span,
-                    format!("Job '{job_id}' is already defined"),
+                    format!("Job '{}' is already defined", job.id),
                 ));
             }
             // Constraint 4: Arguments must be already-defined, valid entities
@@ -173,7 +171,7 @@ impl Parse for AllConfig {
                 dimensions.insert(dim.clone(), new_dim_config);
             }
             let job_config = JobConfig {
-                id: job_id.clone(),
+                id: job.id.clone(),
                 from: args
                     .into_iter()
                     .map(|e| JobArg {
@@ -186,7 +184,7 @@ impl Parse for AllConfig {
                 spawn_dim: new_entity.dims.first().cloned(),
                 pool_size: pool,
             };
-            jobs.insert(job_id, job_config);
+            jobs.insert(job.id, job_config);
         }
 
         Ok(AllConfig {

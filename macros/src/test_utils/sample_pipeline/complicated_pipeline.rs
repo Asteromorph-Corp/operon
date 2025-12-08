@@ -20,7 +20,7 @@ use crate::configs::{
 
 pub fn job_alpha() -> JobConfig {
     JobConfig {
-        id: "alpha".to_string(),
+        id: format_ident!("alpha"),
         from: vec![],
         to: format_ident!("A"),
         dims: vec![],
@@ -31,7 +31,7 @@ pub fn job_alpha() -> JobConfig {
 
 pub fn job_beta() -> JobConfig {
     JobConfig {
-        id: "beta".to_string(),
+        id: format_ident!("beta"),
         from: vec![],
         to: format_ident!("B"),
         dims: vec![],
@@ -42,7 +42,7 @@ pub fn job_beta() -> JobConfig {
 
 pub fn job_gamma() -> JobConfig {
     JobConfig {
-        id: "gamma".to_string(),
+        id: format_ident!("gamma"),
         from: vec![
             JobArg {
                 id: format_ident!("A"),
@@ -62,7 +62,7 @@ pub fn job_gamma() -> JobConfig {
 
 pub fn job_delta() -> JobConfig {
     JobConfig {
-        id: "delta".to_string(),
+        id: format_ident!("delta"),
         from: vec![JobArg {
             id: format_ident!("B"),
             over: vec![],
@@ -76,7 +76,7 @@ pub fn job_delta() -> JobConfig {
 
 pub fn job_epsilon() -> JobConfig {
     JobConfig {
-        id: "epsilon".to_string(),
+        id: format_ident!("epsilon"),
         from: vec![
             JobArg {
                 id: format_ident!("C"),
@@ -96,11 +96,11 @@ pub fn job_epsilon() -> JobConfig {
 
 pub fn all_jobs() -> JobConfigMap {
     JobConfigMap::from_iter([
-        ("alpha".to_string(), job_alpha()),
-        ("beta".to_string(), job_beta()),
-        ("gamma".to_string(), job_gamma()),
-        ("delta".to_string(), job_delta()),
-        ("epsilon".to_string(), job_epsilon()),
+        (format_ident!("alpha"), job_alpha()),
+        (format_ident!("beta"), job_beta()),
+        (format_ident!("gamma"), job_gamma()),
+        (format_ident!("delta"), job_delta()),
+        (format_ident!("epsilon"), job_epsilon()),
     ])
 }
 

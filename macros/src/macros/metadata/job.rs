@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::operon_ident;
-use crate::utils::{as_lit_str, job_metadata_ident};
+use crate::utils::{job_metadata_ident, to_lit_str};
 
 /// Generates a metadata function for a job.
 ///
@@ -20,11 +20,11 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = job_metadata_ident(&job.id);
     let n = job.dims.len();
-    let id = &job.id;
-    let dims = job.dims.iter().map(as_lit_str);
+    let id = to_lit_str(&job.id);
+    let dims = job.dims.iter().map(to_lit_str);
     let spawn_dim: syn::Expr = match &job.spawn_dim {
         Some(spawn_dim) => {
-            let spawn_dim = as_lit_str(spawn_dim);
+            let spawn_dim = to_lit_str(spawn_dim);
             parse_quote! { Some(#spawn_dim) }
         }
         None => parse_quote! { None },

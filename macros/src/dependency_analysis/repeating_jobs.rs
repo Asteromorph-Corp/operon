@@ -22,17 +22,17 @@ mod tests {
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]
-    #[case::i(format_ident!("i"), vec!["beta", "gamma", "delta", "epsilon", "zeta"])]
-    #[case::j(format_ident!("j"), vec!["delta"])]
-    #[case::k(format_ident!("k"), vec!["delta", "epsilon"])]
+    #[case::i(format_ident!("i"), vec![format_ident!("beta"), format_ident!("gamma"), format_ident!("delta"), format_ident!("epsilon"), format_ident!("zeta")])]
+    #[case::j(format_ident!("j"), vec![format_ident!("delta")])]
+    #[case::k(format_ident!("k"), vec![format_ident!("delta"), format_ident!("epsilon")])]
     fn test_get_jobs_repeating_on(
         all_jobs: JobConfigMap,
         #[case] dim_id: syn::Ident,
-        #[case] expected_job_ids: Vec<&str>,
+        #[case] expected_job_ids: Vec<syn::Ident>,
     ) {
         let expected = expected_job_ids
             .into_iter()
-            .map(|id| all_jobs.get(id).unwrap())
+            .map(|id| all_jobs.get(&id).unwrap())
             .collect::<IndexSet<_>>();
         assert_eq!(get_jobs_repeating_on(&dim_id, &all_jobs), expected);
     }

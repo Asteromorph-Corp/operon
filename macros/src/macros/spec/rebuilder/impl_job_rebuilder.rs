@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::{JobConfig, JobConfigMap};
 use crate::dependency_analysis::get_direct_downstream_jobs;
-use crate::utils::{as_lit_str, job_metadata_ident, operon_ident, rebuilder_ident};
+use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str};
 
 /// Generates the implementation of the `JobRebuilder` trait for a given job.
 ///
@@ -66,7 +66,7 @@ pub fn impl_job_rebuilder(
 ) -> syn::ItemImpl {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
-    let job_id = &job.id;
+    let job_id = to_lit_str(&job.id);
 
     let maybe_put_resolution = job.spawn_dim.is_some().then(|| -> syn::Stmt {
         parse_quote! { client.resolution(self.spawn_dim_meta).put(resolution).await?; }
@@ -122,7 +122,7 @@ pub fn impl_job_rebuilder(
             let affected_args = downstream_job.from.iter().filter(|arg| arg.id == job.to);
             affected_args.map(|arg| -> syn::Stmt {
                 let downstream_job_meta = job_metadata_ident(&downstream_job.id);
-                let aggregate_dims = arg.over.iter().map(as_lit_str);
+                let aggregate_dims = arg.over.iter().map(to_lit_str);
 
                 parse_quote! {
                     client

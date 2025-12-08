@@ -8,7 +8,7 @@ use crate::configs::{
 };
 use crate::utils::{
     batch_get_entity_ident, batch_put_entity_ident, dim_msg, dimension_metadata_ident,
-    entity_over_dim_ident, get_entity_ident, job_fn_ident, operon_ident, put_entity_ident,
+    entity_over_dim_ident, get_entity_ident, operon_ident, put_entity_ident,
 };
 
 fn resolution_map_ident(dim: &syn::Ident) -> syn::Ident {
@@ -272,7 +272,7 @@ pub(super) fn fn_run_job(
     });
     let resolution_inserts = resolution_inserts(&resolution_index);
 
-    let job_fn_name = job_fn_ident(&job.id);
+    let job_fn_name = &job.id;
     let args = job
         .from
         .iter()

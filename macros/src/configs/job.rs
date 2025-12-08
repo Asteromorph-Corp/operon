@@ -1,7 +1,5 @@
 use indexmap::IndexMap;
 
-pub type JobId = String;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JobArg {
     pub id: syn::Ident,
@@ -12,7 +10,7 @@ pub struct JobArg {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JobConfig {
     /// Unique identifier for the job.
-    pub id: JobId,
+    pub id: syn::Ident,
     /// Entities this job operates on.
     pub from: Vec<JobArg>,
     /// Entities this job produces.
@@ -25,4 +23,4 @@ pub struct JobConfig {
     pub pool_size: usize,
 }
 
-pub type JobConfigMap = IndexMap<JobId, JobConfig>;
+pub type JobConfigMap = IndexMap<syn::Ident, JobConfig>;

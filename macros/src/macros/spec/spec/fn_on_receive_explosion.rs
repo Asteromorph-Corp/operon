@@ -2,7 +2,9 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{dimension_metadata_ident, operon_ident, resolution_enum_ident, variant_ident};
+use crate::utils::{
+    dimension_metadata_ident, operon_ident, resolution_enum_ident, to_lit_str, to_pascal_case,
+};
 
 /// Generates the `on_receive_explosion` function for the implementation of the trait `JobSpec`.
 ///
@@ -32,7 +34,7 @@ pub(super) fn fn_on_receive_explosion(
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
-    let job_id = &job.id;
+    let job_id = to_lit_str(&job.id);
 
     let arms = upstream_jobs
         .iter()
@@ -40,7 +42,7 @@ pub(super) fn fn_on_receive_explosion(
         .collect::<IndexSet<_>>() // Deduplicate
         .into_iter()
         .map(|dim_id| -> syn::Arm {
-            let variant_ident = variant_ident(dim_id);
+            let variant_ident = to_pascal_case(dim_id);
             let dim_meta = dimension_metadata_ident(dim_id);
 
             parse_quote! {
@@ -69,6 +71,7 @@ pub(super) fn fn_on_receive_explosion(
 
 #[cfg(test)]
 mod tests {
+    use quote::format_ident;
     use rstest::rstest;
 
     use super::*;
@@ -78,13 +81,13 @@ mod tests {
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]
-    #[case::simple("epsilon", "spec/spec/fn_on_receive_explosion.rs")]
+    #[case::simple(format_ident!("epsilon"), "spec/spec/fn_on_receive_explosion.rs")]
     fn test_fn_on_receive_explosion(
         all_jobs: JobConfigMap,
-        #[case] job_id: &str,
+        #[case] job_id: syn::Ident,
         #[case] fixture_path: &str,
     ) {
-        let job = all_jobs.get(job_id).unwrap();
+        let job = all_jobs.get(&job_id).unwrap();
         let upstream_jobs = get_direct_upstream_jobs(job, &all_jobs);
         let item = fn_on_receive_explosion(job, &upstream_jobs);
         assert_item_eq(&item, fixture_path);

@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::EntityConfigMap;
 use crate::operon_ident;
-use crate::utils::{as_type, entities_ident, variable_ident};
+use crate::utils::{entities_ident, to_snake_case, to_type};
 
 /// Generates the entities struct to be used as a generic parameter for the `PsqlStorage`.
 ///
@@ -21,9 +21,9 @@ pub fn entities_definition(service_id: &str, entities: &EntityConfigMap) -> syn:
     let operon = operon_ident();
     let entities_ident = entities_ident(service_id);
     let fields = entities.values().map(|entity| -> syn::Field {
-        let field_ident = variable_ident(&entity.id);
+        let field_ident = to_snake_case(&entity.id);
         let n = entity.dims.len();
-        let ty = as_type(&entity.id);
+        let ty = to_type(&entity.id);
         let meta_ty: syn::Type = parse_quote! {
             #operon::schema::EntityMetadata<#n, #ty>
         };

@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::EntityConfigMap;
 use crate::operon_ident;
-use crate::utils::{entities_ident, variable_ident};
+use crate::utils::{entities_ident, to_snake_case};
 
 /// Generates the implementation of `EntityQueries` trait for the entity struct.
 ///
@@ -36,7 +36,7 @@ pub fn impl_entities_queries(service_id: &str, entities: &EntityConfigMap) -> sy
     let entities_ident = entities_ident(service_id);
     let fields = entities
         .keys()
-        .map(|entity_id| variable_ident(entity_id))
+        .map(|entity_id| to_snake_case(entity_id))
         .collect::<Vec<_>>();
 
     parse_quote! {

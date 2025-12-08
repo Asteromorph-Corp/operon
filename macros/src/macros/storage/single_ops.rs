@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::{EntityConfig, EntityConfigMap};
 use crate::operon_ident;
-use crate::utils::{as_type, get_entity_ident, put_entity_ident, variable_ident};
+use crate::utils::{get_entity_ident, put_entity_ident, to_snake_case, to_type};
 
 /// Generates a get function for the implementation of the storage trait.
 ///
@@ -23,8 +23,8 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let get_fn_name = get_entity_ident(&entity.id);
 
     let n = entity.dims.len();
-    let ty = as_type(&entity.id);
-    let id = variable_ident(&entity.id);
+    let ty = to_type(&entity.id);
+    let id = to_snake_case(&entity.id);
 
     parse_quote! {
         async fn #get_fn_name(&self, coordinate: [usize; #n]) -> Result<Option<#ty>, operon::storage::StorageError> {
@@ -58,8 +58,8 @@ fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let put_fn_name = put_entity_ident(&entity.id);
 
     let n = entity.dims.len();
-    let id = variable_ident(&entity.id);
-    let ty = as_type(&entity.id);
+    let id = to_snake_case(&entity.id);
+    let ty = to_type(&entity.id);
 
     parse_quote! {
         async fn #put_fn_name(&self, entity: #operon::schema::Entity<#n, #ty>) -> Result<(), operon::storage::StorageError> {

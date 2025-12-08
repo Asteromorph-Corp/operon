@@ -3,8 +3,6 @@ use once_cell::sync::Lazy;
 use proc_macro_crate::{FoundCrate, crate_name};
 use quote::format_ident;
 
-use crate::configs::JobId;
-
 static CRATE_NAME: Lazy<Result<FoundCrate, proc_macro_crate::Error>> =
     Lazy::new(|| crate_name("operon"));
 
@@ -36,8 +34,9 @@ pub fn get_handler_ident(service_id: &str) -> syn::Ident {
     format_ident!("{}_handler", service_id.to_snake_case())
 }
 
-pub fn job_metadata_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("job_{}_meta", job_id.to_snake_case())
+pub fn job_metadata_ident(job_id: &syn::Ident) -> syn::Ident {
+    let name = format!("job_{}_meta", job_id.to_string().to_snake_case());
+    syn::Ident::new(&name, job_id.span())
 }
 
 pub fn dimension_metadata_ident(dimension_id: &syn::Ident) -> syn::Ident {
@@ -79,10 +78,6 @@ pub fn batch_put_entity_ident(entity_id: &syn::Ident) -> syn::Ident {
     syn::Ident::new(&name, entity_id.span())
 }
 
-pub fn job_fn_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("{}", job_id.to_snake_case())
-}
-
 pub fn entity_over_dim_ident(entity_id: &syn::Ident, over: &[syn::Ident]) -> syn::Ident {
     let name = if over.is_empty() {
         entity_id.to_string().to_snake_case()
@@ -98,29 +93,24 @@ pub fn entity_over_dim_ident(entity_id: &syn::Ident, over: &[syn::Ident]) -> syn
     syn::Ident::new(&name, entity_id.span())
 }
 
-pub fn variant_ident(id: &syn::Ident) -> syn::Ident {
-    syn::Ident::new(&id.to_string().to_pascal_case(), id.span())
+pub fn sender_ident(job_id: &syn::Ident) -> syn::Ident {
+    let name = format!("to_{}", job_id.to_string().to_snake_case());
+    syn::Ident::new(&name, job_id.span())
 }
 
-pub fn variable_ident(id: &syn::Ident) -> syn::Ident {
-    let name = id.to_string().to_snake_case();
-    syn::Ident::new(&name, id.span())
+pub fn spec_ident(job_id: &syn::Ident) -> syn::Ident {
+    let name = format!("{}Spec", job_id.to_string().to_pascal_case());
+    syn::Ident::new(&name, job_id.span())
 }
 
-pub fn sender_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("to_{}", job_id.to_snake_case())
+pub fn rebuilder_ident(job_id: &syn::Ident) -> syn::Ident {
+    let name = format!("{}Rebuilder", job_id.to_string().to_pascal_case());
+    syn::Ident::new(&name, job_id.span())
 }
 
-pub fn spec_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("{}Spec", job_id.to_pascal_case())
-}
-
-pub fn rebuilder_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("{}Rebuilder", job_id.to_pascal_case())
-}
-
-pub fn peer_txs_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("{}PeerTxs", job_id.to_pascal_case())
+pub fn peer_txs_ident(job_id: &syn::Ident) -> syn::Ident {
+    let name = format!("{}PeerTxs", job_id.to_string().to_pascal_case());
+    syn::Ident::new(&name, job_id.span())
 }
 
 pub fn resolution_enum_ident() -> syn::Ident {
@@ -131,15 +121,24 @@ pub fn job_enum_ident() -> syn::Ident {
     format_ident!("JobEnum")
 }
 
-pub fn job_id_ident(job_id: &JobId) -> syn::Ident {
-    format_ident!("{}_ID", job_id.to_shouty_snake_case())
+pub fn job_id_ident(job_id: &syn::Ident) -> syn::Ident {
+    let name = format!("{}_ID", job_id.to_string().to_shouty_snake_case());
+    syn::Ident::new(&name, job_id.span())
 }
 
-pub fn as_lit_str(ident: &syn::Ident) -> syn::LitStr {
+pub fn to_pascal_case(id: &syn::Ident) -> syn::Ident {
+    syn::Ident::new(&id.to_string().to_pascal_case(), id.span())
+}
+
+pub fn to_snake_case(id: &syn::Ident) -> syn::Ident {
+    syn::Ident::new(&id.to_string().to_snake_case(), id.span())
+}
+
+pub fn to_lit_str(ident: &syn::Ident) -> syn::LitStr {
     syn::LitStr::new(&ident.to_string().to_snake_case(), ident.span())
 }
 
-pub fn as_type(ident: &syn::Ident) -> syn::Type {
+pub fn to_type(ident: &syn::Ident) -> syn::Type {
     syn::Type::Path(syn::TypePath {
         qself: None,
         path: syn::Path::from(syn::PathSegment::from(ident.clone())),

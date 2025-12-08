@@ -3,7 +3,8 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    dimension_metadata_ident, operon_ident, resolution_enum_ident, sender_ident, variant_ident,
+    dimension_metadata_ident, operon_ident, resolution_enum_ident, sender_ident, to_lit_str,
+    to_pascal_case,
 };
 
 /// Generates the `on_receive_resolution` function for the implementation of the trait `JobSpec`.
@@ -61,10 +62,10 @@ pub(super) fn fn_on_receive_resolution(
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
-    let job_id = &job.id;
+    let job_id = to_lit_str(&job.id);
 
     let explode_arms = job.dims.iter().enumerate().map(|(idx, dim)| -> syn::Arm {
-        let variant_ident = variant_ident(dim);
+        let variant_ident = to_pascal_case(dim);
         let dim_meta = dimension_metadata_ident(dim);
         let send_explosions = downstream_jobs.iter().flat_map(|downstream_job| {
             let cnt = downstream_job.from.iter().filter(|arg| arg.id == job.to && arg.over.contains(dim)).count();

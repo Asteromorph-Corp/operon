@@ -3,7 +3,7 @@ use quote::format_ident;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, variant_ident};
+use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_case};
 
 /// Generates the `send_on_finish` function for the implementation of the trait `JobSpec`.
 ///
@@ -70,7 +70,7 @@ pub(super) fn fn_send_on_finish(
         .iter()
         .map(|repeating_job| -> syn::Expr {
             // TODO: remove unwrap
-            let resolution_variant_ident = variant_ident(job.spawn_dim.as_ref().unwrap());
+            let resolution_variant_ident = to_pascal_case(job.spawn_dim.as_ref().unwrap());
             let sender_ident = sender_ident(&repeating_job.id);
             let ok_msg = format!(
                 "`{}` sent peer event to `{}`: {{resolution:?}}",
@@ -94,7 +94,7 @@ pub(super) fn fn_send_on_finish(
         });
 
     let send_jobs = downstream_jobs.iter().map(|downstream_job| -> syn::Expr {
-        let job_variant_ident = variant_ident(&format_ident!("{}", job.id));
+        let job_variant_ident = to_pascal_case(&format_ident!("{}", job.id));
         let sender_ident = sender_ident(&downstream_job.id);
         let ok_msg = format!(
             "`{}` sent peer event to `{}`: {{job:?}}",

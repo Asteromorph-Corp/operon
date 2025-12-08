@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::JobConfigMap;
 use crate::operon_ident;
-use crate::utils::{job_enum_ident, variant_ident};
+use crate::utils::{job_enum_ident, to_pascal_case};
 
 /// Generates an enum representing all jobs in the job configuration map.
 ///
@@ -24,7 +24,7 @@ pub fn job_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
     let job_enum_ident = job_enum_ident();
     let variants = jobs.values().map(|job| -> syn::Variant {
         // TODO: Fix this
-        let variant_ident = variant_ident(&format_ident!("{}", job.id));
+        let variant_ident = to_pascal_case(&format_ident!("{}", job.id));
         let n = job.dims.len();
         parse_quote! {
             #variant_ident(#operon::schema::Job<#n>)

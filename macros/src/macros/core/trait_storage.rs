@@ -3,8 +3,8 @@ use syn::parse_quote;
 
 use crate::configs::{AllConfig, EntityConfigMap, JobConfigMap};
 use crate::utils::{
-    as_type, batch_get_entity_ident, batch_put_entity_ident, get_entity_ident, operon_ident,
-    put_entity_ident, storage_trait_ident,
+    batch_get_entity_ident, batch_put_entity_ident, get_entity_ident, operon_ident,
+    put_entity_ident, storage_trait_ident, to_type,
 };
 
 /// A helper function to generate single operation functions for each entity.
@@ -85,7 +85,7 @@ fn batch_gets(
             .filter(|d| !arg.over.contains(d))
             .collect::<Vec<_>>();
         let return_ty: syn::Type = arg.over.iter().fold(
-            as_type(&arg.id),
+            to_type(&arg.id),
             |acc, _| parse_quote! { Vec<#acc> },
         );
         let n = args.len();
@@ -147,7 +147,7 @@ fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> 
         let operon = operon_ident();
         let fn_name = batch_put_entity_ident(&job.to);
         let n = job.dims.len();
-        let ty = as_type(&job.to);
+        let ty = to_type(&job.to);
 
         let put_fn_name = put_entity_ident(&job.to);
         let coord_vars = &job.dims;

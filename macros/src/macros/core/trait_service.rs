@@ -3,8 +3,8 @@ use syn::parse_quote;
 
 use crate::configs::AllConfig;
 use crate::utils::{
-    as_type, entity_over_dim_ident, job_enum_ident, job_fn_ident, operon_ident,
-    resolution_enum_ident, service_trait_ident,
+    entity_over_dim_ident, job_enum_ident, operon_ident, resolution_enum_ident,
+    service_trait_ident, to_type,
 };
 
 /// Generates a trait for the service based on the provided AllConfig.
@@ -31,25 +31,26 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let svc_ident = service_trait_ident(&all_configs.service_id);
 
     let (job_fn_strings, job_fns) = all_configs.jobs.values().map(|job| -> (String, syn::TraitItemFn) {
-        let fn_name = job_fn_ident(&job.id);
+        let fn_name = &job.id;
         let args = job.from.iter().map(|arg| -> syn::FnArg {
             let arg_ident = entity_over_dim_ident(&arg.id, &arg.over);
             let arg_ty: syn::Type = arg.over.iter().fold(
-                as_type(&arg.id),
+                to_type(&arg.id),
                 |acc, _| parse_quote! { Vec<#acc> },
             );
             parse_quote! { #arg_ident: #arg_ty }
         });
         let return_ty: syn::Type = job.spawn_dim.as_ref().map_or_else(
-            || as_type(&job.to),
+            || to_type(&job.to),
             |_| {
-                let unit_ty = as_type(&job.to);
+                let unit_ty = to_type(&job.to);
                 parse_quote! { Vec<#unit_ty> }
             },
         );
         (
             format!(
-                "async fn {fn_name}(&self, {}) -> Result<{}, operon::operon::UserError>;",
+                "async fn {}(&self, {}) -> Result<{}, operon::operon::UserError>;",
+                fn_name,
                 args.clone().map(|arg| arg.to_token_stream().to_string()).collect::<Vec<_>>().join(", "),
                 return_ty.to_token_stream().to_string().replace(" ", "")
             ),
