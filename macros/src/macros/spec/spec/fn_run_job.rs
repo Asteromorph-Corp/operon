@@ -311,6 +311,7 @@ pub(super) fn fn_run_job(
     });
 
     parse_quote! {
+        #[allow(unused_variables)]
         async fn run_job(
             &self,
             service: &Svc,

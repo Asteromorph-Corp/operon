@@ -1,3 +1,4 @@
+#[allow(unused_variables)]
 async fn run_job(
     &self,
     service: &Svc,
