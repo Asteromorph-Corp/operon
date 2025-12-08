@@ -49,7 +49,7 @@ where
     /// any other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
     pub async fn run(self, handler: SchedulerHandler<Svc, Sto>) -> Result<(), OperonError> {
-        let (scheduler_options, log_options) = self.options.split();
+        let (ui_options, scheduler_options, log_options) = self.options.split();
 
         // Initialize the logger
         let (log_tx, log_rx) = ::tokio::sync::broadcast::channel(log_options.buffer_size);
@@ -58,10 +58,13 @@ where
         let (ctrl_tx, ctrl_rx) = ::tokio::sync::watch::channel(ControlEvent::Start);
         let (rec_tx, rec_rx) = ::tokio::sync::watch::channel(RecoveryState::Unknown);
 
+        // Initialize the scheduler state channel
+        let (sched_tx, sched_rx) = ::tokio::sync::watch::channel(false);
+
         // Set up the logger
         UiLogger::new(log_tx, log_options.level, log_options.dump)
             .setup(::log::LevelFilter::Trace)?;
-        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(&handler.job_handlers)));
+        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(ui_options, &handler.job_handlers)));
 
         // Create the scheduler
         let scheduler = Scheduler::<Svc, Sto>::new(
@@ -71,9 +74,10 @@ where
             ui_state.clone(),
             ctrl_rx,
             rec_tx,
+            sched_tx,
             scheduler_options,
         )?;
-        let ui_loop = UiLoop::new(ui_state, log_rx, ctrl_tx, rec_rx);
+        let ui_loop = UiLoop::new(ui_state, log_rx, ctrl_tx, rec_rx, sched_rx);
 
         // Spawn the scheduler thread
         let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };

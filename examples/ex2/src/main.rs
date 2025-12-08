@@ -113,6 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     )?);
 
     let operon_options = OperonOptions::new(&database_uri)
+        .with_ui_options(operon::ui::UiOptions::Headless)
         .with_meta_storage_schema(Some("ex2_meta".to_string()))
         .with_log_dump(Some("./logs".to_string()))
         .with_log_level(log::Level::Info);

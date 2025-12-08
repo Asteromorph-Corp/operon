@@ -8,11 +8,11 @@ use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::operon::RunningState;
 use crate::scheduler::{
     ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
-    SchedulerError, SchedulerHandler, SchedulerOptions,
+    SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender, 
 };
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::UiState;
+use crate::ui::{UiOptions, UiState};
 
 /// # Scheduler
 ///
@@ -35,9 +35,11 @@ where
     ui_state: Arc<RwLock<UiState>>,
     ctrl_rx: ControlEventReceiver,
     rec_tx: RecoveryStateSender,
+    sched_tx: SchedulerStateSender,
     internal_channel_size: usize,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl<Svc, Sto> Scheduler<Svc, Sto>
 where
     Sto: OperonStorage,
@@ -51,6 +53,7 @@ where
         ui_state: Arc<RwLock<UiState>>,
         ctrl_rx: ControlEventReceiver,
         rec_tx: RecoveryStateSender,
+        sched_tx: SchedulerStateSender,
         options: SchedulerOptions,
     ) -> Result<Self, SchedulerError> {
         let (internal_channel_size, meta_storage_options) = options.split();
@@ -64,6 +67,7 @@ where
             ui_state,
             ctrl_rx,
             rec_tx,
+            sched_tx,
             internal_channel_size,
         })
     }
@@ -81,19 +85,26 @@ where
             };
             e
         })?;
+        let ui_options = {
+            let state = self.ui_state.read().await;
+            state.options()
+        };
         self.rec_tx.send(recovery_state)?;
-        match recovery_state {
-            RecoveryState::Fresh => log::info!("Type `run` to begin running jobs."),
-            RecoveryState::Finished => log::info!(
+        match (ui_options, recovery_state) {
+            (UiOptions::Headless, _) => {
+                log::info!("Starting in headless mode.");
+            }
+            (UiOptions::Interactive, RecoveryState::Fresh) => log::info!("Type `run` to begin running jobs."),
+            (UiOptions::Interactive, RecoveryState::Finished) => log::info!(
                 "Found a finished run. \n\
                 Type `run` to begin running jobs and overwrite the existing data, \
                 or `exit` to cancel."
             ),
-            RecoveryState::GracefullyStopped => log::info!(
+            (UiOptions::Interactive, RecoveryState::GracefullyStopped) => log::info!(
                 "Found a gracefully stopped run. \n\
                 Type `run` to resume running jobs from the last run, or `help` for additional options."
             ),
-            RecoveryState::AbortedUnchecked => log::info!(
+            (UiOptions::Interactive, RecoveryState::AbortedUnchecked) => log::info!(
                 "Found an aborted run. \n\
                 Type `check` to check if the data is recoverable, \
                 `run` to start a new run and overwrite the existing data, \
@@ -210,17 +221,23 @@ where
 
     async fn run(self, run_mode: RunMode) -> Result<(), SchedulerError> {
         let start = Instant::now();
+        let sched_tx = self.sched_tx.clone();
+        let res = self.run_internal(run_mode).await;
+        log::info!("All jobs closed in: {:?}.", start.elapsed());
+        // Notify the UI that the schedulers have finished.
+        if let Err(e) = sched_tx.send(true) {
+            log::error!("Failed to send scheduler finished state to UI: {}", e);
+        }
+        res
+    }
 
+    async fn run_internal(self, run_mode: RunMode) -> Result<(), SchedulerError> {
         // Set up the initial storage setup and initial tickets for the individual schedulers.
         let mut handles = match run_mode {
             RunMode::Clean => self.run_clean().await?,
             RunMode::Rebuild => self.run_rebuild().await?,
             RunMode::Restore => self.run_restore().await?,
         };
-
-        // match run_mode {
-        //     RunMode::Clean => {}
-        // }
 
         let mut returned_states = vec![];
         while let Some(res) = handles.join_next().await {
@@ -261,7 +278,6 @@ where
             tx.as_client().put_footprint("global", footprint).await?;
             tx.commit().await?;
         }
-        log::info!("All jobs closed in: {:?}.", start.elapsed());
         Ok(())
     }
 

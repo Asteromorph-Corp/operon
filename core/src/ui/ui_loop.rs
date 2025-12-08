@@ -11,8 +11,8 @@ use ratatui::widgets::*;
 use tokio::sync::RwLock;
 
 use crate::operon::RunningState;
-use crate::scheduler::{ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver};
-use crate::ui::{Action, LogRecordReceiver, Progress, UiError, UiState, UiStateUpdate};
+use crate::scheduler::{ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver};
+use crate::ui::{Action, LogRecordReceiver, Progress, UiError, UiOptions, UiState, UiStateUpdate};
 use crate::utils::SplitFirstOwned;
 
 const SEVENTY_SIX: u16 = 76;
@@ -49,6 +49,7 @@ pub struct UiLoop {
     log_rx: LogRecordReceiver,
     ctrl_tx: ControlEventSender,
     rec_rx: RecoveryStateReceiver,
+    sched_rx: SchedulerStateReceiver,
 }
 
 impl UiLoop {
@@ -59,16 +60,26 @@ impl UiLoop {
         log_rx: LogRecordReceiver,
         ctrl_tx: ControlEventSender,
         rec_rx: RecoveryStateReceiver,
+        sched_rx: SchedulerStateReceiver,
     ) -> Self {
         Self {
             state,
             log_rx,
             ctrl_tx,
             rec_rx,
+            sched_rx,
         }
     }
 
-    pub async fn run(mut self) -> Result<(), UiError> {
+    pub async fn run(self) -> Result<(), UiError> {
+        let options = self.state.read().await.options;
+        match options {
+            UiOptions::Interactive => self.run_interactive().await,
+            UiOptions::Headless => self.run_headless().await,
+        }
+    }
+
+    pub async fn run_interactive(mut self) -> Result<(), UiError> {
         enable_raw_mode()?;
         let mut stdout = ::std::io::stdout();
         execute!(stdout, EnterAlternateScreen)?;
@@ -508,6 +519,60 @@ impl UiLoop {
         disable_raw_mode()?;
         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
         terminal.show_cursor()?;
+        Ok(())
+    }
+
+    pub async fn run_headless(mut self) -> Result<(), UiError> {
+        // Main loop for the headless UI.
+        // Recovery is disabled for this mode,
+        // so we always run fresh off the bat and wait
+        // until everything finishes or something errors.
+        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+        self.state
+            .write()
+            .await
+            .update_ui_state(ControlEvent::CleanRun)?;
+        loop {
+            // Snapshot the current overall state.
+            let (state, last_control_event, exit) = {
+                let guard = self.state.read().await;
+                let exit = self.sched_rx.borrow();
+                (
+                    guard.overall_state(),
+                    guard.last_control_event.clone(),
+                    *exit,
+                )
+            };
+            // Draw all remaining logs.
+            loop {
+                match self.log_rx.try_recv() {
+                    Ok(record) => {
+                        eprintln!("{}", record.format_for_print());
+                    }
+                    // Skip fallen-behind logs
+                    Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+                    // Drained all logs
+                    Err(::tokio::sync::broadcast::error::TryRecvError::Empty) => break,
+                    // Channel unexpectedly closed
+                    Err(e) => return Err(e.into()),
+                }
+            }
+            // If a new error state is detected, abort the execution.
+            if state == RunningState::Error && last_control_event != ControlEvent::Abort {
+                log::error!("Aborting execution due to previous error.");
+                self.ctrl_tx.send(ControlEvent::Abort)?;
+                self.state
+                    .write()
+                    .await
+                    .update_ui_state(ControlEvent::Abort)?;
+            }
+            if exit {
+                // The main scheduler has exited, we can exit too.
+                break;
+            }
+            ::tokio::time::sleep(::std::time::Duration::from_millis(10)).await;
+        }
+
         Ok(())
     }
 

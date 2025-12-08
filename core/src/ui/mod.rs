@@ -4,6 +4,9 @@ pub use ui_loop::*;
 mod ui_logger;
 pub use ui_logger::*;
 
+mod ui_options;
+pub use ui_options::*;
+
 mod ui_state;
 pub use ui_state::*;
 

@@ -30,7 +30,7 @@ impl From<&::log::Record<'_>> for LogRecord {
 }
 
 impl LogRecord {
-    pub fn format(&self, width: u16) -> Vec<Line<'_>> {
+    pub fn format_for_term(&self, width: u16) -> Vec<Line<'_>> {
         let timestamp = self.timestamp.format("%y-%m-%d %H:%M:%S").to_string();
         let level_colour = match self.level {
             log::Level::Error => ::ratatui::style::Style::new().red(),
@@ -95,7 +95,7 @@ impl LogRecord {
         lines
     }
 
-    pub fn dump_format(&self) -> String {
+    pub fn format_for_dump(&self) -> String {
         format!(
             "{},{},{},{},{},{},\"{}\"",
             self.timestamp.format("%Y-%m-%d %H:%M:%S%.f %:z"),
@@ -105,6 +105,22 @@ impl LogRecord {
             self.module_path.as_deref().unwrap_or(""),
             self.line.unwrap_or(0),
             self.msg.replace("\"", "\"\"")
+        )
+    }
+
+    pub fn format_for_print(&self) -> String {
+        let level_colour = match self.level {
+            log::Level::Error => ansi_term::Colour::Red,
+            log::Level::Warn => ansi_term::Colour::Yellow,
+            log::Level::Info => ansi_term::Colour::Green,
+            log::Level::Debug => ansi_term::Colour::Cyan,
+            log::Level::Trace => ansi_term::Colour::White,
+        };
+        format!(
+            "{} {} | {}",
+            self.timestamp.format("%Y-%m-%d %H:%M:%S"),
+            level_colour.paint(format!("{:>5}", self.level)),
+            self.msg
         )
     }
 }
