@@ -83,7 +83,7 @@ impl UiLogger {
         };
         let mut writer = ::std::io::BufWriter::new(log_file);
         let record = LogRecord::from(record);
-        let _ = writeln!(writer, "{}", record.dump_format());
+        let _ = writeln!(writer, "{}", record.format_for_dump());
     }
 }
 

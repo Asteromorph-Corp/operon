@@ -4,13 +4,14 @@ use crate::operon::RunningState;
 use crate::scheduler::{ControlEvent, JobHandler};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{LogBuffer, ShellPrompt, UiError, UiStateUpdate};
+use crate::ui::{LogBuffer, ShellPrompt, UiError, UiStateUpdate, UiOptions};
 
 pub type Progress = (i64, i64, i64, RunningState, bool);
 
 /// Minimal state that holds the information needed to render the UI.
 #[derive(Default, Debug, Clone)]
 pub struct UiState {
+    pub(super) options: UiOptions,
     // Done, queued, waiting, state, returned.
     pub(super) progress: IndexMap<String, Progress>,
     pub(super) log_buffer: LogBuffer,
@@ -25,6 +26,7 @@ pub struct UiState {
 
 impl UiState {
     pub fn from_jobs<Svc: OperonService, Sto: OperonStorage>(
+        ui_options: UiOptions,
         jobs: &[Box<dyn JobHandler<Svc, Sto>>],
     ) -> Self {
         let progress = jobs
@@ -37,9 +39,14 @@ impl UiState {
             })
             .collect();
         Self {
+            options: ui_options,
             progress,
             ..Default::default()
         }
+    }
+
+    pub fn options(&self) -> UiOptions {
+        self.options
     }
 
     pub fn progress_iter(&self) -> impl Iterator<Item = &Progress> {
@@ -86,7 +93,7 @@ impl UiState {
             UiStateUpdate::NewLog(record, width) => {
                 // Follow the cursor if it is not at 0
                 if self.cursor != 0 {
-                    self.cursor = self.cursor.saturating_add(record.format(width).len());
+                    self.cursor = self.cursor.saturating_add(record.format_for_term(width).len());
                     self.unread_logs += 1;
                 }
                 self.log_buffer.push(record);

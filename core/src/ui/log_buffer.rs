@@ -34,7 +34,7 @@ impl LogBuffer {
     }
 
     pub fn to_lines(&self, width: u16) -> Vec<Line<'_>> {
-        self.records.iter().flat_map(|r| r.format(width)).collect()
+        self.records.iter().flat_map(|r| r.format_for_term(width)).collect()
     }
 
     /// Display the bottom `height` lines, skipping `cursor` lines.

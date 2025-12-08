@@ -3,9 +3,11 @@ use std::borrow::Cow;
 use secrecy::SecretString;
 
 use crate::scheduler::SchedulerOptions;
-use crate::ui::LogOptions;
+use crate::ui::{LogOptions, UiOptions};
 
 pub struct OperonOptions {
+    // UI options
+    pub(crate) ui_options: UiOptions,
     // Scheduler options
     pub(crate) internal_channel_size: usize,
     // Meta storage options
@@ -23,6 +25,7 @@ pub struct OperonOptions {
 impl OperonOptions {
     pub fn new(meta_storage_uri: impl Into<String>) -> Self {
         Self {
+            ui_options: UiOptions::Interactive,
             internal_channel_size: 1024,
             meta_storage_uri: SecretString::from(meta_storage_uri.into()),
             meta_storage_pool_size: 16,
@@ -33,6 +36,11 @@ impl OperonOptions {
             log_buffer_size: 1024,
             log_dump: None,
         }
+    }
+
+    pub fn with_ui_options(mut self, options: UiOptions) -> Self {
+        self.ui_options = options;
+        self
     }
 
     pub fn with_internal_channel_size(mut self, size: usize) -> Self {
@@ -82,7 +90,8 @@ impl OperonOptions {
         self
     }
 
-    pub(crate) fn split(self) -> (SchedulerOptions, LogOptions) {
+    pub(crate) fn split(self) -> (UiOptions, SchedulerOptions, LogOptions) {
+        let ui_options = self.ui_options;
         let scheduler_options = SchedulerOptions {
             internal_channel_size: self.internal_channel_size,
             database_uri: self.meta_storage_uri,
@@ -97,6 +106,6 @@ impl OperonOptions {
             dump: self.log_dump.map(Cow::from),
         };
 
-        (scheduler_options, log_options)
+        (ui_options, scheduler_options, log_options)
     }
 }
