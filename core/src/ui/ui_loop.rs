@@ -18,10 +18,10 @@ use crate::utils::SplitFirstOwned;
 const SEVENTY_SIX: u16 = 76;
 const HELP_TEXT: &str = r#"Operon TUI.
 Navigation keys:
-    ^C                  Clear input.
-    ^D                  Exit.
-    ^L                  Clear logs.
-    ^Up, ^Down          Scroll logs 1 line.
+    Ctrl+C              Clear input.
+    Ctrl+D              Exit.
+    Ctrl+L              Clear logs.
+    Alt+Up, Alt+Down    Scroll logs 1 line.
     Up, Down            Scroll logs 5 lines.
     PgUp, PgDn          Scroll logs 20 lines.
     Esc                 Show most recent logs.
@@ -107,15 +107,16 @@ impl UiLoop {
                     let command = match evt? {
                         Event::Key(KeyEvent {
                             code: KeyCode::Up,
-                            modifiers: KeyModifiers::CONTROL,
+                            modifiers: KeyModifiers::ALT,
                             ..
                         }) => {
-                            let _ = self.state.write().await.cursor.saturating_add(1);
+                            let mut state = self.state.write().await;
+                            state.cursor = state.cursor.saturating_add(1);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::Down,
-                            modifiers: KeyModifiers::CONTROL,
+                            modifiers: KeyModifiers::ALT,
                             ..
                         }) => {
                             let mut state = self.state.write().await;
