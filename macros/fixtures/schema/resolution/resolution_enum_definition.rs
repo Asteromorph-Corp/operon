@@ -1,4 +1,4 @@
-///An enum representing the resolution of any dimension.
+/// An enum representing the resolution of any dimension.
 #[derive(Debug, Clone)]
 pub enum ResolutionEnum {
     I(operon::schema::Resolution<0usize>),

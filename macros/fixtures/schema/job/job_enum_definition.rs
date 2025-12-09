@@ -1,4 +1,4 @@
-///An enum representing any job.
+/// An enum representing any job.
 #[derive(Debug, Clone)]
 pub enum JobEnum {
     Alpha(operon::schema::Job<0usize>),
