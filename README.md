@@ -64,7 +64,7 @@ We recommend reading the source code of [ex1](examples/ex1/src/main.rs) to get a
 Operon's primary use case is best described as _a known pipeline of an unknown number of tasks_.
 It executes these tasks in parallel until all possible tasks have completed.
 
-Here, a _task_ is a discrete unit of work that run in parallel, where each task's outputs ([_entities_](#defining-entities)) can serve as inputs for other tasks.
+Here, a _task_ is a discrete unit of work that runs in parallel, where each task's outputs ([_entities_](#defining-entities)) can serve as inputs for other tasks.
 Tasks and their dependencies must be predefined, forming a directed acyclic graph (DAG).
 This DAG's validity is checked at macro-expansion time.
 
