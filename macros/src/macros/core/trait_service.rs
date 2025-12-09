@@ -1,11 +1,68 @@
-use quote::ToTokens;
+use indoc::formatdoc;
 use syn::parse_quote;
 
-use crate::configs::AllConfig;
+use crate::configs::{AllConfig, JobConfig};
 use crate::utils::{
     entity_over_dim_ident, job_enum_ident, operon_ident, resolution_enum_ident,
     service_trait_ident, to_type,
 };
+
+fn format_definition(job: &JobConfig) -> String {
+    let output_agg = job
+        .spawn_dim
+        .as_ref()
+        .map(|d| format!("<{d}>"))
+        .unwrap_or_default();
+    let inputs = job
+        .from
+        .iter()
+        .map(|arg| {
+            let agg = if arg.over.is_empty() {
+                String::new()
+            } else {
+                let dims = arg.over.iter().map(|d| d.to_string()).collect::<Vec<_>>();
+                format!("<{}>", dims.join(", "))
+            };
+            format!("{}{}", arg.id, agg)
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let repeat = if job.dims.is_empty() {
+        String::new()
+    } else {
+        let dims = job.dims.iter().map(|d| d.to_string()).collect::<Vec<_>>();
+        format!(" for {}", dims.join(", "))
+    };
+
+    format!(
+        "{}{} = {}({}){}",
+        job.to, output_agg, job.id, inputs, repeat
+    )
+}
+
+fn format_signature(job: &JobConfig) -> String {
+    let operon = operon_ident();
+    let args = job
+        .from
+        .iter()
+        .map(|arg| {
+            let arg_ident = entity_over_dim_ident(&arg.id, &arg.over);
+            let arg_ty =
+                (0..arg.over.len()).fold(arg.id.to_string(), |acc, _| format!("Vec<{acc}>"));
+            format!("{arg_ident}: {arg_ty}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let return_ty = job
+        .spawn_dim
+        .as_ref()
+        .map_or_else(|| job.to.to_string(), |_| format!("Vec<{}>", job.to));
+
+    format!(
+        "async fn {}({}) -> Result<{}, {}::operon::UserError>",
+        job.id, args, return_ty, operon
+    )
+}
 
 /// Generates a trait for the service based on the provided AllConfig.
 ///
@@ -30,16 +87,16 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let res_enum_ident = resolution_enum_ident();
     let svc_ident = service_trait_ident(&all_configs.service_id);
 
-    let (job_fn_strings, job_fns) = all_configs.jobs.values().map(|job| -> (String, syn::TraitItemFn) {
+    let (job_sigs, job_fns) = all_configs.jobs.values().map(|job| -> (String, syn::TraitItemFn) {
         let fn_name = &job.id;
         let args = job.from.iter().map(|arg| -> syn::FnArg {
             let arg_ident = entity_over_dim_ident(&arg.id, &arg.over);
-            let arg_ty: syn::Type = arg.over.iter().fold(
+            let arg_ty: syn::Type = (0..arg.over.len()).fold(
                 to_type(&arg.id),
                 |acc, _| parse_quote! { Vec<#acc> },
             );
             parse_quote! { #arg_ident: #arg_ty }
-        });
+        }).collect::<Vec<_>>();
         let return_ty: syn::Type = job.spawn_dim.as_ref().map_or_else(
             || to_type(&job.to),
             |_| {
@@ -47,47 +104,40 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
                 parse_quote! { Vec<#unit_ty> }
             },
         );
+
+        let def = format_definition(job);
+        let sig = format_signature(job);
+        let doc = formatdoc! {"
+            # Definition
+            Corresponds to the task:
+            ```rust,ignore
+            {def}
+            ```
+
+            # Signature
+            ```rust,ignore
+            {sig}
+            ```",
+        };
+
         (
-            format!(
-                "async fn {}(&self, {}) -> Result<{}, operon::operon::UserError>;",
-                fn_name,
-                args.clone().map(|arg| arg.to_token_stream().to_string()).collect::<Vec<_>>().join(", "),
-                return_ty.to_token_stream().to_string().replace(" ", "")
-            ),
+            sig,
             parse_quote! {
+                #[doc = #doc]
                 async fn #fn_name(&self, #(#args),*) -> Result<#return_ty, #operon::operon::UserError>;
             },
         )
     }).unzip::<_, _, Vec<_>, Vec<_>>();
 
-    let doc_comment = format!(
-        "# {svc_ident}\n\n\
-        This trait defines the functions Operon will call \
-        to execute jobs in the service you defined. \
-        Implement the functions provided below to define \
-        the behaviour of your service.\n\n\
-        Notes:\n\n\
-        * All functions are async methods and must return a `Result<_, Box<dyn std::error::Error + Send + Sync>>`.\n\
-        * Repeated parameters are slices; repeated return types are vectors.\n\
-        * The functions in the trait are intended to be stateless. \
-          The struct may contain static metadata, but you would need to implement \
-          internally-mutable thread-safe states if you really need stateful functions.\n\n\
-        Please consult the following section for the exact function signatures.\n\n\
-        ## Function Signatures\n\n\
-        The functions were parsed as follows:\n\n\
-        ```rust,ignore\n\
-        use operon::async_trait::async_trait;\n\
-        #[async_trait]\n\
-        pub trait {svc_ident} {{\n\
-        {job_fns}\n\
-        }}\n\
+    let doc_comment = formatdoc! {"
+        The trait used to provide Operon with the implementation of task functions defined in your service.
+
+        # Methods
+        ```rust,ignore
+        {}
         ```",
-        job_fns = job_fn_strings
-            .iter()
-            .map(|fn_body| format!("    {fn_body}"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
+        job_sigs.join("\n")
+    };
 
     parse_quote! {
         #[#operon::async_trait::async_trait]

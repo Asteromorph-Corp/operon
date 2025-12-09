@@ -121,7 +121,7 @@ pub fn to_snake_case(id: &syn::Ident) -> syn::Ident {
 }
 
 pub fn clear_span(ident: &syn::Ident) -> syn::Ident {
-    format_ident!("{ident}")
+    syn::Ident::new(&ident.to_string(), proc_macro2::Span::call_site())
 }
 
 pub fn to_lit_str(ident: &syn::Ident) -> syn::LitStr {
