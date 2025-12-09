@@ -67,13 +67,14 @@ pub fn normalize_comments(input: &str) -> String {
                 chars.next(); // consume third '/'
                 out.push_str("///");
                 // If next char is not space or slash, insert space
-                if let Some(&nc) = chars.peek() {
-                    if !nc.is_whitespace() {
-                        out.push(' ');
-                    }
+                if let Some(&nc) = chars.peek()
+                    && !nc.is_whitespace()
+                {
+                    out.push(' ');
                 }
+
                 // Write until newline
-                while let Some(nc) = chars.next() {
+                for nc in chars.by_ref() {
                     out.push(nc);
                     if nc == '\n' {
                         break;
