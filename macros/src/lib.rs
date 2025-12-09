@@ -33,15 +33,22 @@ pub fn derive_operon_service(input: TokenStream) -> TokenStream {
 
     let service = input.ident;
     let operon = attrs.crate_path.unwrap_or_else(|| operon_ident().into());
-    let definition: syn::Path = match attrs.definition_path {
-        Some(path) => parse_quote! { #path::schema },
-        None => parse_quote! { schema },
-    };
+    let definition = attrs.definition_path.unwrap_or(parse_quote!(self));
 
     quote! {
+        #[automatically_derived]
         impl #operon::service::OperonService for #service {
-            type JobEnum = #definition::JobEnum;
-            type ResolutionEnum = #definition::ResolutionEnum;
+            type JobEnum = #definition::schema::JobEnum;
+            type ResolutionEnum = #definition::schema::ResolutionEnum;
+        }
+
+        #[automatically_derived]
+        impl<Sto: #definition::__misc::StorageTrait> operon::scheduler::ValidOperon<#service, Sto>
+            for (#service, Sto)
+        {
+            fn scheduler_handler() -> operon::scheduler::SchedulerHandler<#service, Sto> {
+                #definition::__misc::scheduler_handler()
+            }
         }
     }
     .into()
