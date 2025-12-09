@@ -8,7 +8,7 @@ use crate::utils::{entities_ident, operon_ident, sql_storage_ident};
 /// ```rust,ignore
 /// pub type PsqlCookingStorage = operon::storage::psql::PsqlStorage<CookingEntities>;
 /// ```
-pub(super) fn storage_definition(service_id: &str) -> syn::ItemType {
+pub(super) fn storage_definition(service_id: &syn::Ident) -> syn::ItemType {
     let operon = operon_ident();
     let sql_storage_ident = sql_storage_ident(service_id);
     let entities_ident = entities_ident(service_id);
@@ -27,8 +27,8 @@ mod tests {
     use crate::test_utils::simple_pipeline::service_id;
 
     #[rstest]
-    fn test_storage_definition(service_id: &str) {
-        let item = storage_definition(service_id);
+    fn test_storage_definition(service_id: syn::Ident) {
+        let item = storage_definition(&service_id);
         assert_item_eq(&item, "storage/storage_definition.rs");
     }
 }

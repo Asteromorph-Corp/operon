@@ -12,13 +12,9 @@ fn get_fixture_path(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn normalize_prettified(s: &str) -> String {
-    s.replace(">::", "> ::")
-}
-
 fn prettify_file(file: &syn::File) -> String {
     let prettified = prettyplease::unparse(file);
-    normalize_prettified(&prettified)
+    normalize_string(&prettified)
 }
 
 fn prettify_item(item: &impl ToTokens) -> String {

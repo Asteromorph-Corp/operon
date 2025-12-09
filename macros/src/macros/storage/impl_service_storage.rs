@@ -7,7 +7,7 @@ use crate::macros::storage::single_ops::single_ops;
 use crate::utils::{operon_ident, sql_storage_ident, storage_trait_ident};
 
 pub(super) fn impl_service_storage(
-    service_id: &str,
+    service_id: &syn::Ident,
     jobs: &JobConfigMap,
     entities: &EntityConfigMap,
 ) -> syn::ItemImpl {

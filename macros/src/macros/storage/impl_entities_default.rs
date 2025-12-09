@@ -1,7 +1,7 @@
 use syn::parse_quote;
 
 use crate::configs::EntityConfigMap;
-use crate::utils::{entities_ident, entity_metadata_ident, variable_ident};
+use crate::utils::{entities_ident, entity_metadata_ident, to_snake_case};
 
 /// Generates the implementation of `Default` trait for the entities struct.
 ///
@@ -20,10 +20,10 @@ use crate::utils::{entities_ident, entity_metadata_ident, variable_ident};
 ///     }
 /// }
 /// ```
-pub fn impl_entities_default(service_id: &str, entities: &EntityConfigMap) -> syn::ItemImpl {
+pub fn impl_entities_default(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemImpl {
     let entities_ident = entities_ident(service_id);
     let fields = entities.values().map(|entity| -> syn::FieldValue {
-        let field_ident = variable_ident(&entity.id);
+        let field_ident = to_snake_case(&entity.id);
         let entity_meta = entity_metadata_ident(&entity.id);
 
         parse_quote! {
@@ -51,8 +51,8 @@ mod tests {
     use crate::test_utils::simple_pipeline::{all_entities, service_id};
 
     #[rstest]
-    fn test_impl_entities_default(service_id: &str, all_entities: EntityConfigMap) {
-        let item = impl_entities_default(service_id, &all_entities);
+    fn test_impl_entities_default(service_id: syn::Ident, all_entities: EntityConfigMap) {
+        let item = impl_entities_default(&service_id, &all_entities);
         assert_item_eq(&item, "storage/impl_entities_default.rs");
     }
 }

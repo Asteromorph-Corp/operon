@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use indexmap::IndexSet;
 
-use crate::configs::{EntityId, JobConfig, JobConfigMap};
+use crate::configs::{JobConfig, JobConfigMap};
 
 /// Returns a mapping from job `to` entity to job `id`.
-fn build_upstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&EntityId, &JobConfig> {
-    let mut index: HashMap<&EntityId, &JobConfig> = HashMap::new();
+fn build_upstream_inverted_index(jobs: &JobConfigMap) -> HashMap<&syn::Ident, &JobConfig> {
+    let mut index: HashMap<&syn::Ident, &JobConfig> = HashMap::new();
 
     for job in jobs.values() {
         if let Some(dup) = index.get(&job.to) {
@@ -73,6 +73,7 @@ pub fn get_direct_upstream_jobs<'a>(
 
 #[cfg(test)]
 mod tests {
+    use quote::format_ident;
     use rstest::rstest;
 
     use super::*;
@@ -80,39 +81,39 @@ mod tests {
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]
-    #[case::beta("beta", vec!["alpha", "beta"])]
-    #[case::gamma("gamma", vec!["alpha", "gamma"])]
-    #[case::delta("delta", vec!["alpha", "beta", "gamma", "delta"])]
-    #[case::epsilon("epsilon", vec!["alpha", "beta", "gamma", "delta", "epsilon"])]
-    #[case::zeta("zeta", vec!["alpha", "beta", "gamma", "delta", "epsilon", "zeta"])]
+    #[case::beta(format_ident!("beta"), vec![format_ident!("alpha"), format_ident!("beta")])]
+    #[case::gamma(format_ident!("gamma"), vec![format_ident!("alpha"), format_ident!("gamma")])]
+    #[case::delta(format_ident!("delta"), vec![format_ident!("alpha"), format_ident!("beta"), format_ident!("gamma"), format_ident!("delta")])]
+    #[case::epsilon(format_ident!("epsilon"), vec![format_ident!("alpha"), format_ident!("beta"), format_ident!("gamma"), format_ident!("delta"), format_ident!("epsilon")])]
+    #[case::zeta(format_ident!("zeta"), vec![format_ident!("alpha"), format_ident!("beta"), format_ident!("gamma"), format_ident!("delta"), format_ident!("epsilon"), format_ident!("zeta")])]
     fn test_get_upstream_jobs(
         all_jobs: JobConfigMap,
-        #[case] job_id: &str,
-        #[case] expected_job_ids: Vec<&str>,
+        #[case] job_id: syn::Ident,
+        #[case] expected_job_ids: Vec<syn::Ident>,
     ) {
-        let job = all_jobs.get(job_id).unwrap();
+        let job = all_jobs.get(&job_id).unwrap();
         let expected = expected_job_ids
             .into_iter()
-            .map(|id| all_jobs.get(id).unwrap())
+            .map(|id| all_jobs.get(&id).unwrap())
             .collect::<IndexSet<_>>();
         assert_eq!(get_upstream_jobs(job, &all_jobs), expected);
     }
 
     #[rstest]
-    #[case::beta("beta", vec!["alpha"])]
-    #[case::gamma("gamma", vec!["alpha"])]
-    #[case::delta("delta", vec!["alpha", "beta", "gamma"])]
-    #[case::epsilon("epsilon", vec!["beta", "delta"])]
-    #[case::zeta("zeta", vec!["gamma", "epsilon"])]
+    #[case::beta(format_ident!("beta"), vec![format_ident!("alpha")])]
+    #[case::gamma(format_ident!("gamma"), vec![format_ident!("alpha")])]
+    #[case::delta(format_ident!("delta"), vec![format_ident!("alpha"), format_ident!("beta"), format_ident!("gamma")])]
+    #[case::epsilon(format_ident!("epsilon"), vec![format_ident!("beta"), format_ident!("delta")])]
+    #[case::zeta(format_ident!("zeta"), vec![format_ident!("gamma"), format_ident!("epsilon")])]
     fn test_get_direct_upstream_jobs(
         all_jobs: JobConfigMap,
-        #[case] job_id: &str,
-        #[case] expected_job_ids: Vec<&str>,
+        #[case] job_id: syn::Ident,
+        #[case] expected_job_ids: Vec<syn::Ident>,
     ) {
-        let job = all_jobs.get(job_id).unwrap();
+        let job = all_jobs.get(&job_id).unwrap();
         let expected = expected_job_ids
             .into_iter()
-            .map(|id| all_jobs.get(id).unwrap())
+            .map(|id| all_jobs.get(&id).unwrap())
             .collect::<IndexSet<_>>();
         assert_eq!(get_direct_upstream_jobs(job, &all_jobs), expected);
     }

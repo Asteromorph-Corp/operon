@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::DimensionConfigMap;
 use crate::operon_ident;
-use crate::utils::{resolution_enum_ident, variant_ident};
+use crate::utils::{resolution_enum_ident, to_pascal_case};
 
 /// Generates an enum representing the resolution of any dimension.
 ///
@@ -19,7 +19,7 @@ pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemE
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
     let variants = dimensions.values().map(|dim| -> syn::Variant {
-        let variant_ident = variant_ident(&dim.id);
+        let variant_ident = to_pascal_case(&dim.id);
         let n = dim.depends_on.len();
         parse_quote! {
             #variant_ident(#operon::schema::Resolution<#n>)

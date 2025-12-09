@@ -1,3 +1,4 @@
+#[allow(unused_variables)]
 async fn run_job(
     &self,
     service: &Svc,
@@ -22,12 +23,12 @@ async fn run_job(
     resolution_j.insert([], resolution.ub);
 
     let b_j = {
-        let elem = storage.get_all_b_over_j([i]).await?;
+        let elem = storage.get_all_b_j([i]).await?;
         let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
-                "b (i = {i}, j = *) expects {ub} elements, but only {len} were found"
+                "B (i = {i}, j = *) expects {ub} elements, but only {len} were found"
             ))
             .into());
         }
@@ -38,12 +39,12 @@ async fn run_job(
             .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
     }?;
     let d_j = {
-        let elem = storage.get_all_d_over_j([i, k]).await?;
+        let elem = storage.get_all_d_j([i, k]).await?;
         let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
             return Err(operon::storage::StorageError::NotFound(format!(
-                "d (i = {i}, j = *, k = {k}) expects {ub} elements, but only {len} were found"
+                "D (i = {i}, j = *, k = {k}) expects {ub} elements, but only {len} were found"
             ))
             .into());
         }

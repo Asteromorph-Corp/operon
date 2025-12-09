@@ -1,8 +1,9 @@
 use indexmap::IndexSet;
+use quote::format_ident;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, variant_ident};
+use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, to_lit_str, to_pascal_case};
 
 /// Generates the `on_receive_job` function for the implementation of the trait `JobSpec`.
 ///
@@ -37,17 +38,20 @@ pub(super) fn fn_on_receive_job(
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
-    let job_id = &job.id;
+    let job_id = to_lit_str(&job.id);
 
     let job_arms = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
         let upstream_job_meta = job_metadata_ident(&upstream_job.id);
-        let variant_ident = variant_ident(&upstream_job.id);
+        let variant_ident = to_pascal_case(&format_ident!("{}", upstream_job.id));
         let affected_args = job.from.iter().filter(|arg| arg.id == upstream_job.to);
 
         let raise_deps_done = affected_args.map(|arg| -> syn::Expr {
-            let aggregate_dims = &arg.over;
+            let aggregate_dims = arg.over.iter().map(to_lit_str);
             parse_quote! {
-                client.ticket(self.job_meta()).raise_deps_done(metadata::#upstream_job_meta(), job, &[#(#aggregate_dims),*]).await?
+                client
+                    .ticket(self.job_meta())
+                    .raise_deps_done(metadata::#upstream_job_meta(), job, &[#(#aggregate_dims),*])
+                    .await?
             }
         });
 
@@ -86,13 +90,13 @@ mod tests {
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]
-    #[case::simple("epsilon", "spec/spec/fn_on_receive_job.rs")]
+    #[case::simple(format_ident!("epsilon"), "spec/spec/fn_on_receive_job.rs")]
     fn test_fn_on_receive_job(
         all_jobs: JobConfigMap,
-        #[case] job_id: &str,
+        #[case] job_id: syn::Ident,
         #[case] fixture_path: &str,
     ) {
-        let job = all_jobs.get(job_id).unwrap();
+        let job = all_jobs.get(&job_id).unwrap();
         let upstream_jobs = get_direct_upstream_jobs(job, &all_jobs);
         let item = fn_on_receive_job(job, &upstream_jobs);
         assert_item_eq(&item, fixture_path);

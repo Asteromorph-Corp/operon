@@ -1,3 +1,4 @@
+#[allow(unused_variables)]
 async fn run_job(
     &self,
     service: &Svc,
@@ -8,7 +9,7 @@ async fn run_job(
     let [i] = job.coordinate;
 
     let Some(a) = storage.get_a([i]).await? else {
-        return Err(operon::storage::StorageError::NotFound(format!("a (i = {i})")).into());
+        return Err(operon::storage::StorageError::NotFound(format!("A (i = {i})")).into());
     };
 
     let b_j = service

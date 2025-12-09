@@ -3,6 +3,7 @@ use syn::parse_quote;
 use crate::configs::AllConfig;
 use crate::macros::core::mod_core;
 use crate::macros::metadata::mod_metadata;
+use crate::macros::misc::misc;
 use crate::macros::prelude::prelude;
 use crate::macros::schema::mod_schema;
 use crate::macros::spec::mod_spec;
@@ -15,6 +16,7 @@ pub fn operon(all_configs: &AllConfig) -> syn::File {
     let mod_spec = mod_spec(all_configs);
     let mod_storage = mod_storage(all_configs);
 
+    let misc = misc(all_configs);
     let prelude = prelude(all_configs);
 
     parse_quote! {
@@ -24,6 +26,7 @@ pub fn operon(all_configs: &AllConfig) -> syn::File {
         #mod_spec
         #mod_storage
 
+        #misc
         #prelude
         pub use prelude::*;
     }

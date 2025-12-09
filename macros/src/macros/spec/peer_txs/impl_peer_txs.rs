@@ -1,7 +1,6 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::configs::JobId;
 use crate::utils::{
     job_enum_ident, job_id_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident,
 };
@@ -32,7 +31,10 @@ use crate::utils::{
 ///     }
 /// }
 /// ```
-pub fn impl_peer_txs(job_id: &JobId, event_receiving_job_ids: &IndexSet<&JobId>) -> syn::ItemImpl {
+pub fn impl_peer_txs(
+    job_id: &syn::Ident,
+    event_receiving_job_ids: &IndexSet<&syn::Ident>,
+) -> syn::ItemImpl {
     let operon = operon_ident();
     let peer_txs_ident = peer_txs_ident(job_id);
     let job_enum_ident = job_enum_ident();
@@ -81,25 +83,24 @@ pub fn impl_peer_txs(job_id: &JobId, event_receiving_job_ids: &IndexSet<&JobId>)
 
 #[cfg(test)]
 mod tests {
+    use quote::format_ident;
     use rstest::rstest;
 
     use super::*;
     use crate::test_utils::assert_item_eq;
 
     #[rstest]
-    #[case::simple("beta", vec!["delta", "epsilon"], "spec/peer_txs/impl_peer_txs.rs")]
+    #[case::simple(
+        format_ident!("beta"),
+        vec![format_ident!("delta"), format_ident!("epsilon")],
+        "spec/peer_txs/impl_peer_txs.rs"
+    )]
     fn test_impl_peer_event_senders(
-        #[case] job_id: &str,
-        #[case] event_receiving_job_ids: Vec<&str>,
+        #[case] job_id: syn::Ident,
+        #[case] event_receiving_job_ids: Vec<syn::Ident>,
         #[case] fixture_path: &str,
     ) {
-        let job_id = JobId::from(job_id);
-        let event_receiving_job_ids = event_receiving_job_ids
-            .into_iter()
-            .map(JobId::from)
-            .collect::<Vec<_>>();
         let event_receiving_job_ids = event_receiving_job_ids.iter().collect::<IndexSet<_>>();
-
         let item = impl_peer_txs(&job_id, &event_receiving_job_ids);
         assert_item_eq(&item, fixture_path);
     }

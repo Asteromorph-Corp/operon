@@ -21,26 +21,27 @@ pub fn get_direct_downstream_jobs<'a>(
 
 #[cfg(test)]
 mod tests {
+    use quote::format_ident;
     use rstest::rstest;
 
     use super::*;
     use crate::test_utils::simple_pipeline::all_jobs;
 
     #[rstest]
-    #[case::beta("beta", vec!["delta", "epsilon"])]
-    #[case::gamma("gamma", vec!["delta", "zeta"])]
-    #[case::delta("delta", vec!["epsilon"])]
-    #[case::epsilon("epsilon", vec!["zeta"])]
-    #[case::zeta("zeta", vec![])]
+    #[case::beta(format_ident!("beta"), vec![format_ident!("delta"), format_ident!("epsilon")])]
+    #[case::gamma(format_ident!("gamma"), vec![format_ident!("delta"), format_ident!("zeta")])]
+    #[case::delta(format_ident!("delta"), vec![format_ident!("epsilon")])]
+    #[case::epsilon(format_ident!("epsilon"), vec![format_ident!("zeta")])]
+    #[case::zeta(format_ident!("zeta"), vec![])]
     fn test_get_direct_downstream_jobs(
         all_jobs: JobConfigMap,
-        #[case] job_id: &str,
-        #[case] expected_job_ids: Vec<&str>,
+        #[case] job_id: syn::Ident,
+        #[case] expected_job_ids: Vec<syn::Ident>,
     ) {
-        let job = all_jobs.get(job_id).unwrap();
+        let job = all_jobs.get(&job_id).unwrap();
         let expected = expected_job_ids
             .into_iter()
-            .map(|id| all_jobs.get(id).unwrap())
+            .map(|id| all_jobs.get(&id).unwrap())
             .collect::<IndexSet<_>>();
         assert_eq!(get_direct_downstream_jobs(job, &all_jobs), expected);
     }

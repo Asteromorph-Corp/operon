@@ -1,7 +1,4 @@
-async fn get_all_b_over_j(
-    &self,
-    [i]: [usize; 1usize],
-) -> Result<Vec<B>, operon::storage::StorageError> {
+async fn get_all_b_j(&self, [i]: [usize; 1usize]) -> Result<Vec<B>, operon::storage::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut j = 0usize;
@@ -14,10 +11,7 @@ async fn get_all_b_over_j(
     Ok(final_results.unwrap_or_default())
 }
 
-async fn get_all_c_over_k(
-    &self,
-    [i]: [usize; 1usize],
-) -> Result<Vec<C>, operon::storage::StorageError> {
+async fn get_all_c_k(&self, [i]: [usize; 1usize]) -> Result<Vec<C>, operon::storage::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut k = 0usize;
@@ -30,7 +24,7 @@ async fn get_all_c_over_k(
     Ok(final_results.unwrap_or_default())
 }
 
-async fn get_all_d_over_j(
+async fn get_all_d_j(
     &self,
     [i, k]: [usize; 2usize],
 ) -> Result<Vec<D>, operon::storage::StorageError> {
@@ -46,10 +40,7 @@ async fn get_all_d_over_j(
     Ok(final_results.unwrap_or_default())
 }
 
-async fn get_all_e_over_k(
-    &self,
-    [i]: [usize; 1usize],
-) -> Result<Vec<E>, operon::storage::StorageError> {
+async fn get_all_e_k(&self, [i]: [usize; 1usize]) -> Result<Vec<E>, operon::storage::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut k = 0usize;
