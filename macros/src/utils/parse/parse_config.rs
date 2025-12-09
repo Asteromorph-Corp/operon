@@ -166,7 +166,7 @@ impl Parse for AllConfig {
             if let Some(dim) = new_entity.dims.first() {
                 let new_dim_config = DimensionConfig {
                     id: dim.clone(),
-                    depends_on: dims.iter().cloned().collect::<Vec<_>>(),
+                    depends_on: dims.clone(),
                 };
                 dimensions.insert(dim.clone(), new_dim_config);
             }

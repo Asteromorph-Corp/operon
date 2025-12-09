@@ -34,10 +34,7 @@ use crate::utils::{entities_ident, to_snake_case};
 pub fn impl_entities_queries(service_id: &str, entities: &EntityConfigMap) -> syn::ItemImpl {
     let operon = operon_ident();
     let entities_ident = entities_ident(service_id);
-    let fields = entities
-        .keys()
-        .map(|entity_id| to_snake_case(entity_id))
-        .collect::<Vec<_>>();
+    let fields = entities.keys().map(to_snake_case).collect::<Vec<_>>();
 
     parse_quote! {
         impl #operon::storage::psql::EntityQueries for #entities_ident {

@@ -161,7 +161,7 @@ fn arg_def_collected(
             } else {
                 quote! { { #acc } }
             };
-            let dim = clear_span(&dim);
+            let dim = clear_span(dim);
 
             let res_map_ident = resolution_map_ident(&dim);
             let res_map_key = resolution_index
