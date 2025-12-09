@@ -15,9 +15,11 @@ pub struct UiState {
     // Done, queued, waiting, state, returned.
     pub(super) progress: IndexMap<String, Progress>,
     pub(super) log_buffer: LogBuffer,
-    /// Corresponds to how many bottom lines to skip
-    pub(super) cursor: usize,
+    /// Corresponds to how many bottom lines to skip.
+    pub(super) log_cursor: usize,
     pub(super) unread_logs: usize,
+    /// Cursor to first progress bar rendered.
+    pub(super) progress_cursor: u16,
     pub(super) shell: ShellPrompt,
     pub(super) exit_on_finish: bool,
     /// Last sent control event.
@@ -92,17 +94,20 @@ impl UiState {
             }
             UiStateUpdate::NewLog(record, width) => {
                 // Follow the cursor if it is not at 0
-                if self.cursor != 0 {
-                    self.cursor = self.cursor.saturating_add(record.format_for_term(width).len());
+                if self.log_cursor != 0 {
+                    self.log_cursor = self.log_cursor.saturating_add(record.format_for_term(width).len());
                     self.unread_logs += 1;
                 }
                 self.log_buffer.push(record);
             }
-            UiStateUpdate::SetCursor(cursor) => {
-                self.cursor = cursor;
+            UiStateUpdate::SetLogCursor(cursor) => {
+                self.log_cursor = cursor;
                 if cursor == 0 {
                     self.unread_logs = 0;
                 }
+            }
+            UiStateUpdate::SetProgressCursor(cursor) => {
+                self.progress_cursor = cursor;
             }
             UiStateUpdate::ExitOnFinish(yes) => {
                 self.exit_on_finish = yes;

@@ -5,7 +5,8 @@ pub enum UiStateUpdate {
     ProgressUpdate(String, Progress),
     /// New log record.
     NewLog(LogRecord, u16),
-    SetCursor(usize),
+    SetLogCursor(usize),
+    SetProgressCursor(u16),
     ExitOnFinish(bool),
     LastControlEvent(ControlEvent),
 }

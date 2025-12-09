@@ -11,7 +11,9 @@ use ratatui::widgets::*;
 use tokio::sync::RwLock;
 
 use crate::operon::RunningState;
-use crate::scheduler::{ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver};
+use crate::scheduler::{
+    ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver,
+};
 use crate::ui::{Action, LogRecordReceiver, Progress, UiError, UiOptions, UiState, UiStateUpdate};
 use crate::utils::SplitFirstOwned;
 
@@ -24,6 +26,7 @@ Navigation keys:
     Alt+Up, Alt+Down    Scroll logs 1 line.
     Up, Down            Scroll logs 5 lines.
     PgUp, PgDn          Scroll logs 20 lines.
+    Left, Right         Scroll progress bars.
     Esc                 Show most recent logs.
 
 Commands:
@@ -106,12 +109,28 @@ impl UiLoop {
                     };
                     let command = match evt? {
                         Event::Key(KeyEvent {
+                            code: KeyCode::Left,
+                            ..
+                        }) => {
+                            let mut state = self.state.write().await;
+                            state.progress_cursor = state.progress_cursor.saturating_sub(1);
+                            None
+                        }
+                        Event::Key(KeyEvent {
+                            code: KeyCode::Right,
+                            ..
+                        }) => {
+                            let mut state = self.state.write().await;
+                            state.progress_cursor = state.progress_cursor.saturating_add(1);
+                            None
+                        }
+                        Event::Key(KeyEvent {
                             code: KeyCode::Up,
                             modifiers: KeyModifiers::ALT,
                             ..
                         }) => {
                             let mut state = self.state.write().await;
-                            state.cursor = state.cursor.saturating_add(1);
+                            state.log_cursor = state.log_cursor.saturating_add(1);
                             None
                         }
                         Event::Key(KeyEvent {
@@ -120,8 +139,8 @@ impl UiLoop {
                             ..
                         }) => {
                             let mut state = self.state.write().await;
-                            state.cursor = state.cursor.saturating_sub(1);
-                            if state.cursor == 0 {
+                            state.log_cursor = state.log_cursor.saturating_sub(1);
+                            if state.log_cursor == 0 {
                                 state.unread_logs = 0;
                             }
                             None
@@ -130,7 +149,7 @@ impl UiLoop {
                             code: KeyCode::Up, ..
                         }) => {
                             let mut state = self.state.write().await;
-                            state.cursor = state.cursor.saturating_add(5);
+                            state.log_cursor = state.log_cursor.saturating_add(5);
                             None
                         }
                         Event::Key(KeyEvent {
@@ -138,8 +157,8 @@ impl UiLoop {
                             ..
                         }) => {
                             let mut state = self.state.write().await;
-                            state.cursor = state.cursor.saturating_sub(5);
-                            if state.cursor == 0 {
+                            state.log_cursor = state.log_cursor.saturating_sub(5);
+                            if state.log_cursor == 0 {
                                 state.unread_logs = 0;
                             }
                             None
@@ -149,7 +168,7 @@ impl UiLoop {
                             ..
                         }) => {
                             let mut state = self.state.write().await;
-                            state.cursor = state.cursor.saturating_add(20);
+                            state.log_cursor = state.log_cursor.saturating_add(20);
                             None
                         }
                         Event::Key(KeyEvent {
@@ -157,8 +176,8 @@ impl UiLoop {
                             ..
                         }) => {
                             let mut state = self.state.write().await;
-                            state.cursor = state.cursor.saturating_sub(20);
-                            if state.cursor == 0 {
+                            state.log_cursor = state.log_cursor.saturating_sub(20);
+                            if state.log_cursor == 0 {
                                 state.unread_logs = 0;
                             }
                             None
@@ -167,7 +186,7 @@ impl UiLoop {
                             code: KeyCode::Esc, ..
                         }) => {
                             let mut state = self.state.write().await;
-                            state.cursor = 0;
+                            state.log_cursor = 0;
                             state.unread_logs = 0;
                             None
                         }
@@ -177,13 +196,13 @@ impl UiLoop {
                         Event::Mouse(me) => match me.kind {
                             MouseEventKind::ScrollUp => {
                                 let mut state = self.state.write().await;
-                                state.cursor = state.cursor.saturating_add(5);
+                                state.log_cursor = state.log_cursor.saturating_add(5);
                                 None
                             }
                             MouseEventKind::ScrollDown => {
                                 let mut state = self.state.write().await;
-                                state.cursor = state.cursor.saturating_sub(5);
-                                if state.cursor == 0 {
+                                state.log_cursor = state.log_cursor.saturating_sub(5);
+                                if state.log_cursor == 0 {
                                     state.unread_logs = 0;
                                 }
                                 None
@@ -362,7 +381,7 @@ impl UiLoop {
                         Action::Clear => {
                             let mut guard = self.state.write().await;
                             guard.log_buffer.clear();
-                            guard.cursor = 0;
+                            guard.log_cursor = 0;
                             guard.unread_logs = 0;
                         }
                         Action::Quit { force, no_exit } => match exec_snapshot.last_control_event {
@@ -587,7 +606,18 @@ impl UiLoop {
             .expect("At least one job name exists")
             .clamp(3, 20);
 
-        let mut cursor = draw_snapshot.cursor;
+        let mut progress_cursor = draw_snapshot.progress_cursor;
+        let mut log_cursor = draw_snapshot.log_cursor;
+        let height = terminal.size()?.height;
+        let total_progress_bars = draw_snapshot.progress.len() as u16;
+        let max_progress_bars = height
+            .saturating_sub(height.saturating_div(2).max(9))
+            .min(20);
+        let num_progress_bars = total_progress_bars.min(max_progress_bars);
+        // Clip the progress cursor if necessary
+        if progress_cursor + num_progress_bars > total_progress_bars {
+            progress_cursor = total_progress_bars.saturating_sub(num_progress_bars);
+        }
         terminal.draw(|frame| {
             let [
                 progress_head,
@@ -599,7 +629,7 @@ impl UiLoop {
                 input_area,
             ] = Layout::vertical([
                 Constraint::Length(1),
-                Constraint::Length((draw_snapshot.progress.len() + 1) as u16),
+                Constraint::Length(num_progress_bars + 1),
                 Constraint::Length(1),
                 Constraint::Length(1),
                 Constraint::Fill(1),
@@ -609,17 +639,31 @@ impl UiLoop {
             .areas(frame.area());
             frame.render_widget(
                 Block::new().borders(Borders::TOP).title(
-                    Line::from(vec![
-                        Span::raw("│ "),
-                        Span::raw("Progress").italic(),
-                        Span::raw(" ├"),
-                    ])
-                    .left_aligned(),
+                    if num_progress_bars == total_progress_bars || num_progress_bars == 0 {
+                        Line::from(vec![
+                            Span::raw("│ "),
+                            Span::raw("Progress").italic(),
+                            Span::raw(" ├"),
+                        ])
+                        .left_aligned()
+                    } else {
+                        Line::from(vec![
+                            Span::raw("│ "),
+                            Span::raw("Progress").italic(),
+                            Span::raw(format!(
+                                " │ {}–{}/{total_progress_bars}",
+                                progress_cursor + 1,
+                                progress_cursor + num_progress_bars
+                            )),
+                            Span::raw(" ├"),
+                        ])
+                        .left_aligned()
+                    },
                 ),
                 progress_head,
             );
             let constraints =
-                std::iter::repeat_n(Constraint::Fill(1), draw_snapshot.progress.len() + 1)
+                std::iter::repeat_n(Constraint::Fill(1), (num_progress_bars + 1) as usize)
                     .collect::<Vec<_>>();
             let (progress_description, progress_bars) = Layout::default()
                 .direction(Direction::Vertical)
@@ -678,6 +722,8 @@ impl UiLoop {
             draw_snapshot
                 .progress
                 .iter()
+                .skip(progress_cursor as usize)
+                .take(num_progress_bars as usize)
                 .zip(progress_bars)
                 .for_each(|((name, progress), bar)| {
                     draw_progress_gauge(frame, bar, name, progress, max_len);
@@ -694,12 +740,12 @@ impl UiLoop {
                 ),
                 logs_head,
             );
-            let (logs_widget, new_cursor) = draw_snapshot.log_buffer.to_text(
+            let (logs_widget, new_log_cursor) = draw_snapshot.log_buffer.to_text(
                 logs_area.width,
                 logs_area.height,
-                draw_snapshot.cursor,
+                draw_snapshot.log_cursor,
             );
-            cursor = new_cursor;
+            log_cursor = new_log_cursor;
             frame.render_widget(logs_widget, logs_area);
             frame.render_widget(
                 Block::new().borders(Borders::BOTTOM).title(
@@ -725,11 +771,18 @@ impl UiLoop {
                 .render(frame, input_area, draw_snapshot.overall_state().color());
         })?;
         // Update the cursor position if it was clipped
-        if cursor != draw_snapshot.cursor {
+        if progress_cursor != draw_snapshot.progress_cursor {
             self.state
                 .write()
                 .await
-                .update_ui_state(UiStateUpdate::SetCursor(cursor))?;
+                .update_ui_state(UiStateUpdate::SetProgressCursor(progress_cursor))?;
+        }
+
+        if log_cursor != draw_snapshot.log_cursor {
+            self.state
+                .write()
+                .await
+                .update_ui_state(UiStateUpdate::SetLogCursor(log_cursor))?;
         }
         Ok(())
     }
