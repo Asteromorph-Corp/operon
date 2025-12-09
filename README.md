@@ -18,7 +18,7 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
     - [Implementing the Service](#implementing-the-service)
     - [Implementing the Storage (Optional)](#implementing-the-storage-optional)
     - [Running Operon](#running-operon)
-        - [UI Shell Commands](#ui-shell-commands)
+        - [Operon TUI](#operon-tui)
 6. [Roadmap](#roadmap)
 7. [License](#license)
 
@@ -328,20 +328,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-The `.run()` method will start the Operon engine that takes over the terminal and paints a UI during its execution.
+The `.run()` method will start the Operon engine that will execute the defined pipeline using the provided service and storage implementations.
 If the execution is successful, the results will be stored in the storage, and you can retrieve them using the storage interface after the `.run().await?` call.
 
-#### UI Shell Commands
+#### Operon TUI
 
-The Operon engine provides a terminal-based text user interface (TUI) that allows you to interact with the engine and control the workflow.
-The following commands are available in the UI:
+When run in Interactive mode (`.with_ui_options(UiOptions::Interactive)` in `OperonOptions`, which is the default behavior), the Operon engine takes over the terminal and launches a text user interface (TUI).
+The UI allows you to interact with the engine and control the workflow using shell-like commands.
 
 ```text
 Navigation keys:
-    ^C                  Clear input.
-    ^D                  Exit.
-    ^L                  Clear logs.
-    ^Up, ^Down          Scroll logs 1 line.
+    Ctrl+C              Clear input.
+    Ctrl+D              Exit.
+    Ctrl+L              Clear logs.
+    Left, Right         Scroll progress bars.
+    Alt+Up, Alt+Down    Scroll logs 1 line.
     Up, Down            Scroll logs 5 lines.
     PgUp, PgDn          Scroll logs 20 lines.
     Esc                 Show most recent logs.
@@ -366,13 +367,15 @@ Commands:
     help                Print this help message.
 ```
 
+You may disable the UI by setting `.with_ui_options(UiOptions::Headless)` in `OperonOptions`.
+Certain features, such as real-time monitoring, pause/resume functionality, and recovery options, will not be available in Headless mode.
+
 ## Roadmap
 
 Operon is under active development. Planned features and improvements include:
 
-- Updating the UI to scale better with larger workflows.
-- Adding support for headless operation mode.
-- Implementing alternative backends for the entity storage and the metadata storage.
+- In-memory and file-based backends for lightweight use cases.
+- More flexible logging options (custom log levels per crate/task, dump formats, etc.).
 
 Please reach out via [opening an issue](https://github.com/Asteromorph-Corp/operon/issues) if you have any suggestions or feature requests.
 

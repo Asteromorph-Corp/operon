@@ -23,10 +23,10 @@ Navigation keys:
     Ctrl+C              Clear input.
     Ctrl+D              Exit.
     Ctrl+L              Clear logs.
+    Left, Right         Scroll progress bars.
     Alt+Up, Alt+Down    Scroll logs 1 line.
     Up, Down            Scroll logs 5 lines.
     PgUp, PgDn          Scroll logs 20 lines.
-    Left, Right         Scroll progress bars.
     Esc                 Show most recent logs.
 
 Commands:
