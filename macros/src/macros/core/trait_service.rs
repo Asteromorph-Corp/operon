@@ -138,7 +138,6 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
 
     parse_quote! {
         #[#operon::async_trait::async_trait]
-        #[automatically_derived]
         #[doc = #doc_comment]
         pub trait #svc_ident: #operon::service::OperonService<JobEnum = schema::#job_enum_ident, ResolutionEnum = schema::#res_enum_ident> {
             #(#job_fns)*
