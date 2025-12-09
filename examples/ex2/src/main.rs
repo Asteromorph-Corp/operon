@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage, cooking_handler};
+use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage};
 use operon::async_trait::async_trait;
 use operon::operon::{Operon, OperonOptions, UserError};
 use operon::service::OperonService;
@@ -118,9 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .with_log_dump(Some("./logs".to_string()))
         .with_log_level(log::Level::Info);
 
-    Operon::new(service, storage, operon_options)
-        .run(cooking_handler())
-        .await?;
+    Operon::new(service, storage, operon_options).run().await?;
 
     Ok(())
 }

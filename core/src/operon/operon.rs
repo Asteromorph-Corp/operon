@@ -4,7 +4,7 @@ use futures::future::try_join;
 use tokio::sync::RwLock;
 
 use crate::operon::{OperonError, OperonOptions};
-use crate::scheduler::{ControlEvent, RecoveryState, Scheduler, SchedulerHandler};
+use crate::scheduler::{ControlEvent, RecoveryState, Scheduler, ValidOperon};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiLogger, UiLoop, UiState};
@@ -18,6 +18,7 @@ pub struct Operon<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    (Svc, Sto): ValidOperon<Svc, Sto>,
 {
     service: Arc<Svc>,
     storage: Arc<Sto>,
@@ -28,6 +29,7 @@ impl<Svc, Sto> Operon<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    (Svc, Sto): ValidOperon<Svc, Sto>,
 {
     /// Create a new Operon instance with the given storage and service.
     pub fn new(
@@ -48,7 +50,8 @@ where
     /// context. Running this will take over the terminal, so it is strongly discouraged to make
     /// any other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
-    pub async fn run(self, handler: SchedulerHandler<Svc, Sto>) -> Result<(), OperonError> {
+    pub async fn run(self) -> Result<(), OperonError> {
+        let handler = <(Svc, Sto) as ValidOperon<Svc, Sto>>::scheduler_handler();
         let (ui_options, scheduler_options, log_options) = self.options.split();
 
         // Initialize the logger
@@ -64,7 +67,10 @@ where
         // Set up the logger
         UiLogger::new(log_tx, log_options.level, log_options.dump)
             .setup(::log::LevelFilter::Trace)?;
-        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(ui_options, &handler.job_handlers)));
+        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(
+            ui_options,
+            &handler.job_handlers,
+        )));
 
         // Create the scheduler
         let scheduler = Scheduler::<Svc, Sto>::new(

@@ -1,4 +1,6 @@
-#[allow(clippy::module_inception)]
+mod valid_operon;
+pub use valid_operon::*;
+
 mod scheduler_handler;
 pub use scheduler_handler::*;
 
