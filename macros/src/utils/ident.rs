@@ -14,24 +14,29 @@ pub fn operon_ident() -> syn::Ident {
     }
 }
 
-pub fn service_trait_ident(service_id: &str) -> syn::Ident {
-    format_ident!("{}Service", service_id.to_pascal_case())
+pub fn service_trait_ident_spanned(service_id: &syn::Ident) -> syn::Ident {
+    let name = format!("{}Service", service_id.to_string().to_pascal_case());
+    syn::Ident::new(&name, service_id.span())
 }
 
-pub fn storage_trait_ident(service_id: &str) -> syn::Ident {
-    format_ident!("{}Storage", service_id.to_pascal_case())
+pub fn service_trait_ident(service_id: &syn::Ident) -> syn::Ident {
+    format_ident!("{}Service", service_id.to_string().to_pascal_case())
 }
 
-pub fn entities_ident(service_id: &str) -> syn::Ident {
-    format_ident!("{}Entities", service_id.to_pascal_case())
+pub fn storage_trait_ident(service_id: &syn::Ident) -> syn::Ident {
+    format_ident!("{}Storage", service_id.to_string().to_pascal_case())
 }
 
-pub fn sql_storage_ident(service_id: &str) -> syn::Ident {
-    format_ident!("Psql{}Storage", service_id.to_pascal_case())
+pub fn entities_ident(service_id: &syn::Ident) -> syn::Ident {
+    format_ident!("{}Entities", service_id.to_string().to_pascal_case())
 }
 
-pub fn get_handler_ident(service_id: &str) -> syn::Ident {
-    format_ident!("{}_handler", service_id.to_snake_case())
+pub fn sql_storage_ident(service_id: &syn::Ident) -> syn::Ident {
+    format_ident!("Psql{}Storage", service_id.to_string().to_pascal_case())
+}
+
+pub fn get_handler_ident(service_id: &syn::Ident) -> syn::Ident {
+    format_ident!("{}_handler", service_id.to_string().to_snake_case())
 }
 
 pub fn job_metadata_ident(job_id: &syn::Ident) -> syn::Ident {

@@ -17,7 +17,7 @@ use crate::utils::{entities_ident, to_snake_case, to_type};
 ///     f: operon::schema::EntityMetadata<1usize, F>,
 /// }
 /// ```
-pub fn entities_definition(service_id: &str, entities: &EntityConfigMap) -> syn::ItemStruct {
+pub fn entities_definition(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemStruct {
     let operon = operon_ident();
     let entities_ident = entities_ident(service_id);
     let fields = entities.values().map(|entity| -> syn::Field {
@@ -46,8 +46,8 @@ mod tests {
     use crate::test_utils::simple_pipeline::{all_entities, service_id};
 
     #[rstest]
-    fn test_entities_definition(service_id: &str, all_entities: EntityConfigMap) {
-        let item = entities_definition(service_id, &all_entities);
+    fn test_entities_definition(service_id: syn::Ident, all_entities: EntityConfigMap) {
+        let item = entities_definition(&service_id, &all_entities);
         assert_item_eq(&item, "storage/entities_definition.rs");
     }
 }

@@ -31,7 +31,7 @@ use crate::utils::{entities_ident, to_snake_case};
 ///     }
 /// }
 /// ```
-pub fn impl_entities_queries(service_id: &str, entities: &EntityConfigMap) -> syn::ItemImpl {
+pub fn impl_entities_queries(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemImpl {
     let operon = operon_ident();
     let entities_ident = entities_ident(service_id);
     let fields = entities.keys().map(to_snake_case).collect::<Vec<_>>();
@@ -60,8 +60,8 @@ mod tests {
     use crate::test_utils::simple_pipeline::{all_entities, service_id};
 
     #[rstest]
-    fn test_impl_entities_default(service_id: &str, all_entities: EntityConfigMap) {
-        let item = impl_entities_queries(service_id, &all_entities);
+    fn test_impl_entities_default(service_id: syn::Ident, all_entities: EntityConfigMap) {
+        let item = impl_entities_queries(&service_id, &all_entities);
         assert_item_eq(&item, "storage/impl_entities_queries.rs");
     }
 }

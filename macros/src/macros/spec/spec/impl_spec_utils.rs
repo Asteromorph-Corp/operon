@@ -38,7 +38,7 @@ use crate::utils::{
 /// }
 /// ```
 pub fn impl_spec_utils(
-    service_id: &str,
+    service_id: &syn::Ident,
     job: &JobConfig,
     all_upstream_jobs: &IndexSet<&JobConfig>,
 ) -> syn::ItemImpl {
@@ -103,13 +103,13 @@ mod tests {
     #[case::simple(job_beta(), "spec/spec/impl_spec_utils.simple.rs")]
     #[case::no_spawn_dim(job_epsilon(), "spec/spec/impl_spec_utils.no_spawn_dim.rs")]
     fn test_impl_spec_utils(
-        service_id: &str,
+        service_id: syn::Ident,
         all_jobs: JobConfigMap,
         #[case] job: JobConfig,
         #[case] fixture_path: &str,
     ) {
         let all_upstream_jobs = get_upstream_jobs(&job, &all_jobs);
-        let item = impl_spec_utils(service_id, &job, &all_upstream_jobs);
+        let item = impl_spec_utils(&service_id, &job, &all_upstream_jobs);
         assert_item_eq(&item, fixture_path)
     }
 }

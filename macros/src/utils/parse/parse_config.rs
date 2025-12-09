@@ -32,7 +32,7 @@ fn validate_downwards_closed<'a>(
 impl Parse for AllConfig {
     fn parse(input: &ParseBuffer) -> syn::Result<AllConfig> {
         let config_decl: ConfigDecl = input.parse()?;
-        let service_id = config_decl.service_id.to_string();
+        let service_id = config_decl.service_id;
         let mut dimensions: DimensionConfigMap = IndexMap::new();
         let mut entities: EntityConfigMap = IndexMap::new();
         let mut jobs: JobConfigMap = IndexMap::new();

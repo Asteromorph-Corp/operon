@@ -186,14 +186,14 @@ pub fn all_entities() -> EntityConfigMap {
     ])
 }
 
-pub fn service_id() -> &'static str {
-    "Complicated"
+pub fn service_id() -> syn::Ident {
+    format_ident!("complicated")
 }
 
 #[allow(dead_code)]
 pub fn complicated_pipeline() -> AllConfig {
     AllConfig {
-        service_id: service_id().to_string(),
+        service_id: service_id(),
         dimensions: all_dimensions(),
         entities: all_entities(),
         jobs: all_jobs(),

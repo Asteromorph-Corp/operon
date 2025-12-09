@@ -4,7 +4,7 @@ use syn::parse_quote;
 use crate::configs::{AllConfig, JobConfig};
 use crate::utils::{
     entity_over_dim_ident, job_enum_ident, operon_ident, resolution_enum_ident,
-    service_trait_ident, to_type,
+    service_trait_ident_spanned, to_type,
 };
 
 fn format_definition(job: &JobConfig) -> String {
@@ -85,7 +85,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
-    let svc_ident = service_trait_ident(&all_configs.service_id);
+    let svc_ident = service_trait_ident_spanned(&all_configs.service_id);
 
     let (job_sigs, job_fns) = all_configs.jobs.values().map(|job| -> (String, syn::TraitItemFn) {
         let fn_name = &job.id;

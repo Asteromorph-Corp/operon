@@ -18,7 +18,7 @@ use crate::utils::{
 
 /// Generates the implementation of the `JobSpec` trait for a given job.
 pub fn impl_job_spec(
-    service_id: &str,
+    service_id: &syn::Ident,
     job: &JobConfig,
     spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
     upstream_jobs: &IndexSet<&JobConfig>,

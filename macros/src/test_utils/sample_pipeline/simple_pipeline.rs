@@ -220,14 +220,14 @@ pub fn all_entities() -> EntityConfigMap {
 }
 
 #[fixture]
-pub fn service_id() -> &'static str {
-    "Cooking"
+pub fn service_id() -> syn::Ident {
+    format_ident!("cooking")
 }
 
 #[fixture]
 pub fn simple_pipeline() -> AllConfig {
     AllConfig {
-        service_id: service_id().to_string(),
+        service_id: service_id(),
         dimensions: all_dimensions(),
         entities: all_entities(),
         jobs: all_jobs(),
