@@ -73,7 +73,7 @@ define_operon! {
 
 // The necessary functions are generated as traits,
 // so we will need to create a struct to implement them.
-// The struct must implement `OperonService`.
+// The struct must derive `OperonService`.
 #[derive(OperonService)]
 struct MySplitterService;
 
