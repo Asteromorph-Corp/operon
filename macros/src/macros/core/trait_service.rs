@@ -108,15 +108,12 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
         let def = format_definition(job);
         let sig = format_signature(job);
         let doc = formatdoc! {"
-            # Definition
+            ```rust,ignore
+            {sig}
+            ```
             Corresponds to the task:
             ```rust,ignore
             {def}
-            ```
-
-            # Signature
-            ```rust,ignore
-            {sig}
             ```",
         };
 
@@ -130,7 +127,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     }).unzip::<_, _, Vec<_>, Vec<_>>();
 
     let doc_comment = formatdoc! {"
-        The trait used to provide Operon with the implementation of task functions defined in your service.
+        Generated trait containing task methods that should be implemented for use with Operon.
 
         # Methods
         ```rust,ignore
