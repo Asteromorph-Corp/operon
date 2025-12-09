@@ -4,6 +4,7 @@ mod schema;
 mod spec;
 mod storage;
 
+mod misc;
 mod prelude;
 
 mod operon;
