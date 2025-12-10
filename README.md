@@ -237,6 +237,7 @@ impl OperonService for MySplitterService {
     type JobEnum = schema::JobEnum;
     type ResolutionEnum = schema::ResolutionEnum;
 }
+
 #[async_trait]
 impl SplitterService for MySplitterService {
     async fn get_inputs(&self) -> Result<Vec<Input>, Box<dyn std::error::Error + Send + Sync>> {
@@ -281,7 +282,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // ...
     let storage = PsqlSplitterStorage::new(
         StorageOptions::new("postgres://username:password@hostname:port/dbname")
-            .with_schema(Some("data".to_string())),
+            .with_schema("data"),
     )?;
     // ...
 }
@@ -310,19 +311,15 @@ use std::sync::Arc;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //# ——————————————————— Initializing Settings ————————————————————— #//
     let database_uri = "postgres://username:password@hostname:port/dbname";
-    let service = Arc::new(MySplitterService);
-    let storage = Arc::new(PsqlSplitterStorage::new(
-        StorageOptions::new(&database_uri).with_schema(Some("ex1_data".to_string())),
-    )?);
-    let operon_options = OperonOptions::new(&database_uri)
-        .with_meta_storage_schema(Some("ex1_meta".to_string()))
-        .with_log_buffer_size(16384)
-        .with_log_level(operon::log::Level::Info)
-        .with_log_dump(Some("./logs".to_string()));
+    
+    let storage_options = StorageOptions::new(&database_uri).with_schema("ex1_data");
+    let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex1_meta");
+    
+    let service = MySplitterService;
+    let storage = PsqlSplitterStorage::new(storage_options)?;
 
     //# ———————————————————————— Running Operon ——————————————————————— #//
-    let operon_instance = Operon::new(service, storage, operon_options);
-    operon_instance.run(splitter_handler()).await?;
+    Operon::new(service, storage, operon_options).run().await?;
 
     Ok(())
 }
