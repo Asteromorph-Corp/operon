@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage};
 use operon::async_trait::async_trait;
 use operon::operon::{Operon, OperonOptions, UserError};
@@ -106,18 +104,11 @@ impl CookingService for ExampleService {
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
 
-    let service = Arc::new(ExampleService);
+    let storage_options = StorageOptions::new(&database_uri).with_schema("ex2_data");
+    let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex2_meta");
 
-    let storage = Arc::new(PsqlCookingStorage::new(
-        StorageOptions::new(&database_uri).with_schema(Some("ex2_data".to_string())),
-    )?);
-
-    let operon_options = OperonOptions::new(&database_uri)
-        .with_ui_options(operon::ui::UiOptions::Headless)
-        .with_meta_storage_schema(Some("ex2_meta".to_string()))
-        .with_log_dump(Some("./logs".to_string()))
-        .with_log_level(log::Level::Info);
-
+    let service = ExampleService;
+    let storage = PsqlCookingStorage::new(storage_options)?;
     Operon::new(service, storage, operon_options).run().await?;
 
     Ok(())

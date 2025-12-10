@@ -33,13 +33,13 @@ where
 {
     /// Create a new Operon instance with the given storage and service.
     pub fn new(
-        service: ::std::sync::Arc<Svc>,
-        storage: ::std::sync::Arc<Sto>,
+        service: impl Into<Arc<Svc>>,
+        storage: impl Into<Arc<Sto>>,
         options: OperonOptions,
     ) -> Self {
         Self {
-            service,
-            storage,
+            service: service.into(),
+            storage: storage.into(),
             options,
         }
     }

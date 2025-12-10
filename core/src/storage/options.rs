@@ -34,15 +34,16 @@ impl StorageOptions {
         self
     }
 
-    pub fn with_schema(mut self, schema: Option<String>) -> Self {
-        if let Some(ref s) = schema {
-            if !s.chars().all(|c| c.is_alphanumeric() || c == '_') {
-                panic!("Schema name can only contain alphanumeric characters and underscores");
-            } else if s.is_empty() {
-                panic!("Schema name cannot be empty");
-            }
+    pub fn with_schema(mut self, schema: impl Into<String>) -> Self {
+        let schema = schema.into();
+
+        if !schema.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            panic!("Schema name can only contain alphanumeric characters and underscores");
+        } else if schema.is_empty() {
+            panic!("Schema name cannot be empty");
         }
-        self.schema = schema;
+
+        self.schema = Some(schema);
         self
     }
 }

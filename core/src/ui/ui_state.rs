@@ -4,7 +4,7 @@ use crate::operon::RunningState;
 use crate::scheduler::{ControlEvent, JobHandler};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{LogBuffer, ShellPrompt, UiError, UiStateUpdate, UiOptions};
+use crate::ui::{LogBuffer, ShellPrompt, UiError, UiOptions, UiStateUpdate};
 
 pub type Progress = (i64, i64, i64, RunningState, bool);
 
@@ -95,7 +95,9 @@ impl UiState {
             UiStateUpdate::NewLog(record, width) => {
                 // Follow the cursor if it is not at 0
                 if self.log_cursor != 0 {
-                    self.log_cursor = self.log_cursor.saturating_add(record.format_for_term(width).len());
+                    self.log_cursor = self
+                        .log_cursor
+                        .saturating_add(record.format_for_term(width).len());
                     self.unread_logs += 1;
                 }
                 self.log_buffer.push(record);

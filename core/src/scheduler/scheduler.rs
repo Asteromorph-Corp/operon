@@ -8,7 +8,7 @@ use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::operon::RunningState;
 use crate::scheduler::{
     ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
-    SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender, 
+    SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender,
 };
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -94,7 +94,9 @@ where
             (UiOptions::Headless, _) => {
                 log::info!("Starting in headless mode.");
             }
-            (UiOptions::Interactive, RecoveryState::Fresh) => log::info!("Type `run` to begin running jobs."),
+            (UiOptions::Interactive, RecoveryState::Fresh) => {
+                log::info!("Type `run` to begin running jobs.")
+            }
             (UiOptions::Interactive, RecoveryState::Finished) => log::info!(
                 "Found a finished run. \n\
                 Type `run` to begin running jobs and overwrite the existing data, \

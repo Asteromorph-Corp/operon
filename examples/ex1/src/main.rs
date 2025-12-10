@@ -120,6 +120,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // or use some other method like `.env`-`dotenvy` to load it.
     let database_uri = std::env::var("POSTGRES_URI")?;
 
+    // The two settings object
+    let storage_options = StorageOptions::new(&database_uri).with_schema("ex1_data");
+    let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex1_meta");
+
     //# ——————————————————— Initializing Settings ————————————————————— #//
     // The service is what we defined above —
     // a struct that holds the logic for the pipeline.
@@ -129,21 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Here, we use `PsqlSplitterStorage` for the storage.
     // This is an automatically generated storage implementation
     // based on a PostgreSQL database.
-    let storage = Arc::new(PsqlSplitterStorage::new(
-        StorageOptions::new(&database_uri).with_schema(Some("ex1_data".to_string())),
-    )?);
-
-    // The `OperonOptions` struct is used to configure the Operon instance.
-    // The URI to a PostgreSQL database (which will hold the metadata for Operon) is REQUIRED here.
-    // Note that we used the same URI as the data storage,
-    // but we may use a different one as long as it points to a valid PostgreSQL database.
-    // We strongly suggest using different schema names if you use the same database.
-    // We can also set some additional options related to the general performance of Operon here.
-    let operon_options = OperonOptions::new(&database_uri)
-        .with_meta_storage_schema(Some("ex1_meta".to_string()))
-        .with_log_buffer_size(16384) // How many log messages should the UI remember?
-        .with_log_level(operon::log::Level::Info) // What should be the minimum log level to show in the UI?
-        .with_log_dump(Some("./logs".to_string())); // Optionally, which directory should all logs be dumped to?
+    let storage = Arc::new(PsqlSplitterStorage::new(storage_options)?);
 
     //# ———————————————————————— Running Operon ——————————————————————— #//
     // Now we finally run Operon.
