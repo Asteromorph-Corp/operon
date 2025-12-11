@@ -61,15 +61,14 @@ pub fn batch_gets(
 
         let insert_results = arg.over.iter().enumerate().map(|(i, over)| {
             let over = clear_span(over);
-            let i_plus_1 = i + 1;
 
-            if i_plus_1 == arg.over.len() {
+            if i + 1 == arg.over.len() {
                 quote! {
-                    result.push(entity);
+                    result.push(entity.value);
                 }
             } else {
                 quote! {
-                    let #over = usize::try_from(row.get::<_, i64>(#i_plus_1))?; // TODO: Handle None case
+                    let #over = entity.coordinate[#i]; // TODO: Handle None case
                     while result.len() <= #over {
                         result.push(Default::default());
                     }

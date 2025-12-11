@@ -71,7 +71,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         &self,
         coordinate: [usize; M],
         over: [&'static str; K],
-    ) -> Result<Vec<T>, StorageError> {
+    ) -> Result<Vec<Entity<K, T>>, StorageError> {
         const { assert!(M + K == N) }
 
         let schema_prefix = self.client.schema_prefix();
@@ -80,7 +80,15 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let entities = rows
             .into_iter()
-            .map(|r| serde_json::from_value::<T>(r.get(0)))
+            .map(|r| -> Result<Entity<K, T>, StorageError> {
+                let value = serde_json::from_value::<T>(r.get(0))?;
+                let coordinate: [usize; K] = (1..=K)
+                    .map(|idx| usize::try_from(r.get::<_, i64>(idx)))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .try_into()
+                    .expect("Length is always K");
+                Ok(Entity { value, coordinate })
+            })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(entities)
     }
