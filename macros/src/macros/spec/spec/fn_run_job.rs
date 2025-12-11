@@ -179,9 +179,9 @@ fn arg_def_collected(
                         return dim_msg(arg_dim);
                     }
                     cnt += 1;
-                    if cnt <= i {
+                    if cnt < i {
                         dim_msg(arg_dim)
-                    } else if cnt == i + 1 {
+                    } else if cnt == i {
                         format!("{arg_dim} = *")
                     } else {
                         format!("{arg_dim} = _")
