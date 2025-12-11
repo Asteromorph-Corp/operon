@@ -100,7 +100,7 @@ pub(super) fn fn_on_receive_resolution(
     });
 
     parse_quote! {
-        #[allow(unused_variables, clippy::match_single_binding)]
+        #[allow(unused_variables, unreachable_code, clippy::match_single_binding)]
         async fn on_receive_resolution(
             &self,
             client: #operon::meta_storage::MetaClient<'_>,
