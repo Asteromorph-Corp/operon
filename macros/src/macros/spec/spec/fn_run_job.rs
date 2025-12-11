@@ -137,7 +137,6 @@ fn arg_def_collected(
     arg_entity: &EntityConfig,
     over: &[syn::Ident],
     resolution_index: &IndexMap<&syn::Ident, ResolutionIndexEntry>,
-    job_dim_set: &IndexSet<&syn::Ident>,
 ) -> syn::Stmt {
     let operon = operon_ident();
     let arg_ident = entity_over_dim_ident(&arg_entity.id, over);
@@ -175,13 +174,13 @@ fn arg_def_collected(
                 .dims
                 .iter()
                 .map(|arg_dim| {
-                    if job_dim_set.contains(arg_dim) {
+                    if !over.contains(arg_dim) {
                         return dim_msg(arg_dim);
                     }
                     cnt += 1;
-                    if cnt < i {
+                    if cnt <= i {
                         dim_msg(arg_dim)
-                    } else if cnt == i {
+                    } else if cnt == i + 1 {
                         format!("{arg_dim} = *")
                     } else {
                         format!("{arg_dim} = _")
@@ -284,7 +283,7 @@ pub(super) fn fn_run_job(
         if arg.over.is_empty() {
             arg_def_single(entity)
         } else {
-            arg_def_collected(entity, &arg.over, &resolution_index, &job_dim_set)
+            arg_def_collected(entity, &arg.over, &resolution_index)
         }
     });
 
