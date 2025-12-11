@@ -81,7 +81,7 @@ pub(super) fn fn_on_receive_resolution(
             let stmt: syn::Stmt = parse_quote! {
                 match peer_txs
                     .#sender_ident
-                    .send(#operon::scheduler::PeerEvent::Explosion(schema::#res_enum_ident::#variant_ident(res)))
+                    .send(#operon::scheduler::PeerEvent::Explosion(schema::#res_enum_ident::#variant_ident(res), affected))
                     .await
                 {
                     Ok(_) => #operon::log::trace!(#ok_msg),
@@ -93,8 +93,8 @@ pub(super) fn fn_on_receive_resolution(
 
         parse_quote! {
             schema::#res_enum_ident::#variant_ident(res) => {
+                let affected = client.ticket(self.job_meta()).explode::<_, #idx>(metadata::#dim_meta(), res).await?;
                 #(#send_explosions)*
-                Ok(client.ticket(self.job_meta()).explode::<_, #idx>(metadata::#dim_meta(), res).await?)
             },
         }
     });
@@ -109,8 +109,9 @@ pub(super) fn fn_on_receive_resolution(
         ) -> Result<Vec<Self::Ticket>, #operon::scheduler::SchedulerError> {
             match resolution {
                 #(#explode_arms)*
-                _ => Err(#operon::scheduler::SchedulerError::InvalidPeerEventReceived("resolution", #job_id)),
+                _ => return Err(#operon::scheduler::SchedulerError::InvalidPeerEventReceived("resolution", #job_id)),
             }
+            Ok(vec![])
         }
     }
 }

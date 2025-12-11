@@ -48,7 +48,7 @@ pub(super) fn fn_on_receive_explosion(
             parse_quote! {
                 schema::#res_enum_ident::#variant_ident(res) => Ok(
                     client.ticket(self.job_meta())
-                        .raise_deps_quota(metadata::#dim_meta(), res)
+                        .raise_deps_quota(metadata::#dim_meta(), res, affected)
                         .await?
                 ),
             }
@@ -60,6 +60,7 @@ pub(super) fn fn_on_receive_explosion(
             &self,
             client: #operon::meta_storage::MetaClient<'_>,
             resolution: schema::#res_enum_ident,
+            affected: usize,
         ) -> Result<Vec<Self::Ticket>, #operon::scheduler::SchedulerError> {
             match resolution {
                 #(#arms)*

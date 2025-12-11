@@ -124,5 +124,6 @@ where
         &self,
         client: MetaClient<'_>,
         explosion: Svc::ResolutionEnum,
+        affected: usize,
     ) -> Result<Vec<Self::Ticket>, SchedulerError>;
 }

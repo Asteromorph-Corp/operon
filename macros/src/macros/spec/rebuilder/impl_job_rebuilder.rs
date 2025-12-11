@@ -73,9 +73,9 @@ pub fn impl_job_rebuilder(
     });
 
     let explode_exprs = if let Some(spawn_dim) = &job.spawn_dim {
-        let explode = spawn_dim_repeating_jobs
+        spawn_dim_repeating_jobs
             .iter()
-            .map(|repeating_job| -> syn::Stmt {
+            .flat_map(|repeating_job| {
                 let Some(idx) = repeating_job.dims.iter().position(|d| d == spawn_dim) else {
                     panic!(
                         "{} not found in repeating job {}",
@@ -84,32 +84,34 @@ pub fn impl_job_rebuilder(
                 };
                 let job_meta = job_metadata_ident(&repeating_job.id);
 
-                parse_quote! {
-                    client
+                let explode: syn::Stmt = parse_quote! {
+                    let affected = client
                         .ticket(metadata::#job_meta())
                         .explode::<_, #idx>(self.spawn_dim_meta, resolution)
                         .await?;
-                }
-            });
-        let raise_quotas = spawn_dim_repeating_jobs.iter().flat_map(|repeating_job| {
-            get_direct_downstream_jobs(repeating_job, all_jobs)
-                .into_iter()
-                .flat_map(|downstream_job| {
-                    let downstream_job_meta = job_metadata_ident(&downstream_job.id);
-                    let cnt = downstream_job
-                        .from
-                        .iter()
-                        .filter(|arg| arg.id == repeating_job.to && arg.over.contains(spawn_dim))
-                        .count();
-                    let stmt: syn::Stmt = parse_quote! {
-                        client.ticket(metadata::#downstream_job_meta())
-                            .raise_deps_quota(self.spawn_dim_meta, resolution)
-                            .await?;
-                    };
-                    std::iter::repeat_n(stmt, cnt)
-                })
-        });
-        explode.chain(raise_quotas).collect()
+                };
+                let raise_quotas = get_direct_downstream_jobs(repeating_job, all_jobs)
+                    .into_iter()
+                    .flat_map(|downstream_job| {
+                        let downstream_job_meta = job_metadata_ident(&downstream_job.id);
+                        let cnt = downstream_job
+                            .from
+                            .iter()
+                            .filter(|arg| {
+                                arg.id == repeating_job.to && arg.over.contains(spawn_dim)
+                            })
+                            .count();
+                        let stmt: syn::Stmt = parse_quote! {
+                            client.ticket(metadata::#downstream_job_meta())
+                                .raise_deps_quota(self.spawn_dim_meta, resolution, affected)
+                                .await?;
+                        };
+                        std::iter::repeat_n(stmt, cnt)
+                    });
+
+                std::iter::once(explode).chain(raise_quotas)
+            })
+            .collect::<Vec<_>>()
     } else if !spawn_dim_repeating_jobs.is_empty() {
         panic!("`spawn_dim` is `None`, but `spawn_dim_repeating_jobs` is not empty")
     } else {

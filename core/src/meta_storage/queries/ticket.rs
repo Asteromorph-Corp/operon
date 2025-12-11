@@ -100,6 +100,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         &self,
         res_meta: DimensionMetadata<M>,
         res: Resolution<M>,
+        affected: usize,
     ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
         if self.job_meta.dims.contains(&res_meta.id) {
             log::warn!("Invalid resolution received for raising quota.");
@@ -114,7 +115,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
             .iter()
             .zip(res.coordinate)
             .filter_map(|(d, c)| self.job_meta.dims.contains(d).then_some(c));
-        let params = SqlParams::from_usize([res.ub].into_iter().chain(params))?;
+        let params = SqlParams::from_usize([res.ub, affected].into_iter().chain(params))?;
 
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
@@ -126,16 +127,16 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
 
     /// Explodes the ticket along a dimension at a given coordinate.
     ///
-    /// Returns tickets that are newly `"queued"`.
+    /// Returns the number of exploded tickets.
     pub async fn explode<const M: usize, const IDX: usize>(
         &self,
         res_meta: DimensionMetadata<M>,
         res: Resolution<M>,
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    ) -> Result<usize, MetaStorageError> {
         const { assert!(IDX < N) }
         if self.job_meta.dims[IDX] != res_meta.id {
             log::warn!("Invalid resolution received for explosion.");
-            return Ok(vec![]);
+            return Ok(0);
         }
 
         let schema_prefix = self.client.schema_prefix();
@@ -183,11 +184,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         }
         sink.close().await?;
 
-        let ready_tickets = new_tickets
-            .into_iter()
-            .filter(|ticket| ticket.is_ready())
-            .collect::<Vec<_>>();
-        Ok(ready_tickets)
+        Ok(tickets.len())
     }
 
     /// Marks the ticket corresponding to a given job as done.
@@ -428,9 +425,15 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsQuotaQuery<'
         writeln!(f, "WITH updated AS (")?;
         writeln!(f, "    UPDATE {schema}ticket_{id}")?;
         writeln!(f, "    SET")?;
-        writeln!(f, "        deps_quota = deps_quota + $1 - 1,")?;
+        writeln!(
+            f,
+            "        deps_quota = deps_quota + $1::bigint * $2::bigint - $2,"
+        )?;
         writeln!(f, "        status = CASE")?;
-        writeln!(f, "            WHEN deps_done >= deps_quota + $1 - 1")?;
+        writeln!(
+            f,
+            "            WHEN deps_done >= deps_quota + $1::bigint * $2::bigint - $2"
+        )?;
         writeln!(f, "                THEN 'queued'::{schema}ticket_status")?;
         writeln!(f, "            ELSE 'waiting'::{schema}ticket_status")?;
         writeln!(f, "        END")?;
@@ -442,7 +445,7 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsQuotaQuery<'
             .filter(|d| self.1.dims.contains(d))
             .enumerate()
         {
-            writeln!(f, "        AND {} = ${}", dim, idx + 2)?;
+            writeln!(f, "        AND {} = ${}", dim, idx + 3)?;
         }
         writeln!(f, "    RETURNING *")?;
         writeln!(f, ")")?;

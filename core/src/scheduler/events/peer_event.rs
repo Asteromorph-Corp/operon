@@ -14,7 +14,7 @@ use crate::schema::{JobEnum, ResolutionEnum};
 pub enum PeerEvent<JE: JobEnum, RE: ResolutionEnum> {
     Job(JE),
     Resolution(RE),
-    Explosion(RE),
+    Explosion(RE, usize),
 }
 
 #[derive(Debug, Clone)]

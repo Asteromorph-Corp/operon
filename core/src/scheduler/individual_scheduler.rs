@@ -129,9 +129,9 @@ where
                     .on_receive_resolution(tx.as_client(), peer_txs, resolution)
                     .await?
             }
-            PeerEvent::Explosion(explosion) => {
+            PeerEvent::Explosion(explosion, affected) => {
                 self.spec
-                    .on_receive_explosion(tx.as_client(), explosion)
+                    .on_receive_explosion(tx.as_client(), explosion, affected)
                     .await?
             }
         };
