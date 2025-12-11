@@ -13,13 +13,13 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                 .await?;
             client.ticket(self.job_meta).mark_done(job).await?;
 
-            client
+            let affected = client
                 .ticket(metadata::job_delta_meta())
                 .explode::<_, 1usize>(self.spawn_dim_meta, resolution)
                 .await?;
             client
                 .ticket(metadata::job_epsilon_meta())
-                .raise_deps_quota(self.spawn_dim_meta, resolution)
+                .raise_deps_quota(self.spawn_dim_meta, resolution, affected)
                 .await?;
             client
                 .ticket(metadata::job_delta_meta())

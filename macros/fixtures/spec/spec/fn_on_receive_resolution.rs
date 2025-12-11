@@ -1,4 +1,4 @@
-#[allow(unused_variables, clippy::match_single_binding)]
+#[allow(unused_variables, unreachable_code, clippy::match_single_binding)]
 async fn on_receive_resolution(
     &self,
     client: operon::meta_storage::MetaClient<'_>,
@@ -6,15 +6,22 @@ async fn on_receive_resolution(
     resolution: schema::ResolutionEnum,
 ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
     match resolution {
-        schema::ResolutionEnum::I(res) => Ok(client
-            .ticket(self.job_meta())
-            .explode::<_, 0usize>(metadata::dimension_i_meta(), res)
-            .await?),
+        schema::ResolutionEnum::I(res) => {
+            let affected = client
+                .ticket(self.job_meta())
+                .explode::<_, 0usize>(metadata::dimension_i_meta(), res)
+                .await?;
+        }
         schema::ResolutionEnum::J(res) => {
+            let affected = client
+                .ticket(self.job_meta())
+                .explode::<_, 1usize>(metadata::dimension_j_meta(), res)
+                .await?;
             match peer_txs
                 .to_epsilon
                 .send(operon::scheduler::PeerEvent::Explosion(
                     schema::ResolutionEnum::J(res),
+                    affected,
                 ))
                 .await
             {
@@ -27,18 +34,19 @@ async fn on_receive_resolution(
                     )
                 }
             }
-            Ok(client
-                .ticket(self.job_meta())
-                .explode::<_, 1usize>(metadata::dimension_j_meta(), res)
-                .await?)
         }
-        schema::ResolutionEnum::K(res) => Ok(client
-            .ticket(self.job_meta())
-            .explode::<_, 2usize>(metadata::dimension_k_meta(), res)
-            .await?),
-        _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
-            "resolution",
-            "delta",
-        )),
+        schema::ResolutionEnum::K(res) => {
+            let affected = client
+                .ticket(self.job_meta())
+                .explode::<_, 2usize>(metadata::dimension_k_meta(), res)
+                .await?;
+        }
+        _ => {
+            return Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+                "resolution",
+                "delta",
+            ));
+        }
     }
+    Ok(vec![])
 }

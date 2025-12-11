@@ -8,7 +8,7 @@ async fn get_all_b_j(&self, [i]: [usize; 1usize]) -> Result<Vec<B>, operon::stor
 
     let mut result: Vec<B> = Default::default();
     for entity in entities {
-        result.push(entity);
+        result.push(entity.value);
     }
 
     Ok(result)
@@ -24,7 +24,7 @@ async fn get_all_c_k(&self, [i]: [usize; 1usize]) -> Result<Vec<C>, operon::stor
 
     let mut result: Vec<C> = Default::default();
     for entity in entities {
-        result.push(entity);
+        result.push(entity.value);
     }
 
     Ok(result)
@@ -43,7 +43,7 @@ async fn get_all_d_j(
 
     let mut result: Vec<D> = Default::default();
     for entity in entities {
-        result.push(entity);
+        result.push(entity.value);
     }
 
     Ok(result)
@@ -59,7 +59,7 @@ async fn get_all_e_k(&self, [i]: [usize; 1usize]) -> Result<Vec<E>, operon::stor
 
     let mut result: Vec<E> = Default::default();
     for entity in entities {
-        result.push(entity);
+        result.push(entity.value);
     }
     Ok(result)
 }
