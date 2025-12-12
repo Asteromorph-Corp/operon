@@ -5,7 +5,10 @@ use tokio::task::JoinSet;
 
 use crate::meta_storage::MetaStorage;
 use crate::operon::RunningState;
-use crate::scheduler::{ControlEventReceiver, JobHandler, PeerEventReceiver, PeerEventSenderMap};
+use crate::scheduler::{
+    ControlEventReceiver, JobHandler, PeerEventSenderMap, ServicePeerEventReceiver,
+    ServicePeerEventSenderMap,
+};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiState;
@@ -19,7 +22,7 @@ where
     Sto: OperonStorage,
 {
     pub handler: &'a dyn JobHandler<Svc, Sto>,
-    pub peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+    pub peer_rx: ServicePeerEventReceiver<Svc>,
 }
 
 impl<'a, Svc, Sto> HandlerWithRx<'a, Svc, Sto>
@@ -29,7 +32,7 @@ where
 {
     pub fn new(
         handler: &'a dyn JobHandler<Svc, Sto>,
-        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+        peer_rx: ServicePeerEventReceiver<Svc>,
     ) -> Self {
         Self { handler, peer_rx }
     }
@@ -42,7 +45,7 @@ where
     Sto: OperonStorage,
 {
     pub handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto>>,
-    pub peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
+    pub peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
 }
 
 impl<'a, Svc, Sto> HandlersWithChannels<'a, Svc, Sto>
@@ -52,7 +55,7 @@ where
 {
     pub fn new(
         handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto>>,
-        peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
+        peer_txs: ServicePeerEventSenderMap<Svc>,
     ) -> Self {
         Self {
             handlers_with_rx,

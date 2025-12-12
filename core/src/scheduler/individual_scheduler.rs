@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
 use tokio::sync::{RwLock, Semaphore};
@@ -7,7 +7,8 @@ use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
 use crate::operon::RunningState;
 use crate::scheduler::{
     ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
-    PeerEventReceiver, PeerEventSender, PeerEventSenders, SchedulerError, SpecWithMetadata,
+    PeerEventSenders, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
+    SpecWithMetadata,
 };
 use crate::schema::{Job, JobMetadata, Ticket, TicketStatus};
 use crate::service::OperonService;
@@ -116,7 +117,7 @@ where
     /// One event corresponds to one metadata transaction.
     async fn on_event_ready_tickets(
         &mut self,
-        event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum>,
+        event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
         state: &mut RunningState,
         peer_txs: &JS::PeerEventSenders,
     ) -> Result<Vec<Ticket<N>>, SchedulerError> {
@@ -129,9 +130,9 @@ where
                     .on_receive_resolution(tx.as_client(), peer_txs, resolution)
                     .await?
             }
-            PeerEvent::Explosion(explosion, affected) => {
+            PeerEvent::Explosion(explosion) => {
                 self.spec
-                    .on_receive_explosion(tx.as_client(), explosion, affected)
+                    .on_receive_explosion(tx.as_client(), explosion)
                     .await?
             }
         };
@@ -159,13 +160,13 @@ where
     /// Usually called by the top-level `Scheduler::run` with `tokio::spawn`.
     pub async fn run(
         mut self,
-        peer_tx_map: HashMap<&'static str, PeerEventSender<Svc::JobEnum, Svc::ResolutionEnum>>,
-        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+        peer_tx_map: ServicePeerEventSenderMap<Svc>,
+        peer_rx: ServicePeerEventReceiver<Svc>,
         ctrl_rx: ControlEventReceiver,
         clean: bool,
     ) -> RunningState {
         // Create an internal channel for `InternalEvent`s.
-        let mut peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
+        let peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
 
         let mut state = RunningState::Running;
 
@@ -209,9 +210,6 @@ where
             .run_internal(initial_tickets, &peer_txs, peer_rx, ctrl_rx, &mut state)
             .await;
 
-        // Close peer senders
-        peer_txs.downgrade_all();
-
         match (&res, state) {
             (Ok(()), RunningState::Finished) => {
                 log::debug!("Scheduler for `{}` exited normally.", self.meta.id)
@@ -246,7 +244,7 @@ where
         &mut self,
         initial_tickets: Vec<Ticket<N>>,
         peer_txs: &JS::PeerEventSenders,
-        mut peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+        mut peer_rx: ServicePeerEventReceiver<Svc>,
         mut ctrl_rx: ControlEventReceiver,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {

@@ -40,6 +40,7 @@ pub fn derive_operon_service(input: TokenStream) -> TokenStream {
         impl #operon::service::OperonService for #service {
             type JobEnum = #definition::schema::JobEnum;
             type ResolutionEnum = #definition::schema::ResolutionEnum;
+            type TicketEnum = #definition::schema::TicketEnum;
         }
 
         #[automatically_derived]

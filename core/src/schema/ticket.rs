@@ -1,10 +1,8 @@
 use std::fmt::Debug;
 use std::num::TryFromIntError;
 
-use async_trait::async_trait;
 use tokio_postgres::Row;
 
-use crate::meta_storage::{MetaClient, MetaStorageError};
 use crate::schema::{Job, JobMetadata, OptionCoordinate, TicketStatus};
 use crate::utils::{SqlParams, box_sql};
 
@@ -114,23 +112,15 @@ pub trait TicketLike: Debug + Clone + Copy + Send + Sync + 'static {}
 
 impl<const N: usize> TicketLike for Ticket<N> {}
 
-#[async_trait]
-pub trait TicketSql: Sized {
-    /// Initialize the ticket storage in the metadata storage.
-    async fn init_table(client: MetaClient<'_>) -> Result<(), MetaStorageError>;
+pub trait TicketEnum: Debug + Clone + Send + Sync + 'static {}
 
-    /// Clear the ticket storage in the metadata storage.
-    async fn clear_table(client: MetaClient<'_>) -> Result<(), MetaStorageError>;
-
-    /// Put the ticket into the metadata storage.
-    async fn put(&self, client: MetaClient<'_>) -> Result<(), MetaStorageError>;
-
-    /// Get all tickets that is `status = 'done'`.
-    async fn get_all(
-        client: MetaClient<'_>,
-        status: TicketStatus,
-    ) -> Result<Vec<Self>, MetaStorageError>;
-
-    /// Get the status of the tickets.
-    async fn get_status(client: MetaClient<'_>) -> Result<(i64, i64, i64), MetaStorageError>;
+#[derive(Debug, Clone)]
+pub struct TicketExplosion<T: TicketEnum> {
+    /// The ticket providing the coordinate of explosion.
+    pub ticket: T,
+    /// The dimension of explosion.
+    pub dim: &'static str,
+    /// The ub of the explosion resolution.
+    pub ub: usize,
 }
+

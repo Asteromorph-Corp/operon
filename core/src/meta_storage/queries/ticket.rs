@@ -98,24 +98,27 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     /// Returns tickets that are newly `"queued"`.
     pub async fn raise_deps_quota<const M: usize>(
         &self,
-        res_meta: DimensionMetadata<M>,
-        res: Resolution<M>,
-        affected: usize,
+        upstream_meta: JobMetadata<M>,
+        upstream_ticket: Ticket<M>,
+        aggregate_dims: &[&'static str],
+        ub: usize,
     ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
-        if self.job_meta.dims.contains(&res_meta.id) {
-            log::warn!("Invalid resolution received for raising quota.");
-            return Ok(vec![]);
-        }
-
         let schema = self.client.schema_prefix();
-        let stmt = RaiseDepsQuotaQuery(schema, self.job_meta, res_meta);
 
-        let params = res_meta
-            .deps
+        let (cols, values): (Vec<_>, Vec<_>) = upstream_meta
+            .dims
             .iter()
-            .zip(res.coordinate)
-            .filter_map(|(d, c)| self.job_meta.dims.contains(d).then_some(c));
-        let params = SqlParams::from_usize([res.ub, affected].into_iter().chain(params))?;
+            .zip(upstream_ticket.coordinate)
+            .filter_map(|(&dim, coord)| {
+                if aggregate_dims.contains(&dim) {
+                    return None;
+                }
+                Some((dim, coord.0?))
+            })
+            .unzip();
+        let stmt = RaiseDepsQuotaQuery(schema, self.job_meta, &cols);
+
+        let params = SqlParams::from_usize([ub].into_iter().chain(values))?;
 
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
@@ -127,16 +130,16 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
 
     /// Explodes the ticket along a dimension at a given coordinate.
     ///
-    /// Returns the number of exploded tickets.
+    /// Returns tickets affected.
     pub async fn explode<const M: usize, const IDX: usize>(
         &self,
         res_meta: DimensionMetadata<M>,
         res: Resolution<M>,
-    ) -> Result<usize, MetaStorageError> {
+    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
         const { assert!(IDX < N) }
         if self.job_meta.dims[IDX] != res_meta.id {
             log::warn!("Invalid resolution received for explosion.");
-            return Ok(0);
+            return Ok(vec![]);
         }
 
         let schema_prefix = self.client.schema_prefix();
@@ -184,7 +187,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         }
         sink.close().await?;
 
-        Ok(tickets.len())
+        Ok(tickets)
     }
 
     /// Marks the ticket corresponding to a given job as done.
@@ -411,41 +414,26 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsDoneQuery<'_
 }
 
 /// Helper struct to generate the SQL query for raising `deps_done` count of tickets.
-struct RaiseDepsQuotaQuery<'a, const N: usize, const M: usize>(
-    SchemaPrefix<'a>,
-    JobMetadata<N>,
-    DimensionMetadata<M>,
-);
+struct RaiseDepsQuotaQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>, &'a [&'a str]);
 
-impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsQuotaQuery<'_, N, M> {
+impl<const N: usize> std::fmt::Display for RaiseDepsQuotaQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let cols = self.2;
 
         writeln!(f, "WITH updated AS (")?;
         writeln!(f, "    UPDATE {schema}ticket_{id}")?;
         writeln!(f, "    SET")?;
-        writeln!(
-            f,
-            "        deps_quota = deps_quota + $1::bigint * $2::bigint - $2,"
-        )?;
+        writeln!(f, "        deps_quota = deps_quota + $1 - 1,")?;
         writeln!(f, "        status = CASE")?;
-        writeln!(
-            f,
-            "            WHEN deps_done >= deps_quota + $1::bigint * $2::bigint - $2"
-        )?;
+        writeln!(f, "            WHEN deps_done >= deps_quota + $1 - 1")?;
         writeln!(f, "                THEN 'queued'::{schema}ticket_status")?;
         writeln!(f, "            ELSE 'waiting'::{schema}ticket_status")?;
         writeln!(f, "        END")?;
         writeln!(f, "    WHERE status = 'waiting'::{schema}ticket_status")?;
-        for (idx, dim) in self
-            .2
-            .deps
-            .iter()
-            .filter(|d| self.1.dims.contains(d))
-            .enumerate()
-        {
-            writeln!(f, "        AND {} = ${}", dim, idx + 3)?;
+        for (idx, dim) in cols.iter().enumerate() {
+            writeln!(f, "        AND {} = ${}", dim, idx + 2)?;
         }
         writeln!(f, "    RETURNING *")?;
         writeln!(f, ")")?;

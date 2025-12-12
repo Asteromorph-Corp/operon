@@ -2,7 +2,8 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::utils::{
-    job_enum_ident, job_id_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident,
+    job_enum_ident, job_id_ident, operon_ident, peer_txs_ident, resolution_enum_ident,
+    sender_ident, ticket_enum_ident,
 };
 
 /// Generates an implementation of `PeerEventSenders` for a job's peer event senders.
@@ -39,6 +40,7 @@ pub fn impl_peer_txs(
     let peer_txs_ident = peer_txs_ident(job_id);
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
+    let ticket_enum_ident = ticket_enum_ident();
 
     let sender_value = event_receiving_job_ids
         .iter()
@@ -55,27 +57,20 @@ pub fn impl_peer_txs(
             }
         });
 
-    let senders = event_receiving_job_ids
-        .iter()
-        .map(|downstream_job_id| sender_ident(downstream_job_id));
-
     parse_quote! {
         #[#operon::async_trait::async_trait]
         #[automatically_derived]
-        impl #operon::scheduler::PeerEventSenders<schema::#job_enum_ident, schema::#res_enum_ident> for #peer_txs_ident {
+        impl #operon::scheduler::PeerEventSenders<schema::#job_enum_ident, schema::#res_enum_ident, schema::#ticket_enum_ident> for #peer_txs_ident {
             fn gather_from(
                 mut senders: #operon::scheduler::PeerEventSenderMap<
                     schema::#job_enum_ident,
-                    schema::#res_enum_ident
+                    schema::#res_enum_ident,
+                    schema::#ticket_enum_ident,
                 >,
             ) -> Self {
                 #peer_txs_ident {
                     #(#sender_value,)*
                 }
-            }
-
-            fn downgrade_all(&mut self) {
-                #(self.#senders.downgrade();)*
             }
         }
     }

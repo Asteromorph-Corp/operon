@@ -3,6 +3,7 @@ use syn::parse_quote;
 
 use crate::utils::{
     job_enum_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident,
+    ticket_enum_ident,
 };
 
 /// Generates a struct definition for peer event senders.
@@ -23,6 +24,7 @@ pub fn peer_txs_definition(
     let peer_txs_ident = peer_txs_ident(job_id);
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
+    let ticket_enum_ident = ticket_enum_ident();
 
     let senders = event_receiving_job_ids
         .iter()
@@ -31,7 +33,7 @@ pub fn peer_txs_definition(
     parse_quote! {
         #[derive(Debug)]
         pub struct #peer_txs_ident {
-            #(pub #senders: #operon::scheduler::PeerEventSender<schema::#job_enum_ident, schema::#res_enum_ident>,)*
+            #(pub #senders: #operon::scheduler::PeerEventSender<schema::#job_enum_ident, schema::#res_enum_ident, schema::#ticket_enum_ident>,)*
         }
     }
 }

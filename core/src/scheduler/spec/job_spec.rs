@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
 use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
-use crate::schema::{JobLike, JobMetadata, ResolutionLike, TicketLike};
+use crate::schema::{JobLike, JobMetadata, ResolutionLike, TicketExplosion, TicketLike};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -67,7 +67,7 @@ where
     type Job: JobLike;
     type Resolution: ResolutionLike;
     type Ticket: TicketLike;
-    type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum>;
+    type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>;
 
     fn pool_size(&self) -> usize;
 
@@ -123,7 +123,6 @@ where
     async fn on_receive_explosion(
         &self,
         client: MetaClient<'_>,
-        explosion: Svc::ResolutionEnum,
-        affected: usize,
+        explosion: TicketExplosion<Svc::TicketEnum>,
     ) -> Result<Vec<Self::Ticket>, SchedulerError>;
 }

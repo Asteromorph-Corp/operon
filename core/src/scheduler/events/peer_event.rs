@@ -3,64 +3,49 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 
-use crate::scheduler::SchedulerError;
-use crate::schema::{JobEnum, ResolutionEnum};
+use crate::schema::{JobEnum, ResolutionEnum, TicketEnum, TicketExplosion};
+use crate::service::OperonService;
 
 /// `IndividualScheduler`-`IndividualScheduler` communication events.
 ///
 /// These are used for communication between individual schedulers,
 /// where each scheduler should modify its tickets based on the events.
 #[derive(Debug, Clone)]
-pub enum PeerEvent<JE: JobEnum, RE: ResolutionEnum> {
-    Job(JE),
-    Resolution(RE),
-    Explosion(RE, usize),
+pub enum PeerEvent<J: JobEnum, R: ResolutionEnum, T: TicketEnum> {
+    Job(J),
+    Resolution(R),
+    Explosion(TicketExplosion<T>),
 }
 
-#[derive(Debug, Clone)]
-pub enum PeerEventSender<JE: JobEnum, RE: ResolutionEnum> {
-    Up(tokio::sync::mpsc::Sender<PeerEvent<JE, RE>>),
-    Downgraded(tokio::sync::mpsc::WeakSender<PeerEvent<JE, RE>>),
-}
+pub type PeerEventSender<J, R, T> = tokio::sync::mpsc::Sender<PeerEvent<J, R, T>>;
+pub type PeerEventReceiver<J, R, T> = tokio::sync::mpsc::Receiver<PeerEvent<J, R, T>>;
+pub type PeerEventSenderMap<J, R, T> = HashMap<&'static str, PeerEventSender<J, R, T>>;
 
-pub type PeerEventReceiver<JE, RE> = tokio::sync::mpsc::Receiver<PeerEvent<JE, RE>>;
-pub type PeerEventSenderMap<JE, RE> = HashMap<&'static str, PeerEventSender<JE, RE>>;
-
-impl<JE: JobEnum, RE: ResolutionEnum> PeerEventSender<JE, RE> {
-    pub async fn send(&self, event: PeerEvent<JE, RE>) -> Result<(), SchedulerError> {
-        match self {
-            PeerEventSender::Up(tx) => tx
-                .send(event)
-                .await
-                .map_err(|_| SchedulerError::PeerEventSendFailed),
-            PeerEventSender::Downgraded(_) => Err(SchedulerError::SendThroughDowngradedSender),
-        }
-    }
-
-    pub fn downgrade(&mut self) {
-        match self {
-            PeerEventSender::Up(tx) => {
-                let weak = tx.downgrade();
-                *self = PeerEventSender::Downgraded(weak);
-            }
-            PeerEventSender::Downgraded(_) => {}
-        }
-    }
-}
+pub type ServicePeerEventSender<Svc> = PeerEventSender<
+    <Svc as OperonService>::JobEnum,
+    <Svc as OperonService>::ResolutionEnum,
+    <Svc as OperonService>::TicketEnum,
+>;
+pub type ServicePeerEventReceiver<Svc> = PeerEventReceiver<
+    <Svc as OperonService>::JobEnum,
+    <Svc as OperonService>::ResolutionEnum,
+    <Svc as OperonService>::TicketEnum,
+>;
+pub type ServicePeerEventSenderMap<Svc> = PeerEventSenderMap<
+    <Svc as OperonService>::JobEnum,
+    <Svc as OperonService>::ResolutionEnum,
+    <Svc as OperonService>::TicketEnum,
+>;
 
 #[async_trait]
-pub trait PeerEventSenders<JE: JobEnum, RE: ResolutionEnum>: Send + Sync {
+pub trait PeerEventSenders<J: JobEnum, R: ResolutionEnum, T: TicketEnum>: Send + Sync {
     /// Constructs a new `PeerEventSenders` instance from the given senders.
     ///
     /// Remove the senders from the map.
-    fn gather_from(senders: HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self;
-
-    fn downgrade_all(&mut self);
+    fn gather_from(senders: PeerEventSenderMap<J, R, T>) -> Self;
 }
 
 #[async_trait]
-impl<JE: JobEnum, RE: ResolutionEnum> PeerEventSenders<JE, RE> for () {
-    fn gather_from(_: HashMap<&'static str, PeerEventSender<JE, RE>>) -> Self {}
-
-    fn downgrade_all(&mut self) {}
+impl<J: JobEnum, R: ResolutionEnum, T: TicketEnum> PeerEventSenders<J, R, T> for () {
+    fn gather_from(_: PeerEventSenderMap<J, R, T>) -> Self {}
 }

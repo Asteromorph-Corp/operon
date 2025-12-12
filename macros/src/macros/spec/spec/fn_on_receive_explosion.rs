@@ -1,9 +1,10 @@
 use indexmap::IndexSet;
+use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    dimension_metadata_ident, operon_ident, resolution_enum_ident, to_lit_str, to_pascal_case,
+    job_metadata_ident, operon_ident, ticket_enum_ident, to_lit_str, to_pascal_case,
 };
 
 /// Generates the `on_receive_explosion` function for the implementation of the trait `JobSpec`.
@@ -33,36 +34,47 @@ pub(super) fn fn_on_receive_explosion(
     upstream_jobs: &IndexSet<&JobConfig>,
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
-    let res_enum_ident = resolution_enum_ident();
+    let ticket_enum_ident = ticket_enum_ident();
     let job_id = to_lit_str(&job.id);
 
-    let arms = upstream_jobs
-        .iter()
-        .flat_map(|upstream_job| upstream_job.dims.iter().filter(|dim| !job.dims.contains(dim)))
-        .collect::<IndexSet<_>>() // Deduplicate
-        .into_iter()
-        .map(|dim_id| -> syn::Arm {
-            let variant_ident = to_pascal_case(dim_id);
-            let dim_meta = dimension_metadata_ident(dim_id);
+    let arms = upstream_jobs.into_iter().map(|upstream_job| -> syn::Arm {
+        let variant_ident = to_pascal_case(&upstream_job.id);
+        let job_meta = job_metadata_ident(&upstream_job.id);
 
-            parse_quote! {
-                schema::#res_enum_ident::#variant_ident(res) => Ok(
-                    client.ticket(self.job_meta())
-                        .raise_deps_quota(metadata::#dim_meta(), res, affected)
-                        .await?
-                ),
-            }
-        });
+        let raise_quotas = job
+            .from
+            .iter()
+            .filter(|arg| arg.id == upstream_job.to)
+            .map(|arg| {
+                let over = arg.over.iter().map(to_lit_str);
+                quote! {
+                    let aggregate_dims = [#(#over),*];
+                    if aggregate_dims.contains(&explosion.dim) {
+                        let tickets = client.ticket(self.job_meta())
+                            .raise_deps_quota(metadata::#job_meta(), ticket, &aggregate_dims, explosion.ub)
+                            .await?;
+                        out.extend(tickets);
+                    }
+                }
+            });
+
+        parse_quote! {
+            schema::#ticket_enum_ident::#variant_ident(ticket) => {
+                let mut out = Vec::new();
+                #(#raise_quotas)*
+                Ok(out)
+            },
+        }
+    });
 
     parse_quote! {
         #[allow(unused_variables, clippy::match_single_binding)]
         async fn on_receive_explosion(
             &self,
             client: #operon::meta_storage::MetaClient<'_>,
-            resolution: schema::#res_enum_ident,
-            affected: usize,
+            explosion: #operon::schema::TicketExplosion<schema::#ticket_enum_ident>,
         ) -> Result<Vec<Self::Ticket>, #operon::scheduler::SchedulerError> {
-            match resolution {
+            match explosion.ticket {
                 #(#arms)*
                 _ => Err(#operon::scheduler::SchedulerError::InvalidPeerEventReceived("explosion", #job_id)),
             }

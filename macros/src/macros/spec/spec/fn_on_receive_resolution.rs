@@ -3,8 +3,8 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    dimension_metadata_ident, operon_ident, resolution_enum_ident, sender_ident, to_lit_str,
-    to_pascal_case,
+    dimension_metadata_ident, operon_ident, resolution_enum_ident, sender_ident, ticket_enum_ident,
+    to_lit_str, to_pascal_case,
 };
 
 /// Generates the `on_receive_resolution` function for the implementation of the trait `JobSpec`.
@@ -62,10 +62,12 @@ pub(super) fn fn_on_receive_resolution(
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
+    let ticket_enum_ident = ticket_enum_ident();
     let job_id = to_lit_str(&job.id);
 
     let explode_arms = job.dims.iter().enumerate().map(|(idx, dim)| -> syn::Arm {
-        let variant_ident = to_pascal_case(dim);
+        let res_variant_ident = to_pascal_case(dim);
+        let ticket_variant_ident = to_pascal_case(&job.id);
         let dim_meta = dimension_metadata_ident(dim);
         let send_explosions = downstream_jobs.iter().flat_map(|downstream_job| {
             let cnt = downstream_job.from.iter().filter(|arg| arg.id == job.to && arg.over.contains(dim)).count();
@@ -78,10 +80,15 @@ pub(super) fn fn_on_receive_resolution(
                 "`{}`'s peer channel closed before handling `{}`'s {{resolution:?}}",
                 downstream_job.id, job.id
             );
+            let dim_str = to_lit_str(dim);
             let stmt: syn::Stmt = parse_quote! {
                 match peer_txs
                     .#sender_ident
-                    .send(#operon::scheduler::PeerEvent::Explosion(schema::#res_enum_ident::#variant_ident(res), affected))
+                    .send(#operon::scheduler::PeerEvent::Explosion(#operon::schema::TicketExplosion {
+                        ticket: schema::#ticket_enum_ident::#ticket_variant_ident(ticket),
+                        dim: #dim_str,
+                        ub: res.ub,
+                    }))
                     .await
                 {
                     Ok(_) => #operon::log::trace!(#ok_msg),
@@ -92,9 +99,11 @@ pub(super) fn fn_on_receive_resolution(
         });
 
         parse_quote! {
-            schema::#res_enum_ident::#variant_ident(res) => {
+            schema::#res_enum_ident::#res_variant_ident(res) => {
                 let affected = client.ticket(self.job_meta()).explode::<_, #idx>(metadata::#dim_meta(), res).await?;
-                #(#send_explosions)*
+                for ticket in affected {
+                    #(#send_explosions)*
+                }
             },
         }
     });

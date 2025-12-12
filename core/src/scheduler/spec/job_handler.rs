@@ -7,8 +7,8 @@ use tokio::sync::RwLock;
 use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, PeerEventReceiver,
-    PeerEventSenderMap, SchedulerError, SpecWithMetadata,
+    ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, SchedulerError,
+    ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
 };
 use crate::schema::{Job, Ticket};
 use crate::service::OperonService;
@@ -83,8 +83,8 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
-        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+        peer_txs: ServicePeerEventSenderMap<Svc>,
+        peer_rx: ServicePeerEventReceiver<Svc>,
         ctrl_rx: ControlEventReceiver,
         clean: bool,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // call `start` with empty Vector (`Scheduler::run` 6023)
@@ -163,8 +163,8 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         ui_state: Arc<RwLock<UiState>>,
-        peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum>,
-        peer_rx: PeerEventReceiver<Svc::JobEnum, Svc::ResolutionEnum>,
+        peer_txs: ServicePeerEventSenderMap<Svc>,
+        peer_rx: ServicePeerEventReceiver<Svc>,
         ctrl_rx: ControlEventReceiver,
         clean: bool,
     ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>> {

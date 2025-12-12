@@ -1,4 +1,5 @@
 use indexmap::IndexSet;
+use quote::quote;
 use syn::parse_quote;
 
 use crate::configs::{JobConfig, JobConfigMap};
@@ -75,7 +76,7 @@ pub fn impl_job_rebuilder(
     let explode_exprs = if let Some(spawn_dim) = &job.spawn_dim {
         spawn_dim_repeating_jobs
             .iter()
-            .flat_map(|repeating_job| {
+            .map(|repeating_job| {
                 let Some(idx) = repeating_job.dims.iter().position(|d| d == spawn_dim) else {
                     panic!(
                         "{} not found in repeating job {}",
@@ -93,23 +94,30 @@ pub fn impl_job_rebuilder(
                 let raise_quotas = get_direct_downstream_jobs(repeating_job, all_jobs)
                     .into_iter()
                     .flat_map(|downstream_job| {
-                        let downstream_job_meta = job_metadata_ident(&downstream_job.id);
-                        let cnt = downstream_job
+                        downstream_job
                             .from
                             .iter()
                             .filter(|arg| {
                                 arg.id == repeating_job.to && arg.over.contains(spawn_dim)
                             })
-                            .count();
-                        let stmt: syn::Stmt = parse_quote! {
-                            client.ticket(metadata::#downstream_job_meta())
-                                .raise_deps_quota(self.spawn_dim_meta, resolution, affected)
-                                .await?;
-                        };
-                        std::iter::repeat_n(stmt, cnt)
+                            .map(|arg| -> syn::Stmt {
+                                let repeating_job_meta = job_metadata_ident(&repeating_job.id);
+                                let downstream_job_meta = job_metadata_ident(&downstream_job.id);
+                                let over = arg.over.iter().map(to_lit_str);
+                                parse_quote! {
+                                    client.ticket(metadata::#downstream_job_meta())
+                                        .raise_deps_quota(metadata::#repeating_job_meta(), ticket, &[#(#over),*], resolution.ub)
+                                        .await?;
+                                }
+                            })
                     });
 
-                std::iter::once(explode).chain(raise_quotas)
+                quote! {
+                    #explode
+                    for ticket in affected {
+                        #(#raise_quotas)*
+                    }
+                }
             })
             .collect::<Vec<_>>()
     } else if !spawn_dim_repeating_jobs.is_empty() {

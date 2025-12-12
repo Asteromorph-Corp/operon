@@ -5,8 +5,7 @@ use futures::{StreamExt, TryStreamExt};
 use crate::meta_storage::MetaClient;
 use crate::operon::RunningState;
 use crate::scheduler::{
-    HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent, PeerEventSender,
-    SchedulerError,
+    HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent, SchedulerError,
 };
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -32,9 +31,9 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
 
         self.job_handlers.iter().for_each(|job_handler| {
             let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
-                PeerEvent<Svc::JobEnum, Svc::ResolutionEnum>,
+                PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
             >(channel_size);
-            peer_txs.insert(job_handler.job_id(), PeerEventSender::Up(peer_tx));
+            peer_txs.insert(job_handler.job_id(), peer_tx);
             schedules_with_rx.push(HandlerWithRx::new(job_handler.as_ref(), peer_rx));
         });
 

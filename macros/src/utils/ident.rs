@@ -109,6 +109,10 @@ pub fn job_enum_ident() -> syn::Ident {
     format_ident!("JobEnum")
 }
 
+pub fn ticket_enum_ident() -> syn::Ident {
+    format_ident!("TicketEnum")
+}
+
 pub fn job_id_ident(job_id: &syn::Ident) -> syn::Ident {
     format_ident!("{}_ID", job_id.to_string().to_shouty_snake_case())
 }
