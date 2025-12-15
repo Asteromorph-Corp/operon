@@ -82,7 +82,8 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
             .dims
             .iter()
             .zip(upstream_job.coordinate)
-            .filter_map(|(d, c)| self.job_meta.dims.contains(d).then_some(c));
+            .filter(|(d, _)| self.job_meta.dims.contains(d) && !aggregate_dims.contains(d))
+            .map(|(_, c)| c);
         let params = SqlParams::from_usize(params)?;
 
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
