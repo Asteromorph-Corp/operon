@@ -9,7 +9,7 @@ async fn run_job(
     let [i] = job.coordinate;
 
     let mut resolution_j: std::collections::HashMap<[usize; 0usize], usize> = Default::default();
-    let mut resolution_k: std::collections::HashMap<[usize; 1usize], usize> = Default::default();
+    let mut resolution_k_j: std::collections::HashMap<[usize; 1usize], usize> = Default::default();
 
     let Some(resolution) = client
         .resolution(metadata::dimension_j_meta())
@@ -37,7 +37,7 @@ async fn run_job(
                 .into(),
             );
         };
-        resolution_k.insert([j], resolution.ub);
+        resolution_k_j.insert([j], resolution.ub);
     }
 
     let c_j = {
@@ -71,7 +71,7 @@ async fn run_job(
             .enumerate()
             .map(|(j, elem)| {
                 let len = elem.len();
-                let ub = resolution_k.get(&[j]).unwrap_or(&0);
+                let ub = resolution_k_j.get(&[j]).unwrap_or(&0);
                 if len < *ub {
                     return Err(operon::storage::StorageError::NotFound(format!(
                         "D (i = {i}, j = {j}, k = *) expects {ub} elements, but only {len} were found"

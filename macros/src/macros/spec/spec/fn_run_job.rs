@@ -15,6 +15,10 @@ use crate::utils::{
 
 fn resolution_map_ident(dim: &RequiredDim<'_>) -> syn::Ident {
     let id = dim.config.id.to_string().to_snake_case();
+    if dim.fetched_over.is_empty() {
+        return format_ident!("resolution_{id}");
+    }
+
     let over = dim
         .fetched_over
         .iter()

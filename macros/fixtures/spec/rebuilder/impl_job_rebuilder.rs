@@ -17,10 +17,12 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                 .ticket(metadata::job_delta_meta())
                 .explode::<_, 1usize>(self.spawn_dim_meta, resolution)
                 .await?;
-            client
-                .ticket(metadata::job_epsilon_meta())
-                .raise_deps_quota(self.spawn_dim_meta, resolution, affected)
-                .await?;
+            for ticket in affected {
+                client
+                    .ticket(metadata::job_epsilon_meta())
+                    .raise_deps_quota(metadata::job_delta_meta(), ticket, &["j"], resolution.ub)
+                    .await?;
+            }
             client
                 .ticket(metadata::job_delta_meta())
                 .raise_deps_done(self.job_meta, job, &[])

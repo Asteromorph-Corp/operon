@@ -11,27 +11,33 @@ async fn on_receive_resolution(
                 .ticket(self.job_meta())
                 .explode::<_, 0usize>(metadata::dimension_i_meta(), res)
                 .await?;
+            for ticket in affected {}
         }
         schema::ResolutionEnum::J(res) => {
             let affected = client
                 .ticket(self.job_meta())
                 .explode::<_, 1usize>(metadata::dimension_j_meta(), res)
                 .await?;
-            match peer_txs
-                .to_epsilon
-                .send(operon::scheduler::PeerEvent::Explosion(
-                    schema::ResolutionEnum::J(res),
-                    affected,
-                ))
-                .await
-            {
-                Ok(_) => {
-                    operon::log::trace!("`delta` sent peer event to `epsilon`: {resolution:?}")
-                }
-                Err(_) => {
-                    operon::log::trace!(
-                        "`epsilon`'s peer channel closed before handling `delta`'s {resolution:?}"
-                    )
+            for ticket in affected {
+                match peer_txs
+                    .to_epsilon
+                    .send(operon::scheduler::PeerEvent::Explosion(
+                        operon::schema::TicketExplosion {
+                            ticket: schema::TicketEnum::Delta(ticket),
+                            dim: "j",
+                            ub: res.ub,
+                        },
+                    ))
+                    .await
+                {
+                    Ok(_) => {
+                        operon::log::trace!("`delta` sent peer event to `epsilon`: {resolution:?}")
+                    }
+                    Err(_) => {
+                        operon::log::trace!(
+                            "`epsilon`'s peer channel closed before handling `delta`'s {resolution:?}"
+                        )
+                    }
                 }
             }
         }
@@ -40,6 +46,7 @@ async fn on_receive_resolution(
                 .ticket(self.job_meta())
                 .explode::<_, 2usize>(metadata::dimension_k_meta(), res)
                 .await?;
+            for ticket in affected {}
         }
         _ => {
             return Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
