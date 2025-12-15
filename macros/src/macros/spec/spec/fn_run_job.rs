@@ -161,6 +161,7 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
 
 /// Generates the code for defining a collected argument entity in the `run_job` function.
 fn arg_def_collected(
+    job: &JobConfig,
     entity: &EntityConfig,
     over: &[syn::Ident],
     dimensions: &DimensionConfigMap,
@@ -178,64 +179,54 @@ fn arg_def_collected(
         .map(clear_span)
         .collect::<Vec<_>>();
 
-    let check_ub = over
-        .iter()
-        .enumerate()
-        .rfold(quote! { Ok(elem) }, |acc, (i, dim)| {
-            let Some(dim_config) = dimensions.get(dim) else {
-                panic!("Dimension `{dim}` not found in config");
-            };
-            let dim = clear_span(dim);
-            let dim_required = RequiredDim::new(dim_config, over);
+    let check_ub = over.iter().rfold(quote! { Ok(elem) }, |acc, dim| {
+        let Some(dim_config) = dimensions.get(dim) else {
+            panic!("Dimension `{dim}` not found in config");
+        };
+        let dim = clear_span(dim);
+        let dim_required = RequiredDim::new(dim_config, over);
 
-            let acc = if i == over.len() - 1 {
-                acc
-            } else {
-                quote! { { #acc } }
-            };
+        let res_map_ident = resolution_map_ident(&dim_required);
+        let res_map_key = dim_required.fetched_over.iter().cloned().map(clear_span);
 
-            let res_map_ident = resolution_map_ident(&dim_required);
-            let res_map_key = dim_required.fetched_over.iter().cloned().map(clear_span);
-
-            let mut cnt = 0;
-            let dim_msgs = entity
-                .dims
-                .iter()
-                .map(|arg_dim| {
-                    if !over.contains(arg_dim) {
-                        return dim_msg(arg_dim);
-                    }
-                    cnt += 1;
-                    if cnt <= i {
-                        dim_msg(arg_dim)
-                    } else if cnt == i + 1 {
-                        format!("{arg_dim} = *")
-                    } else {
-                        format!("{arg_dim} = _")
-                    }
-                })
-                .collect::<Vec<_>>();
-            let not_found_msg = format!(
-                "{} ({}) expects {{ub}} elements, but only {{len}} were found",
-                entity.id,
-                dim_msgs.join(", ")
-            );
-
-            quote! {
-                let len = elem.len();
-                let ub = #res_map_ident.get(&[#(#res_map_key,)*]).unwrap_or(&0); // TODO: Handle this better
-                if len < *ub {
-                    return Err(#operon::storage::StorageError::NotFound(
-                        format!(#not_found_msg)
-                    ).into());
+        let dim_msgs = entity
+            .dims
+            .iter()
+            .map(|arg_dim| {
+                if *arg_dim == dim {
+                    format!("{arg_dim} = *")
+                } else if dim_config.depends_on.contains(arg_dim) {
+                    dim_msg(arg_dim)
+                } else if over.contains(arg_dim) {
+                    format!("{arg_dim} = _")
+                } else if job.dims.contains(arg_dim) {
+                    dim_msg(arg_dim)
+                } else {
+                    format!("{arg_dim} = _")
                 }
-                elem.into_iter()
-                    .take(*ub)
-                    .enumerate()
-                    .map(|(#dim, elem)| #acc)
-                    .collect::<Result<Vec<_>, #operon::scheduler::SchedulerError>>()
+            })
+            .collect::<Vec<_>>();
+        let not_found_msg = format!(
+            "{} ({}) expects {{ub}} elements, but only {{len}} were found",
+            entity.id,
+            dim_msgs.join(", ")
+        );
+
+        quote! {
+            let len = elem.len();
+            let ub = #res_map_ident.get(&[#(#res_map_key,)*]).unwrap_or(&0); // TODO: Handle this better
+            if len < *ub {
+                return Err(#operon::storage::StorageError::NotFound(
+                    format!(#not_found_msg)
+                ).into());
             }
-        });
+            elem.into_iter()
+                .take(*ub)
+                .enumerate()
+                .map(|(#dim, elem)| { #acc })
+                .collect::<Result<Vec<_>, #operon::scheduler::SchedulerError>>()
+        }
+    });
 
     parse_quote! {
         let #arg_ident = {
@@ -311,7 +302,7 @@ pub(super) fn fn_run_job(
         if arg.over.is_empty() {
             arg_def_single(entity)
         } else {
-            arg_def_collected(entity, &arg.over, dimensions)
+            arg_def_collected(job, entity, &arg.over, dimensions)
         }
     });
 
