@@ -122,6 +122,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
             sig,
             parse_quote! {
                 #[doc = #doc]
+                #[allow(clippy::too_many_arguments)]
                 async fn #fn_name(&self, #(#args),*) -> Result<#return_ty, #operon::operon::UserError>;
             },
         )
