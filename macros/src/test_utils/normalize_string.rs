@@ -1,7 +1,12 @@
 pub fn normalize_string(input: &str) -> String {
     let newline_normalized = normalize_raw_string_newlines(input);
     let comment_normalized = normalize_comments(&newline_normalized);
-    remove_trailing_commas(&comment_normalized)
+    let parenthesis_removed = remove_parenthesis(&comment_normalized);
+    remove_trailing_commas(&parenthesis_removed)
+}
+
+pub fn remove_parenthesis(s: &str) -> String {
+    s.replace("{ Ok(elem) }", "Ok(elem)")
 }
 
 pub fn remove_trailing_commas(s: &str) -> String {

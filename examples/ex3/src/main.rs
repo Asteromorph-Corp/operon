@@ -15,7 +15,7 @@ operon::define_operon! {
         B<j> = beta(A<i>, A) for i;
         C<k> = gamma(A) for i;
         D<l> = delta(A, B<i, j>, B<j>, B, C) for i, j, k;
-        E<m> = epsilon(D<i, j, k, l>);
+        E<m> = epsilon(D<i, k, j, l>);
         F<n> = zeta(E, D<j, l>, D) for j, l, i, k, m;
         G = eta(F<n>, F<l, n>, F, E, D<l>, D) for n, l, i, k, m, j;
         H = theta(G, F, E, D, C, B, A) for i, j, k, l, m, n;
