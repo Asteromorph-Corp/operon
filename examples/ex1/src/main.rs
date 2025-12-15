@@ -142,7 +142,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We cloned the `storage` Arc because we intend to access the storage
     // after the Operon instance has finished running,
     // but this is entirely optional.
-    let operon_instance = Operon::new(service, storage.clone(), operon_options);
+    let operon_instance: Operon<MySplitterService, PsqlSplitterStorage> =
+        Operon::new(service, storage.clone(), operon_options);
 
     // This will start the Operon UI in the terminal,
     // where we can control the execution of the pipeline.
