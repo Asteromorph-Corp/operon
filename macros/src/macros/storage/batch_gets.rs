@@ -38,8 +38,8 @@ pub fn batch_gets(
         .flat_map(|job| job.from.iter().filter(|arg| !arg.over.is_empty()))
         .collect::<Vec<_>>();
 
-    targets.sort_by_key(|arg| &arg.id);
-    targets.dedup_by_key(|arg| &arg.id);
+    targets.sort_by_key(|arg| (&arg.id, &arg.over));
+    targets.dedup_by_key(|arg| (&arg.id, &arg.over));
 
     targets.into_iter().map(|arg| -> syn::TraitItemFn {
         let operon = operon_ident();
