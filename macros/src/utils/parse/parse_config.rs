@@ -29,6 +29,41 @@ fn validate_downwards_closed<'a>(
     Ok(())
 }
 
+fn validate_topologically_sorted<'a>(
+    dims: impl IntoIterator<Item = &'a syn::Ident>,
+    configs: &DimensionConfigMap,
+) -> Result<(), String> {
+    let mut seen = HashSet::new();
+    let reverse_indexes: IndexMap<&syn::Ident, usize> = dims
+        .into_iter()
+        .enumerate()
+        .map(|(i, dim)| {
+            if !seen.insert(dim) {
+                Err(format!("Dimension '{dim}' appears more than once"))
+            } else {
+                Ok((dim, i))
+            }
+        })
+        .collect::<Result<_, String>>()?;
+
+    for (dim, config) in configs.iter() {
+        let dim_index = match reverse_indexes.get(dim) {
+            Some(index) => *index,
+            None => continue,
+        };
+        for dep in &config.depends_on {
+            if let Some(dep_index) = reverse_indexes.get(dep)
+                && dep_index >= &dim_index
+            {
+                return Err(format!(
+                    "Dimension '{dim}' depends on '{dep}', which appears later here"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 impl Parse for AllConfig {
     fn parse(input: &ParseBuffer) -> syn::Result<AllConfig> {
         let config_decl: ConfigDecl = input.parse()?;
@@ -84,11 +119,15 @@ impl Parse for AllConfig {
                         format!("Undefined entity '{}'", arg_entity.id),
                     ));
                 };
-                // Constraint 4b–d. Let A = arg_entity_config.dims, B = arg_entity.dims, C =
-                // job.dims. Use HashSet for set operations.
+                // Constraint 4b: Argument entity's dimensions must be topologically sorted
+                if let Err(err) = validate_topologically_sorted(&arg_entity.dims, &dimensions) {
+                    return Err(syn::Error::new(arg_entity._span, err));
+                }
+                // Constraint 4c–d. Let A = \mathcal{E}_{in, i}, B = \Sigma(\tau_{in, i}), C =
+                // \mathcal{F}. Use HashSet for set operations.
                 let a_set: HashSet<&syn::Ident> = HashSet::from_iter(&arg_entity_config.dims);
                 let b_set: HashSet<&syn::Ident> = HashSet::from_iter(&arg_entity.dims);
-                // Constraint 4b: B ⊆ A.
+                // Constraint 4c: B ⊆ A.
                 for dim in &arg_entity.dims {
                     if !a_set.contains(dim) {
                         return Err(syn::Error::new(
