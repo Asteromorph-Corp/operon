@@ -180,9 +180,13 @@ impl Parse for AllConfig {
             if job_dims != bigcup {
                 let expected = bigcup.iter().map(|d| d.to_string()).collect::<Vec<_>>();
                 let err_msg = if expected.is_empty() {
-                    "No dimensions expected".to_string()
+                    format!("Job {} expected no dimensions", job.id)
                 } else {
-                    format!("Dimensions do not match, should be: {}", expected.join(","))
+                    format!(
+                        "Job {} expected dimensions: {}",
+                        job.id,
+                        expected.join(", ")
+                    )
                 };
                 return Err(syn::Error::new(job._span, err_msg));
             }
