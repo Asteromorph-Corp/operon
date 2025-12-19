@@ -381,7 +381,7 @@ where
 
                                 // Alert the results to the scheduler
                                 log::trace!(
-                                    "{job_id} worker exited with: JobSuccess({job:?}, {resolution:?});",
+                                    "{job_id} worker exited with: JobSuccess({job:?}, {resolution:?}).",
                                 );
                                 Ok(InternalEvent::JobSuccess(job, resolution))
                             }
