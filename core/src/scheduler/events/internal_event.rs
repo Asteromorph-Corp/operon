@@ -1,8 +1,5 @@
 use crate::scheduler::SchedulerError;
 
-pub type IntEventSender<J, R> = tokio::sync::mpsc::UnboundedSender<InternalEvent<J, R>>;
-pub type IntEventReceiver<J, R> = tokio::sync::mpsc::UnboundedReceiver<InternalEvent<J, R>>;
-
 /// `IndividualScheduler`-worker communication events.
 ///
 /// These are used for communication between individual schedulers and their

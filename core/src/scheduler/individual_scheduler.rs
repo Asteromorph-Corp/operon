@@ -2,11 +2,12 @@ use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
 use tokio::sync::{RwLock, Semaphore};
+use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
 use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEvent, ControlEventReceiver, IntEventReceiver, InternalEvent, JobSpec, PeerEvent,
+    ControlEvent, ControlEventReceiver, InternalEvent, JobSpec, PeerEvent,
     PeerEventSenders, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
     SpecWithMetadata,
 };
@@ -41,6 +42,7 @@ where
     pub pool: Arc<Semaphore>,
     pub pool_size: usize,
     pub ui_state: Arc<RwLock<UiState>>,
+    pub handles: JoinSet<Result<InternalEvent<Job<N>, JS::Resolution>, SchedulerError>>,
 }
 
 impl<Svc, Sto, JS, const N: usize> IndividualScheduler<Svc, Sto, JS, N>
@@ -68,6 +70,7 @@ where
             pool: Arc::new(Semaphore::new(pool_size)),
             pool_size,
             ui_state,
+            handles: JoinSet::new(),
         }
     }
 
@@ -253,9 +256,6 @@ where
         let mut ready_tickets: VecDeque<Ticket<N>> = initial_tickets.into();
         let mut got_all_updates = false;
 
-        let (int_tx, mut int_rx) =
-            tokio::sync::mpsc::unbounded_channel::<InternalEvent<Job<N>, JS::Resolution>>();
-
         // Main event loop.
         loop {
             // This loop cannot be entered with the `Error` or `Stopped` state,
@@ -270,7 +270,7 @@ where
                 ControlEvent::Resume { targets } => self.handle_resume(targets, state).await?,
                 ControlEvent::GracefulStop => {
                     if self
-                        .handle_graceful_stop(state, got_all_updates, &int_rx)
+                        .handle_graceful_stop(state, got_all_updates)
                         .await?
                     {
                         return Ok(());
@@ -296,20 +296,15 @@ where
                 }
 
                 // 1. An internal event.
-                int_event = int_rx.recv() => {
-                    let int_event = int_event.ok_or(
-                        SchedulerError::Other(
-                            "Scheduler internal channel closed prematurely".into()
-                        )
-                    )?;
+                Some(int_event) = self.handles.join_next() => {
+                    let int_event = int_event??;
                     self.update_state_without_client(false, state).await?;
                     match int_event {
                         InternalEvent::JobSuccess(job, resolution) => {
                             // Trace the job success
                             log::trace!(
-                                "{} received internal event: JobSuccess({job:?}, {resolution:?}); \
-                                Internal channel has {} events left.",
-                                self.meta.id, int_rx.len()
+                                "{} received internal event: JobSuccess({job:?}, {resolution:?}).",
+                                self.meta.id
                             );
 
                             // Broadcast the job result events
@@ -317,7 +312,7 @@ where
                             // If all the tickets are finished
                             // AND the scheduler's internal events are drained,
                             // exit the loop.
-                            if *state == RunningState::Finished && int_rx.is_empty(){
+                            if *state == RunningState::Finished && self.handles.is_empty() {
                                 return Ok(());
                             }
                         }
@@ -368,11 +363,11 @@ where
                     let storage = self.storage.clone();
                     let service = self.service.clone();
                     let meta_storage = self.meta_storage.clone();
-                    let int_sender = int_tx.clone();
+                    // let int_sender = int_tx.clone();
 
                     // Move the permit into the task so it is released on drop.
                     // The metadata storage operations are grouped in one transaction here.
-                    tokio::spawn(async move {
+                    self.handles.spawn(async move {
                         // Trace the job start.
                         log::trace!("Running job {job:?} in `{job_id}` scheduler.");
                         let _permit = permit;
@@ -385,22 +380,20 @@ where
                                 tx.commit().await?;
 
                                 // Alert the results to the scheduler
-                                int_sender.send(InternalEvent::JobSuccess(job, resolution))
-                                    .map_err(|e| SchedulerError::Other(format!("Failed to send internal event: {e}")))?;
                                 log::trace!(
-                                    "{job_id} sent internal event: JobSuccess({job:?}, {resolution:?});",
+                                    "{job_id} worker exited with: JobSuccess({job:?}, {resolution:?});",
                                 );
-
-                                Ok(())
+                                Ok(InternalEvent::JobSuccess(job, resolution))
                             }
                             Err(e) => {
                                 // Rollback the transaction
                                 tx.rollback().await?;
 
                                 // Alert the error to the scheduler
-                                int_sender.send(InternalEvent::JobFailure(job, e))
-                                    .map_err(|e| SchedulerError::Other(format!("Failed to send internal event: {e}")))?;
-                                Err(SchedulerError::Other("Job failed".into()))
+                                log::trace!(
+                                    "{job_id} worker exited with: JobFailure({job:?}, {e:?});",
+                                );
+                                Ok(InternalEvent::JobFailure(job, e))
                             }
                         }
                     });
@@ -496,7 +489,6 @@ where
         &mut self,
         state: &mut RunningState,
         got_all_updates: bool,
-        int_rx: &IntEventReceiver<Job<N>, JS::Resolution>,
     ) -> Result<bool, SchedulerError> {
         if *state == RunningState::Running {
             log::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
@@ -513,7 +505,7 @@ where
         }
         match state {
             RunningState::Paused | RunningState::Finished => {
-                if int_rx.is_empty() && got_all_updates {
+                if self.handles.is_empty() && got_all_updates {
                     log::info!("Gracefully stopped `{}` jobs.", self.meta.id);
                     // If the state is `Paused`, set it to `Stopped`,
                     // If the state is `Finished`, keep it as `Finished`.
