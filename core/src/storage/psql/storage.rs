@@ -1,11 +1,10 @@
 use async_trait::async_trait;
 use secrecy::ExposeSecret;
 
+use crate::schema::RunFootprint;
 use crate::storage::psql::{EntityQueries, StorageClient};
 use crate::storage::{OperonStorage, StorageError, StorageOptions};
 use crate::utils::SchemaPrefix;
-
-const GLOBAL: &str = "global";
 
 /// The SQL storage that can be used with the service.
 ///
@@ -86,14 +85,14 @@ impl<T: EntityQueries> OperonStorage for PsqlStorage<T> {
         Ok(())
     }
 
-    async fn get_footprint(&self) -> Result<Option<String>, StorageError> {
+    async fn get_footprint(&self) -> Result<Option<RunFootprint>, StorageError> {
         let client = self.conn().await?;
-        client.get_footprint(GLOBAL).await
+        client.get_footprint().await
     }
 
-    async fn put_footprint(&self, footprint: &str) -> Result<(), StorageError> {
+    async fn put_footprint(&self, footprint: &RunFootprint) -> Result<(), StorageError> {
         let client = self.conn().await?;
-        client.put_footprint(GLOBAL, footprint.to_string()).await
+        client.put_footprint(footprint).await
     }
 
     async fn clear_footprint(&self) -> Result<(), StorageError> {

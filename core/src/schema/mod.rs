@@ -13,6 +13,9 @@ pub use ticket::*;
 mod entity;
 pub use entity::*;
 
+mod run_metadata;
+pub use run_metadata::*;
+
 mod option_coordinate;
 pub use option_coordinate::*;
 

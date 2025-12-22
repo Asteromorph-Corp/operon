@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
+use uuid::Uuid;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::operon::RunningState;
@@ -10,6 +11,7 @@ use crate::scheduler::{
     ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
     SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender,
 };
+use crate::schema::{RunFootprint, RunMetadata, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiOptions, UiState};
@@ -78,42 +80,36 @@ where
         self.init_meta_storage().await?;
 
         // First, check the recovery state.
-        let recovery_state = self.check_recovery_state().await.map_err(|e| {
+        let RunMetadata { run_id, state } = self.check_run_metadata().await.map_err(|e| {
             log::error!("Failed to check the state from last run.");
             if let Err(e) = self.rec_tx.send(RecoveryState::Error) {
                 return SchedulerError::RecoverySendFailed(e.0);
             };
             e
         })?;
-        let ui_options = {
-            let state = self.ui_state.read().await;
-            state.options()
-        };
-        self.rec_tx.send(recovery_state)?;
-        match (ui_options, recovery_state) {
-            (UiOptions::Headless, _) => {
+
+        let ui_options = self.ui_state.read().await.options();
+        self.rec_tx.send(RecoveryState::from(state))?;
+        match state {
+            _ if ui_options == UiOptions::Headless => {
                 log::info!("Starting in headless mode.");
             }
-            (UiOptions::Interactive, RecoveryState::Fresh) => {
-                log::info!("Type `run` to begin running jobs.")
-            }
-            (UiOptions::Interactive, RecoveryState::Finished) => log::info!(
+            RunState::Fresh => log::info!("Type `run` to begin running jobs."),
+            RunState::Completed => log::info!(
                 "Found a finished run. \n\
-                Type `run` to begin running jobs and overwrite the existing data, \
-                or `exit` to cancel."
+                Type `run` to begin running jobs and overwrite the existing data, or `exit` to cancel."
             ),
-            (UiOptions::Interactive, RecoveryState::GracefullyStopped) => log::info!(
+            RunState::Paused => log::info!(
                 "Found a gracefully stopped run. \n\
                 Type `run` to resume running jobs from the last run, or `help` for additional options."
             ),
-            (UiOptions::Interactive, RecoveryState::AbortedUnchecked) => log::info!(
+            RunState::Running | RunState::Aborted => log::info!(
                 "Found an aborted run. \n\
-                Type `check` to check if the data is recoverable, \
-                `run` to start a new run and overwrite the existing data, \
-                or `help` for additional options."
+                Type `check` to check if the data is recoverable, `run` to start a new run and \
+                overwrite the existing data, or `help` for additional options."
             ),
-            _ => unreachable!("Unexpected recovery state: {recovery_state:?}"),
         }
+
         // Then, wait for the UI to decide what to do next.
         loop {
             self.ctrl_rx.changed().await?;
@@ -134,14 +130,12 @@ where
                             };
                             e
                         })?;
-                    let state_after_check = match (recovery_state, consistent) {
-                        (RecoveryState::AbortedUnchecked, true) => RecoveryState::AbortedChecked,
-                        (RecoveryState::GracefullyStopped, true) => {
-                            RecoveryState::GracefullyStoppedChecked
+                    let state_after_check = match (state, consistent) {
+                        (RunState::Aborted, true) => RecoveryState::AbortedChecked,
+                        (RunState::Paused, true) => RecoveryState::GracefullyStoppedChecked,
+                        (_, true) => {
+                            unreachable!("Ran `check_consistency` in an unexpected state: {state}")
                         }
-                        (_, true) => unreachable!(
-                            "Ran `check_consistency` in an unexpected state: {recovery_state:?}"
-                        ),
                         (_, false) => RecoveryState::MissingData,
                     };
                     self.rec_tx.send(state_after_check)?;
@@ -164,9 +158,9 @@ where
                         ),
                     }
                 }
-                ControlEvent::CleanRun => return self.run(RunMode::Clean).await,
-                ControlEvent::RebuildRun => return self.run(RunMode::Rebuild).await,
-                ControlEvent::RestoreRun => return self.run(RunMode::Restore).await,
+                ControlEvent::CleanRun => return self.run(run_id, RunMode::Clean).await,
+                ControlEvent::RebuildRun => return self.run(run_id, RunMode::Rebuild).await,
+                ControlEvent::RestoreRun => return self.run(run_id, RunMode::Restore).await,
                 // Decided to not start a new run.
                 ControlEvent::Abort => return Ok(()),
                 _ => {
@@ -179,52 +173,42 @@ where
     }
 
     /// Find out the recovery state.
-    pub async fn check_recovery_state(&self) -> Result<RecoveryState, SchedulerError> {
+    pub async fn check_run_metadata(&self) -> Result<RunMetadata, SchedulerError> {
         let meta_conn = self.meta_storage.conn().await?;
 
         // Get footprints from both storages.
         let data_footprint = self.storage.get_footprint().await?;
-        let meta_footprint = meta_conn.as_client().get_footprint("global").await?;
+        let meta_footprint = meta_conn.as_client().get_footprint().await?;
+
         // Early return if the state can be inferred through the footprints.
-        match (&data_footprint, &meta_footprint) {
-            (Some(df), Some(mf)) if df == mf => {
-                if df.starts_with("F@") {
-                    // Both storages have the same footprint, and it is a "finished" one.
-                    return Ok(RecoveryState::Finished);
-                } else if df.starts_with("S@") {
-                    // Both storages have the same footprint, and it is a "stopped" one.
-                    return Ok(RecoveryState::GracefullyStopped);
-                } else {
-                    // Both storages have the same footprint, but it is neither "finished" nor
-                    // "stopped".
-                    log::warn!("Unexpected footprint found: {df}, treating the run as aborted.");
-                }
-            }
+        match (data_footprint, meta_footprint) {
+            (Some(df), Some(mf)) if df == mf => match mf.metadata.state {
+                RunState::Completed | RunState::Paused => Ok(mf.metadata),
+                _ => Ok(RunMetadata::new(mf.metadata.run_id, RunState::Aborted)),
+            },
             (Some(df), Some(mf)) if df != mf => {
                 log::warn!(
                     "Inconsistent footprints between data and metadata storage: \
-                    data footprint: {df}, metadata footprint: {mf}. \
+                    data footprint: {df:?}, metadata footprint: {mf:?}. \
                     treating the run as aborted."
                 );
+                Ok(RunMetadata::new(mf.metadata.run_id, RunState::Aborted))
             }
             (None, Some(_)) => {
                 log::info!(
                     "Footprint found in metadata storage, but not in data storage, treating the run as fresh."
                 );
-                return Ok(RecoveryState::Fresh);
+                Ok(RunMetadata::new(Uuid::new_v4(), RunState::Fresh))
             }
-            _ => (),
+            (None, None) => Ok(RunMetadata::new(Uuid::new_v4(), RunState::Fresh)),
+            _ => Ok(RunMetadata::new(Uuid::new_v4(), RunState::Fresh)),
         }
-
-        // Fall back to `AbortedUnchecked`: the metadata storage has some data,
-        // but it is not consistent with the data storage.
-        Ok(RecoveryState::AbortedUnchecked)
     }
 
-    async fn run(self, run_mode: RunMode) -> Result<(), SchedulerError> {
+    async fn run(self, run_id: Uuid, run_mode: RunMode) -> Result<(), SchedulerError> {
         let start = Instant::now();
         let sched_tx = self.sched_tx.clone();
-        let res = self.run_internal(run_mode).await;
+        let res = self.run_inner(run_id, run_mode).await;
         log::info!("All jobs closed in: {:?}.", start.elapsed());
         // Notify the UI that the schedulers have finished.
         if let Err(e) = sched_tx.send(true) {
@@ -233,12 +217,16 @@ where
         res
     }
 
-    async fn run_internal(self, run_mode: RunMode) -> Result<(), SchedulerError> {
+    async fn run_inner(self, run_id: Uuid, run_mode: RunMode) -> Result<(), SchedulerError> {
+        let execution_id = Uuid::new_v4();
+
+        let footprint = RunFootprint::new(run_id, RunState::Running);
+
         // Set up the initial storage setup and initial tickets for the individual schedulers.
         let mut handles = match run_mode {
-            RunMode::Clean => self.run_clean().await?,
-            RunMode::Rebuild => self.run_rebuild().await?,
-            RunMode::Restore => self.run_restore().await?,
+            RunMode::Clean => self.run_clean(&footprint, execution_id).await?,
+            RunMode::Rebuild => self.run_rebuild(&footprint, execution_id).await?,
+            RunMode::Restore => self.run_restore(&footprint, execution_id).await?,
         };
 
         let mut returned_states = vec![];
@@ -256,42 +244,53 @@ where
         // On `1`, we set the footprint to "F@{now}".
         // On `2`, we set the footprint to "S@{now}".
         // On `3`, we don't set the footprint.
-        let footprint = {
-            let now = ::chrono::Local::now();
-            if returned_states.iter().all(|&s| s == RunningState::Finished) {
-                Some(format!("F@{now}"))
-            } else if returned_states
-                .iter()
-                .all(|&s| s == RunningState::Stopped || s == RunningState::Finished)
-                && self.ctrl_rx.borrow().clone() == ControlEvent::GracefulStop
-            {
-                Some(format!("S@{now}"))
-            } else {
-                None
-            }
+        let state = if returned_states.iter().all(|&s| s == RunningState::Finished) {
+            RunState::Completed
+        } else if returned_states
+            .iter()
+            .all(|&s| s == RunningState::Stopped || s == RunningState::Finished)
+            && self.ctrl_rx.borrow().clone() == ControlEvent::GracefulStop
+        {
+            RunState::Paused
+        } else {
+            RunState::Aborted
         };
 
-        if let Some(footprint) = footprint {
-            // Write the footprint to the data storage...
-            self.storage.put_footprint(&footprint).await?;
-            // ...and to the metadata storage.
-            let mut conn = self.meta_storage.conn().await?;
-            let tx = conn.transaction().await?;
-            tx.as_client().put_footprint("global", footprint).await?;
-            tx.commit().await?;
-        }
+        let footprint = RunFootprint::new(run_id, state);
+
+        // Write the footprint to the data storage...
+        self.storage.put_footprint(&footprint).await?;
+
+        // ...and to the metadata storage.
+        let mut conn = self.meta_storage.conn().await?;
+        let tx = conn.transaction().await?;
+        tx.as_client().upsert_run(&footprint).await?;
+        tx.as_client()
+            .update_execution_on_finish(&footprint, execution_id)
+            .await?;
+        tx.commit().await?;
+
         Ok(())
     }
 
-    async fn run_clean(&self) -> Result<JoinSet<RunningState>, SchedulerError> {
+    async fn run_clean(
+        &self,
+        footprint: &RunFootprint,
+        execution_id: Uuid,
+    ) -> Result<JoinSet<RunningState>, SchedulerError> {
+        let run_id = footprint.metadata.run_id;
+
         // Wipe the data storage clean.
         self.storage.clear().await?;
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
         self.handler.clear_resolution(tx.as_client()).await?;
         self.handler.clear_tickets(tx.as_client()).await?;
-        self.handler.put_default_tickets(tx.as_client()).await?;
         tx.as_client().clear_footprint().await?;
+
+        tx.as_client().upsert_run(footprint).await?;
+        tx.as_client().put_execution(run_id, execution_id).await?;
+        self.handler.put_default_tickets(tx.as_client()).await?;
         tx.commit().await?;
 
         let handles = self
@@ -309,7 +308,13 @@ where
         Ok(handles)
     }
 
-    async fn run_rebuild(&self) -> Result<JoinSet<RunningState>, SchedulerError> {
+    async fn run_rebuild(
+        &self,
+        footprint: &RunFootprint,
+        execution_id: Uuid,
+    ) -> Result<JoinSet<RunningState>, SchedulerError> {
+        let run_id = footprint.metadata.run_id;
+
         // * We *trust* the following data to be correct:
         //   - The data storage,
         //   - All dimension resolutions,
@@ -331,8 +336,9 @@ where
 
         self.handler.clear_resolution(tx.as_client()).await?;
         self.handler.clear_tickets(tx.as_client()).await?;
-        tx.as_client().clear_footprint().await?;
 
+        tx.as_client().upsert_run(footprint).await?;
+        tx.as_client().put_execution(run_id, execution_id).await?;
         self.handler.put_default_tickets(tx.as_client()).await?;
         self.update_ui(tx.as_client()).await?;
 
@@ -359,23 +365,24 @@ where
         Ok(handles)
     }
 
-    async fn run_restore(&self) -> Result<JoinSet<RunningState>, SchedulerError> {
+    async fn run_restore(
+        &self,
+        footprint: &RunFootprint,
+        execution_id: Uuid,
+    ) -> Result<JoinSet<RunningState>, SchedulerError> {
+        let run_id = footprint.metadata.run_id;
+
         // * The persistent storage is fully trusted.
         // * Just pull the queued tickets, and have the individual schedulers' initial
         //   `ready_to_run` set to them.
         // * We need to clear the footprint only.
-        let storage = &self.storage;
-        let meta_storage = &self.meta_storage;
+        self.storage.clear_footprint().await?;
 
-        // Clear the data storage's footprint.
-        storage.clear_footprint().await?;
-        // Clear the metadata storage's footprint.
-        {
-            let mut conn = meta_storage.conn().await?;
-            let tx = conn.transaction().await?;
-            tx.as_client().clear_footprint().await?;
-            tx.commit().await?;
-        }
+        let mut conn = self.meta_storage.conn().await?;
+        let tx = conn.transaction().await?;
+        tx.as_client().upsert_run(footprint).await?;
+        tx.as_client().put_execution(run_id, execution_id).await?;
+        tx.commit().await?;
 
         let handles = self
             .handler

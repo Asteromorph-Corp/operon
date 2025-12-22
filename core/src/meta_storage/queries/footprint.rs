@@ -2,7 +2,11 @@
 //! Given a connection with an optional schema, this module provides operations footprint the
 //! metadata storage.
 
+use uuid::Uuid;
+
 use crate::meta_storage::{MetaClient, MetaStorageError};
+use crate::schema::{RunFootprint, RunMetadata};
+use crate::utils::GLOBAL;
 
 impl MetaClient<'_> {
     /// Initializes the footprint table.
@@ -10,12 +14,29 @@ impl MetaClient<'_> {
         let schema_prefix = self.schema_prefix();
 
         let stmt = format!(
-            "CREATE TABLE IF NOT EXISTS {schema_prefix}footprint (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )"
+            "CREATE TABLE IF NOT EXISTS {schema_prefix}runs (
+                key TEXT PRIMARY KEY CHECK (key = '{GLOBAL}'),
+                run_id UUID NOT NULL UNIQUE,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                finished_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                state TEXT NOT NULL DEFAULT 'running' CHECK (
+                    state IN ('running', 'paused', 'completed', 'aborted')
+                )
+            );
+
+            CREATE TABLE IF NOT EXISTS {schema_prefix}run_executions (
+                execution_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                run_id UUID REFERENCES {schema_prefix}runs(run_id) ON DELETE CASCADE,
+                started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                ended_at TIMESTAMP WITH TIME ZONE,
+                end_reason TEXT CHECK (
+                    end_reason IN (NULL, 'paused', 'completed', 'aborted')
+                )
+            );"
         );
-        self.execute(&stmt, &[]).await?;
+
+        self.batch_execute(&stmt).await?;
         Ok(())
     }
 
@@ -23,37 +44,92 @@ impl MetaClient<'_> {
     pub async fn clear_footprint(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.schema_prefix();
 
-        let stmt = format!("TRUNCATE TABLE {schema_prefix}footprint");
+        let stmt = format!("TRUNCATE TABLE {schema_prefix}runs CASCADE");
         self.execute(&stmt, &[]).await?;
         Ok(())
     }
 
-    /// Gets a footprint value by key.
-    pub async fn get_footprint(
-        &self,
-        key: &'static str,
-    ) -> Result<Option<String>, MetaStorageError> {
+    /// Gets the run metadata.
+    pub async fn get_footprint(&self) -> Result<Option<RunFootprint>, MetaStorageError> {
         let schema_prefix = self.schema_prefix();
 
-        let stmt = format!("SELECT value FROM {schema_prefix}footprint WHERE key = $1");
-        let row = self.query_opt(&stmt, &[&key]).await?;
-        Ok(row.map(|r| r.get::<_, &str>(0).to_string()))
+        let stmt =
+            format!("SELECT run_id, updated_at, state FROM {schema_prefix}runs WHERE key = $1");
+        let Some(row) = self.query_opt(&stmt, &[&GLOBAL]).await? else {
+            return Ok(None);
+        };
+
+        let run_id = row.get(0);
+        let updated_at = row.get(1);
+        let state = row
+            .get::<_, &str>(2)
+            .parse()
+            .map_err(MetaStorageError::Other)?;
+
+        let footprint = RunFootprint {
+            metadata: RunMetadata { run_id, state },
+            at: updated_at,
+        };
+        Ok(Some(footprint))
     }
 
-    /// Sets a footprint key-value pair.
-    pub async fn put_footprint(
+    /// Updates the run table on run state change.
+    pub async fn upsert_run(&self, footprint: &RunFootprint) -> Result<(), MetaStorageError> {
+        let schema_prefix = self.schema_prefix();
+        let run_id = footprint.metadata.run_id;
+        let run_state = footprint.metadata.state.to_string();
+        let updated_at = &footprint.at;
+
+        let stmt = format!(
+            "INSERT INTO {schema_prefix}runs (key, run_id, state, updated_at, finished_at)
+            VALUES ($1, $2, $3, $4, CASE WHEN $3 IN ('completed') THEN $4 ELSE NULL::timestamptz END)
+            ON CONFLICT (key) DO UPDATE SET
+                run_id = EXCLUDED.run_id,
+                state = EXCLUDED.state,
+                updated_at = EXCLUDED.updated_at,
+                finished_at = EXCLUDED.finished_at"
+        );
+
+        self.execute(&stmt, &[&GLOBAL, &run_id, &run_state, updated_at])
+            .await?;
+
+        Ok(())
+    }
+
+    /// Inserts a new execution row on execution start.
+    pub async fn put_execution(
         &self,
-        key: &'static str,
-        value: String,
+        run_id: Uuid,
+        execution_id: Uuid,
     ) -> Result<(), MetaStorageError> {
         let schema_prefix = self.schema_prefix();
 
         let stmt = format!(
-            "INSERT INTO {schema_prefix}footprint (key, value)
-            VALUES ($1, $2)
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+            "INSERT INTO {schema_prefix}run_executions (run_id, execution_id)
+            VALUES ($1, $2)"
         );
-        self.execute(&stmt, &[&key, &value]).await?;
+        self.execute(&stmt, &[&run_id, &execution_id]).await?;
+        Ok(())
+    }
+
+    /// Updates the execution row on execution end.
+    pub async fn update_execution_on_finish(
+        &self,
+        footprint: &RunFootprint,
+        execution_id: Uuid,
+    ) -> Result<(), MetaStorageError> {
+        let schema_prefix = self.schema_prefix();
+        let run_id = &footprint.metadata.run_id;
+        let at = &footprint.at;
+        let end_reason = footprint.metadata.state.to_string();
+
+        let stmt = format!(
+            "UPDATE {schema_prefix}run_executions
+            SET ended_at = $3, end_reason = $4
+            WHERE run_id = $1 AND execution_id = $2"
+        );
+        self.execute(&stmt, &[run_id, &execution_id, at, &end_reason])
+            .await?;
         Ok(())
     }
 }

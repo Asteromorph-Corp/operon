@@ -5,6 +5,8 @@ use postgres_types::ToSql;
 
 use crate::schema::TicketStatus;
 
+pub const GLOBAL: &str = "global";
+
 pub trait SplitFirstOwned<T> {
     fn split_first_owned(self) -> Option<(T, Vec<T>)>;
 }

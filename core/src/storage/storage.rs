@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+use crate::schema::RunFootprint;
 use crate::storage::StorageError;
 
 /// # OperonStorage trait
@@ -72,11 +73,11 @@ pub trait OperonStorage: Send + Sync + 'static {
     async fn init(&self) -> Result<(), StorageError>;
     async fn clear(&self) -> Result<(), StorageError>;
 
-    async fn get_footprint(&self) -> Result<Option<String>, StorageError> {
+    async fn get_footprint(&self) -> Result<Option<RunFootprint>, StorageError> {
         // This function is no-op by default, disallowing recovery runs if not implemented.
         Ok(None)
     }
-    async fn put_footprint(&self, _footprint: &str) -> Result<(), StorageError> {
+    async fn put_footprint(&self, _footprint: &RunFootprint) -> Result<(), StorageError> {
         // This function is no-op by default, disallowing recovery runs if not implemented.
         Ok(())
     }

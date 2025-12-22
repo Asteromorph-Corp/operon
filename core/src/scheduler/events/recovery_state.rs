@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::schema::RunState;
+
 pub type RecoveryStateReceiver = tokio::sync::watch::Receiver<RecoveryState>;
 pub type RecoveryStateSender = tokio::sync::watch::Sender<RecoveryState>;
 pub type RecoveryStateSendError = tokio::sync::watch::error::SendError<RecoveryState>;
@@ -63,6 +65,18 @@ impl fmt::Display for RecoveryState {
             RecoveryState::AbortedChecked => write!(f, "Aborted Checked"),
             RecoveryState::GracefullyStopped => write!(f, "Gracefully Stopped"),
             RecoveryState::GracefullyStoppedChecked => write!(f, "Gracefully Stopped Checked"),
+        }
+    }
+}
+
+impl From<RunState> for RecoveryState {
+    fn from(state: RunState) -> Self {
+        match state {
+            RunState::Fresh => RecoveryState::Fresh,
+            RunState::Aborted => RecoveryState::AbortedUnchecked,
+            RunState::Running => RecoveryState::AbortedUnchecked,
+            RunState::Paused => RecoveryState::GracefullyStopped,
+            RunState::Completed => RecoveryState::Finished,
         }
     }
 }
