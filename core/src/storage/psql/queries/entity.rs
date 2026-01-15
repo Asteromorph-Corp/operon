@@ -169,10 +169,13 @@ impl<const N: usize, T> std::fmt::Display for InitEntityQuery<'_, N, T> {
         }
 
         writeln!(f, "    value JSONB,")?;
-        writeln!(f, "    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),")?;
+        write!(f, "    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()")?;
 
         if !dims.is_empty() {
+            writeln!(f, ",")?;
             writeln!(f, "    PRIMARY KEY ({})", dims.join(", "))?;
+        } else {
+            writeln!(f)?;
         }
 
         write!(f, ");")
@@ -387,7 +390,7 @@ mod test {
             CREATE TABLE IF NOT EXISTS test_meta.a (
                 id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
                 value JSONB,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
             );"
         }
     )]
