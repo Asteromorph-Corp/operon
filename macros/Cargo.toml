@@ -1,8 +1,12 @@
 [package]
 name = "operon-macros"
+description = "Procedural macros for the Operon workflow engine."
 version.workspace = true
-edition = "2024"
-publish = ["kellnr"]
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [lib]
 proc-macro = true
