@@ -1,16 +1,14 @@
 [package]
 name = "operon"
-version = "0.1.0"
-authors = [
-    "Sungbin Moon <sb.moon@asteromorph.com>",
-    "Jiho Park <jh.park@asteromorph.com>",
-]
 description = "A workflow engine for parallel, incremental scheduling of DAG-defined multiplex tasks."
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/Asteromorph-Corp/operon"
-readme = "../README.md"
-edition = "2024"
-rust-version = "1.88"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 [dependencies]
 ansi_term = "0.12.1"
@@ -24,7 +22,7 @@ deadpool-postgres = "0.14.1"
 futures = "0.3.31"
 indexmap = "2.9.0"
 log = { version = "0.4.27", features = ["std"] }
-operon-macros = { path = "../macros" }
+operon-macros = { version = "0.1.0", registry = "kellnr" }
 postgres-types = { version = "0.2.9", features = ["derive"] }
 ratatui = "0.29.0"
 secrecy = "0.10.3"
@@ -33,7 +31,11 @@ serde_json = "1.0.140"
 textwrap = "0.16.2"
 thiserror = "2.0.12"
 tokio = { version = "1.45.1", features = ["full"] }
-tokio-postgres = { version = "0.7.13", features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
+tokio-postgres = { version = "0.7.13", features = [
+    "with-chrono-0_4",
+    "with-serde_json-1",
+    "with-uuid-1",
+] }
 uuid = { version = "1.19.0", features = ["v4"] }
 
 [dev-dependencies]
