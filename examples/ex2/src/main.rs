@@ -1,7 +1,6 @@
 use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage};
 use operon::async_trait::async_trait;
 use operon::operon::{Operon, OperonOptions, UserError};
-use operon::ui::UiOptions;
 use operon::service::OperonService;
 use operon::storage::StorageOptions;
 use rand::Rng;
@@ -106,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
 
     let storage_options = StorageOptions::new(&database_uri).with_schema("ex2_data");
-    let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex2_meta"); //.with_ui_options(UiOptions::Headless);
+    let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex2_meta");
 
     let service = ExampleService;
     let storage = PsqlCookingStorage::new(storage_options)?;

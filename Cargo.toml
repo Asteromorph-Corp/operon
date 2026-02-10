@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "macros"]
+members = ["operon", "operon-macros"]
 exclude = ["examples"]
 resolver = "2"
 
@@ -17,4 +17,4 @@ repository = "https://github.com/Asteromorph-Corp/operon"
 readme = "README.md"
 
 [workspace.dependencies]
-operon-macros = { version = "0.1.1", registry = "kellnr", path = "macros" }
+operon-macros = { version = "0.1.1", registry = "kellnr", path = "operon-macros" }

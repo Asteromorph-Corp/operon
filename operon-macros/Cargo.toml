@@ -12,7 +12,6 @@ repository.workspace = true
 proc-macro = true
 
 [dependencies]
-base62 = "2.2.1"
 heck = "0.5.0"
 indexmap = { version = "2.9.0", features = ["serde"] }
 indoc = "2.0.6"
@@ -21,10 +20,7 @@ proc-macro-crate = "3.3.0"
 proc-macro-error = "1.0.4"
 proc-macro2 = "1.0.95"
 quote = "1.0.40"
-rand = "0.9.1"
-serde = { version = "1.0.219", features = ["derive"] }
 syn = { version = "2.0.103", features = ["full", "extra-traits"] }
-toml = "0.8.23"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"

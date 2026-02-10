@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-operon = { path = "../../core" }
+operon = { path = "../../operon" }
 tokio = { version = "1.46.1", features = ["full"] }
