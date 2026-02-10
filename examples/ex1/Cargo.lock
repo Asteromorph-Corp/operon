@@ -933,7 +933,7 @@ checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
 name = "operon"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ansi_term",
  "async-trait",
@@ -956,11 +956,12 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-postgres",
+ "uuid",
 ]
 
 [[package]]
 name = "operon-macros"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base62",
  "heck",
@@ -1079,11 +1080,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613283563cd90e1dfc3518d548caee47e0e725455ed619881f5cf21f36de4b48"
 dependencies = [
  "bytes",
+ "chrono",
  "fallible-iterator",
  "postgres-derive",
  "postgres-protocol",
  "serde",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -1725,6 +1728,17 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
+
+[[package]]
+name = "uuid"
+version = "1.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee48d38b119b0cd71fe4141b30f5ba9c7c5d9f4e7a3a8b4a674e4b6ef789976f"
+dependencies = [
+ "getrandom 0.3.3",
+ "js-sys",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "version_check"
