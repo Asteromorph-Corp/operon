@@ -345,12 +345,15 @@ Navigation keys:
     Esc                 Show most recent logs.
 
 Commands:
-    run [OPTIONS]       Start a new run using the best available restoration
-                        (unless overridden by options).
-        -f, --fresh         Start a fresh run, ignoring any existing data.
-                            Takes precedence over `rebuild`.
+    run [OPTIONS]       Start a new run using the best available restoration (unless overridden by options).
+        -f, --fresh         Start a fresh run, ignoring any existing data. Takes precedence over `rebuild`.
         -r, --rebuild       Rebuild the run from trusted data before starting.
-    check               Check the consistency of the data from the last run.
+    check [OPTIONS]     Check the consistency of the data from the last run.
+        -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
+            trust-all           Assume all data is trustworthy, skipping checks.
+            metadata-only       Check only metadata consistency.
+            quick               Perform a metadata check plus data validation only at boundaries.
+            exhaustive          Perform a full consistency check of all data. (Can be very slow.)
     exit                Exit the UI.
     clear               Clear the log buffer.
     quit [OPTIONS]      Stop all jobs and exit the UI. Defaults to graceful shutdown.
