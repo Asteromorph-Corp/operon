@@ -79,6 +79,7 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
+        mode: crate::ui::CheckMode,
     ) -> Result<bool, SchedulerError>;
 
     /// Prepare the job rebuilder for the given storage and metadata client by fetching the

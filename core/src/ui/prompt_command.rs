@@ -9,7 +9,7 @@ pub struct PromptCommand {
 }
 
 #[derive(Subcommand, Debug, Clone)]
-#[clap(rename_all = "snake_case")]
+#[clap(rename_all = "kebab-case")]
 pub enum Action {
     /// Start a new run using the best available restoration.
     Run {
@@ -22,7 +22,16 @@ pub enum Action {
     },
 
     /// Check the consistency of the data from the last run.
-    Check,
+    Check {
+        /// Mode of the consistency check. Defaults to "quick".
+        ///
+        /// - trust-all: Assume all data is trustworthy, skipping checks.
+        /// - metadata-only: Check only metadata consistency.
+        /// - quick: Perform a metadata check plus data validation only at upper boundaries.
+        /// - exhaustive: Perform a full consistency check of all data. (Can be very slow.)
+        #[clap(short, long, default_value = "quick")]
+        mode: CheckMode,
+    },
 
     /// Exit the UI.
     Exit,
@@ -62,4 +71,13 @@ pub enum Action {
 
     /// Print help.
     Help,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq, Copy)]
+#[clap(rename_all = "kebab-case")]
+pub enum CheckMode {
+    TrustAll,
+    MetadataOnly,
+    Quick,
+    Exhaustive,
 }

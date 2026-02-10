@@ -7,9 +7,8 @@ use tokio::task::JoinSet;
 use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
 use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEvent, ControlEventReceiver, InternalEvent, JobSpec, PeerEvent,
-    PeerEventSenders, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
-    SpecWithMetadata,
+    ControlEvent, ControlEventReceiver, InternalEvent, JobSpec, PeerEvent, PeerEventSenders,
+    SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
 };
 use crate::schema::{Job, JobMetadata, Ticket, TicketStatus};
 use crate::service::OperonService;
@@ -269,10 +268,7 @@ where
                 }
                 ControlEvent::Resume { targets } => self.handle_resume(targets, state).await?,
                 ControlEvent::GracefulStop => {
-                    if self
-                        .handle_graceful_stop(state, got_all_updates)
-                        .await?
-                    {
+                    if self.handle_graceful_stop(state, got_all_updates).await? {
                         return Ok(());
                     }
                 }

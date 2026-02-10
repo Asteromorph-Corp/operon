@@ -123,4 +123,3 @@ pub struct TicketExplosion<T: TicketEnum> {
     /// The ub of the explosion resolution.
     pub ub: usize,
 }
-
