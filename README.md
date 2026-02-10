@@ -1,6 +1,9 @@
 # Operon
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](https://arxiv.org/abs/2511.16080)
+[![Kellnr](https://img.shields.io/badge/kellnr-v0.1.1-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-yellow.svg)](LICENSE-MIT)
+[![MSRV](https://img.shields.io/badge/MSRV-1.91+-lightgray.svg)](https://blog.rust-lang.org/2025/10/30/Rust-1.91.0/)
 
 A Rust-native workflow engine designed for parallel, incremental scheduling of [DAG-defined](#running-dag-defined-tasks) [multiplex](#multiplexing) tasks.
 Powered by a PostgreSQL-based transactional backend, Operon specializes in orchestrating complex and long-running workflows with minimal downtime, flexible recovery, and high parallelism.
@@ -39,10 +42,11 @@ You can find more examples in the [examples](examples/) directory of this reposi
 You will need the following to run Operon:
 
 - [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.91+)
+- [Kellnr](https://kellnr.spacer.im/) access to download the Operon crate
+  - Alternatively, you can clone this repository and use the local path as described in the [Installation](#installation) section.
+- An async runtime configured via [`tokio`](https://crates.io/crates/tokio)
 - A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
-  - A [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access said database
-
-We also recommend having [`tokio`](https://crates.io/crates/tokio) in your `Cargo.toml` dependencies.
+  - You will need a full [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access the database.
 
 ## Quick Start
 
@@ -101,9 +105,15 @@ This is particularly useful for tasks that benefit from internal parallel execut
 
 ### Installation
 
-Operon is not published in crates.io for now, so you will need to manually install it to use it in your Rust project.
+Operon is available to internal members via [kellnr](https://kellnr.spacer.im/crate?name=operon).
+Add Operon to your project's dependencies by including the following in your `Cargo.toml`:
 
-To do so, clone this repository:
+```toml
+[dependencies]
+operon = { version = "0.1", registry = "kellnr" }
+```
+
+Alternatively, clone this repository:
 
 ```bash
 git clone https://github.com/Asteromorph-Corp/operon
@@ -114,7 +124,7 @@ Once that's done, add the following to your project's `Cargo.toml`:
 ```toml
 [dependencies]
 # Assuming you cloned the repository to your home directory:
-operon = { path = "~/operon/core" }
+operon = { path = "~/operon/operon" }
 ```
 
 ### Defining Entities
