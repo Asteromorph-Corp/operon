@@ -12,28 +12,46 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///     &self,
 ///     storage: &Sto,
 ///     client: operon::meta_storage::MetaClient<'_>,
+///     mode: operon::ui::CheckMode,
 /// ) -> Result<bool, operon::scheduler::SchedulerError> {
+///     if mode == operon::ui::CheckMode::TrustAll {
+///         return Ok(true);
+///     }
+/// 
 ///     let tickets = client
 ///         .ticket(self.job_meta())
 ///         .get_all(operon::schema::TicketStatus::Done)
 ///         .await?;
-///     // Pull the "done" beta jobs from the metadata storage...
-///     let Some(jobs) = tickets
+///     // Pull the "done" epsilon jobs from the metadata storage...
+///     let Some(coordinates) = tickets
 ///         .iter()
-///         .map(|ticket| ticket.resolve())
+///         .map(|ticket| ticket.resolve().map(|job| job.coordinate))
 ///         .collect::<Option<Vec<_>>>()
 ///     else {
 ///         operon::log::info!("Some `epsilon` tickets are corrupt in the metadata storage.");
 ///         return Ok(false);
 ///     };
+/// 
 ///     // ...and check if the data storage holds all the data for them.
-///     for job in jobs {
-///         if storage.get_e(job.coordinate).await?.is_none() {
-///             operon::log::info!("Data storage does not hold `e_{:?}`.", job.coordinate);
+///     let coordinates_to_check = match mode {
+///         operon::ui::CheckMode::MetadataOnly => return Ok(true),
+///         operon::ui::CheckMode::Exhaustive => {
+///             coordinates
+///         }
+///         operon::ui::CheckMode::Quick => {
+///             operon::utils::dop::get_dop_coords(&coordinates)
+///         }
+///         _ => unreachable!(),
+///     };
+/// 
+///     for coordinate in coordinates_to_check {
+///         if storage.get_e(coordinate).await?.is_none() {
+///             // TODO: improve error message coordinate display
+///             operon::log::info!("Data storage does not hold `E_{:?}`.", coordinate);
 ///             return Ok(false);
 ///         }
 ///     }
-///
+/// 
 ///     Ok(true)
 /// }
 /// ```
@@ -59,17 +77,29 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
 
             quote! {
                 let mut tags = Vec::new();
-                for job in jobs {
-                    let Some(res) = client.resolution(self.spawn_dim_meta()).get(job.coordinate).await?
+                for coordinate in coordinates {
+                    let Some(res) = client.resolution(self.spawn_dim_meta()).get(coordinate).await?
                     else {
-                        #operon::log::info!(#missing_res_msg, job.coordinate);
+                        #operon::log::info!(#missing_res_msg, coordinate);
                         return Ok(false);
                     };
                     for #spawn_dim in 0..(res.ub) {
-                        tags.push((job.coordinate, #spawn_dim));
+                        tags.push((coordinate, #spawn_dim));
                     }
                 }
-                for ([#(#field_vars),*], #spawn_dim) in tags {
+
+                let tags_to_check = match mode {
+                    #operon::ui::CheckMode::MetadataOnly => return Ok(true),
+                    #operon::ui::CheckMode::Exhaustive => {
+                        tags
+                    }
+                    #operon::ui::CheckMode::Quick => {
+                        #operon::utils::get_dop_tags(&tags)
+                    }
+                    _ => unreachable!(),
+                };
+
+                for ([#(#field_vars),*], #spawn_dim) in tags_to_check {
                     if storage.#get_fn_name([#(#field_vars,)* #spawn_dim]).await?.is_none() {
                         #operon::log::info!(#missing_entity_msg, [#(#field_vars,)* #spawn_dim]);
                         return Ok(false);
@@ -79,9 +109,20 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
         }
         None => {
             quote! {
-                for job in jobs {
-                    if storage.#get_fn_name(job.coordinate).await?.is_none() {
-                        #operon::log::info!(#missing_entity_msg, job.coordinate);
+                let coordinates_to_check = match mode {
+                    #operon::ui::CheckMode::MetadataOnly => return Ok(true),
+                    #operon::ui::CheckMode::Exhaustive => {
+                        coordinates
+                    }
+                    #operon::ui::CheckMode::Quick => {
+                        #operon::utils::get_dop_coords(&coordinates)
+                    }
+                    _ => unreachable!(),
+                };
+
+                for coordinate in coordinates_to_check {
+                    if storage.#get_fn_name(coordinate).await?.is_none() {
+                        #operon::log::info!(#missing_entity_msg, coordinate);
                         return Ok(false);
                     }
                 }
@@ -94,14 +135,19 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             &self,
             storage: &Sto,
             client: #operon::meta_storage::MetaClient<'_>,
+            mode: #operon::ui::CheckMode,
         ) -> Result<bool, #operon::scheduler::SchedulerError> {
+            if mode == #operon::ui::CheckMode::TrustAll {
+                return Ok(true);
+            }
+
             let tickets = client
                 .ticket(self.job_meta())
                 .get_all(#operon::schema::TicketStatus::Done)
                 .await?;
-            let Some(jobs) = tickets
+            let Some(coordinates) = tickets
                 .iter()
-                .map(|ticket| ticket.resolve())
+                .map(|ticket| ticket.resolve().map(|job| job.coordinate))
                 .collect::<Option<Vec<_>>>() else {
                     #operon::log::info!(#corrupt_msg);
                     return Ok(false);

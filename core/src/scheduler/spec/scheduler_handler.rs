@@ -68,11 +68,13 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
+        mode: crate::ui::CheckMode,
     ) -> Result<bool, SchedulerError> {
         for schedule in &self.job_handlers {
-            if !schedule.check_consistency(storage, client).await? {
+            if !schedule.check_consistency(storage, client, mode).await? {
                 return Ok(false);
             }
+            crate::log::info!("Consistency check passed for job handler: {}", schedule.job_id());
         }
         Ok(true)
     }

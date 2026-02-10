@@ -115,12 +115,13 @@ where
             self.ctrl_rx.changed().await?;
             let ctrl_event = self.ctrl_rx.borrow_and_update().clone();
             match ctrl_event {
-                ControlEvent::Check => {
+                ControlEvent::Check { mode } => {
                     let consistent = self
                         .handler
                         .check_consistency(
                             &self.storage,
                             self.meta_storage.conn().await?.as_client(),
+                            mode,
                         )
                         .await
                         .map_err(|e| {

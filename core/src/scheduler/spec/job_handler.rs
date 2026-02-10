@@ -65,6 +65,7 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
+        mode: crate::ui::CheckMode,
     ) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
 
     /// Prepare the job rebuilder for the given storage and metadata client by fetching the
@@ -144,8 +145,9 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
+        mode: crate::ui::CheckMode,
     ) -> Result<bool, SchedulerError> {
-        self.spec.check_consistency(storage, client).await
+        self.spec.check_consistency(storage, client, mode).await
     }
 
     async fn prepare_rebuild(

@@ -11,7 +11,7 @@ pub enum ControlEvent {
     #[default]
     Start,
     /// Perform a check on the consistency between the storages.
-    Check,
+    Check { mode: crate::ui::CheckMode },
     /// Perform a clean run.
     CleanRun,
     /// Perform a rebuilding run from an `AbortedChecked` state.
