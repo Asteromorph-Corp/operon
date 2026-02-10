@@ -922,7 +922,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "log",
- "operon-macros 0.1.0 (sparse+https://kellnr.spacer.im/api/v1/crates/)",
+ "operon-macros",
  "postgres-types",
  "pretty_assertions",
  "ratatui",
@@ -954,27 +954,6 @@ dependencies = [
  "quote",
  "rand",
  "rstest",
- "serde",
- "syn 2.0.110",
- "toml",
-]
-
-[[package]]
-name = "operon-macros"
-version = "0.1.0"
-source = "sparse+https://kellnr.spacer.im/api/v1/crates/"
-checksum = "a146132c832553fa942e662b4508c872ef180f39af88468355e56951d688610b"
-dependencies = [
- "base62",
- "heck",
- "indexmap",
- "indoc",
- "once_cell",
- "proc-macro-crate",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "rand",
  "serde",
  "syn 2.0.110",
  "toml",
