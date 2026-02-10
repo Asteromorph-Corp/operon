@@ -221,7 +221,7 @@ The pipeline must follow a few rules that are enforced at macro-expansion time:
   - A 1D vector of entities, denoted `SpawnedEntityType<spawned_dimension_name>`.
     In this case, this task spawns a dimension that can be iterated over in subsequent tasks.
 - The dimension specifications must be "well-formed," as thoroughly described in [our technical report](https://arxiv.org/abs/2511.16080).
-  - For illustration, take the list of `Intermediate`s as shown in [Figure 1](docs/figures/figure1.svg): `[["Good", "morning"], ["Bonjour"], ["Buenos", "días"]]`.
+  - For illustration, take the list of `Intermediate`s as shown in [the "splitter" pipeline example](docs/assets/figure1.svg): `[["Good", "morning"], ["Bonjour"], ["Buenos", "días"]]`.
   - Writing `Intermediate<word_no>` represents a vector/slice of `Intermediate` entities indexed by `word_no`, which we will have for each `input_no` "coordinate."
   `["Good", "morning"]` or `["Bonjour"]` would be a valid example of such a vector.
   - However, writing `Intermediate<input_no>` would not be feasible.
