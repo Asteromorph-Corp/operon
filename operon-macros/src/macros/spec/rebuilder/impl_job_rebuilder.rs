@@ -69,6 +69,12 @@ pub fn impl_job_rebuilder(
     let rebuilder_ident = rebuilder_ident(&job.id);
     let job_id = to_lit_str(&job.id);
 
+    let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
+    let invalid_ticket_msg = format!(
+        "The following {{}} {} ticket(s) were incorrectly marked as done: {{}}",
+        job.id
+    );
+
     let maybe_put_resolution = job.spawn_dim.is_some().then(|| -> syn::Stmt {
         parse_quote! { client.resolution(self.spawn_dim_meta).put(resolution).await?; }
     });
@@ -153,7 +159,25 @@ pub fn impl_job_rebuilder(
                 client: #operon::meta_storage::MetaClient<'_>,
                 ui_state: &#operon::tokio::sync::RwLock<#operon::ui::UiState>,
             ) -> Result<(), #operon::scheduler::SchedulerError> {
+                let ready_tickets = client
+                    .ticket(self.job_meta)
+                    .get_all(#operon::schema::TicketStatus::Queued)
+                    .await?
+                    .into_iter()
+                    .map(|ticket| match ticket.resolve() {
+                        Some(job) => Ok(job.coordinate),
+                        None => Err(#operon::scheduler::SchedulerError::Other(
+                            #resolve_fail_msg.into(),
+                        ))
+                    })
+                    .collect::<Result<std::collections::HashSet<_>, _>>()?;
+                let mut invalid_tickets = Vec::new();
+
                 for (job, resolution) in self.data.iter().cloned() {
+                    if !ready_tickets.contains(&job.coordinate) {
+                        invalid_tickets.push(job);
+                        continue;
+                    }
                     #maybe_put_resolution
                     client.ticket(self.job_meta).mark_done(job).await?;
 
@@ -172,6 +196,20 @@ pub fn impl_job_rebuilder(
                         #job_id.to_string(),
                         (done, queued, waiting, state, false),
                     ))?;
+                }
+
+                if !invalid_tickets.is_empty() {
+                    let count = invalid_tickets.len();
+                    let display = if count <= 3 {
+                        format!("{:?}", invalid_tickets)
+                    } else {
+                        format!(
+                            "{:?}, {:?}, and {} more",
+                            invalid_tickets[0], invalid_tickets[1],
+                            count - 2
+                        )
+                    };
+                    #operon::log::warn!(#invalid_ticket_msg, count, display);
                 }
                 Ok(())
             }

@@ -6,7 +6,25 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
         client: operon::meta_storage::MetaClient<'_>,
         ui_state: &operon::tokio::sync::RwLock<operon::ui::UiState>,
     ) -> Result<(), operon::scheduler::SchedulerError> {
+        let ready_tickets = client
+            .ticket(self.job_meta)
+            .get_all(operon::schema::TicketStatus::Queued)
+            .await?
+            .into_iter()
+            .map(|ticket| match ticket.resolve() {
+                Some(job) => Ok(job.coordinate),
+                None => Err(operon::scheduler::SchedulerError::Other(
+                    "Failed to resolve a beta ticket".into(),
+                )),
+            })
+            .collect::<Result<std::collections::HashSet<_>, _>>()?;
+        let mut invalid_tickets = Vec::new();
+
         for (job, resolution) in self.data.iter().cloned() {
+            if !ready_tickets.contains(&job.coordinate) {
+                invalid_tickets.push(job);
+                continue;
+            }
             client
                 .resolution(self.spawn_dim_meta)
                 .put(resolution)
@@ -43,6 +61,25 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                 "beta".to_string(),
                 (done, queued, waiting, state, false),
             ))?;
+        }
+
+        if !invalid_tickets.is_empty() {
+            let count = invalid_tickets.len();
+            let display = if count <= 3 {
+                format!("{:?}", invalid_tickets)
+            } else {
+                format!(
+                    "{:?}, {:?}, and {} more",
+                    invalid_tickets[0],
+                    invalid_tickets[1],
+                    count - 2
+                )
+            };
+            operon::log::warn!(
+                "The following {} beta ticket(s) were incorrectly marked as done: {}",
+                count,
+                display
+            );
         }
 
         Ok(())
