@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use crate::schema::{Entity, EntityMetadata};
 use crate::storage::StorageError;
 use crate::storage::psql::StorageClient;
-use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams};
+use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams, hash_metadata, replace_if_updated};
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
 impl<T> PsqlEntity for T where T: Serialize + DeserializeOwned + Send + Sync + 'static {}
@@ -142,7 +142,14 @@ pub trait EntityQueries: Send + Sync + 'static {
 
 impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<N, T> {
     fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String {
-        InitEntityQuery(schema, *self).to_string()
+        let hash = hash_metadata(self);
+        replace_if_updated(
+            self.id,
+            &hash,
+            schema,
+            "_entity_hash",
+            InitEntityQuery(schema, *self),
+        )
     }
 
     fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String {

@@ -45,6 +45,8 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         client: MetaClient<'_>,
     ) -> Result<(), SchedulerError> {
         client.init_schema().await?;
+        client.init_dimension_hash().await?;
+        client.init_ticket_hash().await?;
         for job_handler in &self.job_handlers {
             job_handler.init_resolution(client).await?;
         }

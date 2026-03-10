@@ -1,11 +1,57 @@
 use std::fmt::Display;
+use std::hash::{Hash, Hasher};
 use std::num::TryFromIntError;
 
 use postgres_types::ToSql;
+use twox_hash::XxHash3_64;
 
 use crate::schema::TicketStatus;
+use crate::utils::SchemaPrefix;
 
 pub const GLOBAL: &str = "global";
+
+pub fn hash_metadata<T: Hash>(metadata: T) -> String {
+    let mut hasher = XxHash3_64::new();
+    metadata.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+pub fn replace_if_updated(
+    id: &str,
+    hash: &str,
+    schema_prefix: SchemaPrefix<'_>,
+    hash_table: &'static str,
+    init_query: impl Display,
+) -> String {
+    format! { r#"
+        DO $$
+        DECLARE
+            existing_hash TEXT;
+        BEGIN
+            SELECT hash
+            INTO existing_hash
+            FROM {schema_prefix}{hash_table}
+            WHERE id = '{id}';
+
+            IF existing_hash IS NULL THEN
+                {init_query}
+
+                INSERT INTO {schema_prefix}{hash_table} (id, hash)
+                VALUES ('{id}', '{hash}');
+
+            ELSIF existing_hash != '{hash}' THEN
+                DROP TABLE IF EXISTS {schema_prefix}{id};
+
+                {init_query}
+
+                UPDATE {schema_prefix}{hash_table}
+                SET hash = '{hash}'
+                WHERE id = '{id}';
+            END IF;
+        END
+        $$;"#
+    }
+}
 
 pub trait SplitFirstOwned<T> {
     fn split_first_owned(self) -> Option<(T, Vec<T>)>;

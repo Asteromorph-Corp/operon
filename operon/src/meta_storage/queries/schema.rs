@@ -11,6 +11,30 @@ impl MetaClient<'_> {
         Ok(())
     }
 
+    pub async fn init_ticket_hash(&self) -> Result<(), MetaStorageError> {
+        let schema_prefix = self.schema_prefix();
+        let stmt = format!(
+            "CREATE TABLE IF NOT EXISTS {schema_prefix}_ticket_hash (
+                id TEXT PRIMARY KEY,
+                hash TEXT NOT NULL
+            );"
+        );
+        self.execute(&stmt, &[]).await?;
+        Ok(())
+    }
+
+    pub async fn init_dimension_hash(&self) -> Result<(), MetaStorageError> {
+        let schema_prefix = self.schema_prefix();
+        let stmt = format!(
+            "CREATE TABLE IF NOT EXISTS {schema_prefix}_dimension_hash (
+                id TEXT PRIMARY KEY,
+                hash TEXT NOT NULL
+            );"
+        );
+        self.execute(&stmt, &[]).await?;
+        Ok(())
+    }
+
     /// Initializes the `ticket_status` type.
     pub async fn init_ticket_status_type(&self) -> Result<(), MetaStorageError> {
         let schema = self.schema_prefix();

@@ -11,4 +11,18 @@ impl<'a> StorageClient<'a> {
         self.execute(&create_schema, &[]).await?;
         Ok(())
     }
+
+    /// Initializes the entity hash table.
+    pub async fn init_entity_hash(&self) -> Result<(), StorageError> {
+        let schema = self.schema_prefix();
+
+        let create_table = format!(
+            "CREATE TABLE IF NOT EXISTS {schema}_entity_hash (
+                id TEXT PRIMARY KEY,
+                hash TEXT NOT NULL
+            )",
+        );
+        self.execute(&create_table, &[]).await?;
+        Ok(())
+    }
 }

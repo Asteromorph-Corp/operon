@@ -1,6 +1,6 @@
 use crate::meta_storage::{MetaClient, MetaStorageError};
 use crate::schema::{DimensionMetadata, Resolution};
-use crate::utils::{SchemaPrefix, SqlParams};
+use crate::utils::{SchemaPrefix, SqlParams, hash_metadata, replace_if_updated};
 
 /// Helper struct for building SQL queries related to resolutions.
 pub struct ResolutionQueryBuilder<'a, const N: usize> {
@@ -25,8 +25,16 @@ impl<const N: usize> ResolutionQueryBuilder<'_, N> {
     /// Initializes the resolution table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
-        let stmt = InitResolutionQuery(schema_prefix, self.dim_meta);
-        self.client.execute_stmt(&stmt, &[]).await?;
+        let hash = hash_metadata(self.dim_meta);
+
+        let stmt = replace_if_updated(
+            self.dim_meta.id,
+            &hash,
+            schema_prefix,
+            "_dimension_hash",
+            InitResolutionQuery(schema_prefix, self.dim_meta),
+        );
+        self.client.execute(&stmt, &[]).await?;
         Ok(())
     }
 

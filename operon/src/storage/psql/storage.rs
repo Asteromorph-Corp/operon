@@ -71,6 +71,7 @@ impl<T: EntityQueries> OperonStorage for PsqlStorage<T> {
         let entities_init_stmt = self.entities_meta.init_stmt(self.schema_prefix());
 
         client.init_schema().await?;
+        client.init_entity_hash().await?;
         client.init_footprint().await?;
         client.batch_execute(&entities_init_stmt).await?;
         Ok(())

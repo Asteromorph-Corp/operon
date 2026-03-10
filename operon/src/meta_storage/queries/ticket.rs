@@ -3,7 +3,7 @@ use futures::SinkExt;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
 use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
-use crate::utils::{SchemaPrefix, SqlParams};
+use crate::utils::{SchemaPrefix, SqlParams, hash_metadata, replace_if_updated};
 
 /// Helper struct for building SQL queries related to tickets.
 pub struct TicketQueryBuilder<'a, const N: usize> {
@@ -25,15 +25,24 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     /// Initializes the ticket table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
-        let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
-        let summary_stmt = TicketSummaryInsertQuery(schema_prefix);
-        let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.job_meta);
+        let hash = hash_metadata(self.job_meta);
 
-        self.client.execute_stmt(&init_stmt, &[]).await?;
+        let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
+        let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.job_meta);
+        let stmt = replace_if_updated(
+            self.job_meta.id,
+            &hash,
+            schema_prefix,
+            "_ticket_hash",
+            format!("{init_stmt}\n{trigger_stmts}"),
+        );
+
+        let summary_stmt = TicketSummaryInsertQuery(schema_prefix);
+
+        self.client.execute(&stmt, &[]).await?;
         self.client
             .execute_stmt(&summary_stmt, &[&self.job_meta.id])
             .await?;
-        self.client.batch_execute_stmt(&trigger_stmts).await?;
         Ok(())
     }
 
