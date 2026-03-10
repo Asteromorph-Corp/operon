@@ -100,7 +100,7 @@ where
         returning: bool,
         state: &mut RunningState,
     ) -> Result<(), SchedulerError> {
-        let conn = self.meta_storage.conn_static().await?;
+        let conn = self.meta_storage.ui_conn().await?;
         self.update_state(conn.as_client(), returning, state)
             .await?;
         Ok(())
