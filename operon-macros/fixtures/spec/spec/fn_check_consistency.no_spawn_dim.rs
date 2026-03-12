@@ -25,12 +25,8 @@ async fn check_consistency(
     // ...and check if the data storage holds all the data for them.
     let coordinates_to_check = match mode {
         operon::ui::CheckMode::MetadataOnly => return Ok(true),
-        operon::ui::CheckMode::Exhaustive => {
-            coordinates
-        }
-        operon::ui::CheckMode::Quick => {
-            operon::utils::get_dop_coords(&coordinates)
-        }
+        operon::ui::CheckMode::Exhaustive => coordinates,
+        operon::ui::CheckMode::Quick => operon::utils::get_dop_coords(&coordinates),
         _ => unreachable!(),
     };
 
