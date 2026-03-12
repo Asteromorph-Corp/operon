@@ -1,9 +1,8 @@
-use clap::Parser;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 
-use crate::ui::{Action, PromptCommand};
+use crate::ui::Command;
 
 #[derive(Default, Debug, Clone)]
 pub struct ShellPrompt {
@@ -11,77 +10,45 @@ pub struct ShellPrompt {
 }
 
 impl ShellPrompt {
-    pub(super) fn on_key(&mut self, key: KeyEvent) -> Option<PromptCommand> {
+    pub(super) fn on_key(&mut self, key: KeyEvent) -> Option<Command> {
         match key {
             KeyEvent {
                 code: KeyCode::Char(c),
                 modifiers: crossterm::event::KeyModifiers::CONTROL,
                 ..
             } => match c {
-                'c' => {
-                    self.input.clear();
-                    None
-                }
-                'd' => {
-                    if self.input.is_empty() {
-                        Some(PromptCommand {
-                            action: Action::Exit,
-                        })
-                    } else {
-                        None
-                    }
-                }
-                'l' => {
-                    if self.input.is_empty() {
-                        Some(PromptCommand {
-                            action: Action::Clear,
-                        })
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
+                'c' => self.input.clear(),
+                'd' if self.input.is_empty() => return Some(Command::EXIT),
+                'l' if self.input.is_empty() => return Some(Command::CLEAR),
+                _ => {}
             },
             KeyEvent {
                 code: KeyCode::Char(c),
                 ..
-            } => {
-                self.input.push(c);
-                None
-            }
+            } => self.input.push(c),
             KeyEvent {
                 code: KeyCode::Backspace,
                 ..
             } => {
                 self.input.pop();
-                None
             }
             KeyEvent {
                 code: KeyCode::Enter,
                 ..
             } => {
-                let clap_input = String::from("operon ") + &self.input;
-                let args = clap_input.split_whitespace();
-                if args.clone().count() == 1 {
-                    // No command entered, just return None
-                    self.input.clear();
-                    return None;
+                let command = self.input.parse::<Command>();
+                match command {
+                    Ok(_) => log::info!("$ {}", self.input),
+                    Err(_) if !self.input.trim().is_empty() => log::error!("$ {}", self.input),
+                    _ => {}
                 }
-                let command = match PromptCommand::try_parse_from(args) {
-                    Ok(cmd) => {
-                        log::info!("$ {}", self.input);
-                        Some(cmd)
-                    }
-                    Err(_) => {
-                        log::error!("$ {}", self.input);
-                        None
-                    }
-                };
                 self.input.clear();
-                command
+                return command.ok();
             }
-            _ => None,
+            _ => {}
         }
+
+        None
     }
 
     pub(super) fn render(

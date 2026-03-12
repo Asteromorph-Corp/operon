@@ -25,8 +25,8 @@ pub use log_options::*;
 mod shell_prompt;
 pub use shell_prompt::*;
 
-mod prompt_command;
-pub use prompt_command::*;
+mod command;
+pub use command::*;
 
 mod error;
 pub use error::*;
