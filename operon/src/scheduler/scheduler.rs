@@ -152,7 +152,7 @@ where
                         ),
                         RecoveryState::GracefullyStoppedChecked => log::info!(
                             "No inconsistencies were found. \n\
-                                Type `run` to resume running jobs from the last run, or `help` for additional options."
+                            Type `run` to resume running jobs from the last run, or `help` for additional options."
                         ),
                         _ => unreachable!(
                             "Unexpected recovery state after consistency check: {consistent:?}"
@@ -183,10 +183,7 @@ where
 
         // Early return if the state can be inferred through the footprints.
         match (data_footprint, meta_footprint) {
-            (Some(df), Some(mf)) if df == mf => match mf.metadata.state {
-                RunState::Completed | RunState::Paused => Ok(mf.metadata),
-                _ => Ok(RunMetadata::new(mf.metadata.run_id, RunState::Aborted)),
-            },
+            (Some(df), Some(mf)) if df == mf => Ok(mf.metadata),
             (Some(df), Some(mf)) if df != mf => {
                 log::warn!(
                     "Inconsistent footprints between data and metadata storage: \
@@ -283,6 +280,8 @@ where
 
         // Wipe the data storage clean.
         self.storage.clear().await?;
+        self.storage.put_footprint(footprint).await?;
+
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
         self.handler.clear_resolution(tx.as_client()).await?;
@@ -314,7 +313,7 @@ where
         footprint: &RunFootprint,
         execution_id: Uuid,
     ) -> Result<JoinSet<RunningState>, SchedulerError> {
-        let run_id = footprint.metadata.run_id;
+        self.storage.put_footprint(footprint).await?;
 
         // * We *trust* the following data to be correct:
         //   - The data storage,
@@ -339,7 +338,9 @@ where
         self.handler.clear_tickets(tx.as_client()).await?;
 
         tx.as_client().upsert_run(footprint).await?;
-        tx.as_client().put_execution(run_id, execution_id).await?;
+        tx.as_client()
+            .put_execution(footprint.metadata.run_id, execution_id)
+            .await?;
         self.handler.put_default_tickets(tx.as_client()).await?;
         self.update_ui(tx.as_client()).await?;
 
@@ -371,18 +372,19 @@ where
         footprint: &RunFootprint,
         execution_id: Uuid,
     ) -> Result<JoinSet<RunningState>, SchedulerError> {
-        let run_id = footprint.metadata.run_id;
-
         // * The persistent storage is fully trusted.
         // * Just pull the queued tickets, and have the individual schedulers' initial
         //   `ready_to_run` set to them.
         // * We need to clear the footprint only.
         self.storage.clear_footprint().await?;
+        self.storage.put_footprint(footprint).await?;
 
         let mut conn = self.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
         tx.as_client().upsert_run(footprint).await?;
-        tx.as_client().put_execution(run_id, execution_id).await?;
+        tx.as_client()
+            .put_execution(footprint.metadata.run_id, execution_id)
+            .await?;
         tx.commit().await?;
 
         let handles = self
