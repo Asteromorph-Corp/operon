@@ -316,6 +316,17 @@ impl UiLoop {
                                         self.state.write().await.update_ui_state(ControlEvent::RestoreRun)?;
                                     }
                                 }
+                                RecoveryState::FinishedChecked => {
+                                    if fresh {
+                                        log::info!("Starting a fresh run, ignoring previous data.");
+                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
+                                    } else {
+                                        log::info!("Continuing the last run.");
+                                        self.ctrl_tx.send(ControlEvent::RestoreRun)?;
+                                        self.state.write().await.update_ui_state(ControlEvent::RestoreRun)?;
+                                    }
+                                }
                                 _ => {
                                     log::warn!("Please wait until the check is finished.");
                                 }
@@ -332,7 +343,7 @@ impl UiLoop {
                             }
                             ControlEvent::Start => match rec_state {
                                 RecoveryState::AbortedUnchecked
-                                | RecoveryState::GracefullyStopped => {
+                                | RecoveryState::GracefullyStopped | RecoveryState::Finished => {
                                     log::info!("Starting a consistency check of the remaining data.");
                                     self.ctrl_tx.send(ControlEvent::Check {mode})?;
                                     self.state.write().await.update_ui_state(ControlEvent::Check {mode})?;

@@ -97,7 +97,8 @@ where
             RunState::Fresh => log::info!("Type `run` to begin running jobs."),
             RunState::Completed => log::info!(
                 "Found a finished run. \n\
-                Type `run` to begin running jobs and overwrite the existing data, or `exit` to cancel."
+                Type `run` to begin running jobs and overwrite the existing data, or `exit` to cancel.\n\
+                You can also type `check` to check the consistency of the data."
             ),
             RunState::Paused => log::info!(
                 "Found a gracefully stopped run. \n\
@@ -135,6 +136,7 @@ where
                     let state_after_check = match (state, consistent) {
                         (RunState::Aborted, true) => RecoveryState::AbortedChecked,
                         (RunState::Paused, true) => RecoveryState::GracefullyStoppedChecked,
+                        (RunState::Completed, true) => RecoveryState::FinishedChecked,
                         (_, true) => {
                             unreachable!("Ran `check_consistency` in an unexpected state: {state}")
                         }
@@ -157,6 +159,10 @@ where
                             or `help` for additional options."
                         ),
                         RecoveryState::GracefullyStoppedChecked => log::info!(
+                            "No inconsistencies were found. \n\
+                            Type `run` to resume running jobs from the last run, or `help` for additional options."
+                        ),
+                        RecoveryState::FinishedChecked => log::info!(
                             "No inconsistencies were found. \n\
                             Type `run` to resume running jobs from the last run, or `help` for additional options."
                         ),

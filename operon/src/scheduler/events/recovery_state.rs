@@ -28,6 +28,7 @@ pub enum RecoveryState {
     /// The last run was successfully finished,
     /// so we cannot resume from that run.
     Finished,
+    FinishedChecked,
     /// The last run was presumably aborted,
     /// so the storages may be in an inconsistent state.
     /// This happens when:
@@ -61,6 +62,7 @@ impl fmt::Display for RecoveryState {
             RecoveryState::Fresh => write!(f, "Fresh"),
             RecoveryState::MissingData => write!(f, "Missing Data"),
             RecoveryState::Finished => write!(f, "Finished"),
+            RecoveryState::FinishedChecked => write!(f, "Finished Checked"),
             RecoveryState::AbortedUnchecked => write!(f, "Aborted Unchecked"),
             RecoveryState::AbortedChecked => write!(f, "Aborted Checked"),
             RecoveryState::GracefullyStopped => write!(f, "Gracefully Stopped"),
