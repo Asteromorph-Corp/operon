@@ -9,11 +9,7 @@ pub struct LogBuffer {
     records: VecDeque<LogRecord>,
     capacity: usize,
 }
-impl Default for LogBuffer {
-    fn default() -> Self {
-        Self::new(1024)
-    }
-}
+
 impl LogBuffer {
     pub fn new(size: usize) -> Self {
         Self {

@@ -15,8 +15,8 @@ use crate::scheduler::{
     ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver,
 };
 use crate::ui::{
-    Command, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError, UiMode, UiState,
-    UiStateUpdate,
+    Command, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError, UiMode, UiOptions,
+    UiState, UiStateUpdate,
 };
 use crate::utils::SplitFirstOwned;
 
@@ -57,6 +57,7 @@ Commands:
 /// The main UI loop that handles user input and updates the UI state.
 pub struct UiLoop {
     state: Arc<RwLock<UiState>>,
+    mode: UiMode,
     log_view: LogView,
     log_rx: LogRecordReceiver,
     ctrl_tx: ControlEventSender,
@@ -73,10 +74,12 @@ impl UiLoop {
         ctrl_tx: ControlEventSender,
         rec_rx: RecoveryStateReceiver,
         sched_rx: SchedulerStateReceiver,
+        options: UiOptions,
     ) -> Self {
         Self {
             state,
-            log_view: LogView::default(),
+            mode: options.mode,
+            log_view: LogView::new(options.log_buffer_size),
             log_rx,
             ctrl_tx,
             rec_rx,
@@ -85,8 +88,7 @@ impl UiLoop {
     }
 
     pub async fn run(self) -> Result<(), UiError> {
-        let options = self.state.read().await.options;
-        match options.mode {
+        match self.mode {
             UiMode::Interactive => self.run_interactive().await,
             UiMode::Headless => self.run_headless().await,
         }

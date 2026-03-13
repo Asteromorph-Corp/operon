@@ -3,10 +3,6 @@ use ratatui::text::Text;
 use crate::ui::{LogBuffer, LogRecord};
 
 /// Owns the log buffer and scroll state.
-///
-/// Lives directly on `UiLoop`, outside the shared `UiState`,
-/// since only the UI loop reads and writes these fields.
-#[derive(Default)]
 pub struct LogView {
     buffer: LogBuffer,
     /// Number of bottom lines to skip (scroll offset).
@@ -15,6 +11,14 @@ pub struct LogView {
 }
 
 impl LogView {
+    pub fn new(buffer_size: usize) -> Self {
+        Self {
+            buffer: LogBuffer::new(buffer_size),
+            cursor: 0,
+            unread: 0,
+        }
+    }
+
     /// Push a new log record. If the cursor is scrolled back,
     /// adjust it to keep the viewport stable and track unread count.
     pub fn push(&mut self, record: LogRecord, width: u16) {

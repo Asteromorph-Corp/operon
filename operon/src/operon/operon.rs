@@ -67,10 +67,7 @@ where
 
         // Set up the logger
         Logger::new(log_tx, log_options).setup(::log::LevelFilter::Trace)?;
-        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(
-            ui_options,
-            &handler.job_handlers,
-        )));
+        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(&handler.job_handlers)));
 
         // Create the scheduler
         let scheduler = Scheduler::<Svc, Sto>::new(
@@ -83,7 +80,7 @@ where
             sched_tx,
             scheduler_options,
         )?;
-        let ui_loop = UiLoop::new(ui_state, log_rx, ctrl_tx, rec_rx, sched_rx);
+        let ui_loop = UiLoop::new(ui_state, log_rx, ctrl_tx, rec_rx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
         let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };

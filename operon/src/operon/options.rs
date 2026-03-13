@@ -97,6 +97,7 @@ impl OperonOptions {
         };
         let scheduler_options = SchedulerOptions {
             internal_channel_size: self.internal_channel_size,
+            ui_mode: self.ui_mode,
             database_uri: self.meta_storage_uri,
             pool_size: self.meta_storage_pool_size as usize,
             schema: self.meta_storage_schema,

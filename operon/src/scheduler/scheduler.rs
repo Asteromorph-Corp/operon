@@ -39,6 +39,7 @@ where
     rec_tx: RecoveryStateSender,
     sched_tx: SchedulerStateSender,
     internal_channel_size: usize,
+    ui_mode: UiMode,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -58,7 +59,7 @@ where
         sched_tx: SchedulerStateSender,
         options: SchedulerOptions,
     ) -> Result<Self, SchedulerError> {
-        let (internal_channel_size, meta_storage_options) = options.split();
+        let (internal_channel_size, ui_mode, meta_storage_options) = options.split();
         let meta_storage = MetaStorage::new(meta_storage_options)?;
 
         Ok(Self {
@@ -71,6 +72,7 @@ where
             rec_tx,
             sched_tx,
             internal_channel_size,
+            ui_mode,
         })
     }
 
@@ -88,12 +90,9 @@ where
             e
         })?;
 
-        let ui_options = self.ui_state.read().await.options().mode;
         self.rec_tx.send(RecoveryState::from(state))?;
         match state {
-            _ if ui_options == UiMode::Headless => {
-                log::info!("Starting in headless mode.");
-            }
+            _ if self.ui_mode == UiMode::Headless => log::info!("Starting in headless mode."),
             RunState::Fresh => log::info!("Type `run` to begin running jobs."),
             RunState::Completed => log::info!(
                 "Found a finished run. \n\
