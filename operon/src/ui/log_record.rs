@@ -30,7 +30,7 @@ impl From<&::log::Record<'_>> for LogRecord {
 }
 
 impl LogRecord {
-    pub fn format_for_term(&self, width: u16) -> Vec<Line<'_>> {
+    pub fn format_for_term(&self, width: u16) -> Vec<Line<'static>> {
         let timestamp = self.timestamp.format("%y-%m-%d %H:%M:%S").to_string();
         let level_colour = match self.level {
             log::Level::Error => ::ratatui::style::Style::new().red(),
