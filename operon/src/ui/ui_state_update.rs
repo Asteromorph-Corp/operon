@@ -3,8 +3,6 @@ use crate::ui::Progress;
 
 pub enum UiStateUpdate {
     ProgressUpdate(String, Progress),
-    SetProgressCursor(u16),
-    ExitOnFinish(bool),
     LastControlEvent(ControlEvent),
 }
 

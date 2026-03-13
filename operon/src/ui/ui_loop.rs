@@ -16,7 +16,7 @@ use crate::scheduler::{
 };
 use crate::ui::{
     Command, CommandPrompt, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError,
-    UiMode, UiOptions, UiState, UiStateUpdate,
+    UiMode, UiOptions, UiState,
 };
 use crate::utils::SplitFirstOwned;
 
@@ -58,12 +58,14 @@ Commands:
 pub struct UiLoop {
     state: Arc<RwLock<UiState>>,
     mode: UiMode,
+    progress_cursor: u16,
     logs: LogView,
     prompt: CommandPrompt,
     log_rx: LogRecordReceiver,
     ctrl_tx: ControlEventSender,
     rec_rx: RecoveryStateReceiver,
     sched_rx: SchedulerStateReceiver,
+    exit_on_finish: bool,
 }
 
 impl UiLoop {
@@ -80,12 +82,14 @@ impl UiLoop {
         Self {
             state,
             mode: options.mode,
+            progress_cursor: 0u16,
             logs: LogView::new(options.log_buffer_size),
             prompt: CommandPrompt::default(),
             log_rx,
             ctrl_tx,
             rec_rx,
             sched_rx,
+            exit_on_finish: false,
         }
     }
 
@@ -111,7 +115,7 @@ impl UiLoop {
         loop {
             {
                 let guard = self.state.read().await;
-                if !guard.any_alive() && guard.exit_on_finish {
+                if !guard.any_alive() && self.exit_on_finish {
                     break;
                 }
             }
@@ -126,16 +130,14 @@ impl UiLoop {
                             code: KeyCode::Left,
                             ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.progress_cursor = state.progress_cursor.saturating_sub(1);
+                            self.progress_cursor = self.progress_cursor.saturating_sub(1);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::Right,
                             ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.progress_cursor = state.progress_cursor.saturating_add(1);
+                            self.progress_cursor = self.progress_cursor.saturating_add(1);
                             None
                         }
                         Event::Key(KeyEvent {
@@ -364,9 +366,7 @@ impl UiLoop {
                                     if exec_snapshot.any_alive() {
                                         self.ctrl_tx.send(ControlEvent::Abort)?;
                                         self.state.write().await.update_ui_state(ControlEvent::Abort)?;
-                                        self.state.write().await.update_ui_state(
-                                            UiStateUpdate::ExitOnFinish(true)
-                                        )?;
+                                        self.exit_on_finish = true;
                                     } else {
                                         break;
                                     }
@@ -414,9 +414,7 @@ impl UiLoop {
 
                                     self.ctrl_tx.send(ControlEvent::Abort)?;
                                     self.state.write().await.update_ui_state(ControlEvent::Abort)?;
-                                    self.state.write().await.update_ui_state(
-                                        UiStateUpdate::ExitOnFinish(!no_exit),
-                                    )?;
+                                    self.exit_on_finish = !no_exit;
                                 }
                                 RunningState::Error => {
                                     if !exec_snapshot.any_alive() {
@@ -435,11 +433,7 @@ impl UiLoop {
                                     self.state.write().await.update_ui_state(ControlEvent::Abort)?;
                                     // We *don't* exit here (even without the no-exit flag),
                                     // because the user should be able to inspect the logs.
-                                    if exec_snapshot.exit_on_finish {
-                                        self.state.write().await.update_ui_state(
-                                            UiStateUpdate::ExitOnFinish(false),
-                                        )?;
-                                    }
+                                    self.exit_on_finish = false;
                                 }
                                 RunningState::Paused | RunningState::Running => {
                                     if force {
@@ -453,9 +447,7 @@ impl UiLoop {
                                         self.ctrl_tx.send(ControlEvent::GracefulStop)?;
                                         self.state.write().await.update_ui_state(ControlEvent::GracefulStop)?;
                                     }
-                                    self.state.write().await.update_ui_state(
-                                        UiStateUpdate::ExitOnFinish(!no_exit),
-                                    )?;
+                                    self.exit_on_finish = !no_exit;
                                 }
                             },
                         },
@@ -600,17 +592,18 @@ impl UiLoop {
             .expect("At least one job name exists")
             .clamp(3, 20);
 
-        let mut progress_cursor = draw_snapshot.progress_cursor;
         let height = terminal.size()?.height;
         let total_progress_bars = draw_snapshot.progress.len() as u16;
         let max_progress_bars = height
             .saturating_sub(height.saturating_div(2).max(9))
             .min(20);
         let num_progress_bars = total_progress_bars.min(max_progress_bars);
+
         // Clip the progress cursor if necessary
-        if progress_cursor + num_progress_bars > total_progress_bars {
-            progress_cursor = total_progress_bars.saturating_sub(num_progress_bars);
+        if self.progress_cursor + num_progress_bars > total_progress_bars {
+            self.progress_cursor = total_progress_bars.saturating_sub(num_progress_bars);
         }
+
         terminal.draw(|frame| {
             let [
                 progress_head,
@@ -645,8 +638,8 @@ impl UiLoop {
                             Span::raw("Progress").italic(),
                             Span::raw(format!(
                                 " │ {}–{}/{total_progress_bars}",
-                                progress_cursor + 1,
-                                progress_cursor + num_progress_bars
+                                self.progress_cursor + 1,
+                                self.progress_cursor + num_progress_bars
                             )),
                             Span::raw(" ├"),
                         ])
@@ -715,7 +708,7 @@ impl UiLoop {
             draw_snapshot
                 .progress
                 .iter()
-                .skip(progress_cursor as usize)
+                .skip(self.progress_cursor as usize)
                 .take(num_progress_bars as usize)
                 .zip(progress_bars)
                 .for_each(|((name, progress), bar)| {
@@ -743,13 +736,6 @@ impl UiLoop {
             let input_widget = self.prompt.to_line(draw_snapshot.overall_state().color());
             frame.render_widget(input_widget, input_area);
         })?;
-        // Update the cursor position if it was clipped
-        if progress_cursor != draw_snapshot.progress_cursor {
-            self.state
-                .write()
-                .await
-                .update_ui_state(UiStateUpdate::SetProgressCursor(progress_cursor))?;
-        }
 
         Ok(())
     }

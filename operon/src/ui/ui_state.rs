@@ -13,9 +13,6 @@ pub type Progress = (i64, i64, i64, RunningState, bool);
 pub struct UiState {
     // Done, queued, waiting, state, returned.
     pub(super) progress: IndexMap<String, Progress>,
-    /// Cursor to first progress bar rendered.
-    pub(super) progress_cursor: u16,
-    pub(super) exit_on_finish: bool,
     /// Last sent control event.
     pub(super) last_control_event: ControlEvent,
 }
@@ -79,12 +76,6 @@ impl UiState {
                     return Err(UiError::ProgressNotFound(id));
                 };
                 *v = progress;
-            }
-            UiStateUpdate::SetProgressCursor(cursor) => {
-                self.progress_cursor = cursor;
-            }
-            UiStateUpdate::ExitOnFinish(yes) => {
-                self.exit_on_finish = yes;
             }
             UiStateUpdate::LastControlEvent(event) => {
                 self.last_control_event = event;
