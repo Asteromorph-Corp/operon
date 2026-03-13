@@ -116,6 +116,7 @@ where
             let ctrl_event = self.ctrl_rx.borrow_and_update().clone();
             match ctrl_event {
                 ControlEvent::Check { mode } => {
+                    let check_start = Instant::now();
                     let consistent = self
                         .handler
                         .check_consistency(
@@ -140,6 +141,11 @@ where
                         (_, false) => RecoveryState::MissingData,
                     };
                     self.rec_tx.send(state_after_check)?;
+
+                    log::info!(
+                        "Consistency check completed in: {:?}.",
+                        check_start.elapsed()
+                    );
                     match state_after_check {
                         RecoveryState::MissingData => log::info!(
                             "Some data is corrupted or missing. \n\
@@ -315,6 +321,8 @@ where
     ) -> Result<JoinSet<RunningState>, SchedulerError> {
         self.storage.put_footprint(footprint).await?;
 
+        let rebuild_start = Instant::now();
+
         // * We *trust* the following data to be correct:
         //   - The data storage,
         //   - All dimension resolutions,
@@ -351,7 +359,10 @@ where
             self.update_ui(tx.as_client()).await?;
         }
         tx.commit().await?;
-        log::info!("Rebuild complete, starting the run.");
+        log::info!(
+            "Rebuild completed in: {:?}, starting the run.",
+            rebuild_start.elapsed()
+        );
 
         let handles = self
             .handler
