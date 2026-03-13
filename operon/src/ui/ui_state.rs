@@ -4,7 +4,7 @@ use crate::operon::RunningState;
 use crate::scheduler::{ControlEvent, JobHandler};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{LogBuffer, ShellPrompt, UiError, UiOptions, UiStateUpdate};
+use crate::ui::{ShellPrompt, UiError, UiOptions, UiStateUpdate};
 
 pub type Progress = (i64, i64, i64, RunningState, bool);
 
@@ -14,10 +14,6 @@ pub struct UiState {
     pub(super) options: UiOptions,
     // Done, queued, waiting, state, returned.
     pub(super) progress: IndexMap<String, Progress>,
-    pub(super) log_buffer: LogBuffer,
-    /// Corresponds to how many bottom lines to skip.
-    pub(super) log_cursor: usize,
-    pub(super) unread_logs: usize,
     /// Cursor to first progress bar rendered.
     pub(super) progress_cursor: u16,
     pub(super) shell: ShellPrompt,
@@ -91,22 +87,6 @@ impl UiState {
                     return Err(UiError::ProgressNotFound(id));
                 };
                 *v = progress;
-            }
-            UiStateUpdate::NewLog(record, width) => {
-                // Follow the cursor if it is not at 0
-                if self.log_cursor != 0 {
-                    self.log_cursor = self
-                        .log_cursor
-                        .saturating_add(record.format_for_term(width).len());
-                    self.unread_logs += 1;
-                }
-                self.log_buffer.push(record);
-            }
-            UiStateUpdate::SetLogCursor(cursor) => {
-                self.log_cursor = cursor;
-                if cursor == 0 {
-                    self.unread_logs = 0;
-                }
             }
             UiStateUpdate::SetProgressCursor(cursor) => {
                 self.progress_cursor = cursor;

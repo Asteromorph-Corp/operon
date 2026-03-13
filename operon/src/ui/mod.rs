@@ -19,6 +19,9 @@ pub use log_record::*;
 mod log_buffer;
 pub use log_buffer::*;
 
+mod log_view;
+pub use log_view::*;
+
 mod log_options;
 pub use log_options::*;
 

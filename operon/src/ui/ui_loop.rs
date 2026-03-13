@@ -15,7 +15,7 @@ use crate::scheduler::{
     ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver,
 };
 use crate::ui::{
-    Command, LogRecordReceiver, Progress, SchedulerCommand, UiError, UiOptions, UiState,
+    Command, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError, UiOptions, UiState,
     UiStateUpdate,
 };
 use crate::utils::SplitFirstOwned;
@@ -57,6 +57,7 @@ Commands:
 /// The main UI loop that handles user input and updates the UI state.
 pub struct UiLoop {
     state: Arc<RwLock<UiState>>,
+    log_view: LogView,
     log_rx: LogRecordReceiver,
     ctrl_tx: ControlEventSender,
     rec_rx: RecoveryStateReceiver,
@@ -75,6 +76,7 @@ impl UiLoop {
     ) -> Self {
         Self {
             state,
+            log_view: LogView::default(),
             log_rx,
             ctrl_tx,
             rec_rx,
@@ -137,8 +139,7 @@ impl UiLoop {
                             modifiers: KeyModifiers::ALT,
                             ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.log_cursor = state.log_cursor.saturating_add(1);
+                            self.log_view.scroll_up(1);
                             None
                         }
                         Event::Key(KeyEvent {
@@ -146,56 +147,40 @@ impl UiLoop {
                             modifiers: KeyModifiers::ALT,
                             ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.log_cursor = state.log_cursor.saturating_sub(1);
-                            if state.log_cursor == 0 {
-                                state.unread_logs = 0;
-                            }
+                            self.log_view.scroll_down(1);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::Up, ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.log_cursor = state.log_cursor.saturating_add(5);
+                            self.log_view.scroll_up(5);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::Down,
                             ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.log_cursor = state.log_cursor.saturating_sub(5);
-                            if state.log_cursor == 0 {
-                                state.unread_logs = 0;
-                            }
+                            self.log_view.scroll_down(5);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::PageUp,
                             ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.log_cursor = state.log_cursor.saturating_add(20);
+                            self.log_view.scroll_up(20);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::PageDown,
                             ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.log_cursor = state.log_cursor.saturating_sub(20);
-                            if state.log_cursor == 0 {
-                                state.unread_logs = 0;
-                            }
+                            self.log_view.scroll_down(20);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::Esc, ..
                         }) => {
-                            let mut state = self.state.write().await;
-                            state.log_cursor = 0;
-                            state.unread_logs = 0;
+                            self.log_view.reset_scroll();
                             None
                         }
                         Event::Key(key) => {
@@ -203,16 +188,11 @@ impl UiLoop {
                         }
                         Event::Mouse(me) => match me.kind {
                             MouseEventKind::ScrollUp => {
-                                let mut state = self.state.write().await;
-                                state.log_cursor = state.log_cursor.saturating_add(5);
+                                self.log_view.scroll_up(5);
                                 None
                             }
                             MouseEventKind::ScrollDown => {
-                                let mut state = self.state.write().await;
-                                state.log_cursor = state.log_cursor.saturating_sub(5);
-                                if state.log_cursor == 0 {
-                                    state.unread_logs = 0;
-                                }
+                                self.log_view.scroll_down(5);
                                 None
                             }
                             _ => None,
@@ -398,10 +378,7 @@ impl UiLoop {
                             },
                         },
                         Command::CLEAR => {
-                            let mut guard = self.state.write().await;
-                            guard.log_buffer.clear();
-                            guard.log_cursor = 0;
-                            guard.unread_logs = 0;
+                            self.log_view.clear();
                         }
                         Command::Scheduler(SchedulerCommand::Quit { force, no_exit }) => match exec_snapshot.last_control_event {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
@@ -531,14 +508,10 @@ impl UiLoop {
 
                 _ = ::tokio::time::sleep(::std::time::Duration::from_millis(10)) => {
                     // Drain the log channel before drawing the UI.
+                    let width = terminal.size()?.width;
                     loop {
                         match self.log_rx.try_recv() {
-                            Ok(record) => self.state.write().await.update_ui_state(
-                                UiStateUpdate::NewLog(
-                                    record,
-                                    terminal.size()?.width,
-                                ),
-                            )?,
+                            Ok(record) => self.log_view.push(record, width),
                             // Skip fallen-behind logs
                             Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
                             // Drained all logs
@@ -615,7 +588,7 @@ impl UiLoop {
         Ok(())
     }
 
-    async fn draw(&self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
+    async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
         let draw_snapshot = self.state.read().await.clone();
         let max_len = draw_snapshot
             .progress
@@ -626,7 +599,6 @@ impl UiLoop {
             .clamp(3, 20);
 
         let mut progress_cursor = draw_snapshot.progress_cursor;
-        let mut log_cursor = draw_snapshot.log_cursor;
         let height = terminal.size()?.height;
         let total_progress_bars = draw_snapshot.progress.len() as u16;
         let max_progress_bars = height
@@ -759,32 +731,13 @@ impl UiLoop {
                 ),
                 logs_head,
             );
-            let (logs_widget, new_log_cursor) = draw_snapshot.log_buffer.to_text(
-                logs_area.width,
-                logs_area.height,
-                draw_snapshot.log_cursor,
-            );
-            log_cursor = new_log_cursor;
+
+            let logs_widget = self.log_view.to_text(logs_area.width, logs_area.height);
             frame.render_widget(logs_widget, logs_area);
-            frame.render_widget(
-                Block::new().borders(Borders::BOTTOM).title(
-                    Line::from(if draw_snapshot.unread_logs == 0 {
-                        vec![]
-                    } else {
-                        vec![
-                            Span::raw("┤ "),
-                            Span::raw(format!(
-                                "{} unread, Esc to follow",
-                                draw_snapshot.unread_logs
-                            ))
-                            .italic(),
-                            Span::raw(" │"),
-                        ]
-                    })
-                    .right_aligned(),
-                ),
-                logs_foot,
-            );
+
+            let separator_widget = separator(self.log_view.unread());
+            frame.render_widget(separator_widget, logs_foot);
+
             draw_snapshot
                 .shell
                 .render(frame, input_area, draw_snapshot.overall_state().color());
@@ -797,14 +750,22 @@ impl UiLoop {
                 .update_ui_state(UiStateUpdate::SetProgressCursor(progress_cursor))?;
         }
 
-        if log_cursor != draw_snapshot.log_cursor {
-            self.state
-                .write()
-                .await
-                .update_ui_state(UiStateUpdate::SetLogCursor(log_cursor))?;
-        }
         Ok(())
     }
+}
+
+fn separator(unread_logs: usize) -> Block<'static> {
+    let title = if unread_logs == 0 {
+        Line::from(vec![])
+    } else {
+        Line::from(vec![
+            Span::raw("┤ "),
+            Span::raw(format!("{unread_logs} unread, Esc to follow")).italic(),
+            Span::raw(" │"),
+        ])
+        .right_aligned()
+    };
+    Block::new().borders(Borders::BOTTOM).title(title)
 }
 
 /// Formats the count for display in the progress gauge.

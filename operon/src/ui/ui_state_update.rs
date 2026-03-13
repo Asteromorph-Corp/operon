@@ -1,11 +1,8 @@
 use crate::scheduler::ControlEvent;
-use crate::ui::{LogRecord, Progress};
+use crate::ui::Progress;
 
 pub enum UiStateUpdate {
     ProgressUpdate(String, Progress),
-    /// New log record.
-    NewLog(LogRecord, u16),
-    SetLogCursor(usize),
     SetProgressCursor(u16),
     ExitOnFinish(bool),
     LastControlEvent(ControlEvent),
