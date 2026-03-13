@@ -1,4 +1,4 @@
-pub use operon_macros::*;
+mod logger;
 
 pub mod meta_storage;
 pub mod operon;
@@ -9,6 +9,7 @@ pub mod storage;
 pub mod ui;
 pub mod utils;
 
+pub use operon_macros::*;
 // Re-export the external crates used in the macro expansions
 pub use {
     async_trait, bytes, chrono, clap, crossterm, csv, deadpool_postgres, futures, log,

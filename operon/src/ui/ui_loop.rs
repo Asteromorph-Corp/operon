@@ -15,7 +15,7 @@ use crate::scheduler::{
     ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver,
 };
 use crate::ui::{
-    Command, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError, UiOptions, UiState,
+    Command, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError, UiMode, UiState,
     UiStateUpdate,
 };
 use crate::utils::SplitFirstOwned;
@@ -86,9 +86,9 @@ impl UiLoop {
 
     pub async fn run(self) -> Result<(), UiError> {
         let options = self.state.read().await.options;
-        match options {
-            UiOptions::Interactive => self.run_interactive().await,
-            UiOptions::Headless => self.run_headless().await,
+        match options.mode {
+            UiMode::Interactive => self.run_interactive().await,
+            UiMode::Headless => self.run_headless().await,
         }
     }
 

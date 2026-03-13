@@ -14,7 +14,7 @@ use crate::scheduler::{
 use crate::schema::{RunFootprint, RunMetadata, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{UiOptions, UiState};
+use crate::ui::{UiMode, UiState};
 
 /// # Scheduler
 ///
@@ -88,10 +88,10 @@ where
             e
         })?;
 
-        let ui_options = self.ui_state.read().await.options();
+        let ui_options = self.ui_state.read().await.options().mode;
         self.rec_tx.send(RecoveryState::from(state))?;
         match state {
-            _ if ui_options == UiOptions::Headless => {
+            _ if ui_options == UiMode::Headless => {
                 log::info!("Starting in headless mode.");
             }
             RunState::Fresh => log::info!("Type `run` to begin running jobs."),

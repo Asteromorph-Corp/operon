@@ -1,11 +1,8 @@
 mod ui_loop;
 pub use ui_loop::*;
 
-mod ui_logger;
-pub use ui_logger::*;
-
-mod ui_options;
-pub use ui_options::*;
+mod options;
+pub use options::*;
 
 mod ui_state;
 pub use ui_state::*;
@@ -21,9 +18,6 @@ pub use log_buffer::*;
 
 mod log_view;
 pub use log_view::*;
-
-mod log_options;
-pub use log_options::*;
 
 mod shell_prompt;
 pub use shell_prompt::*;

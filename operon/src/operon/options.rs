@@ -1,13 +1,12 @@
-use std::borrow::Cow;
-
 use secrecy::SecretString;
 
+use crate::logger::LoggerOptions;
 use crate::scheduler::SchedulerOptions;
-use crate::ui::{LogOptions, UiOptions};
+use crate::ui::{UiMode, UiOptions};
 
 pub struct OperonOptions {
     // UI options
-    pub(crate) ui_options: UiOptions,
+    pub(crate) ui_mode: UiMode,
     // Scheduler options
     pub(crate) internal_channel_size: usize,
     // Meta storage options
@@ -25,7 +24,7 @@ pub struct OperonOptions {
 impl OperonOptions {
     pub fn new(meta_storage_uri: impl Into<String>) -> Self {
         Self {
-            ui_options: UiOptions::Interactive,
+            ui_mode: UiMode::Interactive,
             internal_channel_size: 1024,
             meta_storage_uri: SecretString::from(meta_storage_uri.into()),
             meta_storage_pool_size: 16,
@@ -38,8 +37,8 @@ impl OperonOptions {
         }
     }
 
-    pub fn with_ui_options(mut self, options: UiOptions) -> Self {
-        self.ui_options = options;
+    pub fn with_ui_mode(mut self, mode: UiMode) -> Self {
+        self.ui_mode = mode;
         self
     }
 
@@ -91,8 +90,11 @@ impl OperonOptions {
         self
     }
 
-    pub(crate) fn split(self) -> (UiOptions, SchedulerOptions, LogOptions) {
-        let ui_options = self.ui_options;
+    pub(crate) fn split(self) -> (UiOptions, SchedulerOptions, LoggerOptions) {
+        let ui_options = UiOptions {
+            mode: self.ui_mode,
+            log_buffer_size: self.log_buffer_size,
+        };
         let scheduler_options = SchedulerOptions {
             internal_channel_size: self.internal_channel_size,
             database_uri: self.meta_storage_uri,
@@ -101,10 +103,10 @@ impl OperonOptions {
             keepalives_idle: self.meta_storage_keepalives_idle,
             keepalives_interval: self.meta_storage_keepalives_interval,
         };
-        let log_options = LogOptions {
+        let log_options = LoggerOptions {
             level: self.log_level,
             buffer_size: self.log_buffer_size,
-            dump: self.log_dump.map(Cow::from),
+            dump: self.log_dump,
         };
 
         (ui_options, scheduler_options, log_options)

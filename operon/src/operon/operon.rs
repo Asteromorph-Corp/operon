@@ -3,11 +3,12 @@ use std::sync::Arc;
 use futures::future::try_join;
 use tokio::sync::RwLock;
 
+use crate::logger::Logger;
 use crate::operon::{OperonError, OperonOptions};
 use crate::scheduler::{ControlEvent, RecoveryState, Scheduler, ValidOperon};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{UiLogger, UiLoop, UiState};
+use crate::ui::{UiLoop, UiState};
 
 /// # Operon
 ///
@@ -65,8 +66,7 @@ where
         let (sched_tx, sched_rx) = ::tokio::sync::watch::channel(false);
 
         // Set up the logger
-        UiLogger::new(log_tx, log_options.level, log_options.dump)
-            .setup(::log::LevelFilter::Trace)?;
+        Logger::new(log_tx, log_options).setup(::log::LevelFilter::Trace)?;
         let ui_state = Arc::new(RwLock::new(UiState::from_jobs(
             ui_options,
             &handler.job_handlers,
