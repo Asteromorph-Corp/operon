@@ -43,15 +43,15 @@ pub enum CheckMode {
 #[derive(Parser)]
 #[clap(name = "operon")]
 #[command(disable_help_flag = true, disable_help_subcommand = true)]
-struct CliParser {
+struct PromptParser {
     #[clap(subcommand)]
-    pub action: CliCommand,
+    pub action: PromptCommand,
 }
 
 #[derive(Subcommand)]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 #[clap(rename_all = "kebab-case")]
-enum CliCommand {
+enum PromptCommand {
     /// Start a new run using the best available restoration.
     Run {
         /// Start a fresh run, ignoring any existing data.
@@ -114,12 +114,12 @@ enum CliCommand {
     Help,
 }
 
-impl FromStr for CliCommand {
+impl FromStr for PromptCommand {
     type Err = clap::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let args = std::iter::once("operon").chain(s.split_whitespace());
-        let helper = CliParser::try_parse_from(args)?;
+        let helper = PromptParser::try_parse_from(args)?;
         Ok(helper.action)
     }
 }
@@ -128,24 +128,24 @@ impl FromStr for Command {
     type Err = clap::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let helper = CliCommand::from_str(s)?;
+        let helper = PromptCommand::from_str(s)?;
         let command = match helper {
-            CliCommand::Run { fresh, rebuild } => {
+            PromptCommand::Run { fresh, rebuild } => {
                 Command::Scheduler(SchedulerCommand::Run { fresh, rebuild })
             }
-            CliCommand::Check { mode } => Command::Scheduler(SchedulerCommand::Check { mode }),
-            CliCommand::Quit { force, no_exit } => {
+            PromptCommand::Check { mode } => Command::Scheduler(SchedulerCommand::Check { mode }),
+            PromptCommand::Quit { force, no_exit } => {
                 Command::Scheduler(SchedulerCommand::Quit { force, no_exit })
             }
-            CliCommand::Pause { targets, cascade } => {
+            PromptCommand::Pause { targets, cascade } => {
                 Command::Scheduler(SchedulerCommand::Pause { targets, cascade })
             }
-            CliCommand::Resume { targets } => {
+            PromptCommand::Resume { targets } => {
                 Command::Scheduler(SchedulerCommand::Resume { targets })
             }
-            CliCommand::Exit => Command::Ui(UiCommand::Exit),
-            CliCommand::Clear => Command::Ui(UiCommand::Clear),
-            CliCommand::Help => Command::Ui(UiCommand::Help),
+            PromptCommand::Exit => Command::Ui(UiCommand::Exit),
+            PromptCommand::Clear => Command::Ui(UiCommand::Clear),
+            PromptCommand::Help => Command::Ui(UiCommand::Help),
         };
         Ok(command)
     }
@@ -158,23 +158,23 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[case::run_fresh("run --fresh", CliCommand::Run { fresh: true, rebuild: false })]
-    #[case::run_rebuild("run --rebuild", CliCommand::Run { fresh: false, rebuild: true })]
-    #[case::check_trust_all("check --mode trust-all", CliCommand::Check { mode: CheckMode::TrustAll })]
-    #[case::check_metadata_only("check --mode metadata-only", CliCommand::Check { mode: CheckMode::MetadataOnly })]
-    #[case::check_quick("check", CliCommand::Check { mode: CheckMode::Quick })]
-    #[case::check_exhaustive("check --mode exhaustive", CliCommand::Check { mode: CheckMode::Exhaustive })]
-    #[case::quit_force("quit --force", CliCommand::Quit { force: true, no_exit: false })]
-    #[case::quit_no_exit("quit --no-exit", CliCommand::Quit { force: false, no_exit: true })]
-    #[case::pause_all("pause", CliCommand::Pause { targets: vec![], cascade: false })]
-    #[case::pause_specific("pause job1 job2 --cascade", CliCommand::Pause { targets: vec!["job1".to_owned(), "job2".to_owned()], cascade: true })]
-    #[case::resume_all("resume", CliCommand::Resume { targets: vec![] })]
-    #[case::resume_specific("resume job1 job2", CliCommand::Resume { targets: vec!["job1".to_owned(), "job2".to_owned()] })]
-    #[case::exit("exit", CliCommand::Exit)]
-    #[case::clear("clear", CliCommand::Clear)]
-    #[case::help("help", CliCommand::Help)]
-    fn test_parse_command(#[case] input: &str, #[case] expected: CliCommand) {
-        let action = CliCommand::from_str(input).unwrap();
+    #[case::run_fresh("run --fresh", PromptCommand::Run { fresh: true, rebuild: false })]
+    #[case::run_rebuild("run --rebuild", PromptCommand::Run { fresh: false, rebuild: true })]
+    #[case::check_trust_all("check --mode trust-all", PromptCommand::Check { mode: CheckMode::TrustAll })]
+    #[case::check_metadata_only("check --mode metadata-only", PromptCommand::Check { mode: CheckMode::MetadataOnly })]
+    #[case::check_quick("check", PromptCommand::Check { mode: CheckMode::Quick })]
+    #[case::check_exhaustive("check --mode exhaustive", PromptCommand::Check { mode: CheckMode::Exhaustive })]
+    #[case::quit_force("quit --force", PromptCommand::Quit { force: true, no_exit: false })]
+    #[case::quit_no_exit("quit --no-exit", PromptCommand::Quit { force: false, no_exit: true })]
+    #[case::pause_all("pause", PromptCommand::Pause { targets: vec![], cascade: false })]
+    #[case::pause_specific("pause job1 job2 --cascade", PromptCommand::Pause { targets: vec!["job1".to_owned(), "job2".to_owned()], cascade: true })]
+    #[case::resume_all("resume", PromptCommand::Resume { targets: vec![] })]
+    #[case::resume_specific("resume job1 job2", PromptCommand::Resume { targets: vec!["job1".to_owned(), "job2".to_owned()] })]
+    #[case::exit("exit", PromptCommand::Exit)]
+    #[case::clear("clear", PromptCommand::Clear)]
+    #[case::help("help", PromptCommand::Help)]
+    fn test_parse_command(#[case] input: &str, #[case] expected: PromptCommand) {
+        let action = PromptCommand::from_str(input).unwrap();
         assert_eq!(action, expected);
     }
 }

@@ -15,8 +15,8 @@ use crate::scheduler::{
     ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver,
 };
 use crate::ui::{
-    Command, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError, UiMode, UiOptions,
-    UiState, UiStateUpdate,
+    Command, CommandPrompt, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError,
+    UiMode, UiOptions, UiState, UiStateUpdate,
 };
 use crate::utils::SplitFirstOwned;
 
@@ -58,7 +58,8 @@ Commands:
 pub struct UiLoop {
     state: Arc<RwLock<UiState>>,
     mode: UiMode,
-    log_view: LogView,
+    logs: LogView,
+    prompt: CommandPrompt,
     log_rx: LogRecordReceiver,
     ctrl_tx: ControlEventSender,
     rec_rx: RecoveryStateReceiver,
@@ -79,7 +80,8 @@ impl UiLoop {
         Self {
             state,
             mode: options.mode,
-            log_view: LogView::new(options.log_buffer_size),
+            logs: LogView::new(options.log_buffer_size),
+            prompt: CommandPrompt::default(),
             log_rx,
             ctrl_tx,
             rec_rx,
@@ -141,7 +143,7 @@ impl UiLoop {
                             modifiers: KeyModifiers::ALT,
                             ..
                         }) => {
-                            self.log_view.scroll_up(1);
+                            self.logs.scroll_up(1);
                             None
                         }
                         Event::Key(KeyEvent {
@@ -149,52 +151,50 @@ impl UiLoop {
                             modifiers: KeyModifiers::ALT,
                             ..
                         }) => {
-                            self.log_view.scroll_down(1);
+                            self.logs.scroll_down(1);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::Up, ..
                         }) => {
-                            self.log_view.scroll_up(5);
+                            self.logs.scroll_up(5);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::Down,
                             ..
                         }) => {
-                            self.log_view.scroll_down(5);
+                            self.logs.scroll_down(5);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::PageUp,
                             ..
                         }) => {
-                            self.log_view.scroll_up(20);
+                            self.logs.scroll_up(20);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::PageDown,
                             ..
                         }) => {
-                            self.log_view.scroll_down(20);
+                            self.logs.scroll_down(20);
                             None
                         }
                         Event::Key(KeyEvent {
                             code: KeyCode::Esc, ..
                         }) => {
-                            self.log_view.reset_scroll();
+                            self.logs.reset_scroll();
                             None
                         }
-                        Event::Key(key) => {
-                            self.state.write().await.shell.on_key(key)
-                        }
+                        Event::Key(key) => self.prompt.on_key(key),
                         Event::Mouse(me) => match me.kind {
                             MouseEventKind::ScrollUp => {
-                                self.log_view.scroll_up(5);
+                                self.logs.scroll_up(5);
                                 None
                             }
                             MouseEventKind::ScrollDown => {
-                                self.log_view.scroll_down(5);
+                                self.logs.scroll_down(5);
                                 None
                             }
                             _ => None,
@@ -380,7 +380,7 @@ impl UiLoop {
                             },
                         },
                         Command::CLEAR => {
-                            self.log_view.clear();
+                            self.logs.clear();
                         }
                         Command::Scheduler(SchedulerCommand::Quit { force, no_exit }) => match exec_snapshot.last_control_event {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
@@ -513,7 +513,7 @@ impl UiLoop {
                     let width = terminal.size()?.width;
                     loop {
                         match self.log_rx.try_recv() {
-                            Ok(record) => self.log_view.push(record, width),
+                            Ok(record) => self.logs.push(record, width),
                             // Skip fallen-behind logs
                             Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
                             // Drained all logs
@@ -734,15 +734,14 @@ impl UiLoop {
                 logs_head,
             );
 
-            let logs_widget = self.log_view.to_text(logs_area.width, logs_area.height);
+            let logs_widget = self.logs.to_text(logs_area.width, logs_area.height);
             frame.render_widget(logs_widget, logs_area);
 
-            let separator_widget = separator(self.log_view.unread());
+            let separator_widget = separator(self.logs.unread());
             frame.render_widget(separator_widget, logs_foot);
 
-            draw_snapshot
-                .shell
-                .render(frame, input_area, draw_snapshot.overall_state().color());
+            let input_widget = self.prompt.to_line(draw_snapshot.overall_state().color());
+            frame.render_widget(input_widget, input_area);
         })?;
         // Update the cursor position if it was clipped
         if progress_cursor != draw_snapshot.progress_cursor {

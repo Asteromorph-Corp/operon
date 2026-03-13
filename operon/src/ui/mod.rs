@@ -19,11 +19,11 @@ pub use log_buffer::*;
 mod log_view;
 pub use log_view::*;
 
-mod shell_prompt;
-pub use shell_prompt::*;
-
 mod command;
 pub use command::*;
+
+mod command_prompt;
+pub use command_prompt::*;
 
 mod error;
 pub use error::*;

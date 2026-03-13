@@ -4,7 +4,7 @@ use crate::operon::RunningState;
 use crate::scheduler::{ControlEvent, JobHandler};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{ShellPrompt, UiError, UiStateUpdate};
+use crate::ui::{UiError, UiStateUpdate};
 
 pub type Progress = (i64, i64, i64, RunningState, bool);
 
@@ -15,7 +15,6 @@ pub struct UiState {
     pub(super) progress: IndexMap<String, Progress>,
     /// Cursor to first progress bar rendered.
     pub(super) progress_cursor: u16,
-    pub(super) shell: ShellPrompt,
     pub(super) exit_on_finish: bool,
     /// Last sent control event.
     pub(super) last_control_event: ControlEvent,
