@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers, MouseEventKind};
+use crossterm::event::{Event, EventStream, KeyCode, KeyModifiers, MouseEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
@@ -125,84 +125,7 @@ impl UiLoop {
                         // Stream closed, exit the UI.
                         break;
                     };
-                    let command = match evt? {
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Left,
-                            ..
-                        }) => {
-                            self.progress_cursor = self.progress_cursor.saturating_sub(1);
-                            None
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Right,
-                            ..
-                        }) => {
-                            self.progress_cursor = self.progress_cursor.saturating_add(1);
-                            None
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Up,
-                            modifiers: KeyModifiers::ALT,
-                            ..
-                        }) => {
-                            self.logs.scroll_up(1);
-                            None
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Down,
-                            modifiers: KeyModifiers::ALT,
-                            ..
-                        }) => {
-                            self.logs.scroll_down(1);
-                            None
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Up, ..
-                        }) => {
-                            self.logs.scroll_up(5);
-                            None
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Down,
-                            ..
-                        }) => {
-                            self.logs.scroll_down(5);
-                            None
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::PageUp,
-                            ..
-                        }) => {
-                            self.logs.scroll_up(20);
-                            None
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::PageDown,
-                            ..
-                        }) => {
-                            self.logs.scroll_down(20);
-                            None
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Esc, ..
-                        }) => {
-                            self.logs.reset_scroll();
-                            None
-                        }
-                        Event::Key(key) => self.prompt.on_key(key),
-                        Event::Mouse(me) => match me.kind {
-                            MouseEventKind::ScrollUp => {
-                                self.logs.scroll_up(5);
-                                None
-                            }
-                            MouseEventKind::ScrollDown => {
-                                self.logs.scroll_down(5);
-                                None
-                            }
-                            _ => None,
-                        },
-                        _ => None,
-                    };
+                    let command = self.handle_event(evt?);
 
                     // Fetch the recovery state.
                     let rec_state = *self.rec_rx.borrow();
@@ -580,6 +503,33 @@ impl UiLoop {
         }
 
         Ok(())
+    }
+
+    fn handle_event(&mut self, event: Event) -> Option<Command> {
+        match event {
+            Event::Key(ke) if ke.code == KeyCode::Left => {
+                self.progress_cursor = self.progress_cursor.saturating_sub(1)
+            }
+            Event::Key(ke) if ke.code == KeyCode::Right => {
+                self.progress_cursor = self.progress_cursor.saturating_add(1);
+            }
+            Event::Key(ke) if ke.modifiers == KeyModifiers::ALT && ke.code == KeyCode::Up => {
+                self.logs.scroll_up(1)
+            }
+            Event::Key(ke) if ke.modifiers == KeyModifiers::ALT && ke.code == KeyCode::Down => {
+                self.logs.scroll_down(1);
+            }
+            Event::Key(ke) if ke.code == KeyCode::Up => self.logs.scroll_up(5),
+            Event::Key(ke) if ke.code == KeyCode::Down => self.logs.scroll_down(5),
+            Event::Key(ke) if ke.code == KeyCode::PageUp => self.logs.scroll_up(20),
+            Event::Key(ke) if ke.code == KeyCode::PageDown => self.logs.scroll_down(20),
+            Event::Key(ke) if ke.code == KeyCode::Esc => self.logs.reset_scroll(),
+            Event::Key(key) => return self.prompt.on_key(key),
+            Event::Mouse(me) if me.kind == MouseEventKind::ScrollUp => self.logs.scroll_up(5),
+            Event::Mouse(me) if me.kind == MouseEventKind::ScrollDown => self.logs.scroll_down(5),
+            _ => {}
+        };
+        None
     }
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
