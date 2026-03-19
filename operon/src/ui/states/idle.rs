@@ -32,7 +32,7 @@ impl UiState for IdleState {
         match command {
             Command::Run { fresh, rebuild } => {
                 self.ctrl_tx.send(ControlEvent::Run { fresh, rebuild })?;
-                return Ok(NextState::Next(RunningState::boxed()));
+                return Ok(NextState::Next(RunningState::boxed(self.ctrl_tx)));
             }
             Command::Check { .. } if self.checked => log::warn!("Already run a check."),
             Command::Check { mode } => {

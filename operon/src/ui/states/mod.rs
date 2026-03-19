@@ -1,6 +1,7 @@
 use crate::ui::{Command, ProgressMap, UiError};
 
 mod idle;
+mod quitting;
 mod running;
 
 pub use idle::IdleState;

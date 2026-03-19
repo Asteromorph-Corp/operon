@@ -245,6 +245,7 @@ impl UiLoop {
                                     log::warn!("Please wait until the check is finished.");
                                 }
                             },
+                            // DONE: Handle `Command::Run` from `RunningState`.
                             // TODO: Reject `Command::Run` in other UI states.
                             _ => {
                                 log::warn!(
@@ -272,6 +273,7 @@ impl UiLoop {
                                     );
                                 }
                             },
+                            // DONE: Handle `Command::Check` from `RunningState`.
                             // TODO: Reject `Command::Check` in other UI states.
                             _ => {
                                 log::warn!("Cannot check after the run has already started.");
@@ -284,7 +286,7 @@ impl UiLoop {
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
                                 break;
                             }
-                            // TODO: Handle `Command::Exit` in other UI states.
+                            // TODO: Handle `Command::Exit` in the `QuittingState`.
                             ControlEvent::Abort | ControlEvent::GracefulStop
                                 if exec_snapshot.any_alive() =>
                             {
@@ -292,7 +294,7 @@ impl UiLoop {
                                     "Please wait until the current jobs are stopped before exiting."
                                 );
                             }
-                            // TODO: Handle `Command::Exit` in other UI states.
+                            // DONE: Handle `Command::Exit` in `RunningState`.
                             _ => match overall_state_snapshot {
                                 ExecutionState::Finished
                                 | ExecutionState::Stopped
@@ -324,11 +326,11 @@ impl UiLoop {
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
                                 break;
                             }
-                            // TODO: Handle `Command::Quit` in other UI states.
+                            // TODO: Handle `Command::Exit` in the `QuittingState`.
                             ControlEvent::Abort if exec_snapshot.any_alive() => {
                                 log::warn!("Already processing an abort.");
                             }
-                            // TODO: Handle `Command::Quit` in other UI states.
+                            // TODO: Handle `Command::Exit` in the `QuittingState`.
                             ControlEvent::GracefulStop if exec_snapshot.any_alive() => {
                                 if !force {
                                     log::warn!("Already processing a graceful stop.");
@@ -339,7 +341,7 @@ impl UiLoop {
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
                                 self.state.write().await.update_ui_state(ControlEvent::Abort)?;
                             }
-                            // TODO: Handle `Command::Quit` in other UI states.
+                            // DONE: Handle `Command::Quit` in `RunningState`.
                             _ => match overall_state_snapshot {
                                 ExecutionState::Finished | ExecutionState::Stopped => {
                                     if !exec_snapshot.any_alive() {
@@ -392,13 +394,13 @@ impl UiLoop {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 log::warn!("Cannot pause before the run has started.");
                             }
-                            // TODO: Handle `Command::Pause` in other UI states.
+                            // TODO: Handle `Command::Pause` in the `QuittingState`.
                             ControlEvent::Abort | ControlEvent::GracefulStop
                                 if exec_snapshot.any_alive() =>
                             {
                                 log::warn!("Cannot pause while stopping.");
                             }
-                            // TODO: Handle `Command::Pause` in other UI states.
+                            // DONE: Handle `Command::Pause` in `RunningState`.
                             _ => {
                                 if !exec_snapshot
                                     .state_iter()
@@ -418,13 +420,13 @@ impl UiLoop {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 log::warn!("Cannot resume before the run has started.");
                             }
-                            // TODO: Handle `Command::Resume` in other UI states.
+                            // TODO: Handle `Command::Resume` in the `QuittingState`.
                             ControlEvent::Abort | ControlEvent::GracefulStop
                                 if exec_snapshot.any_alive() =>
                             {
                                 log::warn!("Cannot resume while stopping.");
                             }
-                            // TODO: Handle `Command::Resume` in other UI states.
+                            // DONE: Handle `Command::Resume` in `RunningState`.
                             _ => {
                                 if !exec_snapshot
                                     .state_iter()
