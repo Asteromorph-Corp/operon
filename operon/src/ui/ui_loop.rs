@@ -145,6 +145,8 @@ impl UiLoop {
                     // Execute the command if any.
                     match command {
                         Command::Run { fresh, rebuild }  => match exec_snapshot.last_control_event {
+                            // DONE: Handle `Command::Run` in `IdleState`.
+                            // TODO: Handle `ControlEvent::Run` in scheduler.
                             ControlEvent::Start => match rec_state {
                                 RecoveryState::Unknown => log::warn!("Scheduler was not initialized yet."),
                                 RecoveryState::Fresh | RecoveryState::Finished => {
@@ -191,6 +193,8 @@ impl UiLoop {
                                 }
                                 _ => unreachable!(),
                             },
+                            // DONE: Handle `Command::Run` from `IdleState`.
+                            // TODO: Handle `ControlEvent::Run` in scheduler.
                             ControlEvent::Check { .. } => match rec_state {
                                 RecoveryState::MissingData => {
                                     if rebuild {
@@ -241,6 +245,7 @@ impl UiLoop {
                                     log::warn!("Please wait until the check is finished.");
                                 }
                             },
+                            // TODO: Reject `Command::Run` in other UI states.
                             _ => {
                                 log::warn!(
                                     "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
@@ -248,9 +253,12 @@ impl UiLoop {
                             }
                         },
                         Command::Check { mode } => match exec_snapshot.last_control_event {
+                            // DONE: Reject `Command::Check` in `IdleState` if already checked.
                             ControlEvent::Check { .. } => {
                                 log::warn!("Already run a check.");
                             }
+                            // DONE: Handle `Command::Check` in `IdleState`.
+                            // TODO: Reject `ControlEvent::Check` in scheduler if not appropriate.
                             ControlEvent::Start => match rec_state {
                                 RecoveryState::AbortedUnchecked
                                 | RecoveryState::GracefullyStopped | RecoveryState::Finished => {
@@ -264,16 +272,19 @@ impl UiLoop {
                                     );
                                 }
                             },
+                            // TODO: Reject `Command::Check` in other UI states.
                             _ => {
                                 log::warn!("Cannot check after the run has already started.");
                             }
                         },
                         Command::Exit => match exec_snapshot.last_control_event {
+                            // DONE: Handle `Command::Exit` in `IdleState`.
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 // We didn't start any jobs, so we can exit immediately.
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
                                 break;
                             }
+                            // TODO: Handle `Command::Exit` in other UI states.
                             ControlEvent::Abort | ControlEvent::GracefulStop
                                 if exec_snapshot.any_alive() =>
                             {
@@ -281,6 +292,7 @@ impl UiLoop {
                                     "Please wait until the current jobs are stopped before exiting."
                                 );
                             }
+                            // TODO: Handle `Command::Exit` in other UI states.
                             _ => match overall_state_snapshot {
                                 RunningState::Finished
                                 | RunningState::Stopped
@@ -303,6 +315,7 @@ impl UiLoop {
                             },
                         },
                         Command::Quit { force, no_exit } => match exec_snapshot.last_control_event {
+                            // DONE: Handle `Command::Quit` in `IdleState`.
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 if no_exit {
                                     log::warn!("Cannot quit before the run has started.");
@@ -311,9 +324,11 @@ impl UiLoop {
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
                                 break;
                             }
+                            // TODO: Handle `Command::Quit` in other UI states.
                             ControlEvent::Abort if exec_snapshot.any_alive() => {
                                 log::warn!("Already processing an abort.");
                             }
+                            // TODO: Handle `Command::Quit` in other UI states.
                             ControlEvent::GracefulStop if exec_snapshot.any_alive() => {
                                 if !force {
                                     log::warn!("Already processing a graceful stop.");
@@ -324,6 +339,7 @@ impl UiLoop {
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
                                 self.state.write().await.update_ui_state(ControlEvent::Abort)?;
                             }
+                            // TODO: Handle `Command::Quit` in other UI states.
                             _ => match overall_state_snapshot {
                                 RunningState::Finished | RunningState::Stopped => {
                                     if !exec_snapshot.any_alive() {
@@ -372,14 +388,17 @@ impl UiLoop {
                             },
                         },
                         Command::Pause { targets, cascade } => match exec_snapshot.last_control_event {
+                            // DONE: Handle `Command::Pause` in `IdleState`.
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 log::warn!("Cannot pause before the run has started.");
                             }
+                            // TODO: Handle `Command::Pause` in other UI states.
                             ControlEvent::Abort | ControlEvent::GracefulStop
                                 if exec_snapshot.any_alive() =>
                             {
                                 log::warn!("Cannot pause while stopping.");
                             }
+                            // TODO: Handle `Command::Pause` in other UI states.
                             _ => {
                                 if !exec_snapshot
                                     .state_iter()
@@ -395,14 +414,17 @@ impl UiLoop {
                             }
                         }
                         Command::Resume { targets } => match exec_snapshot.last_control_event {
+                            // DONE: Handle `Command::Resume` in `IdleState`.
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 log::warn!("Cannot resume before the run has started.");
                             }
+                            // TODO: Handle `Command::Resume` in other UI states.
                             ControlEvent::Abort | ControlEvent::GracefulStop
                                 if exec_snapshot.any_alive() =>
                             {
                                 log::warn!("Cannot resume while stopping.");
                             }
+                            // TODO: Handle `Command::Resume` in other UI states.
                             _ => {
                                 if !exec_snapshot
                                     .state_iter()

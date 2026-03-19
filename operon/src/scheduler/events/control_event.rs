@@ -12,6 +12,9 @@ pub enum ControlEvent {
     Start,
     /// Perform a check on the consistency between the storages.
     Check { mode: crate::ui::CheckMode },
+    /// Perform a run.
+    Run { fresh: bool, rebuild: bool },
+    // TODO: Remove `CleanRun`, `RebuildRun`, `RestoreRun`
     /// Perform a clean run.
     CleanRun,
     /// Perform a rebuilding run from an `AbortedChecked` state.

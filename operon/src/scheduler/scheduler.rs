@@ -170,6 +170,7 @@ where
                         ),
                     }
                 }
+                // TODO: Remove `CleanRun`, `RebuildRun`, `RestoreRun` and handle `Run`.
                 ControlEvent::CleanRun => return self.run(run_id, RunMode::Clean).await,
                 ControlEvent::RebuildRun => return self.run(run_id, RunMode::Rebuild).await,
                 ControlEvent::RestoreRun => return self.run(run_id, RunMode::Restore).await,

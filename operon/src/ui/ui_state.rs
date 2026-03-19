@@ -6,13 +6,15 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiError, UiStateUpdate};
 
+pub type ProgressMap = IndexMap<String, Progress>;
 pub type Progress = (i64, i64, i64, RunningState, bool);
 
+// TODO: remove this
 /// Minimal state that holds the information needed to render the UI.
 #[derive(Default, Debug, Clone)]
 pub struct UiState {
     // Done, queued, waiting, state, returned.
-    pub(super) progress: IndexMap<String, Progress>,
+    pub(super) progress: ProgressMap,
     /// Last sent control event.
     pub(super) last_control_event: ControlEvent,
 }
