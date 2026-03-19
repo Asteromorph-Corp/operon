@@ -246,7 +246,7 @@ impl UiLoop {
                                 }
                             },
                             // DONE: Handle `Command::Run` from `RunningState`.
-                            // TODO: Reject `Command::Run` in other UI states.
+                            // DONE: Handle `Command::Run` in `QuittingState`.
                             _ => {
                                 log::warn!(
                                     "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
@@ -274,7 +274,7 @@ impl UiLoop {
                                 }
                             },
                             // DONE: Handle `Command::Check` from `RunningState`.
-                            // TODO: Reject `Command::Check` in other UI states.
+                            // TODO: Handle `Command::Check` in `QuittingState`.
                             _ => {
                                 log::warn!("Cannot check after the run has already started.");
                             }
@@ -326,11 +326,11 @@ impl UiLoop {
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
                                 break;
                             }
-                            // TODO: Handle `Command::Exit` in the `QuittingState`.
+                            // DONE: Handle `Command::Quit` in `QuittingState`.
                             ControlEvent::Abort if exec_snapshot.any_alive() => {
                                 log::warn!("Already processing an abort.");
                             }
-                            // TODO: Handle `Command::Exit` in the `QuittingState`.
+                            // DONE: Handle `Command::Exit` in the `QuittingState`.
                             ControlEvent::GracefulStop if exec_snapshot.any_alive() => {
                                 if !force {
                                     log::warn!("Already processing a graceful stop.");
@@ -394,7 +394,7 @@ impl UiLoop {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 log::warn!("Cannot pause before the run has started.");
                             }
-                            // TODO: Handle `Command::Pause` in the `QuittingState`.
+                            // Done: Handle `Command::Pause` in the `QuittingState`.
                             ControlEvent::Abort | ControlEvent::GracefulStop
                                 if exec_snapshot.any_alive() =>
                             {

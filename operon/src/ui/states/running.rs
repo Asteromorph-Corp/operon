@@ -68,7 +68,11 @@ impl UiState for RunningState {
                     ControlEvent::GracefulStop
                 };
                 self.ctrl_tx.send(event)?;
-                return Ok(NextState::Next(QuittingState::boxed(force, exit)));
+                return Ok(NextState::Next(QuittingState::boxed(
+                    force,
+                    exit,
+                    self.ctrl_tx,
+                )));
             }
             Command::Pause { .. } if !self.exec_states.any_running() => {
                 log::warn!("No running jobs to pause, did you mean to `exit` or `quit` instead?")
