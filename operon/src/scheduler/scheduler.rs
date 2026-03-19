@@ -6,10 +6,9 @@ use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
-use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
-    SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender,
+    ControlEvent, ControlEventReceiver, ExecutionState, RecoveryState, RecoveryStateSender,
+    RunMode, SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender,
 };
 use crate::schema::{RunFootprint, RunMetadata, RunState};
 use crate::service::OperonService;
@@ -254,11 +253,14 @@ where
         // On `1`, we set the footprint to "F@{now}".
         // On `2`, we set the footprint to "S@{now}".
         // On `3`, we don't set the footprint.
-        let state = if returned_states.iter().all(|&s| s == RunningState::Finished) {
+        let state = if returned_states
+            .iter()
+            .all(|&s| s == ExecutionState::Finished)
+        {
             RunState::Completed
         } else if returned_states
             .iter()
-            .all(|&s| s == RunningState::Stopped || s == RunningState::Finished)
+            .all(|&s| s == ExecutionState::Stopped || s == ExecutionState::Finished)
             && self.ctrl_rx.borrow().clone() == ControlEvent::GracefulStop
         {
             RunState::Paused
@@ -287,7 +289,7 @@ where
         &self,
         footprint: &RunFootprint,
         execution_id: Uuid,
-    ) -> Result<JoinSet<RunningState>, SchedulerError> {
+    ) -> Result<JoinSet<ExecutionState>, SchedulerError> {
         let run_id = footprint.metadata.run_id;
 
         // Wipe the data storage clean.
@@ -324,7 +326,7 @@ where
         &self,
         footprint: &RunFootprint,
         execution_id: Uuid,
-    ) -> Result<JoinSet<RunningState>, SchedulerError> {
+    ) -> Result<JoinSet<ExecutionState>, SchedulerError> {
         self.storage.put_footprint(footprint).await?;
 
         let rebuild_start = Instant::now();
@@ -388,7 +390,7 @@ where
         &self,
         footprint: &RunFootprint,
         execution_id: Uuid,
-    ) -> Result<JoinSet<RunningState>, SchedulerError> {
+    ) -> Result<JoinSet<ExecutionState>, SchedulerError> {
         // * The persistent storage is fully trusted.
         // * Just pull the queued tickets, and have the individual schedulers' initial
         //   `ready_to_run` set to them.

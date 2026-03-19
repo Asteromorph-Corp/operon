@@ -4,9 +4,8 @@ use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
 use crate::meta_storage::MetaStorage;
-use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEventReceiver, JobHandler, PeerEventSenderMap, ServicePeerEventReceiver,
+    ControlEventReceiver, ExecutionState, JobHandler, PeerEventSenderMap, ServicePeerEventReceiver,
     ServicePeerEventSenderMap,
 };
 use crate::service::OperonService;
@@ -77,7 +76,7 @@ where
         ui_state: &Arc<RwLock<UiState>>,
         ctrl_rx: &ControlEventReceiver,
         clean: bool,
-    ) -> JoinSet<RunningState> {
+    ) -> JoinSet<ExecutionState> {
         JoinSet::from_iter(self.handlers_with_rx.into_iter().map(
             |HandlerWithRx { handler, peer_rx }| {
                 handler.run_scheduler(

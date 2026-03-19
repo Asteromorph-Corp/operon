@@ -5,10 +5,9 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
-use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, SchedulerError,
-    ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
+    ControlEventReceiver, ExecutionState, IndividualScheduler, JobRebuilder, JobSpec,
+    SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
 };
 use crate::schema::{Job, Ticket};
 use crate::service::OperonService;
@@ -88,7 +87,7 @@ where
         peer_rx: ServicePeerEventReceiver<Svc>,
         ctrl_rx: ControlEventReceiver,
         clean: bool,
-    ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>>; // call `start` with empty Vector (`Scheduler::run` 6023)
+    ) -> Pin<Box<dyn Future<Output = ExecutionState> + Send + 'static>>; // call `start` with empty Vector (`Scheduler::run` 6023)
 }
 
 #[async_trait]
@@ -169,7 +168,7 @@ where
         peer_rx: ServicePeerEventReceiver<Svc>,
         ctrl_rx: ControlEventReceiver,
         clean: bool,
-    ) -> Pin<Box<dyn Future<Output = RunningState> + Send + 'static>> {
+    ) -> Pin<Box<dyn Future<Output = ExecutionState> + Send + 'static>> {
         let individual_scheduler = IndividualScheduler::new(
             self.clone(),
             service,

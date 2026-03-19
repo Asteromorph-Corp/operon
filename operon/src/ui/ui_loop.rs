@@ -10,9 +10,9 @@ use ratatui::prelude::*;
 use ratatui::widgets::*;
 use tokio::sync::RwLock;
 
-use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver,
+    ControlEvent, ControlEventSender, ExecutionState, RecoveryState, RecoveryStateReceiver,
+    SchedulerStateReceiver,
 };
 use crate::ui::{
     Command, CommandPrompt, LogRecordReceiver, LogView, Progress, UiError, UiMode, UiOptions,
@@ -294,9 +294,9 @@ impl UiLoop {
                             }
                             // TODO: Handle `Command::Exit` in other UI states.
                             _ => match overall_state_snapshot {
-                                RunningState::Finished
-                                | RunningState::Stopped
-                                | RunningState::Error => {
+                                ExecutionState::Finished
+                                | ExecutionState::Stopped
+                                | ExecutionState::Error => {
                                     // `quit` first, then exit.
                                     if exec_snapshot.any_alive() {
                                         self.ctrl_tx.send(ControlEvent::Abort)?;
@@ -306,7 +306,7 @@ impl UiLoop {
                                         break;
                                     }
                                 }
-                                RunningState::Running | RunningState::Paused => {
+                                ExecutionState::Running | ExecutionState::Paused => {
                                     log::warn!(
                                         "Cannot exit while jobs are running or paused. \
                                         Use `quit` for a graceful stop, or `quit --force` to abort all jobs."
@@ -341,7 +341,7 @@ impl UiLoop {
                             }
                             // TODO: Handle `Command::Quit` in other UI states.
                             _ => match overall_state_snapshot {
-                                RunningState::Finished | RunningState::Stopped => {
+                                ExecutionState::Finished | ExecutionState::Stopped => {
                                     if !exec_snapshot.any_alive() {
                                         if !no_exit { break; }
                                         log::warn!("Nothing to quit.");
@@ -352,7 +352,7 @@ impl UiLoop {
                                     self.state.write().await.update_ui_state(ControlEvent::Abort)?;
                                     self.exit_on_finish = !no_exit;
                                 }
-                                RunningState::Error => {
+                                ExecutionState::Error => {
                                     if !exec_snapshot.any_alive() {
                                         if !no_exit { break; }
                                         log::warn!("Nothing to quit.");
@@ -371,7 +371,7 @@ impl UiLoop {
                                     // because the user should be able to inspect the logs.
                                     self.exit_on_finish = false;
                                 }
-                                RunningState::Paused | RunningState::Running => {
+                                ExecutionState::Paused | ExecutionState::Running => {
                                     if force {
                                         // Send an `Abort` event to all schedulers
                                         log::info!("Sent abort request, stopping immediately...");
@@ -402,7 +402,7 @@ impl UiLoop {
                             _ => {
                                 if !exec_snapshot
                                     .state_iter()
-                                    .any(|s| s == RunningState::Running)
+                                    .any(|s| s == ExecutionState::Running)
                                 {
                                     log::warn!(
                                         "No running jobs to pause, did you mean to `exit` or `quit` instead?"
@@ -428,7 +428,7 @@ impl UiLoop {
                             _ => {
                                 if !exec_snapshot
                                     .state_iter()
-                                    .any(|s| s == RunningState::Paused)
+                                    .any(|s| s == ExecutionState::Paused)
                                 {
                                     log::warn!("No paused jobs to resume.");
                                     continue;
@@ -507,7 +507,7 @@ impl UiLoop {
                 }
             }
             // If a new error state is detected, abort the execution.
-            if state == RunningState::Error && last_control_event != ControlEvent::Abort {
+            if state == ExecutionState::Error && last_control_event != ControlEvent::Abort {
                 log::error!("Aborting execution due to previous error.");
                 self.ctrl_tx.send(ControlEvent::Abort)?;
                 self.state

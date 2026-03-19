@@ -5,10 +5,10 @@ use tokio::sync::{RwLock, Semaphore};
 use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
-use crate::operon::RunningState;
 use crate::scheduler::{
-    ControlEvent, ControlEventReceiver, InternalEvent, JobSpec, PeerEvent, PeerEventSenders,
-    SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
+    ControlEvent, ControlEventReceiver, ExecutionState, InternalEvent, JobSpec, PeerEvent,
+    PeerEventSenders, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
+    SpecWithMetadata,
 };
 use crate::schema::{Job, JobMetadata, Ticket, TicketStatus};
 use crate::service::OperonService;
@@ -77,12 +77,12 @@ where
         &self,
         client: MetaClient<'_>,
         returning: bool,
-        state: &mut RunningState,
+        state: &mut ExecutionState,
     ) -> Result<(), SchedulerError> {
         let (done, queued, waiting) = client.ticket(self.meta).get_status().await?;
-        if queued + waiting == 0 && *state != RunningState::Finished {
+        if queued + waiting == 0 && *state != ExecutionState::Finished {
             log::info!("All `{}` jobs are finished.", self.meta.id);
-            *state = RunningState::Finished
+            *state = ExecutionState::Finished
         }
         self.ui_state
             .write()
@@ -98,7 +98,7 @@ where
     async fn update_state_without_client(
         &self,
         returning: bool,
-        state: &mut RunningState,
+        state: &mut ExecutionState,
     ) -> Result<(), SchedulerError> {
         let conn = self.meta_storage.ui_conn().await?;
         self.update_state(conn.as_client(), returning, state)
@@ -120,7 +120,7 @@ where
     async fn on_event_ready_tickets(
         &mut self,
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
-        state: &mut RunningState,
+        state: &mut ExecutionState,
         peer_txs: &JS::PeerEventSenders,
     ) -> Result<Vec<Ticket<N>>, SchedulerError> {
         let mut conn = self.meta_storage.conn_static().await?;
@@ -166,19 +166,19 @@ where
         peer_rx: ServicePeerEventReceiver<Svc>,
         ctrl_rx: ControlEventReceiver,
         clean: bool,
-    ) -> RunningState {
+    ) -> ExecutionState {
         // Create an internal channel for `InternalEvent`s.
         let peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
 
-        let mut state = RunningState::Running;
+        let mut state = ExecutionState::Running;
 
         let Ok(initial_tickets) = self.initial_ready_tickets().await else {
-            return RunningState::Error;
+            return ExecutionState::Error;
         };
 
         // Check if the initial data is valid, it can only be done if the job is not clean.
         if !clean && !self.check_initial_data(&initial_tickets) {
-            return RunningState::Error;
+            return ExecutionState::Error;
         }
 
         // Update the UI state before entering the loop.
@@ -192,10 +192,10 @@ where
                 self.meta.id
             );
             // state = RunningState::Error;
-            return RunningState::Error;
+            return ExecutionState::Error;
         }
         // Early return if the scheduler is already finished (e.g. the last run completed this job).
-        if state == RunningState::Finished {
+        if state == ExecutionState::Finished {
             log::debug!(
                 "Scheduler for `{}` exited due to being finished from the start.",
                 self.meta.id
@@ -204,7 +204,7 @@ where
                 .await
                 .unwrap_or_else(|e| {
                     log::error!("Failed to update UI state after scheduler run: {e}");
-                    state = RunningState::Error
+                    state = ExecutionState::Error
                 });
             return state;
         }
@@ -213,10 +213,10 @@ where
             .await;
 
         match (&res, state) {
-            (Ok(()), RunningState::Finished) => {
+            (Ok(()), ExecutionState::Finished) => {
                 log::debug!("Scheduler for `{}` exited normally.", self.meta.id)
             }
-            (Ok(()), RunningState::Stopped) => {
+            (Ok(()), ExecutionState::Stopped) => {
                 log::debug!("Scheduler for `{}` was stopped and exited.", self.meta.id)
             }
             (Ok(()), _) => {
@@ -224,11 +224,11 @@ where
                     "Scheduler for `{}` exited with an unexpected state: {state:?}",
                     self.meta.id,
                 );
-                state = RunningState::Error;
+                state = ExecutionState::Error;
             }
             (Err(e), _) => {
                 log::error!("Scheduler for `{}` exited with an error: {e}", self.meta.id);
-                state = RunningState::Error;
+                state = ExecutionState::Error;
             }
         }
 
@@ -237,7 +237,7 @@ where
             .await
             .unwrap_or_else(|e| {
                 log::error!("Failed to update UI state after scheduler run: {e}");
-                state = RunningState::Error;
+                state = ExecutionState::Error;
             });
         state
     }
@@ -248,7 +248,7 @@ where
         peer_txs: &JS::PeerEventSenders,
         mut peer_rx: ServicePeerEventReceiver<Svc>,
         mut ctrl_rx: ControlEventReceiver,
-        state: &mut RunningState,
+        state: &mut ExecutionState,
     ) -> Result<(), SchedulerError> {
         let pool = self.pool.clone();
 
@@ -277,8 +277,8 @@ where
                     // If this is a finished scheduler rolling out peer events,
                     // don't change the state to `Stopped`,
                     // since it is already `Finished`.
-                    if matches!(state, RunningState::Running | RunningState::Paused) {
-                        *state = RunningState::Stopped;
+                    if matches!(state, ExecutionState::Running | ExecutionState::Paused) {
+                        *state = ExecutionState::Stopped;
                     }
                     return Ok(());
                 }
@@ -308,7 +308,7 @@ where
                             // If all the tickets are finished
                             // AND the scheduler's internal events are drained,
                             // exit the loop.
-                            if *state == RunningState::Finished && self.handles.is_empty() {
+                            if *state == ExecutionState::Finished && self.handles.is_empty() {
                                 return Ok(());
                             }
                         }
@@ -402,7 +402,7 @@ where
         &mut self,
         targets: Vec<String>,
         cascade: bool,
-        state: &mut RunningState,
+        state: &mut ExecutionState,
     ) -> Result<(), SchedulerError> {
         if !(targets.is_empty()
             || targets.iter().any(|t| t == self.meta.id)
@@ -415,9 +415,9 @@ where
         }
 
         match state {
-            RunningState::Running => {
+            ExecutionState::Running => {
                 log::info!("Pausing `{}` jobs.", self.meta.id);
-                *state = RunningState::Paused;
+                *state = ExecutionState::Paused;
                 self.update_state_without_client(false, state).await?;
                 // Acquire and forget all permits.
                 let permit = self
@@ -428,8 +428,8 @@ where
                 permit.forget();
                 log::debug!("Remaining `{}` jobs were finished.", self.meta.id);
             }
-            RunningState::Paused => (),   // Silent no-op, already paused.
-            RunningState::Finished => (), // No jobs to pause, no-op.
+            ExecutionState::Paused => (), // Silent no-op, already paused.
+            ExecutionState::Finished => (), // No jobs to pause, no-op.
             // This scheduler is executing the leftover `send_on_finish` events,
             // which are not affected by the pause.
             _ => {
@@ -438,7 +438,7 @@ where
                     self.meta.id,
                     state
                 );
-                *state = RunningState::Error;
+                *state = ExecutionState::Error;
                 return Err(SchedulerError::Other(
                     "Scheduler entered event loop in an unexpected state".into(),
                 ));
@@ -450,29 +450,29 @@ where
     async fn handle_resume(
         &mut self,
         targets: Vec<String>,
-        state: &mut RunningState,
+        state: &mut ExecutionState,
     ) -> Result<(), SchedulerError> {
         if !(targets.is_empty() || targets.iter().any(|t| t == self.meta.id)) {
             return Ok(());
         }
 
         match state {
-            RunningState::Paused => {
+            ExecutionState::Paused => {
                 log::info!("Resuming `{}` jobs.", self.meta.id);
-                *state = RunningState::Running;
+                *state = ExecutionState::Running;
                 self.update_state_without_client(false, state).await?;
                 // Add back all permits.
                 self.pool.add_permits(self.pool_size);
             }
-            RunningState::Running => (), // Silent no-op, already running.
-            RunningState::Finished => (), // No jobs to resume, no-op.
+            ExecutionState::Running => (), // Silent no-op, already running.
+            ExecutionState::Finished => (), // No jobs to resume, no-op.
             _ => {
                 log::error!(
                     "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
                     self.meta.id,
                     state
                 );
-                *state = RunningState::Error;
+                *state = ExecutionState::Error;
                 return Err(SchedulerError::Other(
                     "Scheduler entered event loop in an unexpected state".into(),
                 ));
@@ -483,12 +483,12 @@ where
 
     async fn handle_graceful_stop(
         &mut self,
-        state: &mut RunningState,
+        state: &mut ExecutionState,
         got_all_updates: bool,
     ) -> Result<bool, SchedulerError> {
-        if *state == RunningState::Running {
+        if *state == ExecutionState::Running {
             log::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
-            *state = RunningState::Paused;
+            *state = ExecutionState::Paused;
             self.update_state_without_client(false, state).await?;
             // Acquire and forget all permits.
             let permit = self
@@ -500,13 +500,13 @@ where
             log::debug!("Remaining `{}` jobs were finished.", self.meta.id);
         }
         match state {
-            RunningState::Paused | RunningState::Finished => {
+            ExecutionState::Paused | ExecutionState::Finished => {
                 if self.handles.is_empty() && got_all_updates {
                     log::info!("Gracefully stopped `{}` jobs.", self.meta.id);
                     // If the state is `Paused`, set it to `Stopped`,
                     // If the state is `Finished`, keep it as `Finished`.
-                    if *state == RunningState::Paused {
-                        *state = RunningState::Stopped;
+                    if *state == ExecutionState::Paused {
+                        *state = ExecutionState::Stopped;
                     }
                     Ok(true)
                 } else {
@@ -519,7 +519,7 @@ where
                     self.meta.id,
                     state
                 );
-                *state = RunningState::Error;
+                *state = ExecutionState::Error;
                 Err(SchedulerError::Other(
                     "Scheduler entered event loop in an unexpected state".into(),
                 ))

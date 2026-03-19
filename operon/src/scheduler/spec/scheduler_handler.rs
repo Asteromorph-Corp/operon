@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use futures::{StreamExt, TryStreamExt};
 
 use crate::meta_storage::MetaClient;
-use crate::operon::RunningState;
 use crate::scheduler::{
-    HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent, SchedulerError,
+    ExecutionState, HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent,
+    SchedulerError,
 };
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -119,9 +119,9 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         for schedule in &self.job_handlers {
             let (done, queued, waiting) = schedule.get_status(client).await?;
             let state = if queued + waiting == 0 {
-                RunningState::Finished
+                ExecutionState::Finished
             } else {
-                RunningState::Running
+                ExecutionState::Running
             };
 
             ui_state.update_ui_state(UiStateUpdate::ProgressUpdate(

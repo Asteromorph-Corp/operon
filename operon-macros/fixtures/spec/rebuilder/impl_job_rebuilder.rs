@@ -53,9 +53,9 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
             let mut ui_state = ui_state.write().await;
             let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
             let state = if queued + waiting == 0 {
-                operon::operon::RunningState::Finished
+                operon::scheduler::ExecutionState::Finished
             } else {
-                operon::operon::RunningState::Running
+                operon::scheduler::ExecutionState::Running
             };
             ui_state.update_ui_state(operon::ui::UiStateUpdate::ProgressUpdate(
                 "beta".to_string(),

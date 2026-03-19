@@ -1,13 +1,12 @@
 use indexmap::IndexMap;
 
-use crate::operon::RunningState;
-use crate::scheduler::{ControlEvent, JobHandler};
+use crate::scheduler::{ControlEvent, ExecutionState, JobHandler};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiError, UiStateUpdate};
 
 pub type ProgressMap = IndexMap<String, Progress>;
-pub type Progress = (i64, i64, i64, RunningState, bool);
+pub type Progress = (i64, i64, i64, ExecutionState, bool);
 
 // TODO: remove this
 /// Minimal state that holds the information needed to render the UI.
@@ -28,7 +27,7 @@ impl UiState {
             .map(|job| {
                 (
                     job.job_id().to_string(),
-                    (0, 0, 0, RunningState::Running, false),
+                    (0, 0, 0, ExecutionState::Running, false),
                 )
             })
             .collect();
@@ -42,7 +41,7 @@ impl UiState {
         self.progress.values()
     }
 
-    pub fn state_iter(&self) -> impl Iterator<Item = RunningState> {
+    pub fn state_iter(&self) -> impl Iterator<Item = ExecutionState> {
         self.progress_iter().map(|s| s.3)
     }
 
@@ -50,23 +49,23 @@ impl UiState {
         self.progress_iter().any(|s| !s.4)
     }
 
-    pub fn overall_state(&self) -> RunningState {
-        if self.state_iter().any(|s| s == RunningState::Error) {
-            RunningState::Error
-        } else if self.state_iter().all(|s| s == RunningState::Finished) {
-            RunningState::Finished
+    pub fn overall_state(&self) -> ExecutionState {
+        if self.state_iter().any(|s| s == ExecutionState::Error) {
+            ExecutionState::Error
+        } else if self.state_iter().all(|s| s == ExecutionState::Finished) {
+            ExecutionState::Finished
         } else if self
             .state_iter()
-            .all(|s| s == RunningState::Paused || s == RunningState::Finished)
+            .all(|s| s == ExecutionState::Paused || s == ExecutionState::Finished)
         {
-            RunningState::Paused
+            ExecutionState::Paused
         } else if self
             .state_iter()
-            .all(|s| s == RunningState::Stopped || s == RunningState::Finished)
+            .all(|s| s == ExecutionState::Stopped || s == ExecutionState::Finished)
         {
-            RunningState::Stopped
+            ExecutionState::Stopped
         } else {
-            RunningState::Running
+            ExecutionState::Running
         }
     }
 
