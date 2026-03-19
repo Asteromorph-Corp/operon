@@ -15,8 +15,8 @@ use crate::scheduler::{
     ControlEvent, ControlEventSender, RecoveryState, RecoveryStateReceiver, SchedulerStateReceiver,
 };
 use crate::ui::{
-    Command, CommandPrompt, LogRecordReceiver, LogView, Progress, SchedulerCommand, UiError,
-    UiMode, UiOptions, UiState,
+    Command, CommandPrompt, LogRecordReceiver, LogView, Progress, UiError, UiMode, UiOptions,
+    UiState,
 };
 use crate::utils::SplitFirstOwned;
 
@@ -144,7 +144,7 @@ impl UiLoop {
 
                     // Execute the command if any.
                     match command {
-                        Command::Scheduler(SchedulerCommand::Run{ fresh, rebuild })  => match exec_snapshot.last_control_event {
+                        Command::Run { fresh, rebuild }  => match exec_snapshot.last_control_event {
                             ControlEvent::Start => match rec_state {
                                 RecoveryState::Unknown => log::warn!("Scheduler was not initialized yet."),
                                 RecoveryState::Fresh | RecoveryState::Finished => {
@@ -247,7 +247,7 @@ impl UiLoop {
                                 );
                             }
                         },
-                        Command::Scheduler(SchedulerCommand::Check { mode }) => match exec_snapshot.last_control_event {
+                        Command::Check { mode } => match exec_snapshot.last_control_event {
                             ControlEvent::Check { .. } => {
                                 log::warn!("Already run a check.");
                             }
@@ -268,7 +268,7 @@ impl UiLoop {
                                 log::warn!("Cannot check after the run has already started.");
                             }
                         },
-                        Command::EXIT => match exec_snapshot.last_control_event {
+                        Command::Exit => match exec_snapshot.last_control_event {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 // We didn't start any jobs, so we can exit immediately.
                                 self.ctrl_tx.send(ControlEvent::Abort)?;
@@ -302,10 +302,7 @@ impl UiLoop {
                                 }
                             },
                         },
-                        Command::CLEAR => {
-                            self.logs.clear();
-                        }
-                        Command::Scheduler(SchedulerCommand::Quit { force, no_exit }) => match exec_snapshot.last_control_event {
+                        Command::Quit { force, no_exit } => match exec_snapshot.last_control_event {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 if no_exit {
                                     log::warn!("Cannot quit before the run has started.");
@@ -374,7 +371,7 @@ impl UiLoop {
                                 }
                             },
                         },
-                        Command::Scheduler(SchedulerCommand::Pause { targets, cascade }) => match exec_snapshot.last_control_event {
+                        Command::Pause { targets, cascade } => match exec_snapshot.last_control_event {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 log::warn!("Cannot pause before the run has started.");
                             }
@@ -397,7 +394,7 @@ impl UiLoop {
                                 self.state.write().await.update_ui_state(ControlEvent::pause(targets, cascade))?;
                             }
                         }
-                        Command::Scheduler(SchedulerCommand::Resume { targets }) => match exec_snapshot.last_control_event {
+                        Command::Resume { targets } => match exec_snapshot.last_control_event {
                             ControlEvent::Start | ControlEvent::Check { .. } => {
                                 log::warn!("Cannot resume before the run has started.");
                             }
@@ -418,7 +415,8 @@ impl UiLoop {
                                 self.state.write().await.update_ui_state(ControlEvent::resume(targets.clone()))?;
                             }
                         },
-                        Command::HELP => log::info!("{HELP_TEXT}"),
+                        Command::Clear => self.logs.clear(),
+                        Command::Help => log::info!("{HELP_TEXT}"),
                         // _ => log::warn!("Command not yet implemented: {command:?}"),
                     }
                 }

@@ -14,10 +14,10 @@ impl CommandPrompt {
         match (key.modifiers, key.code) {
             (KeyModifiers::CONTROL, KeyCode::Char('c')) => self.input.clear(),
             (KeyModifiers::CONTROL, KeyCode::Char('d')) if self.input.is_empty() => {
-                return Some(Command::EXIT);
+                return Some(Command::Exit);
             }
             (KeyModifiers::CONTROL, KeyCode::Char('l')) if self.input.is_empty() => {
-                return Some(Command::CLEAR);
+                return Some(Command::Clear);
             }
             (_, KeyCode::Char(c)) => self.input.push(c),
             (_, KeyCode::Backspace) => {
