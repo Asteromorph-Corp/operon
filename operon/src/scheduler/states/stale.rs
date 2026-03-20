@@ -203,6 +203,7 @@ where
             ControlEvent::Quit { .. } => return Ok(NextState::Exit),
             ControlEvent::Exit => return Ok(NextState::Exit),
             // TODO: remove other events.
+            ControlEvent::Abort => return Ok(NextState::Exit),
             _ => {}
         }
         Ok(NextState::Next(self))

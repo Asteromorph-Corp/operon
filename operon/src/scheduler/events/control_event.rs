@@ -11,9 +11,14 @@ pub enum ControlEvent {
     #[default]
     Start,
     /// Perform a check on the consistency between the storages.
-    Check { mode: crate::ui::CheckMode },
+    Check {
+        mode: crate::ui::CheckMode,
+    },
     /// Perform a run.
-    Run { fresh: bool, rebuild: bool },
+    Run {
+        fresh: bool,
+        rebuild: bool,
+    },
     // TODO: Remove `CleanRun`, `RebuildRun`, `RestoreRun`
     /// Perform a clean run.
     CleanRun,
@@ -24,9 +29,19 @@ pub enum ControlEvent {
     /// Pause executing new jobs.
     /// Note that pausing the scheduler does not stop ongoing jobs,
     /// neither does it stop handling events (i.e. updating the ticket storage).
-    Pause { targets: Vec<String>, cascade: bool },
+    Pause {
+        targets: Vec<String>,
+        cascade: bool,
+    },
     /// Resume executing new jobs.
-    Resume { targets: Vec<String> },
+    Resume {
+        targets: Vec<String>,
+    },
+    Quit {
+        force: bool,
+    },
+    Exit,
+
     /// Gracefully stop the scheduler:
     /// * Stop executing new jobs (= pause),
     /// * wait for all ongoing jobs to finish,

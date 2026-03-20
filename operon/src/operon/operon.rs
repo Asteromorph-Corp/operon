@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::logger::Logger;
 use crate::operon::{OperonError, OperonOptions};
-use crate::scheduler::{ControlEvent, RecoveryState, Scheduler, ValidOperon};
+use crate::scheduler::{ControlEvent, Scheduler, ValidOperon};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiLoop, UiState};
@@ -60,7 +60,6 @@ where
 
         // Initialize the control event and recovery state channel
         let (ctrl_tx, ctrl_rx) = ::tokio::sync::watch::channel(ControlEvent::Start);
-        let (rec_tx, rec_rx) = ::tokio::sync::watch::channel(RecoveryState::Unknown);
 
         // Initialize the scheduler state channel
         let (sched_tx, sched_rx) = ::tokio::sync::watch::channel(false);
@@ -76,11 +75,10 @@ where
             handler,
             ui_state.clone(),
             ctrl_rx,
-            rec_tx,
             sched_tx,
             scheduler_options,
         )?;
-        let ui_loop = UiLoop::new(ui_state, log_rx, ctrl_tx, rec_rx, sched_rx, ui_options);
+        let ui_loop = UiLoop::new(ui_state, log_rx, ctrl_tx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
         let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };

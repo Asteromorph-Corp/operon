@@ -10,10 +10,8 @@ use ratatui::prelude::*;
 use ratatui::widgets::*;
 use tokio::sync::RwLock;
 
-use crate::scheduler::{
-    ControlEvent, ControlEventSender, ExecutionState, RecoveryState, RecoveryStateReceiver,
-    SchedulerStateReceiver,
-};
+use crate::scheduler::{ControlEvent, ControlEventSender, ExecutionState, SchedulerStateReceiver};
+use crate::ui::states::{IdleState, NextState, UiState as UiStateTrait};
 use crate::ui::{
     Command, CommandPrompt, LogRecordReceiver, LogView, Progress, UiError, UiMode, UiOptions,
     UiState,
@@ -63,9 +61,7 @@ pub struct UiLoop {
     prompt: CommandPrompt,
     log_rx: LogRecordReceiver,
     ctrl_tx: ControlEventSender,
-    rec_rx: RecoveryStateReceiver,
     sched_rx: SchedulerStateReceiver,
-    exit_on_finish: bool,
 }
 
 impl UiLoop {
@@ -75,7 +71,6 @@ impl UiLoop {
         state: Arc<RwLock<UiState>>,
         log_rx: LogRecordReceiver,
         ctrl_tx: ControlEventSender,
-        rec_rx: RecoveryStateReceiver,
         sched_rx: SchedulerStateReceiver,
         options: UiOptions,
     ) -> Self {
@@ -87,9 +82,7 @@ impl UiLoop {
             prompt: CommandPrompt::default(),
             log_rx,
             ctrl_tx,
-            rec_rx,
             sched_rx,
-            exit_on_finish: false,
         }
     }
 
@@ -112,340 +105,42 @@ impl UiLoop {
         // Note: breaking this loop exits the UI, at least guard against `any_alive` before
         // breaking.
         let mut events = EventStream::new();
+        let mut state: Box<dyn UiStateTrait> = IdleState::boxed(self.ctrl_tx.clone());
         loop {
-            {
-                let guard = self.state.read().await;
-                if !guard.any_alive() && self.exit_on_finish {
-                    break;
-                }
-            }
             tokio::select! {
                 evt = events.next() => {
                     let Some(evt) = evt else {
                         // Stream closed, exit the UI.
                         break;
                     };
-                    let command = self.handle_event(evt?);
 
-                    // Fetch the recovery state.
-                    let rec_state = *self.rec_rx.borrow();
-                    if rec_state == RecoveryState::Error {
-                        log::error!("Error in scheduler startup, exiting UI.");
-                        break;
-                    }
-                    // Lock and clone current UiState for command execution.
-                    let exec_snapshot = self.state.read().await.clone();
-                    let overall_state_snapshot = exec_snapshot.overall_state();
-
-                    let Some(command) = command else {
-                        // No command, just continue to the next event.
+                    let Some(command) = self.handle_event(evt?) else {
                         continue;
                     };
 
                     // Execute the command if any.
                     match command {
-                        Command::Run { fresh, rebuild }  => match exec_snapshot.last_control_event {
-                            // DONE: Handle `Command::Run` in `IdleState`.
-                            // TODO: Handle `ControlEvent::Run` in scheduler.
-                            ControlEvent::Start => match rec_state {
-                                RecoveryState::Unknown => log::warn!("Scheduler was not initialized yet."),
-                                RecoveryState::Fresh | RecoveryState::Finished => {
-                                    if rebuild {
-                                        log::error!("Cannot rebuild.")
-                                    } else {
-                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
-                                    }
-                                }
-                                RecoveryState::AbortedUnchecked => {
-                                    if rebuild {
-                                        log::error!("Cannot rebuild before checking for consistency.")
-                                    } else {
-                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
-                                    }
-                                }
-                                RecoveryState::AbortedChecked => {
-                                    if fresh {
-                                        log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
-                                    } else {
-                                        log::info!("Rebuilding the run from trusted data.");
-                                        self.ctrl_tx.send(ControlEvent::RebuildRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::RebuildRun)?;
-                                    }
-                                }
-                                RecoveryState::GracefullyStopped => {
-                                    if fresh {
-                                        log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
-                                    } else if rebuild {
-                                        log::info!("Rebuilding the run from trusted data.");
-                                        self.ctrl_tx.send(ControlEvent::RebuildRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::RebuildRun)?;
-                                    } else {
-                                        log::info!("Continuing the last run.");
-                                        self.ctrl_tx.send(ControlEvent::RestoreRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::RestoreRun)?;
-                                    }
-                                }
-                                _ => unreachable!(),
-                            },
-                            // DONE: Handle `Command::Run` from `IdleState`.
-                            // TODO: Handle `ControlEvent::Run` in scheduler.
-                            ControlEvent::Check { .. } => match rec_state {
-                                RecoveryState::MissingData => {
-                                    if rebuild {
-                                        log::error!("Cannot rebuild.");
-                                        continue;
-                                    }
-                                    self.ctrl_tx.send(ControlEvent::CleanRun)?;
-                                    self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
-                                }
-                                RecoveryState::AbortedChecked => {
-                                    if fresh {
-                                        log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
-                                    } else {
-                                        log::info!("Rebuilding the run from trusted data.");
-                                        self.ctrl_tx.send(ControlEvent::RebuildRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::RebuildRun)?;
-                                    }
-                                }
-                                RecoveryState::GracefullyStoppedChecked => {
-                                    if fresh {
-                                        log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
-                                    } else if rebuild {
-                                        log::info!("Rebuilding the run from trusted data.");
-                                        self.ctrl_tx.send(ControlEvent::RebuildRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::RebuildRun)?;
-                                    } else {
-                                        log::info!("Continuing the last run.");
-                                        self.ctrl_tx.send(ControlEvent::RestoreRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::RestoreRun)?;
-                                    }
-                                }
-                                RecoveryState::FinishedChecked => {
-                                    if fresh {
-                                        log::info!("Starting a fresh run, ignoring previous data.");
-                                        self.ctrl_tx.send(ControlEvent::CleanRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::CleanRun)?;
-                                    } else {
-                                        log::info!("Continuing the last run.");
-                                        self.ctrl_tx.send(ControlEvent::RestoreRun)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::RestoreRun)?;
-                                    }
-                                }
-                                _ => {
-                                    log::warn!("Please wait until the check is finished.");
-                                }
-                            },
-                            // DONE: Handle `Command::Run` from `RunningState`.
-                            // DONE: Handle `Command::Run` in `QuittingState`.
-                            _ => {
-                                log::warn!(
-                                    "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
-                                );
-                            }
-                        },
-                        Command::Check { mode } => match exec_snapshot.last_control_event {
-                            // DONE: Reject `Command::Check` in `IdleState` if already checked.
-                            ControlEvent::Check { .. } => {
-                                log::warn!("Already run a check.");
-                            }
-                            // DONE: Handle `Command::Check` in `IdleState`.
-                            // TODO: Reject `ControlEvent::Check` in scheduler if not appropriate.
-                            ControlEvent::Start => match rec_state {
-                                RecoveryState::AbortedUnchecked
-                                | RecoveryState::GracefullyStopped | RecoveryState::Finished => {
-                                    log::info!("Starting a consistency check of the remaining data.");
-                                    self.ctrl_tx.send(ControlEvent::Check {mode})?;
-                                    self.state.write().await.update_ui_state(ControlEvent::Check {mode})?;
-                                }
-                                _ => {
-                                    log::warn!(
-                                        "Checks are only available when the previous run was aborted or gracefully stopped."
-                                    );
-                                }
-                            },
-                            // DONE: Handle `Command::Check` from `RunningState`.
-                            // TODO: Handle `Command::Check` in `QuittingState`.
-                            _ => {
-                                log::warn!("Cannot check after the run has already started.");
-                            }
-                        },
-                        Command::Exit => match exec_snapshot.last_control_event {
-                            // DONE: Handle `Command::Exit` in `IdleState`.
-                            ControlEvent::Start | ControlEvent::Check { .. } => {
-                                // We didn't start any jobs, so we can exit immediately.
-                                self.ctrl_tx.send(ControlEvent::Abort)?;
-                                break;
-                            }
-                            // TODO: Handle `Command::Exit` in the `QuittingState`.
-                            ControlEvent::Abort | ControlEvent::GracefulStop
-                                if exec_snapshot.any_alive() =>
-                            {
-                                log::warn!(
-                                    "Please wait until the current jobs are stopped before exiting."
-                                );
-                            }
-                            // DONE: Handle `Command::Exit` in `RunningState`.
-                            _ => match overall_state_snapshot {
-                                ExecutionState::Finished
-                                | ExecutionState::Stopped
-                                | ExecutionState::Error => {
-                                    // `quit` first, then exit.
-                                    if exec_snapshot.any_alive() {
-                                        self.ctrl_tx.send(ControlEvent::Abort)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::Abort)?;
-                                        self.exit_on_finish = true;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                ExecutionState::Running | ExecutionState::Paused => {
-                                    log::warn!(
-                                        "Cannot exit while jobs are running or paused. \
-                                        Use `quit` for a graceful stop, or `quit --force` to abort all jobs."
-                                    );
-                                }
-                            },
-                        },
-                        Command::Quit { force, no_exit } => match exec_snapshot.last_control_event {
-                            // DONE: Handle `Command::Quit` in `IdleState`.
-                            ControlEvent::Start | ControlEvent::Check { .. } => {
-                                if no_exit {
-                                    log::warn!("Cannot quit before the run has started.");
-                                    continue;
-                                }
-                                self.ctrl_tx.send(ControlEvent::Abort)?;
-                                break;
-                            }
-                            // DONE: Handle `Command::Quit` in `QuittingState`.
-                            ControlEvent::Abort if exec_snapshot.any_alive() => {
-                                log::warn!("Already processing an abort.");
-                            }
-                            // DONE: Handle `Command::Exit` in the `QuittingState`.
-                            ControlEvent::GracefulStop if exec_snapshot.any_alive() => {
-                                if !force {
-                                    log::warn!("Already processing a graceful stop.");
-                                    continue;
-                                }
-
-                                log::warn!("Already processing a graceful stop, but force quit requested.");
-                                self.ctrl_tx.send(ControlEvent::Abort)?;
-                                self.state.write().await.update_ui_state(ControlEvent::Abort)?;
-                            }
-                            // DONE: Handle `Command::Quit` in `RunningState`.
-                            _ => match overall_state_snapshot {
-                                ExecutionState::Finished | ExecutionState::Stopped => {
-                                    if !exec_snapshot.any_alive() {
-                                        if !no_exit { break; }
-                                        log::warn!("Nothing to quit.");
-                                        continue;
-                                    }
-
-                                    self.ctrl_tx.send(ControlEvent::Abort)?;
-                                    self.state.write().await.update_ui_state(ControlEvent::Abort)?;
-                                    self.exit_on_finish = !no_exit;
-                                }
-                                ExecutionState::Error => {
-                                    if !exec_snapshot.any_alive() {
-                                        if !no_exit { break; }
-                                        log::warn!("Nothing to quit.");
-                                        continue;
-                                    }
-
-                                    if !force {
-                                        log::warn!(
-                                            "Cannot gracefully stop due to previous errors. \
-                                            Defaulting to a force quit."
-                                        );
-                                    }
-                                    self.ctrl_tx.send(ControlEvent::Abort)?;
-                                    self.state.write().await.update_ui_state(ControlEvent::Abort)?;
-                                    // We *don't* exit here (even without the no-exit flag),
-                                    // because the user should be able to inspect the logs.
-                                    self.exit_on_finish = false;
-                                }
-                                ExecutionState::Paused | ExecutionState::Running => {
-                                    if force {
-                                        // Send an `Abort` event to all schedulers
-                                        log::info!("Sent abort request, stopping immediately...");
-                                        self.ctrl_tx.send(ControlEvent::Abort)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::Abort)?;
-                                    } else {
-                                        // Send a `GracefulStop` command to all schedulers
-                                        log::info!("Sent stop request, stopping gracefully...");
-                                        self.ctrl_tx.send(ControlEvent::GracefulStop)?;
-                                        self.state.write().await.update_ui_state(ControlEvent::GracefulStop)?;
-                                    }
-                                    self.exit_on_finish = !no_exit;
-                                }
-                            },
-                        },
-                        Command::Pause { targets, cascade } => match exec_snapshot.last_control_event {
-                            // DONE: Handle `Command::Pause` in `IdleState`.
-                            ControlEvent::Start | ControlEvent::Check { .. } => {
-                                log::warn!("Cannot pause before the run has started.");
-                            }
-                            // Done: Handle `Command::Pause` in the `QuittingState`.
-                            ControlEvent::Abort | ControlEvent::GracefulStop
-                                if exec_snapshot.any_alive() =>
-                            {
-                                log::warn!("Cannot pause while stopping.");
-                            }
-                            // DONE: Handle `Command::Pause` in `RunningState`.
-                            _ => {
-                                if !exec_snapshot
-                                    .state_iter()
-                                    .any(|s| s == ExecutionState::Running)
-                                {
-                                    log::warn!(
-                                        "No running jobs to pause, did you mean to `exit` or `quit` instead?"
-                                    );
-                                    continue;
-                                }
-                                self.ctrl_tx.send(ControlEvent::pause(targets.clone(), cascade))?;
-                                self.state.write().await.update_ui_state(ControlEvent::pause(targets, cascade))?;
-                            }
-                        }
-                        Command::Resume { targets } => match exec_snapshot.last_control_event {
-                            // DONE: Handle `Command::Resume` in `IdleState`.
-                            ControlEvent::Start | ControlEvent::Check { .. } => {
-                                log::warn!("Cannot resume before the run has started.");
-                            }
-                            // TODO: Handle `Command::Resume` in the `QuittingState`.
-                            ControlEvent::Abort | ControlEvent::GracefulStop
-                                if exec_snapshot.any_alive() =>
-                            {
-                                log::warn!("Cannot resume while stopping.");
-                            }
-                            // DONE: Handle `Command::Resume` in `RunningState`.
-                            _ => {
-                                if !exec_snapshot
-                                    .state_iter()
-                                    .any(|s| s == ExecutionState::Paused)
-                                {
-                                    log::warn!("No paused jobs to resume.");
-                                    continue;
-                                }
-                                self.ctrl_tx.send(ControlEvent::resume(targets.clone()))?;
-                                self.state.write().await.update_ui_state(ControlEvent::resume(targets.clone()))?;
-                            }
-                        },
                         Command::Clear => self.logs.clear(),
                         Command::Help => log::info!("{HELP_TEXT}"),
-                        // _ => log::warn!("Command not yet implemented: {command:?}"),
+                        _ => {
+                            match state.handle_progress(self.state.read().await.clone().progress)? {
+                                NextState::Next(next) => state = next,
+                                NextState::Exit => break,
+                            }
+                            match state.handle_command(command)? {
+                                NextState::Next(next) => state = next,
+                                NextState::Exit => break,
+                            }
+                        },
                     }
                 }
 
                 _ = ::tokio::time::sleep(::std::time::Duration::from_millis(10)) => {
+                    match state.handle_progress(self.state.read().await.clone().progress)? {
+                        NextState::Next(next) => state = next,
+                        NextState::Exit => break,
+                    }
+
                     // Drain the log channel before drawing the UI.
                     let width = terminal.size()?.width;
                     loop {

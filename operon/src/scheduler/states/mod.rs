@@ -15,6 +15,8 @@ mod running;
 mod stale;
 mod start;
 
+pub use init::InitTransition;
+
 pub enum NextState {
     Next(Box<dyn SchedulerState>),
     Exit,
