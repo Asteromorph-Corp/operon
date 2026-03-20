@@ -39,7 +39,7 @@ impl UiState for RunningState {
                 "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
             ),
             Command::Check { .. } => log::warn!("Cannot check after the run has already started."),
-            Command::Quit { no_exit: false, .. } if self.schedulers_exited => {
+            Command::Quit { no_exit: true, .. } if self.schedulers_exited => {
                 log::warn!("Nothing to quit.")
             }
             Command::Quit { .. } if self.schedulers_exited => return Ok(NextState::Exit),
