@@ -3,8 +3,8 @@ use uuid::Uuid;
 
 use crate::scheduler::ControlEvent;
 use crate::scheduler::context::SchedulerContext;
-use crate::scheduler::states::running::RunningState;
-use crate::scheduler::states::{NextState, SchedulerState};
+use crate::scheduler::states::start::StartTransition;
+use crate::scheduler::states::{NextState, SchedulerState, TransitionState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
@@ -42,8 +42,8 @@ where
         }
     }
 
-    fn into_running(self) -> RunningState<Svc, Sto> {
-        RunningState::new(self.ctx, self.channel_size, true)
+    fn into_running(self) -> TransitionState {
+        StartTransition::state(self.ctx, self.channel_size, self.run_id, true)
     }
 }
 

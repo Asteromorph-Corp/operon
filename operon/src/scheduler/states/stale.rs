@@ -3,8 +3,10 @@ use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::scheduler::context::SchedulerContext;
-use crate::scheduler::states::running::RunningState;
-use crate::scheduler::states::{NextState, SchedulerState};
+use crate::scheduler::states::clean::CleanTransition;
+use crate::scheduler::states::rebuild::RebuildTransition;
+use crate::scheduler::states::start::StartTransition;
+use crate::scheduler::states::{NextState, SchedulerState, TransitionState};
 use crate::scheduler::{ControlEvent, RunMode, SchedulerError};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -67,8 +69,16 @@ where
         }
     }
 
-    fn into_running(self, run_mode: RunMode) -> RunningState<Svc, Sto> {
-        RunningState::new(self.ctx, self.channel_size, run_mode == RunMode::Clean)
+    fn into_clean(self) -> TransitionState {
+        CleanTransition::state(self.ctx, self.channel_size, self.run_id)
+    }
+
+    fn into_rebuild(self) -> TransitionState {
+        RebuildTransition::state(self.ctx, self.channel_size, self.run_id)
+    }
+
+    fn into_restore(self) -> TransitionState {
+        StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 
     async fn run_consistency_check(&mut self, mode: CheckMode) -> Result<(), SchedulerError> {
@@ -182,11 +192,12 @@ where
                 log::warn!("Already run a check.")
             }
             ControlEvent::Check { mode } => self.run_consistency_check(mode).await?,
-            ControlEvent::Run { fresh, rebuild } => {
-                if let Some(run_mode) = self.choose_run_mode(fresh, rebuild) {
-                    return Ok(NextState::from(self.into_running(run_mode)));
-                }
-            }
+            ControlEvent::Run { fresh, rebuild } => match self.choose_run_mode(fresh, rebuild) {
+                Some(RunMode::Clean) => return Ok(NextState::from(self.into_clean())),
+                Some(RunMode::Rebuild) => return Ok(NextState::from(self.into_rebuild())),
+                Some(RunMode::Restore) => return Ok(NextState::from(self.into_restore())),
+                None => {}
+            },
             ControlEvent::Pause { .. } => log::warn!("Cannot pause before the run has started."),
             ControlEvent::Resume { .. } => log::warn!("Cannot resume before the run has started."),
             ControlEvent::Quit { .. } => return Ok(NextState::Exit),

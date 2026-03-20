@@ -5,10 +5,13 @@ use tokio::task::JoinHandle;
 
 use crate::scheduler::{ControlEvent, SchedulerError};
 
+mod clean;
 mod fresh;
 mod init;
+mod rebuild;
 mod running;
 mod stale;
+mod start;
 
 pub enum NextState {
     Next(Box<dyn SchedulerState>),
