@@ -71,10 +71,9 @@ where
             ControlEvent::Run { .. } => return Ok(NextState::from(self.into_running())),
             ControlEvent::Pause { .. } => log::warn!("Cannot pause before the run has started."),
             ControlEvent::Resume { .. } => log::warn!("Cannot resume before the run has started."),
-            ControlEvent::Quit { .. } => return Ok(NextState::Exit),
-            ControlEvent::Exit => return Ok(NextState::Exit),
+            ControlEvent::Quit { .. } => return Ok(NextState::Exit { exit_ui: true }),
+            ControlEvent::Exit => return Ok(NextState::Exit { exit_ui: true }),
             // TODO: remove other events.
-            ControlEvent::Abort => return Ok(NextState::Exit),
             _ => {}
         }
         Ok(NextState::Next(self))

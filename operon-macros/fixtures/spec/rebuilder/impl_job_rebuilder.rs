@@ -59,7 +59,7 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
             };
             ui_state.update_ui_state(operon::ui::UiStateUpdate::ProgressUpdate(
                 "beta".to_string(),
-                (done, queued, waiting, state, false),
+                (done, queued, waiting, state),
             ))?;
         }
 

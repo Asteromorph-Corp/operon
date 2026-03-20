@@ -51,7 +51,7 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///             };
 ///             ui_state.update_ui_state(operon::ui::UiStateUpdate::ProgressUpdate(
 ///                 "beta".to_string(),
-///                 (done, queued, waiting, state, false),
+///                 (done, queued, waiting, state),
 ///             ))?;
 ///         }
 ///
@@ -194,7 +194,7 @@ pub fn impl_job_rebuilder(
                     };
                     ui_state.update_ui_state(#operon::ui::UiStateUpdate::ProgressUpdate(
                         #job_id.to_string(),
-                        (done, queued, waiting, state, false),
+                        (done, queued, waiting, state),
                     ))?;
                 }
 

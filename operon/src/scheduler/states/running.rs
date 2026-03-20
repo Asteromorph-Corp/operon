@@ -19,6 +19,8 @@ where
     execution_id: Uuid,
     handles: JoinSet<ExecutionState>,
     returned: Vec<ExecutionState>,
+    force_exited: bool,
+    exit_ui: bool,
 }
 
 impl<Svc, Sto> RunningState<Svc, Sto>
@@ -48,6 +50,8 @@ where
             run_id,
             execution_id,
             returned: Vec::new(),
+            force_exited: false,
+            exit_ui: false,
         }
     }
 }
@@ -73,7 +77,7 @@ where
             .returned
             .iter()
             .all(|&s| s == ExecutionState::Stopped || s == ExecutionState::Finished)
-            && self.ctx.ctrl_rx.borrow().clone() == ControlEvent::GracefulStop
+            && !self.force_exited
         {
             RunState::Paused
         } else {
@@ -94,13 +98,23 @@ where
             .await?;
         tx.commit().await?;
 
-        Ok(NextState::Exit)
+        Ok(NextState::Exit {
+            exit_ui: self.exit_ui,
+        })
     }
 
     async fn handle_control_event(
-        self: Box<Self>,
-        _: ControlEvent,
+        mut self: Box<Self>,
+        evt: ControlEvent,
     ) -> Result<NextState, SchedulerError> {
+        // TODO: make `RunningState` aware of individual scheduler states and decide whether to
+        // propagate events.
+
+        if let ControlEvent::Quit { force, no_exit } = evt {
+            self.force_exited = force;
+            self.exit_ui = !no_exit;
+        };
+
         Ok(NextState::Next(self))
     }
 }

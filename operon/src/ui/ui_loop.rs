@@ -11,7 +11,6 @@ use ratatui::widgets::*;
 use tokio::sync::RwLock;
 
 use crate::scheduler::{ControlEvent, ControlEventSender, ExecutionState, SchedulerStateReceiver};
-use crate::ui::states::{IdleState, NextState, UiState as UiStateTrait};
 use crate::ui::{
     Command, CommandPrompt, LogRecordReceiver, LogView, Progress, UiError, UiMode, UiOptions,
     UiState,
@@ -62,6 +61,8 @@ pub struct UiLoop {
     log_rx: LogRecordReceiver,
     ctrl_tx: ControlEventSender,
     sched_rx: SchedulerStateReceiver,
+    finished: bool,
+    exit_on_finish: bool,
 }
 
 impl UiLoop {
@@ -83,6 +84,8 @@ impl UiLoop {
             log_rx,
             ctrl_tx,
             sched_rx,
+            finished: false,
+            exit_on_finish: false,
         }
     }
 
@@ -105,42 +108,34 @@ impl UiLoop {
         // Note: breaking this loop exits the UI, at least guard against `any_alive` before
         // breaking.
         let mut events = EventStream::new();
-        let mut state: Box<dyn UiStateTrait> = IdleState::boxed(self.ctrl_tx.clone());
         loop {
+            if self.finished && self.exit_on_finish {
+                break;
+            }
+
             tokio::select! {
+                scheduler_exit = &mut self.sched_rx, if !self.finished => {
+                    if scheduler_exit == Ok(true) {
+                        break;
+                    }
+                    self.finished = true;
+                }
+
                 evt = events.next() => {
                     let Some(evt) = evt else {
                         // Stream closed, exit the UI.
                         break;
                     };
 
-                    let Some(command) = self.handle_event(evt?) else {
-                        continue;
+                    if let Some(command) = self.handle_event(evt?) {
+                        let exit_ui = self.execute_command(command)?;
+
+                        if exit_ui {
+                            break;
+                        }
                     };
-
-                    // Execute the command if any.
-                    match command {
-                        Command::Clear => self.logs.clear(),
-                        Command::Help => log::info!("{HELP_TEXT}"),
-                        _ => {
-                            match state.handle_progress(self.state.read().await.clone().progress)? {
-                                NextState::Next(next) => state = next,
-                                NextState::Exit => break,
-                            }
-                            match state.handle_command(command)? {
-                                NextState::Next(next) => state = next,
-                                NextState::Exit => break,
-                            }
-                        },
-                    }
                 }
-
                 _ = ::tokio::time::sleep(::std::time::Duration::from_millis(10)) => {
-                    match state.handle_progress(self.state.read().await.clone().progress)? {
-                        NextState::Next(next) => state = next,
-                        NextState::Exit => break,
-                    }
-
                     // Drain the log channel before drawing the UI.
                     let width = terminal.size()?.width;
                     loop {
@@ -174,47 +169,46 @@ impl UiLoop {
         // so we always run fresh off the bat and wait
         // until everything finishes or something errors.
         self.ctrl_tx.send(ControlEvent::CleanRun)?;
-        self.state
-            .write()
-            .await
-            .update_ui_state(ControlEvent::CleanRun)?;
         loop {
-            // Snapshot the current overall state.
-            let (state, last_control_event, exit) = {
-                let guard = self.state.read().await;
-                let exit = self.sched_rx.borrow();
-                (
-                    guard.overall_state(),
-                    guard.last_control_event.clone(),
-                    *exit,
-                )
-            };
-            // Draw all remaining logs.
-            loop {
-                match self.log_rx.try_recv() {
-                    Ok(record) => {
-                        eprintln!("{}", record.format_for_print());
+            if self.finished {
+                break;
+            }
+
+            tokio::select! {
+                scheduler_exit = &mut self.sched_rx, if !self.finished => {
+                    if scheduler_exit == Ok(true) {
+                        break;
                     }
-                    // Skip fallen-behind logs
-                    Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
-                    // Drained all logs
-                    Err(::tokio::sync::broadcast::error::TryRecvError::Empty) => break,
-                    // Channel unexpectedly closed
-                    Err(e) => return Err(e.into()),
+                    self.finished = true;
+                }
+                _ = ::tokio::time::sleep(::std::time::Duration::from_millis(10)) => {
+                    // Draw all remaining logs.
+                    loop {
+                        match self.log_rx.try_recv() {
+                            Ok(record) => {
+                                eprintln!("{}", record.format_for_print());
+                            }
+                            // Skip fallen-behind logs
+                            Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+                            // Drained all logs
+                            Err(::tokio::sync::broadcast::error::TryRecvError::Empty) => break,
+                            // Channel unexpectedly closed
+                            Err(e) => return Err(e.into()),
+                        }
+                    }
                 }
             }
+
+            // Snapshot the current overall state.
+            let state = self.state.read().await.overall_state();
+
             // If a new error state is detected, abort the execution.
-            if state == ExecutionState::Error && last_control_event != ControlEvent::Abort {
+            if state == ExecutionState::Error {
                 log::error!("Aborting execution due to previous error.");
-                self.ctrl_tx.send(ControlEvent::Abort)?;
-                self.state
-                    .write()
-                    .await
-                    .update_ui_state(ControlEvent::Abort)?;
-            }
-            if exit {
-                // The main scheduler has exited, we can exit too.
-                break;
+                self.ctrl_tx.send(ControlEvent::Quit {
+                    force: true,
+                    no_exit: false,
+                })?;
             }
             ::tokio::time::sleep(::std::time::Duration::from_millis(10)).await;
         }
@@ -247,6 +241,47 @@ impl UiLoop {
             _ => {}
         };
         None
+    }
+
+    fn execute_command(&mut self, command: Command) -> Result<bool, UiError> {
+        if self.finished {
+            match command {
+                Command::Run { .. } => log::warn!(
+                    "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
+                ),
+                Command::Check { .. } => {
+                    log::warn!("Cannot check after the run has already started.")
+                }
+                Command::Quit { no_exit: true, .. } => log::warn!("Nothing to quit."),
+                Command::Quit { .. } | Command::Exit => return Ok(true),
+                Command::Pause { .. } => log::warn!("Nothing to pause."),
+                Command::Resume { .. } => log::warn!("Nothing to resume"),
+                Command::Clear => self.logs.clear(),
+                Command::Help => log::info!("{HELP_TEXT}"),
+            };
+
+            return Ok(false);
+        }
+
+        match command {
+            Command::Run { fresh, rebuild } => {
+                self.ctrl_tx.send(ControlEvent::Run { fresh, rebuild })?
+            }
+            Command::Check { mode } => self.ctrl_tx.send(ControlEvent::Check { mode })?,
+            Command::Quit { force, no_exit } => {
+                self.ctrl_tx.send(ControlEvent::Quit { force, no_exit })?;
+                self.exit_on_finish = !no_exit;
+            }
+            Command::Exit => self.ctrl_tx.send(ControlEvent::Exit)?,
+            Command::Pause { targets, cascade } => self
+                .ctrl_tx
+                .send(ControlEvent::Pause { targets, cascade })?,
+            Command::Resume { targets } => self.ctrl_tx.send(ControlEvent::Resume { targets })?,
+            Command::Clear => self.logs.clear(),
+            Command::Help => log::info!("{HELP_TEXT}"),
+        }
+
+        Ok(false)
     }
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {

@@ -62,7 +62,7 @@ where
         let (ctrl_tx, ctrl_rx) = ::tokio::sync::watch::channel(ControlEvent::Start);
 
         // Initialize the scheduler state channel
-        let (sched_tx, sched_rx) = ::tokio::sync::watch::channel(false);
+        let (sched_tx, sched_rx) = ::tokio::sync::oneshot::channel();
 
         // Set up the logger
         Logger::new(log_tx, log_options).setup(::log::LevelFilter::Trace)?;

@@ -76,7 +76,6 @@ where
     async fn update_state(
         &self,
         client: MetaClient<'_>,
-        returning: bool,
         state: &mut ExecutionState,
     ) -> Result<(), SchedulerError> {
         let (done, queued, waiting) = client.ticket(self.meta).get_status().await?;
@@ -89,7 +88,7 @@ where
             .await
             .update_ui_state(UiStateUpdate::ProgressUpdate(
                 self.meta.id.into(),
-                (done, queued, waiting, *state, returning),
+                (done, queued, waiting, *state),
             ))?;
         Ok(())
     }
@@ -97,12 +96,10 @@ where
     /// Call `update_ui` without an ongoing connection.
     async fn update_state_without_client(
         &self,
-        returning: bool,
         state: &mut ExecutionState,
     ) -> Result<(), SchedulerError> {
         let conn = self.meta_storage.ui_conn().await?;
-        self.update_state(conn.as_client(), returning, state)
-            .await?;
+        self.update_state(conn.as_client(), state).await?;
         Ok(())
     }
 
@@ -138,7 +135,7 @@ where
                     .await?
             }
         };
-        self.update_state(tx.as_client(), false, state).await?;
+        self.update_state(tx.as_client(), state).await?;
         tx.commit().await?;
         Ok(ready_tickets)
     }
@@ -182,11 +179,7 @@ where
         }
 
         // Update the UI state before entering the loop.
-        if self
-            .update_state_without_client(false, &mut state)
-            .await
-            .is_err()
-        {
+        if self.update_state_without_client(&mut state).await.is_err() {
             log::error!(
                 "Failed to update UI state for `{}` scheduler after initial data processing.",
                 self.meta.id
@@ -200,7 +193,7 @@ where
                 "Scheduler for `{}` exited due to being finished from the start.",
                 self.meta.id
             );
-            self.update_state_without_client(true, &mut state)
+            self.update_state_without_client(&mut state)
                 .await
                 .unwrap_or_else(|e| {
                     log::error!("Failed to update UI state after scheduler run: {e}");
@@ -233,7 +226,7 @@ where
         }
 
         // Update the UI state one last time.
-        self.update_state_without_client(true, &mut state)
+        self.update_state_without_client(&mut state)
             .await
             .unwrap_or_else(|e| {
                 log::error!("Failed to update UI state after scheduler run: {e}");
@@ -267,12 +260,12 @@ where
                     self.handle_pause(targets, cascade, state).await?
                 }
                 ControlEvent::Resume { targets } => self.handle_resume(targets, state).await?,
-                ControlEvent::GracefulStop => {
+                ControlEvent::Quit { force: false, .. } => {
                     if self.handle_graceful_stop(state, got_all_updates).await? {
                         return Ok(());
                     }
                 }
-                ControlEvent::Abort => {
+                ControlEvent::Quit { force: true, .. } => {
                     log::info!("Aborting `{}` jobs.", self.meta.id);
                     // If this is a finished scheduler rolling out peer events,
                     // don't change the state to `Stopped`,
@@ -294,7 +287,7 @@ where
                 // 1. An internal event.
                 Some(int_event) = self.handles.join_next() => {
                     let int_event = int_event??;
-                    self.update_state_without_client(false, state).await?;
+                    self.update_state_without_client( state).await?;
                     match int_event {
                         InternalEvent::JobSuccess(job, resolution) => {
                             // Trace the job success
@@ -418,7 +411,7 @@ where
             ExecutionState::Running => {
                 log::info!("Pausing `{}` jobs.", self.meta.id);
                 *state = ExecutionState::Paused;
-                self.update_state_without_client(false, state).await?;
+                self.update_state_without_client(state).await?;
                 // Acquire and forget all permits.
                 let permit = self
                     .pool
@@ -460,7 +453,7 @@ where
             ExecutionState::Paused => {
                 log::info!("Resuming `{}` jobs.", self.meta.id);
                 *state = ExecutionState::Running;
-                self.update_state_without_client(false, state).await?;
+                self.update_state_without_client(state).await?;
                 // Add back all permits.
                 self.pool.add_permits(self.pool_size);
             }
@@ -489,7 +482,7 @@ where
         if *state == ExecutionState::Running {
             log::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
             *state = ExecutionState::Paused;
-            self.update_state_without_client(false, state).await?;
+            self.update_state_without_client(state).await?;
             // Acquire and forget all permits.
             let permit = self
                 .pool

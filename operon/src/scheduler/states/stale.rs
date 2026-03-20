@@ -191,7 +191,10 @@ where
             ControlEvent::Check { .. } if self.is_consistent.is_some() => {
                 log::warn!("Already run a check.")
             }
-            ControlEvent::Check { mode } => self.run_consistency_check(mode).await?,
+            ControlEvent::Check { mode } => {
+                log::info!("Starting a consistency check of the remaining data.");
+                self.run_consistency_check(mode).await?
+            }
             ControlEvent::Run { fresh, rebuild } => match self.choose_run_mode(fresh, rebuild) {
                 Some(RunMode::Clean) => return Ok(NextState::from(self.into_clean())),
                 Some(RunMode::Rebuild) => return Ok(NextState::from(self.into_rebuild())),
@@ -200,10 +203,9 @@ where
             },
             ControlEvent::Pause { .. } => log::warn!("Cannot pause before the run has started."),
             ControlEvent::Resume { .. } => log::warn!("Cannot resume before the run has started."),
-            ControlEvent::Quit { .. } => return Ok(NextState::Exit),
-            ControlEvent::Exit => return Ok(NextState::Exit),
+            ControlEvent::Quit { .. } => return Ok(NextState::Exit { exit_ui: true }),
+            ControlEvent::Exit => return Ok(NextState::Exit { exit_ui: true }),
             // TODO: remove other events.
-            ControlEvent::Abort => return Ok(NextState::Exit),
             _ => {}
         }
         Ok(NextState::Next(self))

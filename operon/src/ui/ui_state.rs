@@ -1,12 +1,12 @@
 use indexmap::IndexMap;
 
-use crate::scheduler::{ControlEvent, ExecutionState, JobHandler};
+use crate::scheduler::{ExecutionState, JobHandler};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::{UiError, UiStateUpdate};
 
 pub type ProgressMap = IndexMap<String, Progress>;
-pub type Progress = (i64, i64, i64, ExecutionState, bool);
+pub type Progress = (i64, i64, i64, ExecutionState);
 
 // TODO: remove this
 /// Minimal state that holds the information needed to render the UI.
@@ -14,8 +14,6 @@ pub type Progress = (i64, i64, i64, ExecutionState, bool);
 pub struct UiState {
     // Done, queued, waiting, state, returned.
     pub(super) progress: ProgressMap,
-    /// Last sent control event.
-    pub(super) last_control_event: ControlEvent,
 }
 
 impl UiState {
@@ -24,17 +22,9 @@ impl UiState {
     ) -> Self {
         let progress = jobs
             .iter()
-            .map(|job| {
-                (
-                    job.job_id().to_string(),
-                    (0, 0, 0, ExecutionState::Running, false),
-                )
-            })
+            .map(|job| (job.job_id().to_string(), (0, 0, 0, ExecutionState::Running)))
             .collect();
-        Self {
-            progress,
-            ..Default::default()
-        }
+        Self { progress }
     }
 
     pub fn progress_iter(&self) -> impl Iterator<Item = &Progress> {
@@ -43,10 +33,6 @@ impl UiState {
 
     pub fn state_iter(&self) -> impl Iterator<Item = ExecutionState> {
         self.progress_iter().map(|s| s.3)
-    }
-
-    pub fn any_alive(&self) -> bool {
-        self.progress_iter().any(|s| !s.4)
     }
 
     pub fn overall_state(&self) -> ExecutionState {
@@ -77,9 +63,6 @@ impl UiState {
                     return Err(UiError::ProgressNotFound(id));
                 };
                 *v = progress;
-            }
-            UiStateUpdate::LastControlEvent(event) => {
-                self.last_control_event = event;
             }
         }
 

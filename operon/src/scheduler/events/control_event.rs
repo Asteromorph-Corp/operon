@@ -39,6 +39,7 @@ pub enum ControlEvent {
     },
     Quit {
         force: bool,
+        no_exit: bool,
     },
     Exit,
 
@@ -53,14 +54,4 @@ pub enum ControlEvent {
     GracefulStop,
     /// Abort the scheduler immediately.
     Abort,
-}
-
-impl ControlEvent {
-    pub fn pause(targets: Vec<String>, cascade: bool) -> Self {
-        ControlEvent::Pause { targets, cascade }
-    }
-
-    pub fn resume(targets: Vec<String>) -> Self {
-        ControlEvent::Resume { targets }
-    }
 }

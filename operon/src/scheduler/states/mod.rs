@@ -19,7 +19,7 @@ pub use init::InitTransition;
 
 pub enum NextState {
     Next(Box<dyn SchedulerState>),
-    Exit,
+    Exit { exit_ui: bool },
 }
 
 #[async_trait]
@@ -66,7 +66,7 @@ impl SchedulerState for TransitionState {
                     NextState::Next(state) => {
                         next = state.handle_control_event(evt).await?;
                     }
-                    NextState::Exit => return Ok(NextState::Exit),
+                    NextState::Exit { exit_ui } => return Ok(NextState::Exit { exit_ui }),
                 }
             }
             return Ok(next);

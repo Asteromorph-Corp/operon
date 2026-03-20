@@ -126,7 +126,7 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
 
             ui_state.update_ui_state(UiStateUpdate::ProgressUpdate(
                 schedule.job_id().to_string(),
-                (done, queued, waiting, state, false),
+                (done, queued, waiting, state),
             ))?;
         }
         Ok(())
