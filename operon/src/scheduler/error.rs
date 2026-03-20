@@ -16,7 +16,7 @@ pub enum SchedulerError {
     #[error("UI Error: {0}")]
     Ui(#[from] UiError),
     #[error("Join failed: {0}")]
-    JobJoinFailed(#[from] JoinError),
+    JoinFailed(#[from] JoinError),
     #[error("Failed to send recovery state: {0}")]
     RecoverySendFailed(RecoveryState),
     #[error("Unexpected control event: {0:?}")]

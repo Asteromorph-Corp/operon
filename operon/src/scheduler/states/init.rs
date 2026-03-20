@@ -1,21 +1,17 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::fresh::FreshState;
 use crate::scheduler::states::stale::{StaleKind, StaleState};
-use crate::scheduler::states::{NextState, SchedulerState};
-use crate::scheduler::{ControlEvent, SchedulerError};
+use crate::scheduler::states::{NextState, SchedulerTransition, TransitionState};
 use crate::schema::{RunMetadata, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-/// The initial state of the scheduler.
-///
-/// Does not accept control events, and immediately transitions to either [`FreshState`] or
-/// [`StaleState`].
-pub struct InitState<Svc, Sto>
+pub struct InitTransition<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -25,7 +21,7 @@ where
     ui_mode: UiMode,
 }
 
-impl<Svc, Sto> InitState<Svc, Sto>
+impl<Svc, Sto> InitTransition<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -37,13 +33,15 @@ where
             ui_mode,
         }
     }
-}
 
-impl<Svc, Sto> InitState<Svc, Sto>
-where
-    Svc: OperonService,
-    Sto: OperonStorage,
-{
+    pub fn state(
+        ctx: SchedulerContext<Svc, Sto>,
+        ui_mode: UiMode,
+        channel_size: usize,
+    ) -> TransitionState {
+        TransitionState::new(Self::new(ctx, ui_mode, channel_size))
+    }
+
     // TODO: rename states
     fn into_fresh(self, run_id: Uuid) -> FreshState<Svc, Sto> {
         FreshState::new(self.ctx, self.ui_mode, self.channel_size, run_id)
@@ -84,12 +82,16 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerState for InitState<Svc, Sto>
+impl<Svc, Sto> SchedulerTransition for InitTransition<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
 {
-    async fn handle_progress(self: Box<Self>) -> Result<NextState, SchedulerError> {
+    fn warn_msg(&self) -> Option<&'static str> {
+        None
+    }
+
+    async fn execute(self) -> Result<NextState, SchedulerError> {
         let RunMetadata { run_id, state } = self.get_run_metadata().await?.unwrap_or_default();
 
         if self.ui_mode == UiMode::Headless {
@@ -106,13 +108,5 @@ where
         };
 
         Ok(next)
-    }
-
-    async fn handle_control_event(
-        self: Box<Self>,
-        _: ControlEvent,
-    ) -> Result<NextState, SchedulerError> {
-        log::warn!("Scheduler not initialized yet.");
-        Ok(NextState::Next(self))
     }
 }
