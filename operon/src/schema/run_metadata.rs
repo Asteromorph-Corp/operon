@@ -52,6 +52,15 @@ impl RunMetadata {
     }
 }
 
+impl Default for RunMetadata {
+    fn default() -> Self {
+        Self {
+            run_id: Uuid::new_v4(),
+            state: RunState::Fresh,
+        }
+    }
+}
+
 impl std::fmt::Display for RunState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state_str = match self {

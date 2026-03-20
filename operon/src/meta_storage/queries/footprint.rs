@@ -5,7 +5,7 @@
 use uuid::Uuid;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema::{RunFootprint, RunMetadata};
+use crate::schema::RunFootprint;
 use crate::utils::GLOBAL;
 
 impl MetaClient<'_> {
@@ -66,11 +66,7 @@ impl MetaClient<'_> {
             .parse()
             .map_err(MetaStorageError::Other)?;
 
-        let footprint = RunFootprint {
-            metadata: RunMetadata { run_id, state },
-            at: updated_at,
-        };
-        Ok(Some(footprint))
+        Ok(Some(RunFootprint::at(run_id, state, updated_at)))
     }
 
     /// Updates the run table on run state change.
