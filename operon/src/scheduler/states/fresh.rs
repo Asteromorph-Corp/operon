@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use crate::scheduler::ControlEvent;
 use crate::scheduler::context::SchedulerContext;
+use crate::scheduler::states::running::RunningState;
 use crate::scheduler::states::{NextState, SchedulerState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -40,6 +41,10 @@ where
             run_id,
         }
     }
+
+    fn into_running(self) -> RunningState<Svc, Sto> {
+        RunningState::new(self.ctx, self.channel_size, true)
+    }
 }
 
 #[async_trait]
@@ -51,13 +56,26 @@ where
     async fn handle_progress(
         self: Box<Self>,
     ) -> Result<NextState, crate::scheduler::SchedulerError> {
-        todo!()
+        Ok(NextState::Next(self))
     }
 
     async fn handle_control_event(
         self: Box<Self>,
-        _: ControlEvent,
+        evt: ControlEvent,
     ) -> Result<NextState, crate::scheduler::SchedulerError> {
-        todo!();
+        match evt {
+            ControlEvent::Check { .. } => log::warn!("Cannot check on a fresh run"),
+            ControlEvent::Run { rebuild: true, .. } => {
+                log::error!("Cannot rebuild on a fresh run.")
+            }
+            ControlEvent::Run { .. } => return Ok(NextState::from(self.into_running())),
+            ControlEvent::Pause { .. } => log::warn!("Cannot pause before the run has started."),
+            ControlEvent::Resume { .. } => log::warn!("Cannot resume before the run has started."),
+            ControlEvent::Quit { .. } => return Ok(NextState::Exit),
+            ControlEvent::Exit => return Ok(NextState::Exit),
+            // TODO: remove other events.
+            _ => {}
+        }
+        Ok(NextState::Next(self))
     }
 }

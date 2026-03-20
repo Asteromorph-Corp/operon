@@ -4,6 +4,7 @@ use crate::scheduler::{ControlEvent, SchedulerError};
 
 mod fresh;
 mod init;
+mod running;
 mod stale;
 
 pub enum NextState {

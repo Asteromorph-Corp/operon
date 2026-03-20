@@ -1,11 +1,14 @@
 use async_trait::async_trait;
+use tokio::time::Instant;
 use uuid::Uuid;
 
-use crate::scheduler::ControlEvent;
 use crate::scheduler::context::SchedulerContext;
+use crate::scheduler::states::running::RunningState;
 use crate::scheduler::states::{NextState, SchedulerState};
+use crate::scheduler::{ControlEvent, RunMode, SchedulerError};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
+use crate::ui::CheckMode;
 
 pub struct StaleState<Svc, Sto>
 where
@@ -20,6 +23,7 @@ where
     is_consistent: Option<bool>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum StaleKind {
     Complete,
     GracefulStop,
@@ -62,6 +66,99 @@ where
             is_consistent: None,
         }
     }
+
+    fn into_running(self, run_mode: RunMode) -> RunningState<Svc, Sto> {
+        RunningState::new(self.ctx, self.channel_size, run_mode == RunMode::Clean)
+    }
+
+    async fn run_consistency_check(&mut self, mode: CheckMode) -> Result<(), SchedulerError> {
+        let check_start = Instant::now();
+        let is_consistent = self
+            .ctx
+            .handler
+            .check_consistency(
+                &self.ctx.storage,
+                self.ctx.meta_storage.conn().await?.as_client(),
+                mode,
+            )
+            .await
+            .inspect_err(|e| log::error!("Failed to check data consistency: {e}"))?;
+
+        log::info!(
+            "Consistency check completed in: {:?}.",
+            check_start.elapsed()
+        );
+        self.is_consistent = Some(is_consistent);
+
+        if !is_consistent {
+            log::info!(
+                "Some data is corrupted or missing.\n\
+                Type `run` to start a new run and overwrite the existing data, or `exit` to cancel."
+            );
+            return Ok(());
+        }
+
+        match self.kind {
+            StaleKind::Complete => log::info!(
+                "No inconsistencies were found.\n\
+                Type `run` to resume running jobs from the last run, or `help` for additional options."
+            ),
+            StaleKind::GracefulStop => log::info!(
+                "No inconsistencies were found.\n\
+                Type `run` to resume running jobs from the last run, or `help` for additional options."
+            ),
+            StaleKind::Abort => log::info!(
+                "The data is recoverable.\n\
+                Type `run` to rebuild and resume running jobs from the last run, or `help` for additional options."
+            ),
+        }
+        Ok(())
+    }
+
+    fn choose_run_mode(&self, fresh: bool, rebuild: bool) -> Option<RunMode> {
+        if fresh {
+            log::info!("Starting a fresh run, ignoring previous data.");
+            return Some(RunMode::Clean);
+        }
+
+        if rebuild {
+            return match (&self.kind, self.is_consistent) {
+                // Consistency check failed.
+                (_, Some(false)) => {
+                    log::error!("Cannot rebuild because of missing data.");
+                    None
+                }
+                // Previous run was aborted, and no consistency check was performed.
+                (StaleKind::Abort, None) => {
+                    log::error!("Cannot rebuild before checking for consistency.");
+                    None
+                }
+                // Previous run was either gracefully stopped or complete.
+                _ => {
+                    log::info!("Rebuilding the run from trusted data.");
+                    Some(RunMode::Rebuild)
+                }
+            };
+        }
+
+        // The behaviour of `run` command without any flags.
+        match (&self.kind, self.is_consistent) {
+            // Consistency check failed.
+            (_, Some(false)) => Some(RunMode::Clean),
+            // Previous run was aborted, and no consistency check was performed.
+            (StaleKind::Abort, None) => Some(RunMode::Clean),
+            // Previous run was aborted, but consistency check succeeded.
+            (StaleKind::Abort, Some(true)) => {
+                log::info!("Rebuilding the run from trusted data.");
+                Some(RunMode::Rebuild)
+            }
+            // Previous run was either gracefully stopped or complete.
+            _ => {
+                log::info!("Continuing the last run.");
+                Some(RunMode::Restore)
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -73,13 +170,30 @@ where
     async fn handle_progress(
         self: Box<Self>,
     ) -> Result<NextState, crate::scheduler::SchedulerError> {
-        todo!()
+        Ok(NextState::Next(self))
     }
 
     async fn handle_control_event(
         mut self: Box<Self>,
-        _: ControlEvent,
+        evt: ControlEvent,
     ) -> Result<NextState, crate::scheduler::SchedulerError> {
-        todo!();
+        match evt {
+            ControlEvent::Check { .. } if self.is_consistent.is_some() => {
+                log::warn!("Already run a check.")
+            }
+            ControlEvent::Check { mode } => self.run_consistency_check(mode).await?,
+            ControlEvent::Run { fresh, rebuild } => {
+                if let Some(run_mode) = self.choose_run_mode(fresh, rebuild) {
+                    return Ok(NextState::from(self.into_running(run_mode)));
+                }
+            }
+            ControlEvent::Pause { .. } => log::warn!("Cannot pause before the run has started."),
+            ControlEvent::Resume { .. } => log::warn!("Cannot resume before the run has started."),
+            ControlEvent::Quit { .. } => return Ok(NextState::Exit),
+            ControlEvent::Exit => return Ok(NextState::Exit),
+            // TODO: remove other events.
+            _ => {}
+        }
+        Ok(NextState::Next(self))
     }
 }
