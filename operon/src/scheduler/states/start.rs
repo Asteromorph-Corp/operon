@@ -48,8 +48,14 @@ where
         TransitionState::new(Self::new(ctx, channel_size, run_id, clean))
     }
 
-    fn into_running(self) -> RunningState<Svc, Sto> {
-        RunningState::new(self.ctx, self.channel_size, false)
+    fn into_running(self, execution_id: Uuid) -> RunningState<Svc, Sto> {
+        RunningState::new(
+            self.ctx,
+            self.channel_size,
+            self.run_id,
+            execution_id,
+            false,
+        )
     }
 }
 
@@ -74,6 +80,6 @@ where
             .put_execution(footprint.metadata.run_id, execution_id)
             .await?;
 
-        Ok(NextState::from(self.into_running()))
+        Ok(NextState::from(self.into_running(execution_id)))
     }
 }
