@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 
 use crate::schema::{Entity, EntityMetadata};
 use crate::storage::StorageError;
-use crate::storage::psql::StorageClient;
+use crate::storage::psql::client::StorageClient;
 use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams, hash_metadata, replace_if_updated};
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}

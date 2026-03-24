@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use secrecy::ExposeSecret;
 
 use crate::schema::RunFootprint;
-use crate::storage::psql::{EntityQueries, StorageClient};
+use crate::storage::psql::EntityQueries;
+use crate::storage::psql::client::StorageClient;
 use crate::storage::{OperonStorage, StorageError, StorageOptions};
 use crate::utils::SchemaPrefix;
 
