@@ -19,13 +19,7 @@ pub enum ControlEvent {
         fresh: bool,
         rebuild: bool,
     },
-    // TODO: Remove `CleanRun`, `RebuildRun`, `RestoreRun`
-    /// Perform a clean run.
-    CleanRun,
-    /// Perform a rebuilding run from an `AbortedChecked` state.
-    RebuildRun,
-    /// Perform a restoring run from a `GracefullyStopped` state.
-    RestoreRun,
+
     /// Pause executing new jobs.
     /// Note that pausing the scheduler does not stop ongoing jobs,
     /// neither does it stop handling events (i.e. updating the ticket storage).
@@ -42,16 +36,4 @@ pub enum ControlEvent {
         no_exit: bool,
     },
     Exit,
-
-    /// Gracefully stop the scheduler:
-    /// * Stop executing new jobs (= pause),
-    /// * wait for all ongoing jobs to finish,
-    /// * handle all pending events,
-    /// * place a persistent indication that the scheduler stopped gracefully,
-    /// * and then exit.
-    ///
-    /// Effectively, "pause everything and wait long enough".
-    GracefulStop,
-    /// Abort the scheduler immediately.
-    Abort,
 }
