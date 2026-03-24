@@ -1,9 +1,11 @@
 use std::fmt::Debug;
 use std::num::TryFromIntError;
+use std::str::FromStr;
 
+use postgres_types::{FromSql, ToSql};
 use tokio_postgres::Row;
 
-use crate::schema::{Job, JobMetadata, OptionCoordinate, TicketStatus};
+use crate::schema::{Job, JobMetadata, OptionCoordinate};
 use crate::utils::{SqlParams, box_sql};
 
 #[derive(Debug, Clone, Copy)]
@@ -12,6 +14,34 @@ pub struct Ticket<const N: usize> {
     deps_done: usize,
     deps_quota: usize,
     pub status: TicketStatus,
+}
+
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, ToSql, FromSql)]
+#[postgres(name = "ticket_status")]
+pub enum TicketStatus {
+    #[default]
+    #[postgres(name = "waiting")]
+    Waiting,
+    #[postgres(name = "queued")]
+    Queued,
+    #[postgres(name = "done")]
+    Done,
+}
+
+pub trait TicketLike: Debug + Clone + Copy + Send + Sync + 'static {}
+
+impl<const N: usize> TicketLike for Ticket<N> {}
+
+pub trait TicketEnum: Debug + Clone + Send + Sync + 'static {}
+
+#[derive(Debug, Clone)]
+pub struct TicketExplosion<T: TicketEnum> {
+    /// The ticket providing the coordinate of explosion.
+    pub ticket: T,
+    /// The dimension of explosion.
+    pub dim: &'static str,
+    /// The ub of the explosion resolution.
+    pub ub: usize,
 }
 
 impl<const N: usize> Ticket<N> {
@@ -108,18 +138,25 @@ impl<const N: usize> Ticket<N> {
     }
 }
 
-pub trait TicketLike: Debug + Clone + Copy + Send + Sync + 'static {}
+impl ::std::fmt::Display for TicketStatus {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match self {
+            TicketStatus::Waiting => write!(f, "waiting"),
+            TicketStatus::Queued => write!(f, "queued"),
+            TicketStatus::Done => write!(f, "done"),
+        }
+    }
+}
 
-impl<const N: usize> TicketLike for Ticket<N> {}
+impl FromStr for TicketStatus {
+    type Err = String;
 
-pub trait TicketEnum: Debug + Clone + Send + Sync + 'static {}
-
-#[derive(Debug, Clone)]
-pub struct TicketExplosion<T: TicketEnum> {
-    /// The ticket providing the coordinate of explosion.
-    pub ticket: T,
-    /// The dimension of explosion.
-    pub dim: &'static str,
-    /// The ub of the explosion resolution.
-    pub ub: usize,
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "waiting" => Ok(TicketStatus::Waiting),
+            "queued" => Ok(TicketStatus::Queued),
+            "done" => Ok(TicketStatus::Done),
+            _ => Err(format!("Invalid ticket status: {s}")),
+        }
+    }
 }
