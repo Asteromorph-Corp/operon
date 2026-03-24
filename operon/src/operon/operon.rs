@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use futures::future::try_join;
-use tokio::sync::RwLock;
 
 use crate::logger::Logger;
 use crate::operon::{OperonError, OperonOptions};
 use crate::scheduler::{ControlEvent, Scheduler, ValidOperon};
+use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{UiLoop, UiState};
+use crate::ui::UiLoop;
 
 /// # Operon
 ///
@@ -66,19 +66,19 @@ where
 
         // Set up the logger
         Logger::new(log_tx, log_options).setup(::log::LevelFilter::Trace)?;
-        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(&handler.job_handlers)));
+        let progresses = SharedProgressMap::from_jobs(&handler.job_handlers);
 
         // Create the scheduler
         let scheduler = Scheduler::<Svc, Sto>::new(
             self.service,
             self.storage,
             handler,
-            ui_state.clone(),
+            progresses.clone(),
             ctrl_rx,
             sched_tx,
             scheduler_options,
         )?;
-        let ui_loop = UiLoop::new(ui_state, log_rx, ctrl_tx, sched_rx, ui_options);
+        let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
         let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };

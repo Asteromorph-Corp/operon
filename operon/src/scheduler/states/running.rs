@@ -39,7 +39,7 @@ where
             &ctx.service,
             &ctx.storage,
             &ctx.meta_storage,
-            &ctx.ui_state,
+            &ctx.progresses,
             &ctx.ctrl_rx,
             clean,
         );

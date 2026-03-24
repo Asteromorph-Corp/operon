@@ -1,18 +1,43 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
+use tokio::sync::RwLock;
+use tokio::task::JoinSet;
 
-use crate::meta_storage::MetaClient;
+use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::scheduler::{
-    ExecutionState, HandlerWithRx, HandlersWithChannels, JobHandler, JobRebuilder, PeerEvent,
-    SchedulerError,
+    ControlEventReceiver, ExecutionState, JobHandler, JobRebuilder, PeerEvent, PeerEventSenderMap,
+    SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
+use crate::schema::{Progress, SharedProgressMap};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{UiState, UiStateUpdate};
 
 pub struct SchedulerHandler<Svc: OperonService, Sto: OperonStorage> {
     pub job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>,
+}
+
+/// Helper struct for `Scheduler::prepare_channel`
+///
+/// An association of `JobManager` and event receiver channel
+pub(crate) struct HandlerWithRx<'a, Svc, Sto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    pub handler: &'a dyn JobHandler<Svc, Sto>,
+    pub peer_rx: ServicePeerEventReceiver<Svc>,
+}
+
+/// Helper struct for `Scheduler::prepare_channel`
+pub(crate) struct HandlersWithChannels<'a, Svc, Sto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    pub handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto>>,
+    pub peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
 }
 
 impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
@@ -113,8 +138,8 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
 
     pub(crate) async fn update_ui(
         &self,
+        progresses: &SharedProgressMap,
         client: MetaClient<'_>,
-        ui_state: &mut UiState,
     ) -> Result<(), SchedulerError> {
         for schedule in &self.job_handlers {
             let (done, queued, waiting) = schedule.get_status(client).await?;
@@ -124,10 +149,10 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
                 ExecutionState::Running
             };
 
-            ui_state.update_ui_state(UiStateUpdate::ProgressUpdate(
-                schedule.job_id().to_string(),
-                (done, queued, waiting, state),
-            ))?;
+            let Some(progress) = progresses.0.get(schedule.job_id()) else {
+                return Err(SchedulerError::missing_progress(schedule.job_id()));
+            };
+            *progress.write().await = Progress::new(done, queued, waiting, state);
         }
         Ok(())
     }
@@ -135,11 +160,79 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     pub(crate) async fn prepare_rebuilders(
         &self,
         storage: &Sto,
+        progresses: &SharedProgressMap,
         client: MetaClient<'_>,
     ) -> Result<Vec<Box<dyn JobRebuilder>>, SchedulerError> {
         futures::stream::iter(&self.job_handlers)
-            .then(|schedule| schedule.prepare_rebuild(storage, client))
+            .then(|schedule| async {
+                let Some(progress) = progresses.0.get(schedule.job_id()) else {
+                    return Err(SchedulerError::missing_progress(schedule.job_id()));
+                };
+                schedule
+                    .prepare_rebuild(storage, progress.clone(), client)
+                    .await
+            })
             .try_collect::<Vec<_>>()
             .await
+    }
+}
+
+impl<'a, Svc, Sto> HandlerWithRx<'a, Svc, Sto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    pub fn new(
+        handler: &'a dyn JobHandler<Svc, Sto>,
+        peer_rx: ServicePeerEventReceiver<Svc>,
+    ) -> Self {
+        Self { handler, peer_rx }
+    }
+}
+
+impl<'a, Svc, Sto> HandlersWithChannels<'a, Svc, Sto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    pub fn new(
+        handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto>>,
+        peer_txs: ServicePeerEventSenderMap<Svc>,
+    ) -> Self {
+        Self {
+            handlers_with_rx,
+            peer_txs,
+        }
+    }
+
+    pub fn run_schedulers(
+        self,
+        service: &Arc<Svc>,
+        storage: &Arc<Sto>,
+        meta_storage: &MetaStorage,
+        progresses: &SharedProgressMap,
+        ctrl_rx: &ControlEventReceiver,
+        clean: bool,
+    ) -> JoinSet<ExecutionState> {
+        JoinSet::from_iter(self.handlers_with_rx.into_iter().map(
+            |HandlerWithRx { handler, peer_rx }| {
+                let progress = progresses
+                    .0
+                    .get(handler.job_id())
+                    .cloned()
+                    .unwrap_or_else(|| Arc::new(RwLock::new(Progress::default())));
+
+                handler.run_scheduler(
+                    service.clone(),
+                    storage.clone(),
+                    meta_storage.clone(),
+                    progress,
+                    self.peer_txs.clone(),
+                    peer_rx,
+                    ctrl_rx.clone(),
+                    clean,
+                )
+            },
+        ))
     }
 }

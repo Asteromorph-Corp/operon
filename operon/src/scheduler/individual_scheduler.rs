@@ -1,7 +1,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
-use tokio::sync::{RwLock, Semaphore};
+use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
@@ -10,10 +10,9 @@ use crate::scheduler::{
     PeerEventSenders, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
     SpecWithMetadata,
 };
-use crate::schema::{Job, JobMetadata, Ticket, TicketStatus};
+use crate::schema::{Job, JobMetadata, Progress, SharedProgress, Ticket, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{UiState, UiStateUpdate};
 
 /// # IndividualScheduler
 ///
@@ -40,7 +39,7 @@ where
     pub meta_storage: MetaStorage,
     pub pool: Arc<Semaphore>,
     pub pool_size: usize,
-    pub ui_state: Arc<RwLock<UiState>>,
+    pub progress: SharedProgress,
     pub handles: JoinSet<Result<InternalEvent<Job<N>, JS::Resolution>, SchedulerError>>,
 }
 
@@ -57,7 +56,7 @@ where
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
         pool_size: usize,
-        ui_state: Arc<RwLock<UiState>>,
+        progress: SharedProgress,
     ) -> Self {
         Self {
             spec: spec.spec,
@@ -68,7 +67,7 @@ where
             meta_storage,
             pool: Arc::new(Semaphore::new(pool_size)),
             pool_size,
-            ui_state,
+            progress,
             handles: JoinSet::new(),
         }
     }
@@ -83,13 +82,7 @@ where
             log::info!("All `{}` jobs are finished.", self.meta.id);
             *state = ExecutionState::Finished
         }
-        self.ui_state
-            .write()
-            .await
-            .update_ui_state(UiStateUpdate::ProgressUpdate(
-                self.meta.id.into(),
-                (done, queued, waiting, *state),
-            ))?;
+        *self.progress.write().await = Progress::new(done, queued, waiting, *state);
         Ok(())
     }
 
@@ -432,8 +425,8 @@ where
                     state
                 );
                 *state = ExecutionState::Error;
-                return Err(SchedulerError::Other(
-                    "Scheduler entered event loop in an unexpected state".into(),
+                return Err(SchedulerError::other(
+                    "Scheduler entered event loop in an unexpected state",
                 ));
             }
         }
@@ -466,8 +459,8 @@ where
                     state
                 );
                 *state = ExecutionState::Error;
-                return Err(SchedulerError::Other(
-                    "Scheduler entered event loop in an unexpected state".into(),
+                return Err(SchedulerError::other(
+                    "Scheduler entered event loop in an unexpected state",
                 ));
             }
         }
@@ -513,8 +506,8 @@ where
                     state
                 );
                 *state = ExecutionState::Error;
-                Err(SchedulerError::Other(
-                    "Scheduler entered event loop in an unexpected state".into(),
+                Err(SchedulerError::other(
+                    "Scheduler entered event loop in an unexpected state",
                 ))
             }
         }

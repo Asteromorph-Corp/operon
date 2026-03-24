@@ -1,6 +1,7 @@
 async fn prepare_rebuild(
     &self,
     storage: &Sto,
+    progress: operon::schema::SharedProgress,
     client: operon::meta_storage::MetaClient<'_>,
 ) -> Result<Box<dyn operon::scheduler::JobRebuilder>, operon::scheduler::SchedulerError> {
     let tickets = client
@@ -31,5 +32,6 @@ async fn prepare_rebuild(
         job_meta: self.job_meta(),
         spawn_dim_meta: self.spawn_dim_meta(),
         data,
+        progress,
     }))
 }

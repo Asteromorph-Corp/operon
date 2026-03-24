@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crossterm::event::{Event, EventStream, KeyCode, KeyModifiers, MouseEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -8,13 +6,10 @@ use crossterm::terminal::{
 use futures::StreamExt;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
-use tokio::sync::RwLock;
 
 use crate::scheduler::{ControlEvent, ControlEventSender, ExecutionState, SchedulerStateReceiver};
-use crate::ui::{
-    Command, CommandPrompt, LogRecordReceiver, LogView, Progress, UiError, UiMode, UiOptions,
-    UiState,
-};
+use crate::schema::{Progress, SharedProgressMap};
+use crate::ui::{Command, CommandPrompt, LogRecordReceiver, LogView, UiError, UiMode, UiOptions};
 use crate::utils::SplitFirstOwned;
 
 const SEVENTY_SIX: u16 = 76;
@@ -53,8 +48,8 @@ Commands:
 
 /// The main UI loop that handles user input and updates the UI state.
 pub struct UiLoop {
-    state: Arc<RwLock<UiState>>,
     mode: UiMode,
+    progresses: SharedProgressMap,
     progress_cursor: u16,
     logs: LogView,
     prompt: CommandPrompt,
@@ -69,15 +64,15 @@ impl UiLoop {
     /// Create a new UI loop with the given state, primary upper bound, log receiver,
     /// control event sender, and recovery state receiver.
     pub fn new(
-        state: Arc<RwLock<UiState>>,
+        progresses: SharedProgressMap,
         log_rx: LogRecordReceiver,
         ctrl_tx: ControlEventSender,
         sched_rx: SchedulerStateReceiver,
         options: UiOptions,
     ) -> Self {
         Self {
-            state,
             mode: options.mode,
+            progresses,
             progress_cursor: 0u16,
             logs: LogView::new(options.log_buffer_size),
             prompt: CommandPrompt::default(),
@@ -200,7 +195,7 @@ impl UiLoop {
             }
 
             // Snapshot the current overall state.
-            let state = self.state.read().await.overall_state();
+            let state = self.progresses.snapshot().await.overall_state();
 
             // If a new error state is detected, abort the execution.
             if state == ExecutionState::Error {
@@ -285,9 +280,9 @@ impl UiLoop {
     }
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
-        let draw_snapshot = self.state.read().await.clone();
+        let draw_snapshot = self.progresses.snapshot().await;
         let max_len = draw_snapshot
-            .progress
+            .0
             .keys()
             .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
             .max()
@@ -295,7 +290,7 @@ impl UiLoop {
             .clamp(3, 20);
 
         let height = terminal.size()?.height;
-        let total_progress_bars = draw_snapshot.progress.len() as u16;
+        let total_progress_bars = draw_snapshot.0.len() as u16;
         let max_progress_bars = height
             .saturating_sub(height.saturating_div(2).max(9))
             .min(20);
@@ -408,7 +403,7 @@ impl UiLoop {
                 progress_description,
             );
             draw_snapshot
-                .progress
+                .0
                 .iter()
                 .skip(self.progress_cursor as usize)
                 .take(num_progress_bars as usize)
@@ -512,18 +507,17 @@ fn draw_progress_gauge(
         Constraint::Length(1),
     ]);
     let [text_area, gauge_left, gauge_area, gauge_right] = horizontal.areas(area);
-    let (done, queued, waiting) = (progress.0, progress.1, progress.2);
     frame.render_widget(
         Line::from(vec![
             Span::styled(
                 clamp_name(name, max_len),
-                Style::new().fg(progress.3.color()),
+                Style::new().fg(progress.state.color()),
             ),
             Span::raw(format!(
                 " [{}/{}/{}] ",
-                five_format(done),
-                five_format(queued),
-                five_format(waiting)
+                five_format(progress.done),
+                five_format(progress.queued),
+                five_format(progress.waiting)
             )),
         ]),
         text_area,
@@ -531,13 +525,15 @@ fn draw_progress_gauge(
 
     // Gauge area: manual gauge with Span, surrounded by borders
     let gauge_length = gauge_area.width;
-    let done_length = if done + queued + waiting > 0 {
-        ((done as f64 / (done + queued + waiting) as f64) * gauge_length as f64).round() as u16
+    let total = progress.done + progress.queued + progress.waiting;
+
+    let done_length = if total > 0 {
+        ((progress.done as f64 / total as f64) * gauge_length as f64).round() as u16
     } else {
         0
     };
-    let queued_length = if done + queued + waiting > 0 {
-        ((queued as f64 / (done + queued + waiting) as f64) * gauge_length as f64).round() as u16
+    let queued_length = if total > 0 {
+        ((progress.queued as f64 / total as f64) * gauge_length as f64).round() as u16
     } else {
         0
     };
@@ -550,11 +546,11 @@ fn draw_progress_gauge(
     .areas(gauge_area);
     let done_span = Span::styled(
         "█".repeat(done_length as usize),
-        Style::default().fg(progress.3.color()),
+        Style::default().fg(progress.state.color()),
     );
     let queued_span = Span::styled(
         "░".repeat(queued_length as usize),
-        Style::default().fg(progress.3.color()),
+        Style::default().fg(progress.state.color()),
     );
     let waiting_span = Span::styled(" ".repeat(waiting_length as usize), Style::default());
     frame.render_widget(

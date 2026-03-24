@@ -18,6 +18,7 @@ use crate::utils::rebuilder_ident;
 ///         operon::schema::Job<1usize>,
 ///         operon::schema::Resolution<1usize>,
 ///     )>,
+///     progress: operon::schema::SharedProgress,
 /// }
 /// ```
 pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
@@ -36,6 +37,7 @@ pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
             job_meta: #operon::schema::JobMetadata<#n>,
             #maybe_spawn_dim_meta
             data: Vec<(#operon::schema::Job<#n>, #resolution_type)>,
+            progress: #operon::schema::SharedProgress,
         }
     }
 }

@@ -2,17 +2,15 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::sync::RwLock;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::scheduler::{
     ControlEventReceiver, ExecutionState, IndividualScheduler, JobRebuilder, JobSpec,
     SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
 };
-use crate::schema::{Job, Ticket};
+use crate::schema::{Job, SharedProgress, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::UiState;
 
 #[async_trait]
 /// An helper trait to expose `Resolution`, `Ticket`, and `JobManager` interfaces while being dyn
@@ -72,6 +70,7 @@ where
     async fn prepare_rebuild(
         &self,
         storage: &Sto,
+        progress: SharedProgress,
         client: MetaClient<'_>,
     ) -> Result<Box<dyn JobRebuilder>, SchedulerError>; // `Scheduler::run` 6049~
 
@@ -82,7 +81,7 @@ where
         service: Arc<Svc>,
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
-        ui_state: Arc<RwLock<UiState>>,
+        progress: SharedProgress,
         peer_txs: ServicePeerEventSenderMap<Svc>,
         peer_rx: ServicePeerEventReceiver<Svc>,
         ctrl_rx: ControlEventReceiver,
@@ -152,9 +151,10 @@ where
     async fn prepare_rebuild(
         &self,
         storage: &Sto,
+        progress: SharedProgress,
         client: MetaClient<'_>,
     ) -> Result<Box<dyn JobRebuilder>, SchedulerError> {
-        self.spec.prepare_rebuild(storage, client).await
+        self.spec.prepare_rebuild(storage, progress, client).await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -163,7 +163,7 @@ where
         service: Arc<Svc>,
         storage: Arc<Sto>,
         meta_storage: MetaStorage,
-        ui_state: Arc<RwLock<UiState>>,
+        progress: SharedProgress,
         peer_txs: ServicePeerEventSenderMap<Svc>,
         peer_rx: ServicePeerEventReceiver<Svc>,
         ctrl_rx: ControlEventReceiver,
@@ -175,7 +175,7 @@ where
             storage,
             meta_storage,
             self.pool_size(),
-            ui_state,
+            progress,
         );
         Box::pin(individual_scheduler.run(peer_txs, peer_rx, ctrl_rx, clean))
     }

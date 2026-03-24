@@ -64,7 +64,7 @@ where
         let rebuilders = self
             .ctx
             .handler
-            .prepare_rebuilders(&self.ctx.storage, tx.as_client())
+            .prepare_rebuilders(&self.ctx.storage, &self.ctx.progresses, tx.as_client())
             .await?;
 
         self.ctx.handler.clear_resolution(tx.as_client()).await?;
@@ -73,17 +73,11 @@ where
         self.ctx.handler.put_default_tickets(tx.as_client()).await?;
         self.ctx
             .handler
-            .update_ui(tx.as_client(), &mut *self.ctx.ui_state.write().await)
+            .update_ui(&self.ctx.progresses, tx.as_client())
             .await?;
 
         for rebuilder in rebuilders {
-            rebuilder
-                .rebuild(tx.as_client(), self.ctx.ui_state.as_ref())
-                .await?;
-            self.ctx
-                .handler
-                .update_ui(tx.as_client(), &mut *self.ctx.ui_state.write().await)
-                .await?;
+            rebuilder.rebuild(tx.as_client()).await?;
         }
 
         tx.commit().await?;

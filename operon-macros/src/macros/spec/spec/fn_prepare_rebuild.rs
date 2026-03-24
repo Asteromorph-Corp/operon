@@ -74,6 +74,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
         async fn prepare_rebuild(
             &self,
             storage: &Sto,
+            progress: #operon::schema::SharedProgress,
             client: #operon::meta_storage::MetaClient<'_>,
         ) -> Result<Box<dyn #operon::scheduler::JobRebuilder>, #operon::scheduler::SchedulerError>
         {
@@ -98,7 +99,8 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             Ok(Box::new(#rebuilder_ident {
                 job_meta: self.job_meta(),
                 #maybe_spawn_dim_meta
-                data
+                data,
+                progress,
             }))
         }
     }

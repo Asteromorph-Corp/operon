@@ -4,7 +4,9 @@ use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
 use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
-use crate::schema::{JobLike, JobMetadata, ResolutionLike, TicketExplosion, TicketLike};
+use crate::schema::{
+    JobLike, JobMetadata, ResolutionLike, SharedProgress, TicketExplosion, TicketLike,
+};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -87,6 +89,7 @@ where
     async fn prepare_rebuild(
         &self,
         storage: &Sto,
+        progress: SharedProgress,
         client: MetaClient<'_>,
     ) -> Result<Box<dyn JobRebuilder>, SchedulerError>;
 

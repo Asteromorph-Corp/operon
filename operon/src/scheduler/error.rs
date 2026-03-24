@@ -35,8 +35,20 @@ pub enum SchedulerError {
     SendThroughDowngradedSender,
     #[error("Error in user provided function: {0}")]
     UserError(Box<dyn std::error::Error + Send + Sync>),
+    #[error("Missing progress entry for job: {0}")]
+    MissingProgressEntry(String),
     #[error("Other error: {0}")]
     Other(String),
+}
+
+impl SchedulerError {
+    pub(crate) fn missing_progress(id: impl Into<String>) -> Self {
+        Self::MissingProgressEntry(id.into())
+    }
+
+    pub(crate) fn other(msg: impl Into<String>) -> Self {
+        Self::Other(msg.into())
+    }
 }
 
 impl From<RecoveryStateSendError> for SchedulerError {

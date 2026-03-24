@@ -1,16 +1,15 @@
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
-
 use crate::meta_storage::MetaStorage;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::{InitTransition, NextState, SchedulerState};
 use crate::scheduler::{
     ControlEventReceiver, SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender,
 };
+use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{UiMode, UiState};
+use crate::ui::UiMode;
 
 /// # Scheduler
 ///
@@ -44,7 +43,7 @@ where
         service: Arc<Svc>,
         storage: Arc<Sto>,
         handler: SchedulerHandler<Svc, Sto>,
-        ui_state: Arc<RwLock<UiState>>,
+        progresses: SharedProgressMap,
         ctrl_rx: ControlEventReceiver,
         sched_tx: SchedulerStateSender,
         options: SchedulerOptions,
@@ -57,7 +56,7 @@ where
             storage,
             meta_storage,
             handler,
-            ui_state,
+            progresses,
             ctrl_rx: ctrl_rx.clone(),
         };
 
