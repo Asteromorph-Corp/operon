@@ -6,9 +6,7 @@ use uuid::Uuid;
 
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::{NextState, SchedulerState};
-use crate::scheduler::{
-    ControlChannel, ControlEvent, ExecutionState, IndividualControlEvent, SchedulerError,
-};
+use crate::scheduler::{ControlChannel, ControlEvent, IndividualControlEvent, SchedulerError};
 use crate::schema::{RunFootprint, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -21,7 +19,7 @@ where
     ctx: SchedulerContext<Svc, Sto>,
     run_id: Uuid,
     execution_id: Uuid,
-    handles: JoinSet<ExecutionState>,
+    handles: JoinSet<()>,
     ctrl_channels: Vec<ControlChannel>,
     force_exited: bool,
     exit_ui: bool,

@@ -207,7 +207,7 @@ where
         meta_storage: &MetaStorage,
         progresses: &SharedProgressMap,
         clean: bool,
-    ) -> (JoinSet<ExecutionState>, Vec<ControlChannel>) {
+    ) -> (JoinSet<()>, Vec<ControlChannel>) {
         let mut futs = Vec::new();
         let mut channels = Vec::new();
 
