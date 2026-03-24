@@ -68,10 +68,8 @@ pub fn impl_spec_utils(
             }
             #maybe_spawn_dim_meta
 
-            pub fn all_upstream_jobs(&self) -> std::collections::HashSet<&'static str> {
-                std::collections::HashSet::from_iter([
-                    #(#all_upstream_job_ids,)*
-                ])
+            pub fn all_upstream_jobs(&self) -> Vec<&'static str> {
+                vec![#(#all_upstream_job_ids,)*]
             }
 
 

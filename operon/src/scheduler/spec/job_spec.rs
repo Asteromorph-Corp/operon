@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
@@ -20,7 +18,7 @@ where
     pub job_meta: JobMetadata<N>,
     // TODO: this is here to make `JobMetadata` `Copy`-able, maybe there is a better way to handle
     // this.
-    pub all_upstream_jobs: HashSet<&'static str>,
+    pub all_upstream_jobs: Vec<&'static str>,
     _phantom: std::marker::PhantomData<(Svc, Sto)>,
 }
 
@@ -30,11 +28,7 @@ where
     Sto: OperonStorage,
     JS: JobSpec<Svc, Sto>,
 {
-    pub fn new(
-        spec: JS,
-        job_meta: JobMetadata<N>,
-        all_upstream_jobs: HashSet<&'static str>,
-    ) -> Self {
+    pub fn new(spec: JS, job_meta: JobMetadata<N>, all_upstream_jobs: Vec<&'static str>) -> Self {
         Self {
             spec,
             job_meta,

@@ -57,7 +57,6 @@ where
             meta_storage,
             handler,
             progresses,
-            ctrl_rx: ctrl_rx.clone(),
         };
 
         Ok(Self {

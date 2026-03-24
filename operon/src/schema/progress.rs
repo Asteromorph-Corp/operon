@@ -56,23 +56,43 @@ impl ProgressMap {
     }
 
     pub fn overall_state(&self) -> ExecutionState {
-        if self.state_iter().any(|s| s == ExecutionState::Error) {
+        if self.any_error() {
             ExecutionState::Error
-        } else if self.state_iter().all(|s| s == ExecutionState::Finished) {
+        } else if self.all_finished() {
             ExecutionState::Finished
-        } else if self
-            .state_iter()
-            .all(|s| s == ExecutionState::Paused || s == ExecutionState::Finished)
-        {
+        } else if self.all_paused() {
             ExecutionState::Paused
-        } else if self
-            .state_iter()
-            .all(|s| s == ExecutionState::Stopped || s == ExecutionState::Finished)
-        {
+        } else if self.all_stopped() {
             ExecutionState::Stopped
         } else {
             ExecutionState::Running
         }
+    }
+
+    pub fn any_error(&self) -> bool {
+        self.state_iter().any(|s| s == ExecutionState::Error)
+    }
+
+    pub fn all_finished(&self) -> bool {
+        self.state_iter().all(|s| s == ExecutionState::Finished)
+    }
+
+    pub fn all_paused(&self) -> bool {
+        self.state_iter()
+            .all(|s| s == ExecutionState::Paused || s == ExecutionState::Finished)
+    }
+
+    pub fn all_stopped(&self) -> bool {
+        self.state_iter()
+            .all(|s| s == ExecutionState::Stopped || s == ExecutionState::Finished)
+    }
+
+    pub fn any_running(&self) -> bool {
+        self.state_iter().any(|s| s == ExecutionState::Running)
+    }
+
+    pub fn any_paused(&self) -> bool {
+        self.state_iter().any(|s| s == ExecutionState::Paused)
     }
 }
 

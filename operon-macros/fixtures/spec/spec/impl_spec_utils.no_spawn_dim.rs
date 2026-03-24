@@ -3,8 +3,8 @@ impl EpsilonSpec {
         metadata::job_epsilon_meta()
     }
 
-    pub fn all_upstream_jobs(&self) -> std::collections::HashSet<&'static str> {
-        std::collections::HashSet::from_iter(["alpha", "beta", "delta", "epsilon", "gamma"])
+    pub fn all_upstream_jobs(&self) -> Vec<&'static str> {
+        vec!["alpha", "beta", "delta", "epsilon", "gamma"]
     }
 
     pub fn into_handler<Svc: CookingService, Sto: CookingStorage>(

@@ -1,10 +1,14 @@
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use tokio::task::JoinSet;
 use uuid::Uuid;
 
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::{NextState, SchedulerState};
-use crate::scheduler::{ControlEvent, ExecutionState, SchedulerError};
+use crate::scheduler::{
+    ControlChannel, ControlEvent, ExecutionState, IndividualControlEvent, SchedulerError,
+};
 use crate::schema::{RunFootprint, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -18,7 +22,7 @@ where
     run_id: Uuid,
     execution_id: Uuid,
     handles: JoinSet<ExecutionState>,
-    returned: Vec<ExecutionState>,
+    ctrl_channels: Vec<ControlChannel>,
     force_exited: bool,
     exit_ui: bool,
 }
@@ -35,23 +39,33 @@ where
         execution_id: Uuid,
         clean: bool,
     ) -> Self {
-        let handles = ctx.handler.prepare_channels(channel_size).run_schedulers(
+        let (handles, ctrl_channels) = ctx.handler.prepare_channels(channel_size).run_schedulers(
             &ctx.service,
             &ctx.storage,
             &ctx.meta_storage,
             &ctx.progresses,
-            &ctx.ctrl_rx,
             clean,
         );
 
         Self {
             ctx,
-            handles,
             run_id,
             execution_id,
-            returned: Vec::new(),
+            handles,
+            ctrl_channels,
             force_exited: false,
             exit_ui: false,
+        }
+    }
+
+    async fn handle_quit(&mut self, force: bool, exit_ui: bool) {
+        self.force_exited = force;
+        self.exit_ui = exit_ui;
+        for channel in &self.ctrl_channels {
+            let _ = channel
+                .tx
+                .send(IndividualControlEvent::Quit { force })
+                .await;
         }
     }
 }
@@ -63,22 +77,15 @@ where
     Sto: OperonStorage,
 {
     async fn handle_progress(mut self: Box<Self>) -> Result<NextState, SchedulerError> {
-        if let Some(res) = self.handles.try_join_next() {
-            self.returned.push(res?);
-        }
-
-        if !self.handles.is_empty() {
+        if self.handles.try_join_next().is_none() || !self.handles.is_empty() {
             return Ok(NextState::Next(self));
         }
 
-        let state = if self.returned.iter().all(|&s| s == ExecutionState::Finished) {
+        let snapshot = self.ctx.progresses.snapshot().await;
+
+        let state = if snapshot.all_finished() {
             RunState::Completed
-        } else if self
-            .returned
-            .iter()
-            .all(|&s| s == ExecutionState::Stopped || s == ExecutionState::Finished)
-            && !self.force_exited
-        {
+        } else if snapshot.all_stopped() && !self.force_exited {
             RunState::Paused
         } else {
             RunState::Aborted
@@ -114,6 +121,64 @@ where
             self.force_exited = force;
             self.exit_ui = !no_exit;
         };
+
+        let snapshot = self.ctx.progresses.snapshot().await;
+
+        match evt {
+            ControlEvent::Run { .. } => log::warn!(
+                "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
+            ),
+            ControlEvent::Check { .. } => {
+                log::warn!("Cannot check after the run has already started.")
+            }
+            ControlEvent::Quit { force, .. } if snapshot.any_error() => {
+                if !force {
+                    log::warn!("Cannot stop due to previous errors. Defaulting to a force quit.");
+                }
+                self.handle_quit(true, false).await;
+            }
+            ControlEvent::Quit { force, no_exit } => {
+                if force {
+                    log::warn!("Sent abort request, stopping immediately...");
+                } else {
+                    log::info!("Sent stop request, stopping gracefully...");
+                }
+                self.handle_quit(force, !no_exit).await;
+            }
+            ControlEvent::Pause { .. } if !snapshot.any_running() => {
+                log::warn!("No running jobs to pause, did you mean to `exit` or `quit` instead?")
+            }
+            ControlEvent::Pause { targets, cascade } => {
+                let targets: HashSet<String> = HashSet::from_iter(targets);
+
+                for channel in &self.ctrl_channels {
+                    let is_target = targets.is_empty() || targets.contains(channel.job_id);
+                    let is_downstream =
+                        cascade && channel.upstream_jobs.iter().any(|id| targets.contains(*id));
+
+                    if is_target || is_downstream {
+                        let _ = channel.tx.send(IndividualControlEvent::Pause).await;
+                    }
+                }
+            }
+            ControlEvent::Resume { .. } if !snapshot.any_paused() => {
+                log::warn!("No paused jobs to resume.")
+            }
+            ControlEvent::Resume { targets } => {
+                let targets: HashSet<String> = HashSet::from_iter(targets);
+
+                for channel in &self.ctrl_channels {
+                    if targets.is_empty() || targets.contains(channel.job_id) {
+                        let _ = channel.tx.send(IndividualControlEvent::Resume).await;
+                    }
+                }
+            }
+            ControlEvent::Exit => log::warn!(
+                "Cannot exit while jobs are running or paused. \
+                Use `quit` for a graceful stop, or `quit --force` to abort all jobs."
+            ),
+            _ => {}
+        }
 
         Ok(NextState::Next(self))
     }

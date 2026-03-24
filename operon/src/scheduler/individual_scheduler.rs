@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use tokio::sync::Semaphore;
@@ -6,9 +6,9 @@ use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
 use crate::scheduler::{
-    ControlEvent, ControlEventReceiver, ExecutionState, InternalEvent, JobSpec, PeerEvent,
-    PeerEventSenders, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
-    SpecWithMetadata,
+    ExecutionState, IndividualControlEvent, IndividualControlEventReceiver, InternalEvent, JobSpec,
+    PeerEvent, PeerEventSenders, SchedulerError, ServicePeerEventReceiver,
+    ServicePeerEventSenderMap, SpecWithMetadata,
 };
 use crate::schema::{Job, JobMetadata, Progress, SharedProgress, Ticket, TicketStatus};
 use crate::service::OperonService;
@@ -33,7 +33,7 @@ where
 {
     pub spec: JS,
     pub meta: JobMetadata<N>,
-    pub all_upstream_jobs: HashSet<&'static str>,
+    pub all_upstream_jobs: Vec<&'static str>,
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
     pub meta_storage: MetaStorage,
@@ -154,7 +154,7 @@ where
         mut self,
         peer_tx_map: ServicePeerEventSenderMap<Svc>,
         peer_rx: ServicePeerEventReceiver<Svc>,
-        ctrl_rx: ControlEventReceiver,
+        ctrl_rx: IndividualControlEventReceiver,
         clean: bool,
     ) -> ExecutionState {
         // Create an internal channel for `InternalEvent`s.
@@ -233,48 +233,44 @@ where
         initial_tickets: Vec<Ticket<N>>,
         peer_txs: &JS::PeerEventSenders,
         mut peer_rx: ServicePeerEventReceiver<Svc>,
-        mut ctrl_rx: ControlEventReceiver,
+        mut ctrl_rx: IndividualControlEventReceiver,
         state: &mut ExecutionState,
     ) -> Result<(), SchedulerError> {
         let pool = self.pool.clone();
 
         let mut ready_tickets: VecDeque<Ticket<N>> = initial_tickets.into();
         let mut got_all_updates = false;
+        let mut is_stopping = false;
 
         // Main event loop.
         loop {
-            // This loop cannot be entered with the `Error` or `Stopped` state,
-            // as changing the state to `Error` or `Stopped` always exits `run_internal`
-            // immediately.
-            // 0. Check the control channel.
-            let ctrl_event = ctrl_rx.borrow_and_update().clone();
-            match ctrl_event {
-                ControlEvent::Pause { targets, cascade } => {
-                    self.handle_pause(targets, cascade, state).await?
-                }
-                ControlEvent::Resume { targets } => self.handle_resume(targets, state).await?,
-                ControlEvent::Quit { force: false, .. } => {
-                    if self.handle_graceful_stop(state, got_all_updates).await? {
-                        return Ok(());
-                    }
-                }
-                ControlEvent::Quit { force: true, .. } => {
-                    log::info!("Aborting `{}` jobs.", self.meta.id);
-                    // If this is a finished scheduler rolling out peer events,
-                    // don't change the state to `Stopped`,
-                    // since it is already `Finished`.
-                    if matches!(state, ExecutionState::Running | ExecutionState::Paused) {
-                        *state = ExecutionState::Stopped;
-                    }
-                    return Ok(());
-                }
-                _ => (), // No-op for other control events.
+            if is_stopping && self.handles.is_empty() && got_all_updates {
+                *state = ExecutionState::Stopped;
+                return Ok(());
             }
 
             ::tokio::select! {
-                // 0. Also wait on the control channel to avoid being stuck in this loop.
-                ctrl_event = ctrl_rx.changed() => {
-                    ctrl_event?;
+                // 0. Check the control channel.
+                Some(ctrl_event) = ctrl_rx.recv() => {
+                    match ctrl_event {
+                        IndividualControlEvent::Pause if *state == ExecutionState::Running => self.handle_pause(state).await?,
+                        IndividualControlEvent::Resume if *state == ExecutionState::Paused => self.handle_resume(state).await?,
+                        IndividualControlEvent::Quit { force: false } => {
+                            self.handle_graceful_stop(state).await?;
+                            is_stopping = true;
+                        }
+                        IndividualControlEvent::Quit { force: true } => {
+                            log::info!("Aborting `{}` jobs.", self.meta.id);
+                            // If this is a finished scheduler rolling out peer events,
+                            // don't change the state to `Stopped`,
+                            // since it is already `Finished`.
+                            if matches!(state, ExecutionState::Running | ExecutionState::Paused) {
+                                *state = ExecutionState::Stopped;
+                            }
+                            return Ok(());
+                        }
+                        _ => {}
+                    }
                 }
 
                 // 1. An internal event.
@@ -337,8 +333,8 @@ where
                     if !ready_tickets.is_empty()
                 => {
                     let permit = permit?;
-                    let ticket = ready_tickets.pop_front().ok_or(SchedulerError::Other("Ready to run queue is empty".into()))?;
-                    let job = ticket.resolve().ok_or(SchedulerError::Other("Ticket is not ready to run".into()))?;
+                    let ticket = ready_tickets.pop_front().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
+                    let job = ticket.resolve().ok_or(SchedulerError::other("Ticket is not ready to run"))?;
                     let job_id = self.meta.id;
                     let spec = self.spec.clone();
                     let job_meta = self.meta;
@@ -384,132 +380,49 @@ where
         }
     }
 
-    async fn handle_pause(
-        &mut self,
-        targets: Vec<String>,
-        cascade: bool,
-        state: &mut ExecutionState,
-    ) -> Result<(), SchedulerError> {
-        if !(targets.is_empty()
-            || targets.iter().any(|t| t == self.meta.id)
-            || cascade
-                && targets
-                    .iter()
-                    .any(|t| self.all_upstream_jobs.contains(t.as_str())))
-        {
-            return Ok(());
-        }
-
-        match state {
-            ExecutionState::Running => {
-                log::info!("Pausing `{}` jobs.", self.meta.id);
-                *state = ExecutionState::Paused;
-                self.update_state_without_client(state).await?;
-                // Acquire and forget all permits.
-                let permit = self
-                    .pool
-                    .clone()
-                    .acquire_many_owned(self.pool_size as u32)
-                    .await?;
-                permit.forget();
-                log::debug!("Remaining `{}` jobs were finished.", self.meta.id);
-            }
-            ExecutionState::Paused => (), // Silent no-op, already paused.
-            ExecutionState::Finished => (), // No jobs to pause, no-op.
-            // This scheduler is executing the leftover `send_on_finish` events,
-            // which are not affected by the pause.
-            _ => {
-                log::error!(
-                    "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    self.meta.id,
-                    state
-                );
-                *state = ExecutionState::Error;
-                return Err(SchedulerError::other(
-                    "Scheduler entered event loop in an unexpected state",
-                ));
-            }
-        }
+    async fn handle_pause(&mut self, state: &mut ExecutionState) -> Result<(), SchedulerError> {
+        log::info!("Pausing `{}` jobs.", self.meta.id);
+        *state = ExecutionState::Paused;
+        self.update_state_without_client(state).await?;
+        // Acquire and forget all permits.
+        let permit = self
+            .pool
+            .clone()
+            .acquire_many_owned(self.pool_size as u32)
+            .await?;
+        permit.forget();
+        log::debug!("Remaining `{}` jobs were finished.", self.meta.id);
         Ok(())
     }
 
-    async fn handle_resume(
-        &mut self,
-        targets: Vec<String>,
-        state: &mut ExecutionState,
-    ) -> Result<(), SchedulerError> {
-        if !(targets.is_empty() || targets.iter().any(|t| t == self.meta.id)) {
-            return Ok(());
-        }
-
-        match state {
-            ExecutionState::Paused => {
-                log::info!("Resuming `{}` jobs.", self.meta.id);
-                *state = ExecutionState::Running;
-                self.update_state_without_client(state).await?;
-                // Add back all permits.
-                self.pool.add_permits(self.pool_size);
-            }
-            ExecutionState::Running => (), // Silent no-op, already running.
-            ExecutionState::Finished => (), // No jobs to resume, no-op.
-            _ => {
-                log::error!(
-                    "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    self.meta.id,
-                    state
-                );
-                *state = ExecutionState::Error;
-                return Err(SchedulerError::other(
-                    "Scheduler entered event loop in an unexpected state",
-                ));
-            }
-        }
+    async fn handle_resume(&mut self, state: &mut ExecutionState) -> Result<(), SchedulerError> {
+        log::info!("Resuming `{}` jobs.", self.meta.id);
+        *state = ExecutionState::Running;
+        self.update_state_without_client(state).await?;
+        // Add back all permits.
+        self.pool.add_permits(self.pool_size);
         Ok(())
     }
 
     async fn handle_graceful_stop(
         &mut self,
         state: &mut ExecutionState,
-        got_all_updates: bool,
-    ) -> Result<bool, SchedulerError> {
-        if *state == ExecutionState::Running {
-            log::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
-            *state = ExecutionState::Paused;
-            self.update_state_without_client(state).await?;
-            // Acquire and forget all permits.
-            let permit = self
-                .pool
-                .clone()
-                .acquire_many_owned(self.pool_size as u32)
-                .await?;
-            permit.forget();
-            log::debug!("Remaining `{}` jobs were finished.", self.meta.id);
+    ) -> Result<(), SchedulerError> {
+        if *state == ExecutionState::Paused {
+            return Ok(());
         }
-        match state {
-            ExecutionState::Paused | ExecutionState::Finished => {
-                if self.handles.is_empty() && got_all_updates {
-                    log::info!("Gracefully stopped `{}` jobs.", self.meta.id);
-                    // If the state is `Paused`, set it to `Stopped`,
-                    // If the state is `Finished`, keep it as `Finished`.
-                    if *state == ExecutionState::Paused {
-                        *state = ExecutionState::Stopped;
-                    }
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            }
-            _ => {
-                log::error!(
-                    "Scheduler for `{}` entered event loop in an unexpected state: {:?}",
-                    self.meta.id,
-                    state
-                );
-                *state = ExecutionState::Error;
-                Err(SchedulerError::other(
-                    "Scheduler entered event loop in an unexpected state",
-                ))
-            }
-        }
+
+        log::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
+        *state = ExecutionState::Paused;
+        self.update_state_without_client(state).await?;
+        // Acquire and forget all permits.
+        let permit = self
+            .pool
+            .clone()
+            .acquire_many_owned(self.pool_size as u32)
+            .await?;
+        permit.forget();
+        log::debug!("Remaining `{}` jobs were finished.", self.meta.id);
+        Ok(())
     }
 }

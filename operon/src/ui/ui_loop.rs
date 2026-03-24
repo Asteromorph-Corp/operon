@@ -163,7 +163,10 @@ impl UiLoop {
         // Recovery is disabled for this mode,
         // so we always run fresh off the bat and wait
         // until everything finishes or something errors.
-        self.ctrl_tx.send(ControlEvent::CleanRun)?;
+        self.ctrl_tx.send(ControlEvent::Run {
+            fresh: true,
+            rebuild: false,
+        })?;
         loop {
             if self.finished {
                 break;

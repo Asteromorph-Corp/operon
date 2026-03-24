@@ -7,8 +7,8 @@ impl BetaSpec {
         metadata::dimension_j_meta()
     }
 
-    pub fn all_upstream_jobs(&self) -> std::collections::HashSet<&'static str> {
-        std::collections::HashSet::from_iter(["alpha", "beta"])
+    pub fn all_upstream_jobs(&self) -> Vec<&'static str> {
+        vec!["alpha", "beta"]
     }
 
     pub fn into_handler<Svc: CookingService, Sto: CookingStorage>(

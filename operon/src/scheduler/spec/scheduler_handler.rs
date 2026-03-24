@@ -7,8 +7,8 @@ use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::scheduler::{
-    ControlEventReceiver, ExecutionState, JobHandler, JobRebuilder, PeerEvent, PeerEventSenderMap,
-    SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
+    ExecutionState, IndividualControlEventSender, JobHandler, JobRebuilder, PeerEvent,
+    PeerEventSenderMap, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
 use crate::schema::{Progress, SharedProgressMap};
 use crate::service::OperonService;
@@ -38,6 +38,14 @@ where
 {
     pub handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto>>,
     pub peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
+}
+
+/// A control channel to a single `IndividualScheduler`, returned by
+/// [`HandlersWithChannels::run_schedulers`].
+pub(crate) struct ControlChannel {
+    pub job_id: &'static str,
+    pub upstream_jobs: Vec<&'static str>,
+    pub tx: IndividualControlEventSender,
 }
 
 impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
@@ -177,19 +185,6 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     }
 }
 
-impl<'a, Svc, Sto> HandlerWithRx<'a, Svc, Sto>
-where
-    Svc: OperonService,
-    Sto: OperonStorage,
-{
-    pub fn new(
-        handler: &'a dyn JobHandler<Svc, Sto>,
-        peer_rx: ServicePeerEventReceiver<Svc>,
-    ) -> Self {
-        Self { handler, peer_rx }
-    }
-}
-
 impl<'a, Svc, Sto> HandlersWithChannels<'a, Svc, Sto>
 where
     Svc: OperonService,
@@ -211,28 +206,62 @@ where
         storage: &Arc<Sto>,
         meta_storage: &MetaStorage,
         progresses: &SharedProgressMap,
-        ctrl_rx: &ControlEventReceiver,
         clean: bool,
-    ) -> JoinSet<ExecutionState> {
-        JoinSet::from_iter(self.handlers_with_rx.into_iter().map(
-            |HandlerWithRx { handler, peer_rx }| {
-                let progress = progresses
-                    .0
-                    .get(handler.job_id())
-                    .cloned()
-                    .unwrap_or_else(|| Arc::new(RwLock::new(Progress::default())));
+    ) -> (JoinSet<ExecutionState>, Vec<ControlChannel>) {
+        let mut futs = Vec::new();
+        let mut channels = Vec::new();
 
-                handler.run_scheduler(
-                    service.clone(),
-                    storage.clone(),
-                    meta_storage.clone(),
-                    progress,
-                    self.peer_txs.clone(),
-                    peer_rx,
-                    ctrl_rx.clone(),
-                    clean,
-                )
-            },
-        ))
+        for HandlerWithRx { handler, peer_rx } in self.handlers_with_rx {
+            let progress = progresses
+                .0
+                .get(handler.job_id())
+                .cloned()
+                .unwrap_or_else(|| Arc::new(RwLock::new(Progress::default())));
+            let (ctrl_tx, ctrl_rx) = tokio::sync::mpsc::channel(10);
+            futs.push(handler.run_scheduler(
+                service.clone(),
+                storage.clone(),
+                meta_storage.clone(),
+                progress,
+                self.peer_txs.clone(),
+                peer_rx,
+                ctrl_rx,
+                clean,
+            ));
+            channels.push(ControlChannel::new(
+                handler.job_id(),
+                handler.all_upstream_jobs(),
+                ctrl_tx,
+            ));
+        }
+
+        (JoinSet::from_iter(futs), channels)
+    }
+}
+
+impl<'a, Svc, Sto> HandlerWithRx<'a, Svc, Sto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    pub fn new(
+        handler: &'a dyn JobHandler<Svc, Sto>,
+        peer_rx: ServicePeerEventReceiver<Svc>,
+    ) -> Self {
+        Self { handler, peer_rx }
+    }
+}
+
+impl ControlChannel {
+    pub fn new(
+        job_id: &'static str,
+        upstream_jobs: Vec<&'static str>,
+        tx: IndividualControlEventSender,
+    ) -> Self {
+        Self {
+            job_id,
+            upstream_jobs,
+            tx,
+        }
     }
 }

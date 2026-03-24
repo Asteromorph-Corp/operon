@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::scheduler::{
-    ControlEventReceiver, ExecutionState, IndividualScheduler, JobRebuilder, JobSpec,
+    ExecutionState, IndividualControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec,
     SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
 };
 use crate::schema::{Job, SharedProgress, Ticket};
@@ -24,6 +24,8 @@ where
     Sto: OperonStorage,
 {
     fn job_id(&self) -> &'static str;
+
+    fn all_upstream_jobs(&self) -> Vec<&'static str>;
 
     fn pool_size(&self) -> usize {
         1 // Default pool size, can be overridden by the job configuration
@@ -84,7 +86,7 @@ where
         progress: SharedProgress,
         peer_txs: ServicePeerEventSenderMap<Svc>,
         peer_rx: ServicePeerEventReceiver<Svc>,
-        ctrl_rx: ControlEventReceiver,
+        ctrl_rx: IndividualControlEventReceiver,
         clean: bool,
     ) -> Pin<Box<dyn Future<Output = ExecutionState> + Send + 'static>>; // call `start` with empty Vector (`Scheduler::run` 6023)
 }
@@ -98,6 +100,10 @@ where
 {
     fn job_id(&self) -> &'static str {
         self.job_meta.id
+    }
+
+    fn all_upstream_jobs(&self) -> Vec<&'static str> {
+        self.all_upstream_jobs.clone()
     }
 
     fn pool_size(&self) -> usize {
@@ -166,7 +172,7 @@ where
         progress: SharedProgress,
         peer_txs: ServicePeerEventSenderMap<Svc>,
         peer_rx: ServicePeerEventReceiver<Svc>,
-        ctrl_rx: ControlEventReceiver,
+        ctrl_rx: IndividualControlEventReceiver,
         clean: bool,
     ) -> Pin<Box<dyn Future<Output = ExecutionState> + Send + 'static>> {
         let individual_scheduler = IndividualScheduler::new(

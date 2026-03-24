@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::meta_storage::MetaStorage;
-use crate::scheduler::{ControlEventReceiver, SchedulerHandler};
+use crate::scheduler::SchedulerHandler;
 use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -16,6 +16,4 @@ where
     pub meta_storage: MetaStorage,
     pub handler: SchedulerHandler<Svc, Sto>,
     pub progresses: SharedProgressMap,
-    // TODO: remove these
-    pub ctrl_rx: ControlEventReceiver,
 }

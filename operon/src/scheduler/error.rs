@@ -3,7 +3,6 @@ use tokio::sync::AcquireError;
 use tokio::task::JoinError;
 
 use crate::meta_storage::MetaStorageError;
-use crate::scheduler::{ControlEvent, RecoveryState, RecoveryStateSendError};
 use crate::storage::StorageError;
 use crate::ui::UiError;
 
@@ -17,10 +16,6 @@ pub enum SchedulerError {
     Ui(#[from] UiError),
     #[error("Join failed: {0}")]
     JoinFailed(#[from] JoinError),
-    #[error("Failed to send recovery state: {0}")]
-    RecoverySendFailed(RecoveryState),
-    #[error("Unexpected control event: {0:?}")]
-    UnexpectedControlEvent(ControlEvent),
     #[error("Failed to acquire semaphore")]
     SemaphoreAcquireFailed,
     #[error("Failed to receive control event")]
@@ -48,12 +43,6 @@ impl SchedulerError {
 
     pub(crate) fn other(msg: impl Into<String>) -> Self {
         Self::Other(msg.into())
-    }
-}
-
-impl From<RecoveryStateSendError> for SchedulerError {
-    fn from(err: RecoveryStateSendError) -> Self {
-        SchedulerError::RecoverySendFailed(err.0)
     }
 }
 
