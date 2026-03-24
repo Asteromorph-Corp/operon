@@ -23,4 +23,4 @@ mod ticket_status;
 pub use ticket_status::*;
 
 mod progress;
-pub use progress::{Progress, SharedProgress, SharedProgressMap};
+pub use progress::{Progress, SharedProgress, SharedProgressMap, TaskState};

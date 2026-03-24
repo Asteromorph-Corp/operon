@@ -7,8 +7,8 @@ use futures::StreamExt;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 
-use crate::scheduler::{ControlEvent, ControlEventSender, ExecutionState, SchedulerStateReceiver};
-use crate::schema::{Progress, SharedProgressMap};
+use crate::scheduler::{ControlEvent, ControlEventSender, SchedulerStateReceiver};
+use crate::schema::{Progress, SharedProgressMap, TaskState};
 use crate::ui::{Command, CommandPrompt, LogRecordReceiver, LogView, UiError, UiMode, UiOptions};
 use crate::utils::SplitFirstOwned;
 
@@ -201,7 +201,7 @@ impl UiLoop {
             let state = self.progresses.snapshot().await.overall_state();
 
             // If a new error state is detected, abort the execution.
-            if state == ExecutionState::Error {
+            if state == TaskState::Error {
                 log::error!("Aborting execution due to previous error.");
                 self.ctrl_tx.send(ControlEvent::Quit {
                     force: true,

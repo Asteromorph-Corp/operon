@@ -6,11 +6,11 @@ use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
 use crate::scheduler::{
-    ExecutionState, IndividualControlEvent, IndividualControlEventReceiver, InternalEvent, JobSpec,
-    PeerEvent, PeerEventSenders, SchedulerError, ServicePeerEventReceiver,
-    ServicePeerEventSenderMap, SpecWithMetadata,
+    IndividualControlEvent, IndividualControlEventReceiver, InternalEvent, JobSpec, PeerEvent,
+    PeerEventSenders, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
+    SpecWithMetadata,
 };
-use crate::schema::{Job, JobMetadata, SharedProgress, Ticket, TicketStatus};
+use crate::schema::{Job, JobMetadata, SharedProgress, TaskState, Ticket, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -39,7 +39,7 @@ where
     pub pool: Arc<Semaphore>,
     pub pool_size: usize,
     pub progress: SharedProgress,
-    pub state: ExecutionState,
+    pub state: TaskState,
     pub handles: JoinSet<Result<InternalEvent<Job<N>, JS::Resolution>, SchedulerError>>,
 }
 
@@ -49,7 +49,6 @@ where
     Sto: OperonStorage,
     JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = Ticket<N>>,
 {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         spec: SpecWithMetadata<Svc, Sto, JS, N>,
         service: Arc<Svc>,
@@ -67,12 +66,12 @@ where
             pool: Arc::new(Semaphore::new(pool_size)),
             pool_size,
             progress,
-            state: ExecutionState::Running,
+            state: TaskState::Running,
             handles: JoinSet::new(),
         }
     }
 
-    async fn set_state(&mut self, state: ExecutionState) {
+    async fn set_state(&mut self, state: TaskState) {
         self.state = state;
         (*self.progress.write().await).set_state(state);
     }
@@ -160,32 +159,32 @@ where
         let peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
 
         let Ok(initial_tickets) = self.initial_ready_tickets().await else {
-            self.set_state(ExecutionState::Error).await;
+            self.set_state(TaskState::Error).await;
             return;
         };
 
         // Check if the initial data is valid, it can only be done if the job is not clean.
         if !clean && !self.check_initial_data(&initial_tickets) {
-            self.set_state(ExecutionState::Error).await;
+            self.set_state(TaskState::Error).await;
             return;
         }
 
         // Update the UI state before entering the loop.
         if let Err(e) = self.update_progress().await {
             log::error!("Failed to update UI state after initial data processing: {e}");
-            self.set_state(ExecutionState::Error).await;
+            self.set_state(TaskState::Error).await;
             return;
         }
 
         // Early return if the scheduler is already finished (e.g. the last run completed this job).
-        if self.state == ExecutionState::Finished {
+        if self.state == TaskState::Finished {
             log::debug!(
                 "Scheduler for `{}` exited due to being finished from the start.",
                 self.meta.id
             );
             if let Err(e) = self.update_progress().await {
                 log::error!("Failed to update UI state after scheduler run: {e}");
-                self.set_state(ExecutionState::Error).await;
+                self.set_state(TaskState::Error).await;
             }
             return;
         }
@@ -196,17 +195,17 @@ where
         let id = &self.meta.id;
         if let Err(e) = &res {
             log::error!("Scheduler for `{id}` exited with an error: {e}");
-            self.set_state(ExecutionState::Error).await;
+            self.set_state(TaskState::Error).await;
         } else {
             match self.state {
-                ExecutionState::Finished => log::debug!("Scheduler for `{id}` exited normally."),
-                ExecutionState::Stopped => log::debug!("Scheduler for `{id}` was stopped."),
+                TaskState::Finished => log::debug!("Scheduler for `{id}` exited normally."),
+                TaskState::Stopped => log::debug!("Scheduler for `{id}` was stopped."),
                 _ => {
                     log::error!(
                         "Scheduler for `{id}` exited with an unexpected state: {:?}",
                         self.state,
                     );
-                    self.set_state(ExecutionState::Error).await;
+                    self.set_state(TaskState::Error).await;
                 }
             }
         }
@@ -214,7 +213,7 @@ where
         // Update the UI state one last time.
         if let Err(e) = self.update_progress().await {
             log::error!("Failed to update UI state after scheduler run: {e}");
-            self.set_state(ExecutionState::Error).await;
+            self.set_state(TaskState::Error).await;
         }
     }
 
@@ -234,7 +233,7 @@ where
         // Main event loop.
         loop {
             if is_stopping && self.handles.is_empty() && got_all_updates {
-                self.set_state(ExecutionState::Stopped).await;
+                self.set_state(TaskState::Stopped).await;
                 return Ok(());
             }
 
@@ -242,8 +241,8 @@ where
                 // 0. Check the control channel.
                 Some(ctrl_event) = ctrl_rx.recv() => {
                     match ctrl_event {
-                        IndividualControlEvent::Pause if self.state == ExecutionState::Running => self.handle_pause().await?,
-                        IndividualControlEvent::Resume if self.state == ExecutionState::Paused => self.handle_resume().await?,
+                        IndividualControlEvent::Pause if self.state == TaskState::Running => self.handle_pause().await?,
+                        IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await?,
                         IndividualControlEvent::Quit { force: false } => {
                             self.handle_graceful_stop().await?;
                             is_stopping = true;
@@ -253,8 +252,8 @@ where
                             // If this is a finished scheduler rolling out peer events,
                             // don't change the state to `Stopped`,
                             // since it is already `Finished`.
-                            if matches!(self.state, ExecutionState::Running | ExecutionState::Paused) {
-                                self.set_state(ExecutionState::Stopped).await;
+                            if matches!(self.state, TaskState::Running | TaskState::Paused) {
+                                self.set_state(TaskState::Stopped).await;
                             }
                             return Ok(());
                         }
@@ -279,7 +278,7 @@ where
                             // If all the tickets are finished
                             // AND the scheduler's internal events are drained,
                             // exit the loop.
-                            if self.state == ExecutionState::Finished && self.handles.is_empty() {
+                            if self.state == TaskState::Finished && self.handles.is_empty() {
                                 return Ok(());
                             }
                         }
@@ -371,7 +370,7 @@ where
 
     async fn handle_pause(&mut self) -> Result<(), SchedulerError> {
         log::info!("Pausing `{}` jobs.", self.meta.id);
-        self.set_state(ExecutionState::Paused).await;
+        self.set_state(TaskState::Paused).await;
         // Acquire and forget all permits.
         let permit = self
             .pool
@@ -385,19 +384,19 @@ where
 
     async fn handle_resume(&mut self) -> Result<(), SchedulerError> {
         log::info!("Resuming `{}` jobs.", self.meta.id);
-        self.set_state(ExecutionState::Running).await;
+        self.set_state(TaskState::Running).await;
         // Add back all permits.
         self.pool.add_permits(self.pool_size);
         Ok(())
     }
 
     async fn handle_graceful_stop(&mut self) -> Result<(), SchedulerError> {
-        if self.state == ExecutionState::Paused {
+        if self.state == TaskState::Paused {
             return Ok(());
         }
 
         log::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
-        self.set_state(ExecutionState::Paused).await;
+        self.set_state(TaskState::Paused).await;
 
         // Acquire and forget all permits.
         let permit = self
