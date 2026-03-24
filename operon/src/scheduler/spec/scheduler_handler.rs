@@ -7,8 +7,8 @@ use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::scheduler::{
-    ExecutionState, IndividualControlEventSender, JobHandler, JobRebuilder, PeerEvent,
-    PeerEventSenderMap, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
+    IndividualControlEventSender, JobHandler, JobRebuilder, PeerEvent, PeerEventSenderMap,
+    SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
 use crate::schema::{Progress, SharedProgressMap};
 use crate::service::OperonService;
@@ -151,16 +151,10 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     ) -> Result<(), SchedulerError> {
         for schedule in &self.job_handlers {
             let (done, queued, waiting) = schedule.get_status(client).await?;
-            let state = if queued + waiting == 0 {
-                ExecutionState::Finished
-            } else {
-                ExecutionState::Running
-            };
-
             let Some(progress) = progresses.0.get(schedule.job_id()) else {
                 return Err(SchedulerError::missing_progress(schedule.job_id()));
             };
-            *progress.write().await = Progress::new(done, queued, waiting, state);
+            (*progress.write().await).update(done, queued, waiting);
         }
         Ok(())
     }
