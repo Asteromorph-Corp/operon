@@ -7,19 +7,10 @@ impl BetaSpec {
         metadata::dimension_j_meta()
     }
 
-    pub fn all_upstream_jobs(&self) -> Vec<&'static str> {
-        vec!["alpha", "beta"]
-    }
-
     pub fn into_handler<Svc: CookingService, Sto: CookingStorage>(
         self,
     ) -> Box<dyn operon::scheduler::JobHandler<Svc, Sto>> {
         let job_meta = self.job_meta();
-        let all_upstream_jobs = self.all_upstream_jobs();
-        Box::new(operon::scheduler::SpecWithMetadata::new(
-            self,
-            job_meta,
-            all_upstream_jobs,
-        ))
+        Box::new(operon::scheduler::SpecWithMetadata::new(self, job_meta))
     }
 }

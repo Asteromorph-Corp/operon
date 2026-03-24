@@ -103,7 +103,7 @@ where
     }
 
     fn all_upstream_jobs(&self) -> Vec<&'static str> {
-        self.all_upstream_jobs.clone()
+        self.spec.all_upstream_jobs()
     }
 
     fn pool_size(&self) -> usize {

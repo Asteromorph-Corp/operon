@@ -16,9 +16,6 @@ where
 {
     pub spec: JS,
     pub job_meta: JobMetadata<N>,
-    // TODO: this is here to make `JobMetadata` `Copy`-able, maybe there is a better way to handle
-    // this.
-    pub all_upstream_jobs: Vec<&'static str>,
     _phantom: std::marker::PhantomData<(Svc, Sto)>,
 }
 
@@ -28,11 +25,10 @@ where
     Sto: OperonStorage,
     JS: JobSpec<Svc, Sto>,
 {
-    pub fn new(spec: JS, job_meta: JobMetadata<N>, all_upstream_jobs: Vec<&'static str>) -> Self {
+    pub fn new(spec: JS, job_meta: JobMetadata<N>) -> Self {
         Self {
             spec,
             job_meta,
-            all_upstream_jobs,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -48,7 +44,6 @@ where
         Self {
             spec: self.spec.clone(),
             job_meta: self.job_meta,
-            all_upstream_jobs: self.all_upstream_jobs.clone(),
             _phantom: std::marker::PhantomData,
         }
     }
@@ -65,6 +60,7 @@ where
     type Ticket: TicketLike;
     type PeerEventSenders: PeerEventSenders<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>;
 
+    fn all_upstream_jobs(&self) -> Vec<&'static str>;
     fn pool_size(&self) -> usize;
 
     fn default_ticket(&self) -> Self::Ticket;

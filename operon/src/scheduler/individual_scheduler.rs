@@ -33,7 +33,6 @@ where
 {
     pub spec: JS,
     pub meta: JobMetadata<N>,
-    pub all_upstream_jobs: Vec<&'static str>,
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
     pub meta_storage: MetaStorage,
@@ -62,7 +61,6 @@ where
         Self {
             spec: spec.spec,
             meta: spec.job_meta,
-            all_upstream_jobs: spec.all_upstream_jobs,
             storage,
             service,
             meta_storage,
