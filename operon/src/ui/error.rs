@@ -10,8 +10,8 @@ pub enum UiError {
     IoError(#[from] std::io::Error),
     #[error("Log buffer error: {0}")]
     LogReceiveFailed(tokio::sync::broadcast::error::TryRecvError),
-    #[error("Set logger error: {0}")]
-    SetLoggerError(#[from] log::SetLoggerError),
+    #[error("Set subscriber error: {0}")]
+    SetSubscriberError(#[from] tracing::subscriber::SetGlobalDefaultError),
     #[error("Other error: {0}")]
     Other(String),
 }
