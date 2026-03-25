@@ -1,26 +1,25 @@
-use std::borrow::Cow;
 use std::io::Write;
 use std::path::PathBuf;
 
+use crate::logger::LoggerOptions;
 use crate::ui::{LogRecord, UiError};
 
 #[derive(Debug)]
-pub struct UiLogger {
+pub struct Logger {
     sender: ::tokio::sync::broadcast::Sender<LogRecord>,
     level: log::Level,
-    dump: Option<Cow<'static, str>>,
+    dump: Option<String>,
 }
 
-impl UiLogger {
+impl Logger {
     pub fn new(
         sender: ::tokio::sync::broadcast::Sender<LogRecord>,
-        level: log::Level,
-        dump: Option<impl Into<Cow<'static, str>>>,
+        options: LoggerOptions,
     ) -> Self {
         Self {
             sender,
-            level,
-            dump: dump.map(Into::into),
+            level: options.level,
+            dump: options.dump,
         }
     }
 
@@ -56,7 +55,7 @@ impl UiLogger {
             return;
         }
 
-        let dump_dir = PathBuf::from(dump.as_ref());
+        let dump_dir = PathBuf::from(&dump);
 
         if !dump_dir.exists() {
             ::std::fs::create_dir_all(&dump_dir).unwrap();
@@ -87,7 +86,7 @@ impl UiLogger {
     }
 }
 
-impl ::log::Log for UiLogger {
+impl ::log::Log for Logger {
     fn enabled(&self, metadata: &::log::Metadata) -> bool {
         if self.blacklisted(metadata) {
             return false;

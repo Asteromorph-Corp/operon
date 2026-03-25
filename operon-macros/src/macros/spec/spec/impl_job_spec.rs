@@ -3,6 +3,7 @@ use syn::parse_quote;
 
 use crate::configs::{DimensionConfigMap, EntityConfigMap, JobConfig};
 use crate::macros::spec::resolution_type::resolution_type;
+use crate::macros::spec::spec::fn_all_upstream_jobs::fn_all_upstream_jobs;
 use crate::macros::spec::spec::fn_check_consistency::fn_check_consistency;
 use crate::macros::spec::spec::fn_default_ticket::fn_default_ticket;
 use crate::macros::spec::spec::fn_on_receive_explosion::fn_on_receive_explosion;
@@ -17,9 +18,11 @@ use crate::utils::{
 };
 
 /// Generates the implementation of the `JobSpec` trait for a given job.
+#[allow(clippy::too_many_arguments)]
 pub fn impl_job_spec(
     service_id: &syn::Ident,
     job: &JobConfig,
+    all_upstream_jobs: &IndexSet<&JobConfig>,
     spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
     upstream_jobs: &IndexSet<&JobConfig>,
     downstream_jobs: &IndexSet<&JobConfig>,
@@ -34,6 +37,7 @@ pub fn impl_job_spec(
     let svc_ident = service_trait_ident(service_id);
     let sto_ident = storage_trait_ident(service_id);
 
+    let fn_all_upstream_jobs = fn_all_upstream_jobs(all_upstream_jobs);
     let fn_default_ticket = fn_default_ticket(job);
     let fn_check_consistency = fn_check_consistency(job);
     let fn_prepare_rebuild = fn_prepare_rebuild(job);
@@ -54,7 +58,7 @@ pub fn impl_job_spec(
             type Resolution = #resolution;
             type Ticket = #operon::schema::Ticket<#n>;
             type PeerEventSenders = #peer_txs_ident;
-
+            #fn_all_upstream_jobs
             #fn_default_ticket
             #fn_pool_size
             #fn_check_consistency

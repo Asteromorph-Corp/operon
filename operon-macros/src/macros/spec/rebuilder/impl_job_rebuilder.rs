@@ -16,7 +16,6 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///     async fn rebuild(
 ///         &self,
 ///         client: operon::meta_storage::MetaClient<'_>,
-///         ui_state: &operon::tokio::sync::RwLock<operon::ui::UiState>,
 ///     ) -> Result<(), operon::scheduler::SchedulerError> {
 ///         for (job, resolution) in self.data.iter().cloned() {
 ///             client
@@ -42,17 +41,8 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///                 .raise_deps_done(self.job_meta, job, &["j"])
 ///                 .await?;
 ///
-///             let mut ui_state = ui_state.write().await;
 ///             let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
-///             let state = if queued + waiting == 0 {
-///                 operon::operon::RunningState::Finished
-///             } else {
-///                 operon::operon::RunningState::Running
-///             };
-///             ui_state.update_ui_state(operon::ui::UiStateUpdate::ProgressUpdate(
-///                 "beta".to_string(),
-///                 (done, queued, waiting, state, false),
-///             ))?;
+///             (*self.progress.write().await).update(done, queued, waiting);
 ///         }
 ///
 ///         Ok(())
@@ -67,7 +57,6 @@ pub fn impl_job_rebuilder(
 ) -> syn::ItemImpl {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
-    let job_id = to_lit_str(&job.id);
 
     let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
     let invalid_ticket_msg = format!(
@@ -157,7 +146,6 @@ pub fn impl_job_rebuilder(
             async fn rebuild(
                 &self,
                 client: #operon::meta_storage::MetaClient<'_>,
-                ui_state: &#operon::tokio::sync::RwLock<#operon::ui::UiState>,
             ) -> Result<(), #operon::scheduler::SchedulerError> {
                 let ready_tickets = client
                     .ticket(self.job_meta)
@@ -184,18 +172,8 @@ pub fn impl_job_rebuilder(
                     #(#explode_exprs)*
                     #(#raise_dep_exprs)*
 
-                    // FIXME: I would rather not do this, but every other way of doing this would require massive update of the UI logic
-                    let mut ui_state = ui_state.write().await;
                     let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
-                    let state = if queued + waiting == 0 {
-                        #operon::operon::RunningState::Finished
-                    } else {
-                        #operon::operon::RunningState::Running
-                    };
-                    ui_state.update_ui_state(#operon::ui::UiStateUpdate::ProgressUpdate(
-                        #job_id.to_string(),
-                        (done, queued, waiting, state, false),
-                    ))?;
+                    (*self.progress.write().await).update(done, queued, waiting);
                 }
 
                 if !invalid_tickets.is_empty() {

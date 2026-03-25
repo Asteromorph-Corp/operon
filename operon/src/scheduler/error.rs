@@ -3,7 +3,6 @@ use tokio::sync::AcquireError;
 use tokio::task::JoinError;
 
 use crate::meta_storage::MetaStorageError;
-use crate::scheduler::{ControlEvent, RecoveryState, RecoveryStateSendError};
 use crate::storage::StorageError;
 use crate::ui::UiError;
 
@@ -16,11 +15,7 @@ pub enum SchedulerError {
     #[error("UI Error: {0}")]
     Ui(#[from] UiError),
     #[error("Join failed: {0}")]
-    JobJoinFailed(#[from] JoinError),
-    #[error("Failed to send recovery state: {0}")]
-    RecoverySendFailed(RecoveryState),
-    #[error("Unexpected control event: {0:?}")]
-    UnexpectedControlEvent(ControlEvent),
+    JoinFailed(#[from] JoinError),
     #[error("Failed to acquire semaphore")]
     SemaphoreAcquireFailed,
     #[error("Failed to receive control event")]
@@ -35,13 +30,19 @@ pub enum SchedulerError {
     SendThroughDowngradedSender,
     #[error("Error in user provided function: {0}")]
     UserError(Box<dyn std::error::Error + Send + Sync>),
+    #[error("Missing progress entry for job: {0}")]
+    MissingProgressEntry(String),
     #[error("Other error: {0}")]
     Other(String),
 }
 
-impl From<RecoveryStateSendError> for SchedulerError {
-    fn from(err: RecoveryStateSendError) -> Self {
-        SchedulerError::RecoverySendFailed(err.0)
+impl SchedulerError {
+    pub(crate) fn missing_progress(id: impl Into<String>) -> Self {
+        Self::MissingProgressEntry(id.into())
+    }
+
+    pub(crate) fn other(msg: impl Into<String>) -> Self {
+        Self::Other(msg.into())
     }
 }
 

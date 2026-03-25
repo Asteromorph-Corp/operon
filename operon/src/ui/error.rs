@@ -4,8 +4,6 @@ use crate::scheduler::ControlEventError;
 
 #[derive(Debug, Error)]
 pub enum UiError {
-    #[error("Progress not found for UUID: {0}")]
-    ProgressNotFound(String),
     #[error("Control event send error: {0}")]
     ControlEventSendFailed(#[from] ControlEventError),
     #[error("IO Error: {0}")]

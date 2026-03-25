@@ -12,6 +12,3 @@ pub use job_spec::*;
 
 mod job_rebuilder;
 pub use job_rebuilder::*;
-
-mod handlers_with_channels;
-pub(crate) use handlers_with_channels::*;

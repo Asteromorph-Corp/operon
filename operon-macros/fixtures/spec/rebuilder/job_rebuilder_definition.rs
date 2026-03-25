@@ -6,4 +6,5 @@ pub struct BetaRebuilder {
         operon::schema::Job<1usize>,
         operon::schema::Resolution<1usize>,
     )>,
+    progress: operon::schema::SharedProgress,
 }

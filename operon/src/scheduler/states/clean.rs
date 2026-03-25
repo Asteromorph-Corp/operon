@@ -1,0 +1,71 @@
+use async_trait::async_trait;
+use uuid::Uuid;
+
+use crate::scheduler::SchedulerError;
+use crate::scheduler::context::SchedulerContext;
+use crate::scheduler::states::start::StartTransition;
+use crate::scheduler::states::{NextState, SchedulerTransition, TransitionState};
+use crate::service::OperonService;
+use crate::storage::OperonStorage;
+
+pub struct CleanTransition<Svc, Sto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    ctx: SchedulerContext<Svc, Sto>,
+    channel_size: usize,
+    run_id: Uuid,
+}
+
+impl<Svc, Sto> CleanTransition<Svc, Sto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    pub fn new(ctx: SchedulerContext<Svc, Sto>, channel_size: usize, run_id: Uuid) -> Self {
+        Self {
+            ctx,
+            channel_size,
+            run_id,
+        }
+    }
+
+    pub fn state(
+        ctx: SchedulerContext<Svc, Sto>,
+        channel_size: usize,
+        run_id: Uuid,
+    ) -> TransitionState {
+        TransitionState::new(Self::new(ctx, channel_size, run_id))
+    }
+
+    fn into_start(self) -> TransitionState {
+        StartTransition::state(self.ctx, self.channel_size, self.run_id, true)
+    }
+}
+
+#[async_trait]
+impl<Svc, Sto> SchedulerTransition for CleanTransition<Svc, Sto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    fn warn_msg(&self) -> Option<&'static str> {
+        None
+    }
+
+    async fn execute(self) -> Result<NextState, SchedulerError> {
+        let mut conn = self.ctx.meta_storage.conn().await?;
+        let tx = conn.transaction().await?;
+
+        self.ctx.handler.clear_resolution(tx.as_client()).await?;
+        self.ctx.handler.clear_tickets(tx.as_client()).await?;
+        tx.as_client().clear_footprint().await?;
+
+        self.ctx.handler.put_default_tickets(tx.as_client()).await?;
+
+        tx.commit().await?;
+
+        Ok(NextState::from(self.into_start()))
+    }
+}

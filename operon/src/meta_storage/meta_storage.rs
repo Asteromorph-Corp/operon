@@ -48,9 +48,9 @@ impl MetaStorage {
         Ok(ConnectionWithSchema::new(client, schema))
     }
 
-    pub async fn ui_conn(&self) -> Result<ConnectionWithSchema<'_>, MetaStorageError> {
+    pub async fn ui_conn(&self) -> Result<ConnectionWithSchema<'static>, MetaStorageError> {
         let client = self.ui_pool.get().await?;
-        let schema = self.schema.as_deref();
+        let schema = self.schema.clone();
 
         Ok(ConnectionWithSchema::new(client, schema))
     }

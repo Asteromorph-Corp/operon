@@ -4,7 +4,6 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
     async fn rebuild(
         &self,
         client: operon::meta_storage::MetaClient<'_>,
-        ui_state: &operon::tokio::sync::RwLock<operon::ui::UiState>,
     ) -> Result<(), operon::scheduler::SchedulerError> {
         let ready_tickets = client
             .ticket(self.job_meta)
@@ -50,17 +49,8 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                 .raise_deps_done(self.job_meta, job, &["j"])
                 .await?;
 
-            let mut ui_state = ui_state.write().await;
             let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
-            let state = if queued + waiting == 0 {
-                operon::operon::RunningState::Finished
-            } else {
-                operon::operon::RunningState::Running
-            };
-            ui_state.update_ui_state(operon::ui::UiStateUpdate::ProgressUpdate(
-                "beta".to_string(),
-                (done, queued, waiting, state, false),
-            ))?;
+            (*self.progress.write().await).update(done, queued, waiting);
         }
 
         if !invalid_tickets.is_empty() {

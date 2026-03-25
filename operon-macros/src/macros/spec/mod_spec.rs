@@ -31,13 +31,14 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
         let impl_job_spec = impl_job_spec(
             &all_configs.service_id,
             job,
+            &all_upstream_jobs,
             &spawn_dim_repeating_jobs,
             &upstream_jobs,
             &downstream_jobs,
             &all_configs.entities,
             &all_configs.dimensions,
         );
-        let impl_spec_utils = impl_spec_utils(&all_configs.service_id, job, &all_upstream_jobs);
+        let impl_spec_utils = impl_spec_utils(&all_configs.service_id, job);
 
         let job_rebuilder_def = job_rebuilder_definition(job);
         let impl_job_rebuilder = impl_job_rebuilder(

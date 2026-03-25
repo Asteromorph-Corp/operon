@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use futures::future::try_join;
-use tokio::sync::RwLock;
 
+use crate::logger::Logger;
 use crate::operon::{OperonError, OperonOptions};
-use crate::scheduler::{ControlEvent, RecoveryState, Scheduler, ValidOperon};
+use crate::scheduler::{ControlEvent, Scheduler, ValidOperon};
+use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{UiLogger, UiLoop, UiState};
+use crate::ui::UiLoop;
 
 /// # Operon
 ///
@@ -59,31 +60,25 @@ where
 
         // Initialize the control event and recovery state channel
         let (ctrl_tx, ctrl_rx) = ::tokio::sync::watch::channel(ControlEvent::Start);
-        let (rec_tx, rec_rx) = ::tokio::sync::watch::channel(RecoveryState::Unknown);
 
         // Initialize the scheduler state channel
-        let (sched_tx, sched_rx) = ::tokio::sync::watch::channel(false);
+        let (sched_tx, sched_rx) = ::tokio::sync::oneshot::channel();
 
         // Set up the logger
-        UiLogger::new(log_tx, log_options.level, log_options.dump)
-            .setup(::log::LevelFilter::Trace)?;
-        let ui_state = Arc::new(RwLock::new(UiState::from_jobs(
-            ui_options,
-            &handler.job_handlers,
-        )));
+        Logger::new(log_tx, log_options).setup(::log::LevelFilter::Trace)?;
+        let progresses = SharedProgressMap::from_jobs(&handler.job_handlers);
 
         // Create the scheduler
         let scheduler = Scheduler::<Svc, Sto>::new(
             self.service,
             self.storage,
             handler,
-            ui_state.clone(),
+            progresses.clone(),
             ctrl_rx,
-            rec_tx,
             sched_tx,
             scheduler_options,
         )?;
-        let ui_loop = UiLoop::new(ui_state, log_rx, ctrl_tx, rec_rx, sched_rx);
+        let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
         let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };
