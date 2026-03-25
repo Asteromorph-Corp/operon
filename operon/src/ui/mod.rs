@@ -19,5 +19,8 @@ pub use command::*;
 mod command_prompt;
 pub use command_prompt::*;
 
+mod output_capture;
+pub use output_capture::*;
+
 mod error;
 pub use error::*;
