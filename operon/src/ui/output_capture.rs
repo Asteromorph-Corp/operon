@@ -29,10 +29,10 @@ impl FdRedirectHandle {
         self.handles
             .iter()
             .find(|h| h.target_fd == target.as_raw_fd())
-            .map(|h| {
-                let duped =
-                    nix::unistd::dup(h.original.as_raw_fd()).expect("Failed to dup original fd");
-                unsafe { std::fs::File::from_raw_fd(duped) }
+            .and_then(|h| {
+                nix::unistd::dup(h.original.as_raw_fd())
+                    .ok()
+                    .map(|duped| unsafe { std::fs::File::from_raw_fd(duped) })
             })
     }
 }
