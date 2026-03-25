@@ -70,7 +70,8 @@ impl LogRecord {
         let sep = "│ ";
         let prefix_width = prefix.chars().count() + level.chars().count() + sep.chars().count();
         let available = (width as usize).saturating_sub(prefix_width).max(1);
-        let wrap_indent = " ".repeat(prefix_width.saturating_sub(4)) + "...│ ";
+        let sep_pos = prefix.chars().count() + level.chars().count();
+        let wrap_indent = " ".repeat(sep_pos.saturating_sub(3)) + "...│ ";
         let wrap_options = ::textwrap::Options::new(available);
 
         let mut lines: Vec<Line<'_>> = vec![];
