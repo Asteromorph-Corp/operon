@@ -51,16 +51,16 @@ where
         kind: StaleKind,
     ) -> Self {
         match kind {
-            StaleKind::Complete => log::info!(
+            StaleKind::Complete => tracing::info!(
                 "Found a finished run.\n\
                 Type `run` to begin running jobs and overwrite the existing data, or `exit` to cancel.\n\
                 You can also type `check` to check the consistency of the data."
             ),
-            StaleKind::GracefulStop => log::info!(
+            StaleKind::GracefulStop => tracing::info!(
                 "Found a gracefully stopped run.\n\
                 Type `run` to resume running jobs from the last run, or `help` for additional options."
             ),
-            StaleKind::Abort => log::info!(
+            StaleKind::Abort => tracing::info!(
                 "Found an aborted run.\n\
                 Type `check` to check if the data is recoverable, `run` to start a new run and \
                 overwrite the existing data, or `help` for additional options."
@@ -99,16 +99,16 @@ where
                 mode,
             )
             .await
-            .inspect_err(|e| log::error!("Failed to check data consistency: {e}"))?;
+            .inspect_err(|e| tracing::error!("Failed to check data consistency: {e}"))?;
 
-        log::info!(
+        tracing::info!(
             "Consistency check completed in: {:?}.",
             check_start.elapsed()
         );
         self.is_consistent = Some(is_consistent);
 
         if !is_consistent {
-            log::info!(
+            tracing::info!(
                 "Some data is corrupted or missing.\n\
                 Type `run` to start a new run and overwrite the existing data, or `exit` to cancel."
             );
@@ -116,15 +116,15 @@ where
         }
 
         match self.kind {
-            StaleKind::Complete => log::info!(
+            StaleKind::Complete => tracing::info!(
                 "No inconsistencies were found.\n\
                 Type `run` to resume running jobs from the last run, or `help` for additional options."
             ),
-            StaleKind::GracefulStop => log::info!(
+            StaleKind::GracefulStop => tracing::info!(
                 "No inconsistencies were found.\n\
                 Type `run` to resume running jobs from the last run, or `help` for additional options."
             ),
-            StaleKind::Abort => log::info!(
+            StaleKind::Abort => tracing::info!(
                 "The data is recoverable.\n\
                 Type `run` to rebuild and resume running jobs from the last run, or `help` for additional options."
             ),
@@ -134,7 +134,7 @@ where
 
     fn choose_run_mode(&self, fresh: bool, rebuild: bool) -> Option<RunMode> {
         if fresh {
-            log::info!("Starting a fresh run, ignoring previous data.");
+            tracing::info!("Starting a fresh run, ignoring previous data.");
             return Some(RunMode::Clean);
         }
 
@@ -142,17 +142,17 @@ where
             return match (&self.kind, self.is_consistent) {
                 // Consistency check failed.
                 (_, Some(false)) => {
-                    log::error!("Cannot rebuild because of missing data.");
+                    tracing::error!("Cannot rebuild because of missing data.");
                     None
                 }
                 // Previous run was aborted, and no consistency check was performed.
                 (StaleKind::Abort, None) => {
-                    log::error!("Cannot rebuild before checking for consistency.");
+                    tracing::error!("Cannot rebuild before checking for consistency.");
                     None
                 }
                 // Previous run was either gracefully stopped or complete.
                 _ => {
-                    log::info!("Rebuilding the run from trusted data.");
+                    tracing::info!("Rebuilding the run from trusted data.");
                     Some(RunMode::Rebuild)
                 }
             };
@@ -166,12 +166,12 @@ where
             (StaleKind::Abort, None) => Some(RunMode::Clean),
             // Previous run was aborted, but consistency check succeeded.
             (StaleKind::Abort, Some(true)) => {
-                log::info!("Rebuilding the run from trusted data.");
+                tracing::info!("Rebuilding the run from trusted data.");
                 Some(RunMode::Rebuild)
             }
             // Previous run was either gracefully stopped or complete.
             _ => {
-                log::info!("Continuing the last run.");
+                tracing::info!("Continuing the last run.");
                 Some(RunMode::Restore)
             }
         }
@@ -196,10 +196,10 @@ where
     ) -> Result<NextState, crate::scheduler::SchedulerError> {
         match evt {
             ControlEvent::Check { .. } if self.is_consistent.is_some() => {
-                log::warn!("Already run a check.")
+                tracing::warn!("Already run a check.")
             }
             ControlEvent::Check { mode } => {
-                log::info!("Starting a consistency check of the remaining data.");
+                tracing::info!("Starting a consistency check of the remaining data.");
                 self.run_consistency_check(mode).await?
             }
             ControlEvent::Run { fresh, rebuild } => match self.choose_run_mode(fresh, rebuild) {
@@ -208,8 +208,8 @@ where
                 Some(RunMode::Restore) => return Ok(NextState::from(self.into_restore())),
                 None => {}
             },
-            ControlEvent::Pause { .. } => log::warn!("Cannot pause before the run has started."),
-            ControlEvent::Resume { .. } => log::warn!("Cannot resume before the run has started."),
+            ControlEvent::Pause { .. } => tracing::warn!("Cannot pause before the run has started."),
+            ControlEvent::Resume { .. } => tracing::warn!("Cannot resume before the run has started."),
             ControlEvent::Quit { .. } => return Ok(NextState::Exit { exit_ui: true }),
             ControlEvent::Exit => return Ok(NextState::Exit { exit_ui: true }),
             // TODO: remove other events.

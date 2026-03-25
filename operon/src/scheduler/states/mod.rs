@@ -79,7 +79,7 @@ impl SchedulerState for TransitionState {
         evt: ControlEvent,
     ) -> Result<NextState, SchedulerError> {
         if let Some(msg) = self.warn_msg {
-            log::warn!("{msg}")
+            tracing::warn!("{msg}")
         }
         self.events.push_back(evt);
 

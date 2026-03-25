@@ -93,7 +93,7 @@ where
                 NextState::Next(new_state) => state = new_state,
                 NextState::Exit { exit_ui } => {
                     if self.sched_tx.send(exit_ui).is_err() {
-                        log::error!("UI exited before scheduler.")
+                        tracing::error!("UI exited before scheduler.")
                     };
                     break;
                 }

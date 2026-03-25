@@ -63,7 +63,7 @@ where
         match (data_footprint, meta_footprint) {
             (Some(df), Some(mf)) if df == mf => return Ok(Some(mf.metadata)),
             (Some(df), Some(mf)) if df != mf => {
-                log::warn!(
+                tracing::warn!(
                     "Inconsistent footprints between data and metadata storage: data footprint: {df:?}, metadata footprint: {mf:?},\
                     treating the run as aborted."
                 );
@@ -72,7 +72,7 @@ where
                     RunState::Aborted,
                 )));
             }
-            (None, Some(_)) => log::info!(
+            (None, Some(_)) => tracing::info!(
                 "Footprint found in metadata storage, but not in data storage, treating the run as fresh."
             ),
             _ => {}
