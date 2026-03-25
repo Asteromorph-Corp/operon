@@ -69,7 +69,7 @@ impl LogRecord {
         let level = format!("{level_label:>5}");
         let sep = "│ ";
         let prefix_width = prefix.chars().count() + level.chars().count() + sep.chars().count();
-        let available = (width as usize).saturating_sub(prefix_width);
+        let available = (width as usize).saturating_sub(prefix_width).max(1);
         let wrap_indent = " ".repeat(prefix_width.saturating_sub(4)) + "...│ ";
         let wrap_options = ::textwrap::Options::new(available);
 
@@ -92,6 +92,8 @@ impl LogRecord {
                     vec![Span::raw(wrap_indent.clone())]
                 };
 
+                // NOTE: span context styling is only applied to the first wrapped fragment.
+                // If span_ctx is longer than `available`, the overflow loses gray styling.
                 let segments = if l == 0 && i == 0 {
                     style_message_segments(wrapped, &span_ctx, span_style, msg_colour)
                 } else {
