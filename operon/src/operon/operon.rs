@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::future::try_join;
 
-use crate::logger::Logger;
+use crate::logger::UiBroadcastLayer;
 use crate::operon::{OperonError, OperonOptions};
 use crate::scheduler::{ControlEvent, Scheduler, ValidOperon};
 use crate::schema::SharedProgressMap;
@@ -64,8 +64,13 @@ where
         // Initialize the scheduler state channel
         let (sched_tx, sched_rx) = ::tokio::sync::oneshot::channel();
 
-        // Set up the logger
-        Logger::new(log_tx, log_options).setup(::log::LevelFilter::Trace)?;
+        // Set up the tracing subscriber
+        UiBroadcastLayer::new(log_tx, log_options).setup()?;
+
+        // Capture stdout/stderr and forward to tracing (must be after subscriber setup)
+        let _fd_redirect = crate::ui::capture_std_outputs().map_err(crate::ui::UiError::from)?;
+        let original_stdout = _fd_redirect.original_fd(&std::io::stdout());
+
         let progresses = SharedProgressMap::from_jobs(&handler.job_handlers);
 
         // Create the scheduler
@@ -78,7 +83,7 @@ where
             sched_tx,
             scheduler_options,
         )?;
-        let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
+        let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options, original_stdout);
 
         // Spawn the scheduler thread
         let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };

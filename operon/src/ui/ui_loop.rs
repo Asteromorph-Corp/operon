@@ -58,6 +58,7 @@ pub struct UiLoop {
     sched_rx: SchedulerStateReceiver,
     finished: bool,
     exit_on_finish: bool,
+    stdout: Option<std::fs::File>,
 }
 
 impl UiLoop {
@@ -69,6 +70,7 @@ impl UiLoop {
         ctrl_tx: ControlEventSender,
         sched_rx: SchedulerStateReceiver,
         options: UiOptions,
+        stdout: Option<std::fs::File>,
     ) -> Self {
         Self {
             mode: options.mode,
@@ -81,6 +83,7 @@ impl UiLoop {
             sched_rx,
             finished: false,
             exit_on_finish: false,
+            stdout,
         }
     }
 
@@ -93,7 +96,10 @@ impl UiLoop {
 
     pub async fn run_interactive(mut self) -> Result<(), UiError> {
         enable_raw_mode()?;
-        let mut stdout = ::std::io::stdout();
+        let mut stdout: Box<dyn std::io::Write> = match self.stdout.take() {
+            Some(file) => Box::new(file),
+            None => Box::new(::std::io::stdout()),
+        };
         execute!(stdout, EnterAlternateScreen)?;
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
@@ -202,7 +208,7 @@ impl UiLoop {
 
             // If a new error state is detected, abort the execution.
             if state == TaskState::Error {
-                log::error!("Aborting execution due to previous error.");
+                tracing::error!("Aborting execution due to previous error.");
                 self.ctrl_tx.send(ControlEvent::Quit {
                     force: true,
                     no_exit: false,
@@ -244,18 +250,18 @@ impl UiLoop {
     fn execute_command(&mut self, command: Command) -> Result<bool, UiError> {
         if self.finished {
             match command {
-                Command::Run { .. } => log::warn!(
+                Command::Run { .. } => tracing::warn!(
                     "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
                 ),
                 Command::Check { .. } => {
-                    log::warn!("Cannot check after the run has already started.")
+                    tracing::warn!("Cannot check after the run has already started.")
                 }
-                Command::Quit { no_exit: true, .. } => log::warn!("Nothing to quit."),
+                Command::Quit { no_exit: true, .. } => tracing::warn!("Nothing to quit."),
                 Command::Quit { .. } | Command::Exit => return Ok(true),
-                Command::Pause { .. } => log::warn!("Nothing to pause."),
-                Command::Resume { .. } => log::warn!("Nothing to resume"),
+                Command::Pause { .. } => tracing::warn!("Nothing to pause."),
+                Command::Resume { .. } => tracing::warn!("Nothing to resume"),
                 Command::Clear => self.logs.clear(),
-                Command::Help => log::info!("{HELP_TEXT}"),
+                Command::Help => tracing::info!("{HELP_TEXT}"),
             };
 
             return Ok(false);
@@ -276,7 +282,7 @@ impl UiLoop {
                 .send(ControlEvent::Pause { targets, cascade })?,
             Command::Resume { targets } => self.ctrl_tx.send(ControlEvent::Resume { targets })?,
             Command::Clear => self.logs.clear(),
-            Command::Help => log::info!("{HELP_TEXT}"),
+            Command::Help => tracing::info!("{HELP_TEXT}"),
         }
 
         Ok(false)
