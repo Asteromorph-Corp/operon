@@ -67,9 +67,18 @@ where
         // Set up the tracing subscriber
         UiBroadcastLayer::new(log_tx, log_options).setup()?;
 
-        // Capture stdout/stderr and forward to tracing (must be after subscriber setup)
-        let _fd_redirect = crate::ui::capture_std_outputs().map_err(crate::ui::UiError::from)?;
-        let original_stdout = _fd_redirect.original_fd(&std::io::stdout());
+        // Capture stdout/stderr and forward to tracing (must be after subscriber setup).
+        // Best-effort: if capture fails or is unavailable (non-Unix), fall back to normal stdout.
+        #[cfg(unix)]
+        let (_fd_redirect, original_stdout) = match crate::ui::capture_std_outputs() {
+            Ok(redirect) => {
+                let stdout = redirect.original_fd(&std::io::stdout());
+                (Some(redirect), stdout)
+            }
+            Err(_) => (None, None),
+        };
+        #[cfg(not(unix))]
+        let original_stdout: Option<std::fs::File> = None;
 
         let progresses = SharedProgressMap::from_jobs(&handler.job_handlers);
 
