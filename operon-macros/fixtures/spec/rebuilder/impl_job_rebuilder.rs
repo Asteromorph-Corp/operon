@@ -55,7 +55,7 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
 
         if !invalid_tickets.is_empty() {
             let count = invalid_tickets.len();
-            let display = if count <= 3 {
+            let ticket_display = if count <= 3 {
                 format!("{:?}", invalid_tickets)
             } else {
                 format!(
@@ -65,10 +65,10 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                     count - 2
                 )
             };
-            operon::log::warn!(
+            operon::tracing::warn!(
                 "The following {} beta ticket(s) were incorrectly marked as done: {}",
                 count,
-                display
+                ticket_display
             );
         }
 

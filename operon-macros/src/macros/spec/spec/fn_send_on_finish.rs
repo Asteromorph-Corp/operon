@@ -22,11 +22,11 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///         ))
 ///         .await
 ///     {
-///         Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
+///         Ok(_) => operon::tracing::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
 ///         // Verbosity should be low here, since this can happen
 ///         // an arbitrary number of times
 ///         // if a descendant scheduler errored out.
-///         Err(_) => operon::log::trace!(
+///         Err(_) => operon::tracing::trace!(
 ///             "`delta`'s peer channel closed before handling `beta`'s {resolution:?}"
 ///         ),
 ///     }
@@ -38,9 +38,9 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///         )))
 ///         .await
 ///     {
-///         Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {job:?}"),
+///         Ok(_) => operon::tracing::trace!("`beta` sent peer event to `delta`: {job:?}"),
 ///         Err(_) => {
-///             operon::log::trace!("`delta`'s peer channel closed before handling `beta`'s {job:?}")
+///             operon::tracing::trace!("`delta`'s peer channel closed before handling `beta`'s {job:?}")
 ///         }
 ///     }
 ///     match peer_txs
@@ -50,9 +50,9 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///         )))
 ///         .await
 ///     {
-///         Ok(_) => operon::log::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
+///         Ok(_) => operon::tracing::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
 ///         Err(_) => {
-///             operon::log::trace!("`epsilon`'s peer channel closed before handling `beta`'s {job:?}")
+///             operon::tracing::trace!("`epsilon`'s peer channel closed before handling `beta`'s {job:?}")
 ///         }
 ///     }
 ///     Ok(())
@@ -87,8 +87,8 @@ pub(super) fn fn_send_on_finish(
                     .send(#operon::scheduler::PeerEvent::Resolution(schema::#resolution_enum_ident::#resolution_variant_ident(resolution)))
                     .await
                 {
-                    Ok(_) => #operon::log::trace!(#ok_msg),
-                    Err(_) => #operon::log::trace!(#err_msg),
+                    Ok(_) => #operon::tracing::trace!(#ok_msg),
+                    Err(_) => #operon::tracing::trace!(#err_msg),
                 }
             }
         });
@@ -111,8 +111,8 @@ pub(super) fn fn_send_on_finish(
                 .send(#operon::scheduler::PeerEvent::Job(schema::JobEnum::#job_variant_ident(job)))
                 .await
             {
-                Ok(_) => #operon::log::trace!(#ok_msg),
-                Err(_) => #operon::log::trace!(#err_msg),
+                Ok(_) => #operon::tracing::trace!(#ok_msg),
+                Err(_) => #operon::tracing::trace!(#err_msg),
             }
         }
     });

@@ -178,7 +178,7 @@ pub fn impl_job_rebuilder(
 
                 if !invalid_tickets.is_empty() {
                     let count = invalid_tickets.len();
-                    let display = if count <= 3 {
+                    let ticket_display = if count <= 3 {
                         format!("{:?}", invalid_tickets)
                     } else {
                         format!(
@@ -187,7 +187,7 @@ pub fn impl_job_rebuilder(
                             count - 2
                         )
                     };
-                    #operon::log::warn!(#invalid_ticket_msg, count, display);
+                    #operon::tracing::warn!(#invalid_ticket_msg, count, ticket_display);
                 }
                 Ok(())
             }
