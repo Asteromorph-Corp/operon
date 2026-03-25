@@ -141,6 +141,33 @@ where
         }
     }
 
+    fn on_record(
+        &self,
+        id: &tracing::span::Id,
+        values: &tracing::span::Record<'_>,
+        ctx: Context<'_, S>,
+    ) {
+        if let Some(span) = ctx.span(id) {
+            let mut visitor = FieldVisitor::default();
+            values.record(&mut visitor);
+
+            let mut extensions = span.extensions_mut();
+            if let Some(existing) = extensions.get_mut::<SpanFields>() {
+                for (new_key, new_val) in visitor.fields {
+                    if let Some((_, existing_val)) =
+                        existing.0.iter_mut().find(|(k, _)| *k == new_key)
+                    {
+                        *existing_val = new_val;
+                    } else {
+                        existing.0.push((new_key, new_val));
+                    }
+                }
+            } else {
+                extensions.insert(SpanFields(visitor.fields));
+            }
+        }
+    }
+
     fn on_event(&self, event: &tracing::Event<'_>, ctx: Context<'_, S>) {
         let metadata = event.metadata();
         let level = *metadata.level();
@@ -182,6 +209,23 @@ where
             Some(span_parts.join(", "))
         };
 
+        // Append structured event fields to the message
+        let message = if visitor.fields.is_empty() {
+            visitor.message
+        } else {
+            let fields = visitor
+                .fields
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            if visitor.message.is_empty() {
+                fields
+            } else {
+                format!("{} {{{fields}}}", visitor.message)
+            }
+        };
+
         let record = LogRecord::new(
             level,
             metadata.target().to_string(),
@@ -189,7 +233,7 @@ where
             metadata.module_path().map(|s| s.to_string()),
             metadata.line(),
             span_context,
-            visitor.message,
+            message,
         );
 
         // Dump to CSV
