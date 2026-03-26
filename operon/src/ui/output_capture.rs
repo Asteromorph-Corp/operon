@@ -16,6 +16,7 @@ struct FdHandle {
     thread: Option<JoinHandle<()>>,
 }
 
+#[derive(Default)]
 pub struct FdRedirect {
     specs: Vec<FdSpec>,
 }
@@ -39,7 +40,7 @@ impl FdRedirectHandle {
 
 impl FdRedirect {
     pub fn new() -> Self {
-        Self { specs: Vec::new() }
+        Self::default()
     }
 
     pub fn with_fd(
