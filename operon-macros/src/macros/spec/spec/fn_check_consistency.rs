@@ -12,9 +12,9 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///     &self,
 ///     storage: &Sto,
 ///     client: operon::meta_storage::MetaClient<'_>,
-///     mode: operon::ui::CheckMode,
+///     mode: operon::schema::CheckMode,
 /// ) -> Result<bool, operon::scheduler::SchedulerError> {
-///     if mode == operon::ui::CheckMode::TrustAll {
+///     if mode == operon::schema::CheckMode::TrustAll {
 ///         return Ok(true);
 ///     }
 ///
@@ -34,11 +34,11 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///
 ///     // ...and check if the data storage holds all the data for them.
 ///     let coordinates_to_check = match mode {
-///         operon::ui::CheckMode::MetadataOnly => return Ok(true),
-///         operon::ui::CheckMode::Exhaustive => {
+///         operon::schema::CheckMode::MetadataOnly => return Ok(true),
+///         operon::schema::CheckMode::Exhaustive => {
 ///             coordinates
 ///         }
-///         operon::ui::CheckMode::Quick => {
+///         operon::schema::CheckMode::Quick => {
 ///             operon::utils::dop::get_dop_coords(&coordinates)
 ///         }
 ///         _ => unreachable!(),
@@ -89,11 +89,11 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
                 }
 
                 let tags_to_check = match mode {
-                    #operon::ui::CheckMode::MetadataOnly => return Ok(true),
-                    #operon::ui::CheckMode::Exhaustive => {
+                    #operon::schema::CheckMode::MetadataOnly => return Ok(true),
+                    #operon::schema::CheckMode::Exhaustive => {
                         tags
                     }
-                    #operon::ui::CheckMode::Quick => {
+                    #operon::schema::CheckMode::Quick => {
                         #operon::utils::get_dop_tags(&tags)
                     }
                     _ => unreachable!(),
@@ -110,11 +110,11 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
         None => {
             quote! {
                 let coordinates_to_check = match mode {
-                    #operon::ui::CheckMode::MetadataOnly => return Ok(true),
-                    #operon::ui::CheckMode::Exhaustive => {
+                    #operon::schema::CheckMode::MetadataOnly => return Ok(true),
+                    #operon::schema::CheckMode::Exhaustive => {
                         coordinates
                     }
-                    #operon::ui::CheckMode::Quick => {
+                    #operon::schema::CheckMode::Quick => {
                         #operon::utils::get_dop_coords(&coordinates)
                     }
                     _ => unreachable!(),
@@ -135,9 +135,9 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             &self,
             storage: &Sto,
             client: #operon::meta_storage::MetaClient<'_>,
-            mode: #operon::ui::CheckMode,
+            mode: #operon::schema::CheckMode,
         ) -> Result<bool, #operon::scheduler::SchedulerError> {
-            if mode == #operon::ui::CheckMode::TrustAll {
+            if mode == #operon::schema::CheckMode::TrustAll {
                 return Ok(true);
             }
 

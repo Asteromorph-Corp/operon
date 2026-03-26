@@ -10,7 +10,7 @@ use crate::scheduler::{
     IndividualControlEventSender, JobHandler, JobRebuilder, PeerEvent, PeerEventSenderMap,
     SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
-use crate::schema::{Progress, SharedProgressMap};
+use crate::schema::{CheckMode, Progress, SharedProgressMap};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -103,7 +103,7 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-        mode: crate::ui::CheckMode,
+        mode: CheckMode,
     ) -> Result<bool, SchedulerError> {
         for schedule in &self.job_handlers {
             if !schedule.check_consistency(storage, client, mode).await? {

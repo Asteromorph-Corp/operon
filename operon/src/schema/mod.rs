@@ -22,5 +22,8 @@ pub use option_coordinate::*;
 mod ticket_status;
 pub use ticket_status::*;
 
+mod check_mode;
 mod progress;
+
+pub use check_mode::CheckMode;
 pub use progress::{Progress, SharedProgress, SharedProgressMap, TaskState};

@@ -2,9 +2,9 @@ async fn check_consistency(
     &self,
     storage: &Sto,
     client: operon::meta_storage::MetaClient<'_>,
-    mode: operon::ui::CheckMode,
+    mode: operon::schema::CheckMode,
 ) -> Result<bool, operon::scheduler::SchedulerError> {
-    if mode == operon::ui::CheckMode::TrustAll {
+    if mode == operon::schema::CheckMode::TrustAll {
         return Ok(true);
     }
 
@@ -45,9 +45,9 @@ async fn check_consistency(
 
     // ...and check if the data storage holds all the data for them.
     let tags_to_check = match mode {
-        operon::ui::CheckMode::MetadataOnly => return Ok(true),
-        operon::ui::CheckMode::Exhaustive => tags,
-        operon::ui::CheckMode::Quick => operon::utils::get_dop_tags(&tags),
+        operon::schema::CheckMode::MetadataOnly => return Ok(true),
+        operon::schema::CheckMode::Exhaustive => tags,
+        operon::schema::CheckMode::Quick => operon::utils::get_dop_tags(&tags),
         _ => unreachable!(),
     };
 

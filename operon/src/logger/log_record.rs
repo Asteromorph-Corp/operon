@@ -1,6 +1,7 @@
 use ratatui::style::Stylize;
 use ratatui::text::{Line, Span};
 
+pub type LogRecordSender = tokio::sync::broadcast::Sender<LogRecord>;
 pub type LogRecordReceiver = tokio::sync::broadcast::Receiver<LogRecord>;
 
 #[allow(dead_code)]

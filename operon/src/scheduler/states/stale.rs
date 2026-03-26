@@ -8,9 +8,9 @@ use crate::scheduler::states::rebuild::RebuildTransition;
 use crate::scheduler::states::start::StartTransition;
 use crate::scheduler::states::{NextState, SchedulerState, TransitionState};
 use crate::scheduler::{ControlEvent, SchedulerError};
+use crate::schema::CheckMode;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::CheckMode;
 
 pub struct StaleState<Svc, Sto>
 where

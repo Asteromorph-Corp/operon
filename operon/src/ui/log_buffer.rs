@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use ratatui::text::{Line, Text};
 
-use crate::ui::LogRecord;
+use crate::logger::LogRecord;
 
 #[derive(Debug, Clone)]
 pub struct LogBuffer {
