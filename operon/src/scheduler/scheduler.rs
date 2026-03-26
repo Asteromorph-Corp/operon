@@ -83,10 +83,7 @@ where
         loop {
             let next = tokio::select! {
                 _ = interval.tick() => state.handle_progress().await?,
-                Ok(()) = self.ctrl_rx.changed() => {
-                    let evt = self.ctrl_rx.borrow_and_update().clone();
-                    state.handle_control_event(evt).await?
-                }
+                Some(evt) = self.ctrl_rx.recv() => state.handle_control_event(evt).await?,
             };
 
             match next {

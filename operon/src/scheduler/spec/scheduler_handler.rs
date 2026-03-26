@@ -211,7 +211,7 @@ where
                 .get(handler.job_id())
                 .cloned()
                 .unwrap_or_else(|| Arc::new(RwLock::new(Progress::default())));
-            let (ctrl_tx, ctrl_rx) = tokio::sync::mpsc::channel(10);
+            let (ctrl_tx, ctrl_rx) = tokio::sync::mpsc::channel(64);
             futs.push(handler.run_scheduler(
                 service.clone(),
                 storage.clone(),

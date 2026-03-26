@@ -73,8 +73,6 @@ where
             ControlEvent::Resume { .. } => tracing::warn!("Cannot resume before the run has started."),
             ControlEvent::Quit { .. } => return Ok(NextState::Exit { exit_ui: true }),
             ControlEvent::Exit => return Ok(NextState::Exit { exit_ui: true }),
-            // TODO: remove other events.
-            _ => {}
         }
         Ok(NextState::Next(self))
     }

@@ -175,7 +175,6 @@ where
                 "Cannot exit while jobs are running or paused. \
                 Use `quit` for a graceful stop, or `quit --force` to abort all jobs."
             ),
-            _ => {}
         }
 
         Ok(NextState::Next(self))

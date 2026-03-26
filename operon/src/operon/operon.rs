@@ -4,7 +4,7 @@ use futures::future::try_join;
 
 use crate::logger::UiBroadcastLayer;
 use crate::operon::{OperonError, OperonOptions};
-use crate::scheduler::{ControlEvent, Scheduler, ValidOperon};
+use crate::scheduler::{Scheduler, ValidOperon};
 use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -59,7 +59,7 @@ where
         let (log_tx, log_rx) = ::tokio::sync::broadcast::channel(log_options.buffer_size);
 
         // Initialize the control event and recovery state channel
-        let (ctrl_tx, ctrl_rx) = ::tokio::sync::watch::channel(ControlEvent::Start);
+        let (ctrl_tx, ctrl_rx) = ::tokio::sync::mpsc::channel(64);
 
         // Initialize the scheduler state channel
         let (sched_tx, sched_rx) = ::tokio::sync::oneshot::channel();

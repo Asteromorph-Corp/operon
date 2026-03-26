@@ -147,7 +147,7 @@ impl UiLoop {
                     };
 
                     if let Some(command) = self.handle_event(evt?) {
-                        let exit_ui = self.execute_command(command)?;
+                        let exit_ui = self.execute_command(command).await?;
 
                         if exit_ui {
                             break;
@@ -187,10 +187,7 @@ impl UiLoop {
         // Recovery is disabled for this mode,
         // so we always run fresh off the bat and wait
         // until everything finishes or something errors.
-        self.ctrl_tx.send(ControlEvent::Run {
-            fresh: true,
-            rebuild: false,
-        })?;
+        self.ctrl_tx.send(ControlEvent::FRESH_RUN).await?;
         loop {
             if self.finished {
                 break;
@@ -227,10 +224,7 @@ impl UiLoop {
             // If a new error state is detected, abort the execution.
             if state == TaskState::Error {
                 tracing::error!("Aborting execution due to previous error.");
-                self.ctrl_tx.send(ControlEvent::Quit {
-                    force: true,
-                    no_exit: false,
-                })?;
+                self.ctrl_tx.send(ControlEvent::FORCE_QUIT).await?;
             }
             ::tokio::time::sleep(::std::time::Duration::from_millis(10)).await;
         }
@@ -265,7 +259,7 @@ impl UiLoop {
         None
     }
 
-    fn execute_command(&mut self, command: Command) -> Result<bool, UiError> {
+    async fn execute_command(&mut self, command: Command) -> Result<bool, UiError> {
         if self.finished {
             match command {
                 Command::Run { .. } => tracing::warn!(
@@ -287,18 +281,26 @@ impl UiLoop {
 
         match command {
             Command::Run { fresh, rebuild } => {
-                self.ctrl_tx.send(ControlEvent::Run { fresh, rebuild })?
+                self.ctrl_tx
+                    .send(ControlEvent::Run { fresh, rebuild })
+                    .await?
             }
-            Command::Check { mode } => self.ctrl_tx.send(ControlEvent::Check { mode })?,
+            Command::Check { mode } => self.ctrl_tx.send(ControlEvent::Check { mode }).await?,
             Command::Quit { force, no_exit } => {
-                self.ctrl_tx.send(ControlEvent::Quit { force, no_exit })?;
+                self.ctrl_tx
+                    .send(ControlEvent::Quit { force, no_exit })
+                    .await?;
                 self.exit_on_finish = !no_exit;
             }
-            Command::Exit => self.ctrl_tx.send(ControlEvent::Exit)?,
-            Command::Pause { targets, cascade } => self
-                .ctrl_tx
-                .send(ControlEvent::Pause { targets, cascade })?,
-            Command::Resume { targets } => self.ctrl_tx.send(ControlEvent::Resume { targets })?,
+            Command::Exit => self.ctrl_tx.send(ControlEvent::Exit).await?,
+            Command::Pause { targets, cascade } => {
+                self.ctrl_tx
+                    .send(ControlEvent::Pause { targets, cascade })
+                    .await?
+            }
+            Command::Resume { targets } => {
+                self.ctrl_tx.send(ControlEvent::Resume { targets }).await?
+            }
             Command::Clear => self.logs.clear(),
             Command::Help => tracing::info!("{HELP_TEXT}"),
         }
