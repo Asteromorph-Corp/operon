@@ -14,26 +14,81 @@ use crate::ui::{LogRecord, UiError};
 #[derive(Debug, Default, Clone)]
 struct SpanFields(Vec<(String, String)>);
 
-/// Visitor that collects the message and structured fields from a tracing event.
+/// Metadata extracted from `log.*` fields on `tracing_log`-bridged events.
+///
+/// When crates use the `log` facade and `tracing_log` bridges them into tracing,
+/// the tracing metadata target is `"log"` and the original crate metadata is
+/// stored as `log.target`, `log.module_path`, `log.file`, and `log.line` fields.
+#[derive(Debug, Default)]
+struct LogBridgedMeta {
+    target: Option<String>,
+    module_path: Option<String>,
+    file: Option<String>,
+    line: Option<u64>,
+}
+
+impl LogBridgedMeta {
+    /// Resolve each field, preferring the bridged value over tracing metadata.
+    pub fn resolve(
+        self,
+        metadata: &tracing::Metadata<'_>,
+    ) -> (String, Option<String>, Option<String>, Option<u32>) {
+        let target = self.target.unwrap_or_else(|| metadata.target().to_string());
+        let file = self.file.or_else(|| metadata.file().map(String::from));
+        let module_path = self
+            .module_path
+            .or_else(|| metadata.module_path().map(String::from));
+        let line = self.line.map(|n| n as u32).or(metadata.line());
+        (target, file, module_path, line)
+    }
+}
+
+/// Visitor that collects the message, structured fields, and any `log.*` bridged metadata.
 #[derive(Debug, Default)]
 struct EventVisitor {
     message: String,
     fields: Vec<(String, String)>,
+    log_meta: LogBridgedMeta,
 }
 
 impl Visit for EventVisitor {
     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
-        if field.name() == "message" {
-            self.message = format!("{value:?}");
-        } else {
-            self.fields
-                .push((field.name().to_string(), format!("{value:?}")));
+        match field.name() {
+            "message" => self.message = format!("{value:?}"),
+            "log.target" => self.log_meta.target = Some(format!("{value:?}")),
+            "log.module_path" => self.log_meta.module_path = Some(format!("{value:?}")),
+            "log.file" => self.log_meta.file = Some(format!("{value:?}")),
+            "log.line" => {
+                if let Ok(n) = format!("{value:?}").parse() {
+                    self.log_meta.line = Some(n);
+                }
+            }
+            _ => self
+                .fields
+                .push((field.name().to_string(), format!("{value:?}"))),
         }
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {
-        if field.name() == "message" {
-            self.message = value.to_string();
+        match field.name() {
+            "message" => self.message = value.to_string(),
+            "log.target" => self.log_meta.target = Some(value.to_string()),
+            "log.module_path" => self.log_meta.module_path = Some(value.to_string()),
+            "log.file" => self.log_meta.file = Some(value.to_string()),
+            "log.line" => {
+                if let Ok(n) = value.parse() {
+                    self.log_meta.line = Some(n);
+                }
+            }
+            _ => self
+                .fields
+                .push((field.name().to_string(), value.to_string())),
+        }
+    }
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        if field.name() == "log.line" {
+            self.log_meta.line = Some(value);
         } else {
             self.fields
                 .push((field.name().to_string(), value.to_string()));
@@ -177,18 +232,22 @@ where
             return;
         }
 
+        // Extract event message, fields, and any `log.*` bridged metadata
+        let mut visitor = EventVisitor::default();
+        event.record(&mut visitor);
+
+        // Resolve metadata: prefer bridged `log.*` fields over tracing metadata
+        // so that events from crates using the `log` facade get their original
+        // target/module/file/line instead of the generic "log" placeholder.
+        let (target, file, module_path, line) = visitor.log_meta.resolve(metadata);
+
         // Blacklist noisy third-party crate logs
-        let target = metadata.target();
         if target.starts_with("tokio_postgres") && level >= tracing::Level::INFO {
             return;
         }
         if target.starts_with("mio::poll") && level >= tracing::Level::TRACE {
             return;
         }
-
-        // Extract event message and fields
-        let mut visitor = EventVisitor::default();
-        event.record(&mut visitor);
 
         // Collect span context
         let mut span_parts: Vec<String> = Vec::new();
@@ -228,10 +287,10 @@ where
 
         let record = LogRecord::new(
             level,
-            metadata.target().to_string(),
-            metadata.file().map(|s| s.to_string()),
-            metadata.module_path().map(|s| s.to_string()),
-            metadata.line(),
+            target,
+            file,
+            module_path,
+            line,
             span_context,
             message,
         );
