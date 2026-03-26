@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use secrecy::ExposeSecret;
 
-use crate::meta_storage::{ConnectionWithSchema, MetaStorageError, MetaStorageOptions};
+use crate::meta_storage::meta_client::ConnectionWithSchema;
+use crate::meta_storage::{MetaStorageError, MetaStorageOptions};
 
 #[derive(Debug, Clone)]
 pub struct MetaStorage {
