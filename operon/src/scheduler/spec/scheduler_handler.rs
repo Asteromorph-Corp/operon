@@ -109,7 +109,7 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
             if !schedule.check_consistency(storage, client, mode).await? {
                 return Ok(false);
             }
-            log::info!(
+            tracing::info!(
                 "Consistency check passed for job handler: {}",
                 schedule.job_id()
             );

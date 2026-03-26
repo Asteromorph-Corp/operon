@@ -26,8 +26,8 @@ impl CommandPrompt {
             (_, KeyCode::Enter) => {
                 let command = self.input.parse::<Command>();
                 match command {
-                    Ok(_) => log::info!("$ {}", self.input),
-                    Err(_) if !self.input.trim().is_empty() => log::error!("$ {}", self.input),
+                    Ok(_) => tracing::info!("$ {}", self.input),
+                    Err(_) if !self.input.trim().is_empty() => tracing::error!("$ {}", self.input),
                     _ => {}
                 }
                 self.input.clear();

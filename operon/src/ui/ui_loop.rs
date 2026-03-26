@@ -92,10 +92,34 @@ impl UiLoop {
     }
 
     pub async fn run_interactive(mut self) -> Result<(), UiError> {
+        // Capture stdout/stderr and forward to tracing (must be after subscriber setup).
+        // Best-effort: if capture fails or is unavailable (non-Unix), fall back to normal stdout.
+        #[cfg(unix)]
+        let (_fd_redirect, original_stdout) = match crate::ui::capture_std_outputs() {
+            Ok(redirect) => {
+                let stdout = redirect.original_fd(&std::io::stdout());
+                (Some(redirect), stdout)
+            }
+            Err(_) => {
+                tracing::warn!(
+                    "Failed to capture stdout/stderr, falling back to normal output. This may cause display issues in the TUI."
+                );
+                (None, None)
+            }
+        };
+
+        #[cfg(not(unix))]
+        let original_stdout: Option<std::fs::File> = None;
+
         enable_raw_mode()?;
-        let mut stdout = ::std::io::stdout();
-        execute!(stdout, EnterAlternateScreen)?;
-        let backend = CrosstermBackend::new(stdout);
+
+        let mut stdout_writer: Box<dyn ::std::io::Write> = match original_stdout {
+            Some(file) => Box::new(file),
+            None => Box::new(::std::io::stdout()),
+        };
+
+        execute!(stdout_writer, EnterAlternateScreen)?;
+        let backend = CrosstermBackend::new(stdout_writer);
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
 
@@ -202,7 +226,7 @@ impl UiLoop {
 
             // If a new error state is detected, abort the execution.
             if state == TaskState::Error {
-                log::error!("Aborting execution due to previous error.");
+                tracing::error!("Aborting execution due to previous error.");
                 self.ctrl_tx.send(ControlEvent::Quit {
                     force: true,
                     no_exit: false,
@@ -244,18 +268,18 @@ impl UiLoop {
     fn execute_command(&mut self, command: Command) -> Result<bool, UiError> {
         if self.finished {
             match command {
-                Command::Run { .. } => log::warn!(
+                Command::Run { .. } => tracing::warn!(
                     "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
                 ),
                 Command::Check { .. } => {
-                    log::warn!("Cannot check after the run has already started.")
+                    tracing::warn!("Cannot check after the run has already started.")
                 }
-                Command::Quit { no_exit: true, .. } => log::warn!("Nothing to quit."),
+                Command::Quit { no_exit: true, .. } => tracing::warn!("Nothing to quit."),
                 Command::Quit { .. } | Command::Exit => return Ok(true),
-                Command::Pause { .. } => log::warn!("Nothing to pause."),
-                Command::Resume { .. } => log::warn!("Nothing to resume"),
+                Command::Pause { .. } => tracing::warn!("Nothing to pause."),
+                Command::Resume { .. } => tracing::warn!("Nothing to resume"),
                 Command::Clear => self.logs.clear(),
-                Command::Help => log::info!("{HELP_TEXT}"),
+                Command::Help => tracing::info!("{HELP_TEXT}"),
             };
 
             return Ok(false);
@@ -276,7 +300,7 @@ impl UiLoop {
                 .send(ControlEvent::Pause { targets, cascade })?,
             Command::Resume { targets } => self.ctrl_tx.send(ControlEvent::Resume { targets })?,
             Command::Clear => self.logs.clear(),
-            Command::Help => log::info!("{HELP_TEXT}"),
+            Command::Help => tracing::info!("{HELP_TEXT}"),
         }
 
         Ok(false)

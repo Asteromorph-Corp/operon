@@ -1,0 +1,9 @@
+[package]
+name = "ex4"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+log = "0.4"
+operon = { path = "../../operon" }
+tokio = { version = "1.46.1", features = ["full"] }

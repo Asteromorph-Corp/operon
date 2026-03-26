@@ -28,7 +28,7 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///         .map(|ticket| ticket.resolve().map(|job| job.coordinate))
 ///         .collect::<Option<Vec<_>>>()
 ///     else {
-///         operon::log::info!("Some `epsilon` tickets are corrupt in the metadata storage.");
+///         operon::tracing::info!("Some `epsilon` tickets are corrupt in the metadata storage.");
 ///         return Ok(false);
 ///     };
 ///
@@ -47,7 +47,7 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///     for coordinate in coordinates_to_check {
 ///         if storage.get_e(coordinate).await?.is_none() {
 ///             // TODO: improve error message coordinate display
-///             operon::log::info!("Data storage does not hold `E_{:?}`.", coordinate);
+///             operon::tracing::info!("Data storage does not hold `E_{:?}`.", coordinate);
 ///             return Ok(false);
 ///         }
 ///     }
@@ -80,7 +80,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
                 for coordinate in coordinates {
                     let Some(res) = client.resolution(self.spawn_dim_meta()).get(coordinate).await?
                     else {
-                        #operon::log::info!(#missing_res_msg, coordinate);
+                        #operon::tracing::info!(#missing_res_msg, coordinate);
                         return Ok(false);
                     };
                     for #spawn_dim in 0..(res.ub) {
@@ -101,7 +101,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
 
                 for ([#(#field_vars),*], #spawn_dim) in tags_to_check {
                     if storage.#get_fn_name([#(#field_vars,)* #spawn_dim]).await?.is_none() {
-                        #operon::log::info!(#missing_entity_msg, [#(#field_vars,)* #spawn_dim]);
+                        #operon::tracing::info!(#missing_entity_msg, [#(#field_vars,)* #spawn_dim]);
                         return Ok(false);
                     }
                 }
@@ -122,7 +122,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
 
                 for coordinate in coordinates_to_check {
                     if storage.#get_fn_name(coordinate).await?.is_none() {
-                        #operon::log::info!(#missing_entity_msg, coordinate);
+                        #operon::tracing::info!(#missing_entity_msg, coordinate);
                         return Ok(false);
                     }
                 }
@@ -149,7 +149,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
                 .iter()
                 .map(|ticket| ticket.resolve().map(|job| job.coordinate))
                 .collect::<Option<Vec<_>>>() else {
-                    #operon::log::info!(#corrupt_msg);
+                    #operon::tracing::info!(#corrupt_msg);
                     return Ok(false);
                 };
 

@@ -16,7 +16,7 @@ pub struct OperonOptions {
     pub(crate) meta_storage_keepalives_idle: std::time::Duration,
     pub(crate) meta_storage_keepalives_interval: std::time::Duration,
     // Log options
-    pub(crate) log_level: log::Level,
+    pub(crate) log_level: tracing::Level,
     pub(crate) log_buffer_size: usize,
     pub(crate) log_dump: Option<String>,
 }
@@ -31,7 +31,7 @@ impl OperonOptions {
             meta_storage_schema: Some("metadata".to_string()),
             meta_storage_keepalives_idle: std::time::Duration::from_secs(60),
             meta_storage_keepalives_interval: std::time::Duration::from_secs(30),
-            log_level: log::Level::Info,
+            log_level: tracing::Level::INFO,
             log_buffer_size: 1024,
             log_dump: None,
         }
@@ -75,7 +75,7 @@ impl OperonOptions {
         self
     }
 
-    pub fn with_log_level(mut self, level: log::Level) -> Self {
+    pub fn with_log_level(mut self, level: tracing::Level) -> Self {
         self.log_level = level;
         self
     }

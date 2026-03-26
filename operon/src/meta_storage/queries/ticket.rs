@@ -148,7 +148,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
         const { assert!(IDX < N) }
         if self.job_meta.dims[IDX] != res_meta.id {
-            log::warn!("Invalid resolution received for explosion.");
+            tracing::warn!("Invalid resolution received for explosion.");
             return Ok(vec![]);
         }
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::future::try_join;
 
-use crate::logger::Logger;
+use crate::logger::UiBroadcastLayer;
 use crate::operon::{OperonError, OperonOptions};
 use crate::scheduler::{ControlEvent, Scheduler, ValidOperon};
 use crate::schema::SharedProgressMap;
@@ -64,8 +64,9 @@ where
         // Initialize the scheduler state channel
         let (sched_tx, sched_rx) = ::tokio::sync::oneshot::channel();
 
-        // Set up the logger
-        Logger::new(log_tx, log_options).setup(::log::LevelFilter::Trace)?;
+        // Set up the tracing subscriber
+        UiBroadcastLayer::new(log_tx, log_options).setup()?;
+
         let progresses = SharedProgressMap::from_jobs(&handler.job_handlers);
 
         // Create the scheduler

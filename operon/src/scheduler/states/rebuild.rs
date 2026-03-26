@@ -81,7 +81,7 @@ where
         }
 
         tx.commit().await?;
-        log::info!(
+        tracing::info!(
             "Rebuild completed in: {:?}, starting the run.",
             start.elapsed()
         );

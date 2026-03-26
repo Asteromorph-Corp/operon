@@ -90,7 +90,7 @@ where
         let (done, queued, waiting) = client.ticket(self.meta).get_status().await?;
         let finished = (*self.progress.write().await).update(done, queued, waiting);
         if finished {
-            log::info!("All `{}` jobs are finished.", self.meta.id);
+            tracing::info!("All `{}` jobs are finished.", self.meta.id);
         }
         Ok(())
     }
@@ -134,7 +134,7 @@ where
     fn check_initial_data(&self, tickets: &[Ticket<N>]) -> bool {
         let mut all_ready = true;
         for ticket in tickets.iter().filter(|t| !t.is_ready()) {
-            log::error!(
+            tracing::error!(
                 "Restored ticket for `{}` job is not ready to run: {:?}",
                 self.meta.id,
                 ticket
@@ -171,19 +171,19 @@ where
 
         // Update the UI state before entering the loop.
         if let Err(e) = self.update_progress().await {
-            log::error!("Failed to update UI state after initial data processing: {e}");
+            tracing::error!("Failed to update UI state after initial data processing: {e}");
             self.set_state(TaskState::Error).await;
             return;
         }
 
         // Early return if the scheduler is already finished (e.g. the last run completed this job).
         if self.state == TaskState::Finished {
-            log::debug!(
+            tracing::debug!(
                 "Scheduler for `{}` exited due to being finished from the start.",
                 self.meta.id
             );
             if let Err(e) = self.update_progress().await {
-                log::error!("Failed to update UI state after scheduler run: {e}");
+                tracing::error!("Failed to update UI state after scheduler run: {e}");
                 self.set_state(TaskState::Error).await;
             }
             return;
@@ -194,14 +194,14 @@ where
 
         let id = &self.meta.id;
         if let Err(e) = &res {
-            log::error!("Scheduler for `{id}` exited with an error: {e}");
+            tracing::error!("Scheduler for `{id}` exited with an error: {e}");
             self.set_state(TaskState::Error).await;
         } else {
             match self.state {
-                TaskState::Finished => log::debug!("Scheduler for `{id}` exited normally."),
-                TaskState::Stopped => log::debug!("Scheduler for `{id}` was stopped."),
+                TaskState::Finished => tracing::debug!("Scheduler for `{id}` exited normally."),
+                TaskState::Stopped => tracing::debug!("Scheduler for `{id}` was stopped."),
                 _ => {
-                    log::error!(
+                    tracing::error!(
                         "Scheduler for `{id}` exited with an unexpected state: {:?}",
                         self.state,
                     );
@@ -212,7 +212,7 @@ where
 
         // Update the UI state one last time.
         if let Err(e) = self.update_progress().await {
-            log::error!("Failed to update UI state after scheduler run: {e}");
+            tracing::error!("Failed to update UI state after scheduler run: {e}");
             self.set_state(TaskState::Error).await;
         }
     }
@@ -248,7 +248,7 @@ where
                             is_stopping = true;
                         }
                         IndividualControlEvent::Quit { force: true } => {
-                            log::info!("Aborting `{}` jobs.", self.meta.id);
+                            tracing::info!("Aborting `{}` jobs.", self.meta.id);
                             // If this is a finished scheduler rolling out peer events,
                             // don't change the state to `Stopped`,
                             // since it is already `Finished`.
@@ -268,7 +268,7 @@ where
                     match int_event {
                         InternalEvent::JobSuccess(job, resolution) => {
                             // Trace the job success
-                            log::trace!(
+                            tracing::trace!(
                                 "{} received internal event: JobSuccess({job:?}, {resolution:?}).",
                                 self.meta.id
                             );
@@ -284,7 +284,7 @@ where
                         }
                         InternalEvent::JobFailure(job, e) => {
                             // Log the error
-                            log::error!("Job {job:?} failed: {e}");
+                            tracing::error!("Job {job:?} failed: {e}");
                             // Return the error to the top-level scheduler
                             return Err(e);
                         }
@@ -296,7 +296,7 @@ where
                     match event {
                         Some(evt) => {
                             // Trace the peer event
-                            log::trace!(
+                            tracing::trace!(
                                 "{} received peer event: {evt:?}; \
                                 Peer channel has {} events left.",
                                 self.meta.id, peer_rx.len()
@@ -308,7 +308,7 @@ where
                             // meaning that all peer updates were received,
                             // or that the upstream scheduler was gracefully stopped.
                             // Either way, we stop listening this branch.
-                            log::debug!("`{}` finished receiving updates.", self.meta.id);
+                            tracing::debug!("`{}` finished receiving updates.", self.meta.id);
                             got_all_updates = true;
                         }
                     }
@@ -335,7 +335,7 @@ where
                     // The metadata storage operations are grouped in one transaction here.
                     self.handles.spawn(async move {
                         // Trace the job start.
-                        log::trace!("Running job {job:?} in `{job_id}` scheduler.");
+                        tracing::trace!("Running job {job:?} in `{job_id}` scheduler.");
                         let _permit = permit;
                         let mut conn = meta_storage.conn().await?;
                         let tx = conn.transaction().await?;
@@ -346,7 +346,7 @@ where
                                 tx.commit().await?;
 
                                 // Alert the results to the scheduler
-                                log::trace!(
+                                tracing::trace!(
                                     "{job_id} worker exited with: JobSuccess({job:?}, {resolution:?}).",
                                 );
                                 Ok(InternalEvent::JobSuccess(job, resolution))
@@ -356,7 +356,7 @@ where
                                 tx.rollback().await?;
 
                                 // Alert the error to the scheduler
-                                log::trace!(
+                                tracing::trace!(
                                     "{job_id} worker exited with: JobFailure({job:?}, {e:?});",
                                 );
                                 Ok(InternalEvent::JobFailure(job, e))
@@ -369,7 +369,7 @@ where
     }
 
     async fn handle_pause(&mut self) -> Result<(), SchedulerError> {
-        log::info!("Pausing `{}` jobs.", self.meta.id);
+        tracing::info!("Pausing `{}` jobs.", self.meta.id);
         self.set_state(TaskState::Paused).await;
         // Acquire and forget all permits.
         let permit = self
@@ -378,12 +378,12 @@ where
             .acquire_many_owned(self.pool_size as u32)
             .await?;
         permit.forget();
-        log::debug!("Remaining `{}` jobs were finished.", self.meta.id);
+        tracing::debug!("Remaining `{}` jobs were finished.", self.meta.id);
         Ok(())
     }
 
     async fn handle_resume(&mut self) -> Result<(), SchedulerError> {
-        log::info!("Resuming `{}` jobs.", self.meta.id);
+        tracing::info!("Resuming `{}` jobs.", self.meta.id);
         self.set_state(TaskState::Running).await;
         // Add back all permits.
         self.pool.add_permits(self.pool_size);
@@ -395,7 +395,7 @@ where
             return Ok(());
         }
 
-        log::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
+        tracing::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
         self.set_state(TaskState::Paused).await;
 
         // Acquire and forget all permits.
@@ -405,7 +405,7 @@ where
             .acquire_many_owned(self.pool_size as u32)
             .await?;
         permit.forget();
-        log::debug!("Remaining `{}` jobs were finished.", self.meta.id);
+        tracing::debug!("Remaining `{}` jobs were finished.", self.meta.id);
         Ok(())
     }
 }

@@ -123,28 +123,28 @@ where
         let snapshot = self.ctx.progresses.snapshot().await;
 
         match evt {
-            ControlEvent::Run { .. } => log::warn!(
+            ControlEvent::Run { .. } => tracing::warn!(
                 "Already run. Use `exit` or `quit` to terminate the current session before starting a new run."
             ),
             ControlEvent::Check { .. } => {
-                log::warn!("Cannot check after the run has already started.")
+                tracing::warn!("Cannot check after the run has already started.")
             }
             ControlEvent::Quit { force, .. } if snapshot.any_error() => {
                 if !force {
-                    log::warn!("Cannot stop due to previous errors. Defaulting to a force quit.");
+                    tracing::warn!("Cannot stop due to previous errors. Defaulting to a force quit.");
                 }
                 self.handle_quit(true, false).await;
             }
             ControlEvent::Quit { force, no_exit } => {
                 if force {
-                    log::warn!("Sent abort request, stopping immediately...");
+                    tracing::warn!("Sent abort request, stopping immediately...");
                 } else {
-                    log::info!("Sent stop request, stopping gracefully...");
+                    tracing::info!("Sent stop request, stopping gracefully...");
                 }
                 self.handle_quit(force, !no_exit).await;
             }
             ControlEvent::Pause { .. } if !snapshot.any_running() => {
-                log::warn!("No running jobs to pause, did you mean to `exit` or `quit` instead?")
+                tracing::warn!("No running jobs to pause, did you mean to `exit` or `quit` instead?")
             }
             ControlEvent::Pause { targets, cascade } => {
                 let targets: HashSet<String> = HashSet::from_iter(targets);
@@ -160,7 +160,7 @@ where
                 }
             }
             ControlEvent::Resume { .. } if !snapshot.any_paused() => {
-                log::warn!("No paused jobs to resume.")
+                tracing::warn!("No paused jobs to resume.")
             }
             ControlEvent::Resume { targets } => {
                 let targets: HashSet<String> = HashSet::from_iter(targets);
@@ -171,7 +171,7 @@ where
                     }
                 }
             }
-            ControlEvent::Exit => log::warn!(
+            ControlEvent::Exit => tracing::warn!(
                 "Cannot exit while jobs are running or paused. \
                 Use `quit` for a graceful stop, or `quit --force` to abort all jobs."
             ),

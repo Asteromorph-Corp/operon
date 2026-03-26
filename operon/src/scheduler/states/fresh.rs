@@ -31,8 +31,8 @@ where
         run_id: Uuid,
     ) -> Self {
         match ui_mode {
-            UiMode::Headless => log::info!("Starting in headless mode."),
-            UiMode::Interactive => log::info!("Type `run` to begin running jobs."),
+            UiMode::Headless => tracing::info!("Starting in headless mode."),
+            UiMode::Interactive => tracing::info!("Type `run` to begin running jobs."),
         }
 
         Self {
@@ -64,13 +64,13 @@ where
         evt: ControlEvent,
     ) -> Result<NextState, crate::scheduler::SchedulerError> {
         match evt {
-            ControlEvent::Check { .. } => log::warn!("Cannot check on a fresh run"),
+            ControlEvent::Check { .. } => tracing::warn!("Cannot check on a fresh run"),
             ControlEvent::Run { rebuild: true, .. } => {
-                log::error!("Cannot rebuild on a fresh run.")
+                tracing::error!("Cannot rebuild on a fresh run.")
             }
             ControlEvent::Run { .. } => return Ok(NextState::from(self.into_running())),
-            ControlEvent::Pause { .. } => log::warn!("Cannot pause before the run has started."),
-            ControlEvent::Resume { .. } => log::warn!("Cannot resume before the run has started."),
+            ControlEvent::Pause { .. } => tracing::warn!("Cannot pause before the run has started."),
+            ControlEvent::Resume { .. } => tracing::warn!("Cannot resume before the run has started."),
             ControlEvent::Quit { .. } => return Ok(NextState::Exit { exit_ui: true }),
             ControlEvent::Exit => return Ok(NextState::Exit { exit_ui: true }),
             // TODO: remove other events.
