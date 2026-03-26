@@ -1,11 +1,11 @@
 use std::io::Write;
 use std::path::PathBuf;
 
-use tracing::field::{Field, Visit};
 use tracing::Subscriber;
+use tracing::field::{Field, Visit};
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::registry::LookupSpan;
-use tracing_subscriber::Layer;
 
 use crate::logger::LoggerOptions;
 use crate::ui::{LogRecord, UiError};

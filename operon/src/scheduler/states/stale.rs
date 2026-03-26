@@ -208,8 +208,12 @@ where
                 Some(RunMode::Restore) => return Ok(NextState::from(self.into_restore())),
                 None => {}
             },
-            ControlEvent::Pause { .. } => tracing::warn!("Cannot pause before the run has started."),
-            ControlEvent::Resume { .. } => tracing::warn!("Cannot resume before the run has started."),
+            ControlEvent::Pause { .. } => {
+                tracing::warn!("Cannot pause before the run has started.")
+            }
+            ControlEvent::Resume { .. } => {
+                tracing::warn!("Cannot resume before the run has started.")
+            }
             ControlEvent::Quit { .. } => return Ok(NextState::Exit { exit_ui: true }),
             ControlEvent::Exit => return Ok(NextState::Exit { exit_ui: true }),
         }

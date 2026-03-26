@@ -69,8 +69,12 @@ where
                 tracing::error!("Cannot rebuild on a fresh run.")
             }
             ControlEvent::Run { .. } => return Ok(NextState::from(self.into_running())),
-            ControlEvent::Pause { .. } => tracing::warn!("Cannot pause before the run has started."),
-            ControlEvent::Resume { .. } => tracing::warn!("Cannot resume before the run has started."),
+            ControlEvent::Pause { .. } => {
+                tracing::warn!("Cannot pause before the run has started.")
+            }
+            ControlEvent::Resume { .. } => {
+                tracing::warn!("Cannot resume before the run has started.")
+            }
             ControlEvent::Quit { .. } => return Ok(NextState::Exit { exit_ui: true }),
             ControlEvent::Exit => return Ok(NextState::Exit { exit_ui: true }),
         }

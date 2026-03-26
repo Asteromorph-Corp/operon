@@ -131,7 +131,9 @@ where
             }
             ControlEvent::Quit { force, .. } if snapshot.any_error() => {
                 if !force {
-                    tracing::warn!("Cannot stop due to previous errors. Defaulting to a force quit.");
+                    tracing::warn!(
+                        "Cannot stop due to previous errors. Defaulting to a force quit."
+                    );
                 }
                 self.handle_quit(true, false).await;
             }
@@ -144,7 +146,9 @@ where
                 self.handle_quit(force, !no_exit).await;
             }
             ControlEvent::Pause { .. } if !snapshot.any_running() => {
-                tracing::warn!("No running jobs to pause, did you mean to `exit` or `quit` instead?")
+                tracing::warn!(
+                    "No running jobs to pause, did you mean to `exit` or `quit` instead?"
+                )
             }
             ControlEvent::Pause { targets, cascade } => {
                 let targets: HashSet<String> = HashSet::from_iter(targets);
