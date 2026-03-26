@@ -473,6 +473,7 @@ dependencies = [
 name = "ex3"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "operon",
  "rand",
  "tokio",
@@ -885,7 +886,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "operon"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ansi_term",
  "async-trait",
@@ -908,12 +909,13 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-postgres",
+ "twox-hash",
  "uuid",
 ]
 
 [[package]]
 name = "operon-macros"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "heck",
  "indexmap",
@@ -1600,6 +1602,12 @@ checksum = "7a04e24fab5c89c6a36eb8558c9656f30d81de51dfa4d3b45f26b21d61fa0a6c"
 dependencies = [
  "once_cell",
 ]
+
+[[package]]
+name = "twox-hash"
+version = "2.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
 
 [[package]]
 name = "typenum"

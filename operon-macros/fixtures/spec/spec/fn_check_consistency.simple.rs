@@ -18,7 +18,9 @@ async fn check_consistency(
         .map(|ticket| ticket.resolve().map(|job| job.coordinate))
         .collect::<Option<Vec<_>>>()
     else {
-        operon::tracing::info!("Some `beta` tickets are corrupt in the metadata storage.");
+        operon::__private::tracing::info!(
+            "Some `beta` tickets are corrupt in the metadata storage."
+        );
         return Ok(false);
     };
 
@@ -30,7 +32,7 @@ async fn check_consistency(
             .get(coordinate)
             .await?
         else {
-            operon::tracing::info!(
+            operon::__private::tracing::info!(
                 "No `j` resolution found for `beta_{:?}` in the metadata storage.",
                 coordinate
             );
@@ -51,7 +53,7 @@ async fn check_consistency(
 
     for ([i], j) in tags_to_check {
         if storage.get_b([i, j]).await?.is_none() {
-            operon::tracing::info!("Data storage does not hold `B_{:?}`.", [i, j]);
+            operon::__private::tracing::info!("Data storage does not hold `B_{:?}`.", [i, j]);
             return Ok(false);
         }
     }

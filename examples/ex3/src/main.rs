@@ -24,7 +24,7 @@ operon::define_operon! {
 
 #[derive(operon::OperonService)]
 struct MyService;
-#[operon::async_trait::async_trait]
+#[async_trait::async_trait]
 impl StressTestService for MyService {
     async fn alpha(&self) -> Result<Vec<A>, operon::operon::UserError> {
         let mut rng = rand::rng();

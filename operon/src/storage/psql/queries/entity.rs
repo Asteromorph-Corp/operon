@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use futures::SinkExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -106,7 +108,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         let temp_table_stmt = BatchPutTempTableQuery(&schema_prefix, self.entity_meta).to_string();
         tx.execute(&temp_table_stmt, &[]).await?;
 
-        let mut writer = crate::csv::WriterBuilder::new()
+        let mut writer = csv::WriterBuilder::new()
             .has_headers(false)
             .from_writer(vec![]);
         for (idx, value) in entity.value.iter().enumerate() {
@@ -120,12 +122,8 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         let copy_stmt = BatchPutCopyQuery(self.entity_meta).to_string();
         let sink = tx.copy_in(&copy_stmt).await?;
         let mut sink = Box::pin(sink);
-        crate::futures::sink::SinkExt::send(
-            &mut sink,
-            crate::bytes::Bytes::from(writer.into_inner()?),
-        )
-        .await?;
-        crate::futures::sink::SinkExt::close(&mut sink).await?;
+        sink.send(Bytes::from(writer.into_inner()?)).await?;
+        sink.close().await?;
 
         let insert_stmt = BatchPutInsertQuery(&schema_prefix, self.entity_meta).to_string();
         tx.execute(&insert_stmt, &[]).await?;

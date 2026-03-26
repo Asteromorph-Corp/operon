@@ -8,8 +8,8 @@ async fn prepare_rebuild(
         .ticket(self.job_meta())
         .get_all(operon::schema::TicketStatus::Done)
         .await?;
-    let data =
-        operon::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
+    let data = operon::__private::futures::future::try_join_all(tickets.into_iter().map(
+        |ticket| async move {
             let job = ticket.resolve().ok_or_else(|| {
                 operon::scheduler::SchedulerError::Other("Failed to resolve a beta ticket".into())
             })?;
@@ -25,8 +25,9 @@ async fn prepare_rebuild(
                 })?;
 
             Ok::<_, operon::scheduler::SchedulerError>((job, resolution))
-        }))
-        .await?;
+        },
+    ))
+    .await?;
 
     Ok(Box::new(BetaRebuilder {
         job_meta: self.job_meta(),

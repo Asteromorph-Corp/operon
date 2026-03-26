@@ -10,7 +10,7 @@ use crate::utils::{
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::async_trait::async_trait]
+/// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
 /// impl operon::scheduler::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum> for BetaPeerTxs {
 ///     fn gather_from(
@@ -58,7 +58,7 @@ pub fn impl_peer_txs(
         });
 
     parse_quote! {
-        #[#operon::async_trait::async_trait]
+        #[#operon::__private::async_trait::async_trait]
         #[automatically_derived]
         impl #operon::scheduler::PeerEventSenders<schema::#job_enum_ident, schema::#res_enum_ident, schema::#ticket_enum_ident> for #peer_txs_ident {
             fn gather_from(

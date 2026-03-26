@@ -18,7 +18,9 @@ async fn check_consistency(
         .map(|ticket| ticket.resolve().map(|job| job.coordinate))
         .collect::<Option<Vec<_>>>()
     else {
-        operon::tracing::info!("Some `epsilon` tickets are corrupt in the metadata storage.");
+        operon::__private::tracing::info!(
+            "Some `epsilon` tickets are corrupt in the metadata storage."
+        );
         return Ok(false);
     };
 
@@ -33,7 +35,7 @@ async fn check_consistency(
     for coordinate in coordinates_to_check {
         if storage.get_e(coordinate).await?.is_none() {
             // TODO: improve error message coordinate display
-            operon::tracing::info!("Data storage does not hold `E_{:?}`.", coordinate);
+            operon::__private::tracing::info!("Data storage does not hold `E_{:?}`.", coordinate);
             return Ok(false);
         }
     }

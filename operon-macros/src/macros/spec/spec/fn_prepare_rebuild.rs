@@ -18,7 +18,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///         .get_all(operon::schema::TicketStatus::Done)
 ///         .await?;
 ///     let data =
-///         operon::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
+///         operon::__private::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
 ///             let job = ticket.resolve().ok_or_else(|| {
 ///                 operon::scheduler::SchedulerError::Other("Failed to resolve a beta ticket".into())
 ///             })?;
@@ -82,7 +82,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
                 .ticket(self.job_meta())
                 .get_all(#operon::schema::TicketStatus::Done)
                 .await?;
-            let data = #operon::futures::future::try_join_all(tickets.into_iter().map(
+            let data = #operon::__private::futures::future::try_join_all(tickets.into_iter().map(
                 |ticket| async move {
                     let job = ticket.resolve().ok_or_else(|| {
                         #operon::scheduler::SchedulerError::Other(

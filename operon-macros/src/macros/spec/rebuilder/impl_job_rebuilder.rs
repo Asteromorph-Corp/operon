@@ -10,7 +10,7 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::async_trait::async_trait]
+/// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
 /// impl operon::scheduler::JobRebuilder for BetaRebuilder {
 ///     async fn rebuild(
@@ -140,7 +140,7 @@ pub fn impl_job_rebuilder(
         .collect::<Vec<_>>();
 
     parse_quote! {
-        #[#operon::async_trait::async_trait]
+        #[#operon::__private::async_trait::async_trait]
         #[automatically_derived]
         impl #operon::scheduler::JobRebuilder for #rebuilder_ident {
             async fn rebuild(
@@ -187,7 +187,7 @@ pub fn impl_job_rebuilder(
                             count - 2
                         )
                     };
-                    #operon::tracing::warn!(#invalid_ticket_msg, count, ticket_display);
+                    #operon::__private::tracing::warn!(#invalid_ticket_msg, count, ticket_display);
                 }
                 Ok(())
             }

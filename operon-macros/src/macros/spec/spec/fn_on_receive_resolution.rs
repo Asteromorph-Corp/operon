@@ -32,10 +32,10 @@ use crate::utils::{
 ///                 .await
 ///             {
 ///                 Ok(_) => {
-///                     operon::tracing::trace!("`delta` sent peer event to `epsilon`: {resolution:?}")
+///                     operon::__private::tracing::trace!("`delta` sent peer event to `epsilon`: {resolution:?}")
 ///                 }
 ///                 Err(_) => {
-///                     operon::tracing::trace!(
+///                     operon::__private::tracing::trace!(
 ///                         "`epsilon`'s peer channel closed before handling `delta`'s {resolution:?}"
 ///                     )
 ///                 }
@@ -91,8 +91,8 @@ pub(super) fn fn_on_receive_resolution(
                     }))
                     .await
                 {
-                    Ok(_) => #operon::tracing::trace!(#ok_msg),
-                    Err(_) => #operon::tracing::trace!(#err_msg),
+                    Ok(_) => #operon::__private::tracing::trace!(#ok_msg),
+                    Err(_) => #operon::__private::tracing::trace!(#err_msg),
                 }
             };
             std::iter::repeat_n(stmt, cnt)

@@ -181,7 +181,7 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
     let batch_inserts = batch_inserts(&all_configs.jobs);
 
     parse_quote! {
-        #[#operon::async_trait::async_trait]
+        #[#operon::__private::async_trait::async_trait]
         pub trait #storage_ident: #operon::storage::OperonStorage {
             #(#single_ops)*
             #(#batch_gets)*

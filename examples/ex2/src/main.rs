@@ -1,5 +1,5 @@
 use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage};
-use operon::async_trait::async_trait;
+use async_trait::async_trait;
 use operon::operon::{Operon, OperonOptions, UserError};
 use operon::service::OperonService;
 use operon::storage::StorageOptions;

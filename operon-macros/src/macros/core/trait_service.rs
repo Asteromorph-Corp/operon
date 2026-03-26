@@ -68,7 +68,7 @@ fn format_signature(job: &JobConfig) -> String {
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::async_trait::async_trait]
+/// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
 /// pub trait CookingService:
 ///     operon::service::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum>
@@ -139,7 +139,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     };
 
     parse_quote! {
-        #[#operon::async_trait::async_trait]
+        #[#operon::__private::async_trait::async_trait]
         #[doc = #doc_comment]
         pub trait #svc_ident: #operon::service::OperonService<
             JobEnum = schema::#job_enum_ident,

@@ -11,11 +11,13 @@ async fn send_on_finish(
         ))
         .await
     {
-        Ok(_) => operon::tracing::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
+        Ok(_) => {
+            operon::__private::tracing::trace!("`beta` sent peer event to `delta`: {resolution:?}")
+        }
         // Verbosity should be low here, since this can happen
         // an arbitrary number of times
         // if a descendant scheduler errored out.
-        Err(_) => operon::tracing::trace!(
+        Err(_) => operon::__private::tracing::trace!(
             "`delta`'s peer channel closed before handling `beta`'s {resolution:?}"
         ),
     }
@@ -27,9 +29,11 @@ async fn send_on_finish(
         )))
         .await
     {
-        Ok(_) => operon::tracing::trace!("`beta` sent peer event to `delta`: {job:?}"),
+        Ok(_) => operon::__private::tracing::trace!("`beta` sent peer event to `delta`: {job:?}"),
         Err(_) => {
-            operon::tracing::trace!("`delta`'s peer channel closed before handling `beta`'s {job:?}")
+            operon::__private::tracing::trace!(
+                "`delta`'s peer channel closed before handling `beta`'s {job:?}"
+            )
         }
     }
     match peer_txs
@@ -39,9 +43,11 @@ async fn send_on_finish(
         )))
         .await
     {
-        Ok(_) => operon::tracing::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
+        Ok(_) => operon::__private::tracing::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
         Err(_) => {
-            operon::tracing::trace!("`epsilon`'s peer channel closed before handling `beta`'s {job:?}")
+            operon::__private::tracing::trace!(
+                "`epsilon`'s peer channel closed before handling `beta`'s {job:?}"
+            )
         }
     }
     Ok(())

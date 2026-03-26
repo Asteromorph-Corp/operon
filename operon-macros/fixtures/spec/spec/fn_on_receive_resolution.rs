@@ -31,10 +31,12 @@ async fn on_receive_resolution(
                     .await
                 {
                     Ok(_) => {
-                        operon::tracing::trace!("`delta` sent peer event to `epsilon`: {resolution:?}")
+                        operon::__private::tracing::trace!(
+                            "`delta` sent peer event to `epsilon`: {resolution:?}"
+                        )
                     }
                     Err(_) => {
-                        operon::tracing::trace!(
+                        operon::__private::tracing::trace!(
                             "`epsilon`'s peer channel closed before handling `delta`'s {resolution:?}"
                         )
                     }

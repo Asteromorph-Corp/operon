@@ -1,4 +1,4 @@
-#[operon::async_trait::async_trait]
+#[async_trait::async_trait]
 #[automatically_derived]
 impl operon::scheduler::JobRebuilder for BetaRebuilder {
     async fn rebuild(
@@ -65,7 +65,7 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                     count - 2
                 )
             };
-            operon::tracing::warn!(
+            operon::__private::tracing::warn!(
                 "The following {} beta ticket(s) were incorrectly marked as done: {}",
                 count,
                 ticket_display

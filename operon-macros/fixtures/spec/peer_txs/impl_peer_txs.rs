@@ -1,4 +1,4 @@
-#[operon::async_trait::async_trait]
+#[async_trait::async_trait]
 #[automatically_derived]
 impl
     operon::scheduler::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum, schema::TicketEnum>
