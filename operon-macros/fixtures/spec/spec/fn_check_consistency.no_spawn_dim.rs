@@ -1,16 +1,16 @@
 async fn check_consistency(
     &self,
     storage: &Sto,
-    client: operon::meta_storage::MetaClient<'_>,
-    mode: operon::schema::CheckMode,
-) -> Result<bool, operon::scheduler::SchedulerError> {
-    if mode == operon::schema::CheckMode::TrustAll {
+    client: operon::__private::MetaClient<'_>,
+    mode: operon::__private::CheckMode,
+) -> Result<bool, operon::error::SchedulerError> {
+    if mode == operon::__private::CheckMode::TrustAll {
         return Ok(true);
     }
 
     let tickets = client
         .ticket(self.job_meta())
-        .get_all(operon::schema::TicketStatus::Done)
+        .get_all(operon::__private::TicketStatus::Done)
         .await?;
     // Pull the "done" epsilon jobs from the metadata storage...
     let Some(coordinates) = tickets
@@ -26,9 +26,9 @@ async fn check_consistency(
 
     // ...and check if the data storage holds all the data for them.
     let coordinates_to_check = match mode {
-        operon::schema::CheckMode::MetadataOnly => return Ok(true),
-        operon::schema::CheckMode::Exhaustive => coordinates,
-        operon::schema::CheckMode::Quick => operon::utils::get_dop_coords(&coordinates),
+        operon::__private::CheckMode::MetadataOnly => return Ok(true),
+        operon::__private::CheckMode::Exhaustive => coordinates,
+        operon::__private::CheckMode::Quick => operon::__private::get_dop_coords(&coordinates),
         _ => unreachable!(),
     };
 

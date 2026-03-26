@@ -96,7 +96,7 @@ impl<const N: usize> Ticket<N> {
         Some(Job { coordinate })
     }
 
-    pub fn as_sql_params(&self) -> Result<SqlParams, TryFromIntError> {
+    pub(crate) fn as_sql_params(&self) -> Result<SqlParams, TryFromIntError> {
         let params = self
             .coordinate
             .iter()
@@ -111,11 +111,11 @@ impl<const N: usize> Ticket<N> {
         Ok(SqlParams::new(params))
     }
 
-    pub fn to_copy_string(&self) -> Result<String, TryFromIntError> {
+    pub(crate) fn to_copy_string(self) -> Result<String, TryFromIntError> {
         Ok(self.as_sql_params()?.to_copy_string())
     }
 
-    pub fn from_sql_row(meta: JobMetadata<N>, row: &Row) -> Result<Self, TryFromIntError> {
+    pub(crate) fn from_sql_row(meta: JobMetadata<N>, row: &Row) -> Result<Self, TryFromIntError> {
         let mut coordinate = [OptionCoordinate::none(); N];
         let mut i = 0;
 

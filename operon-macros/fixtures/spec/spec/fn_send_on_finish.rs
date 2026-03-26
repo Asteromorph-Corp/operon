@@ -3,10 +3,10 @@ async fn send_on_finish(
     peer_txs: &Self::PeerEventSenders,
     job: Self::Job,
     resolution: Self::Resolution,
-) -> Result<(), operon::scheduler::SchedulerError> {
+) -> Result<(), operon::error::SchedulerError> {
     match peer_txs
         .to_delta
-        .send(operon::scheduler::PeerEvent::Resolution(
+        .send(operon::__private::PeerEvent::Resolution(
             schema::ResolutionEnum::J(resolution),
         ))
         .await
@@ -24,7 +24,7 @@ async fn send_on_finish(
     // out-dependencies (delta, epsilon)
     match peer_txs
         .to_delta
-        .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+        .send(operon::__private::PeerEvent::Job(schema::JobEnum::Beta(
             job,
         )))
         .await
@@ -38,7 +38,7 @@ async fn send_on_finish(
     }
     match peer_txs
         .to_epsilon
-        .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+        .send(operon::__private::PeerEvent::Job(schema::JobEnum::Beta(
             job,
         )))
         .await

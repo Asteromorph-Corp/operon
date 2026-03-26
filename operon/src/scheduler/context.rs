@@ -6,14 +6,14 @@ use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct SchedulerContext<Svc, Sto>
+pub(super) struct SchedulerContext<Svc, Sto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
 {
-    pub service: Arc<Svc>,
-    pub storage: Arc<Sto>,
-    pub meta_storage: MetaStorage,
-    pub handler: SchedulerHandler<Svc, Sto>,
-    pub progresses: SharedProgressMap,
+    pub(super) service: Arc<Svc>,
+    pub(super) storage: Arc<Sto>,
+    pub(super) meta_storage: MetaStorage,
+    pub(super) handler: SchedulerHandler<Svc, Sto>,
+    pub(super) progresses: SharedProgressMap,
 }

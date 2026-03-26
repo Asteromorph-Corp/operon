@@ -1,16 +1,16 @@
 async fn check_consistency(
     &self,
     storage: &Sto,
-    client: operon::meta_storage::MetaClient<'_>,
-    mode: operon::schema::CheckMode,
-) -> Result<bool, operon::scheduler::SchedulerError> {
-    if mode == operon::schema::CheckMode::TrustAll {
+    client: operon::__private::MetaClient<'_>,
+    mode: operon::__private::CheckMode,
+) -> Result<bool, operon::error::SchedulerError> {
+    if mode == operon::__private::CheckMode::TrustAll {
         return Ok(true);
     }
 
     let tickets = client
         .ticket(self.job_meta())
-        .get_all(operon::schema::TicketStatus::Done)
+        .get_all(operon::__private::TicketStatus::Done)
         .await?;
     // Pull the "done" beta jobs from the metadata storage...
     let Some(coordinates) = tickets
@@ -45,9 +45,9 @@ async fn check_consistency(
 
     // ...and check if the data storage holds all the data for them.
     let tags_to_check = match mode {
-        operon::schema::CheckMode::MetadataOnly => return Ok(true),
-        operon::schema::CheckMode::Exhaustive => tags,
-        operon::schema::CheckMode::Quick => operon::utils::get_dop_tags(&tags),
+        operon::__private::CheckMode::MetadataOnly => return Ok(true),
+        operon::__private::CheckMode::Exhaustive => tags,
+        operon::__private::CheckMode::Quick => operon::__private::get_dop_tags(&tags),
         _ => unreachable!(),
     };
 

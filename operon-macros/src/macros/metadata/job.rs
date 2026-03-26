@@ -8,8 +8,8 @@ use crate::utils::{job_metadata_ident, to_lit_str};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub const fn job_beta_meta() -> operon::schema::JobMetadata<1usize> {
-///     operon::schema::JobMetadata {
+/// pub const fn job_beta_meta() -> operon::__private::JobMetadata<1usize> {
+///     operon::__private::JobMetadata {
 ///         id: "beta",
 ///         dims: ["i"],
 ///         spawn_dim: Some("j"),
@@ -31,8 +31,8 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
     };
 
     parse_quote! {
-        pub const fn #fn_name() -> #operon::schema::JobMetadata<#n> {
-            #operon::schema::JobMetadata {
+        pub const fn #fn_name() -> #operon::__private::JobMetadata<#n> {
+            #operon::__private::JobMetadata {
                 id: #id,
                 dims: [#(#dims),*],
                 spawn_dim: #spawn_dim,

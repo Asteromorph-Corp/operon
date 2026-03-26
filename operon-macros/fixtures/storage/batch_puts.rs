@@ -1,7 +1,7 @@
 async fn put_all_a(
     &self,
-    entity: operon::schema::Entity<0usize, Vec<A>>,
-) -> Result<(), operon::storage::StorageError> {
+    entity: operon::Entity<0usize, Vec<A>>,
+) -> Result<(), operon::error::StorageError> {
     self.conn()
         .await?
         .entity(self.entities_meta.a)
@@ -11,8 +11,8 @@ async fn put_all_a(
 
 async fn put_all_b(
     &self,
-    entity: operon::schema::Entity<1usize, Vec<B>>,
-) -> Result<(), operon::storage::StorageError> {
+    entity: operon::Entity<1usize, Vec<B>>,
+) -> Result<(), operon::error::StorageError> {
     self.conn()
         .await?
         .entity(self.entities_meta.b)
@@ -22,8 +22,8 @@ async fn put_all_b(
 
 async fn put_all_c(
     &self,
-    entity: operon::schema::Entity<1usize, Vec<C>>,
-) -> Result<(), operon::storage::StorageError> {
+    entity: operon::Entity<1usize, Vec<C>>,
+) -> Result<(), operon::error::StorageError> {
     self.conn()
         .await?
         .entity(self.entities_meta.c)

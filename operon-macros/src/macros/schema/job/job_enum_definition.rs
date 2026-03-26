@@ -10,12 +10,12 @@ use crate::utils::{job_enum_ident, to_pascal_case};
 /// ```rust,ignore
 /// #[derive(Debug, Clone)]
 /// pub enum JobEnum {
-///     Alpha(operon::schema::Job<0usize>),
-///     Beta(operon::schema::Job<1usize>),
-///     Gamma(operon::schema::Job<1usize>),
-///     Delta(operon::schema::Job<3usize>),
-///     Epsilon(operon::schema::Job<2usize>),
-///     Zeta(operon::schema::Job<1usize>),
+///     Alpha(operon::__private::Job<0usize>),
+///     Beta(operon::__private::Job<1usize>),
+///     Gamma(operon::__private::Job<1usize>),
+///     Delta(operon::__private::Job<3usize>),
+///     Epsilon(operon::__private::Job<2usize>),
+///     Zeta(operon::__private::Job<1usize>),
 /// }
 /// ```
 pub fn job_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
@@ -26,7 +26,7 @@ pub fn job_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
         let variant_ident = to_pascal_case(&job.id);
         let n = job.dims.len();
         parse_quote! {
-            #variant_ident(#operon::schema::Job<#n>)
+            #variant_ident(#operon::__private::Job<#n>)
         }
     });
     let doc = "An enum representing any job.";

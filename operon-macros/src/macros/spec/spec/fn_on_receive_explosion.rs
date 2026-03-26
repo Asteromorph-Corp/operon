@@ -14,15 +14,15 @@ use crate::utils::{
 /// #[allow(unused_variables, clippy::match_single_binding)]
 /// async fn on_receive_explosion(
 ///     &self,
-///     client: operon::meta_storage::MetaClient<'_>,
+///     client: operon::__private::MetaClient<'_>,
 ///     resolution: schema::ResolutionEnum,
-/// ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
 ///     match resolution {
 ///         schema::ResolutionEnum::J(res) => Ok(client
 ///             .ticket(self.job_meta())
 ///             .raise_deps_quota(metadata::dimension_j_meta(), res)
 ///             .await?),
-///         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+///         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
 ///             "explosion",
 ///             "epsilon",
 ///         )),
@@ -71,12 +71,12 @@ pub(super) fn fn_on_receive_explosion(
         #[allow(unused_variables, clippy::match_single_binding)]
         async fn on_receive_explosion(
             &self,
-            client: #operon::meta_storage::MetaClient<'_>,
-            explosion: #operon::schema::TicketExplosion<schema::#ticket_enum_ident>,
-        ) -> Result<Vec<Self::Ticket>, #operon::scheduler::SchedulerError> {
+            client: #operon::__private::MetaClient<'_>,
+            explosion: #operon::__private::TicketExplosion<schema::#ticket_enum_ident>,
+        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError> {
             match explosion.ticket {
                 #(#arms)*
-                _ => Err(#operon::scheduler::SchedulerError::InvalidPeerEventReceived("explosion", #job_id)),
+                _ => Err(#operon::error::SchedulerError::InvalidPeerEventReceived("explosion", #job_id)),
             }
         }
     }

@@ -14,12 +14,12 @@ use crate::utils::{
 /// async fn get_a(
 ///     &self,
 ///     coordinate: [usize; 1usize],
-/// ) -> Result<Option<A>, operon::storage::StorageError>;
+/// ) -> Result<Option<A>, operon::error::StorageError>;
 ///
 /// async fn put_a(
 ///     &self,
-///     entity: operon::schema::Entity<1usize, A>,
-/// ) -> Result<(), operon::storage::StorageError>;
+///     entity: operon::Entity<1usize, A>,
+/// ) -> Result<(), operon::error::StorageError>;
 /// ```
 fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
     entities.values().flat_map(|entity| -> [syn::TraitItemFn; 2] {
@@ -30,10 +30,10 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItem
         let put_fn_name = put_entity_ident(&entity.id);
 
         let get_fn = parse_quote! {
-            async fn #get_fn_name(&self, coordinate: [usize; #n]) -> Result<Option<#ty>, #operon::storage::StorageError>;
+            async fn #get_fn_name(&self, coordinate: [usize; #n]) -> Result<Option<#ty>, #operon::error::StorageError>;
         };
         let put_fn = parse_quote! {
-            async fn #put_fn_name(&self, entity: #operon::schema::Entity<#n, #ty>) -> Result<(), #operon::storage::StorageError>;
+            async fn #put_fn_name(&self, entity: #operon::Entity<#n, #ty>) -> Result<(), #operon::error::StorageError>;
         };
 
         [get_fn, put_fn]
@@ -47,7 +47,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::TraitItem
 /// async fn get_all_b_over_j(
 ///     &self,
 ///     [i]: [usize; 1usize],
-/// ) -> Result<Vec<B>, operon::storage::StorageError> {
+/// ) -> Result<Vec<B>, operon::error::StorageError> {
 ///     let final_results = {
 ///         let mut results_0 = Vec::new();
 ///         let mut j = 0usize;
@@ -116,7 +116,7 @@ fn batch_gets(
         );
 
         parse_quote! {
-            async fn #fn_name(&self, [#(#args),*]: [usize; #n]) -> Result<#return_ty, #operon::storage::StorageError> {
+            async fn #fn_name(&self, [#(#args),*]: [usize; #n]) -> Result<#return_ty, #operon::error::StorageError> {
                 let final_results = #body;
                 Ok(final_results.unwrap_or_default())
             }
@@ -130,11 +130,11 @@ fn batch_gets(
 /// ```rust,ignore
 /// async fn put_all_a(
 ///     &self,
-///     entity: operon::schema::Entity<0usize, Vec<A>>,
-/// ) -> Result<(), operon::storage::StorageError> {
+///     entity: operon::Entity<0usize, Vec<A>>,
+/// ) -> Result<(), operon::error::StorageError> {
 ///     let [] = entity.coordinate;
 ///     for (i, value) in entity.value.into_iter().enumerate() {
-///         let entity_single = operon::schema::Entity {
+///         let entity_single = operon::Entity {
 ///             coordinate: [i],
 ///             value,
 ///         };
@@ -155,11 +155,11 @@ fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn> 
         let spawn_dim = clear_span(job.spawn_dim.as_ref()?);
 
         Some(parse_quote! {
-            async fn #fn_name(&self, entity: #operon::schema::Entity<#n, Vec<#ty>>) -> Result<(), #operon::storage::StorageError> {
+            async fn #fn_name(&self, entity: #operon::Entity<#n, Vec<#ty>>) -> Result<(), #operon::error::StorageError> {
                 let [#(#coord_vars),*] = entity.coordinate;
 
                 for (#spawn_dim, value) in entity.value.into_iter().enumerate() {
-                    let entity_single = #operon::schema::Entity {
+                    let entity_single = #operon::Entity {
                         coordinate: [#(#coord_vars,)* #spawn_dim],
                         value,
                     };
@@ -182,7 +182,7 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
 
     parse_quote! {
         #[#operon::__private::async_trait::async_trait]
-        pub trait #storage_ident: #operon::storage::OperonStorage {
+        pub trait #storage_ident: #operon::OperonStorage {
             #(#single_ops)*
             #(#batch_gets)*
             #(#batch_inserts)*

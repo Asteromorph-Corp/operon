@@ -1,19 +1,39 @@
 #![allow(clippy::module_inception)]
 
 mod logger;
+mod meta_storage;
+mod operon;
+mod scheduler;
+mod schema;
+mod service;
+mod storage;
+mod ui;
+mod utils;
 
-pub mod meta_storage;
-pub mod operon;
-pub mod scheduler;
-pub mod schema;
-pub mod service;
-pub mod storage;
-pub mod ui;
-pub mod utils;
+pub use operon::{Operon, OperonOptions};
+pub use operon_macros::define_operon;
+pub use schema::Entity;
+pub use service::OperonService;
+pub use storage::{OperonStorage, StorageOptions};
 
-pub use operon_macros::*;
+pub mod error {
+    pub use crate::meta_storage::MetaStorageError;
+    pub use crate::operon::{OperonError, UserError};
+    pub use crate::scheduler::SchedulerError;
+    pub use crate::storage::StorageError;
+}
+
 // Re-export the external crates used in the macro expansions
 #[doc(hidden)]
 pub mod __private {
     pub use {async_trait, futures, tracing};
+
+    pub use crate::meta_storage::MetaClient;
+    pub use crate::scheduler::{
+        JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
+        PeerEventSenders, SchedulerHandler, SpecWithMetadata, ValidOperon,
+    };
+    pub use crate::schema::*;
+    pub use crate::storage::psql::{EntityQueries, PsqlStorage};
+    pub use crate::utils::{SchemaPrefix, get_dop_coords, get_dop_tags};
 }

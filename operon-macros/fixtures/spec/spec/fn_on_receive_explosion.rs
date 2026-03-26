@@ -1,9 +1,9 @@
 #[allow(unused_variables, clippy::match_single_binding)]
 async fn on_receive_explosion(
     &self,
-    client: operon::meta_storage::MetaClient<'_>,
-    explosion: operon::schema::TicketExplosion<schema::TicketEnum>,
-) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+    client: operon::__private::MetaClient<'_>,
+    explosion: operon::__private::TicketExplosion<schema::TicketEnum>,
+) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
     match explosion.ticket {
         schema::TicketEnum::Beta(ticket) => {
             let mut out = Vec::new();
@@ -39,7 +39,7 @@ async fn on_receive_explosion(
             }
             Ok(out)
         }
-        _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+        _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
             "explosion",
             "epsilon",
         )),

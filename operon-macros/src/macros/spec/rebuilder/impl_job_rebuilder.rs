@@ -12,11 +12,11 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 /// ```rust,ignore
 /// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
-/// impl operon::scheduler::JobRebuilder for BetaRebuilder {
+/// impl operon::__private::JobRebuilder for BetaRebuilder {
 ///     async fn rebuild(
 ///         &self,
-///         client: operon::meta_storage::MetaClient<'_>,
-///     ) -> Result<(), operon::scheduler::SchedulerError> {
+///         client: operon::__private::MetaClient<'_>,
+///     ) -> Result<(), operon::error::SchedulerError> {
 ///         for (job, resolution) in self.data.iter().cloned() {
 ///             client
 ///                 .resolution(self.spawn_dim_meta)
@@ -142,19 +142,19 @@ pub fn impl_job_rebuilder(
     parse_quote! {
         #[#operon::__private::async_trait::async_trait]
         #[automatically_derived]
-        impl #operon::scheduler::JobRebuilder for #rebuilder_ident {
+        impl #operon::__private::JobRebuilder for #rebuilder_ident {
             async fn rebuild(
                 &self,
-                client: #operon::meta_storage::MetaClient<'_>,
-            ) -> Result<(), #operon::scheduler::SchedulerError> {
+                client: #operon::__private::MetaClient<'_>,
+            ) -> Result<(), #operon::error::SchedulerError> {
                 let ready_tickets = client
                     .ticket(self.job_meta)
-                    .get_all(#operon::schema::TicketStatus::Queued)
+                    .get_all(#operon::__private::TicketStatus::Queued)
                     .await?
                     .into_iter()
                     .map(|ticket| match ticket.resolve() {
                         Some(job) => Ok(job.coordinate),
-                        None => Err(#operon::scheduler::SchedulerError::Other(
+                        None => Err(#operon::error::SchedulerError::Other(
                             #resolve_fail_msg.into(),
                         ))
                     })

@@ -53,10 +53,10 @@ pub fn impl_job_spec(
     parse_quote! {
         #[#operon::__private::async_trait::async_trait]
         #[automatically_derived]
-        impl<Svc: #svc_ident, Sto: #sto_ident> #operon::scheduler::JobSpec<Svc, Sto> for #spec_ident {
-            type Job = #operon::schema::Job<#n>;
+        impl<Svc: #svc_ident, Sto: #sto_ident> #operon::__private::JobSpec<Svc, Sto> for #spec_ident {
+            type Job = #operon::__private::Job<#n>;
             type Resolution = #resolution;
-            type Ticket = #operon::schema::Ticket<#n>;
+            type Ticket = #operon::__private::Ticket<#n>;
             type PeerEventSenders = #peer_txs_ident;
             #fn_all_upstream_jobs
             #fn_default_ticket

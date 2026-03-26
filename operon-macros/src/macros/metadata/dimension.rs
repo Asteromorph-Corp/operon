@@ -8,8 +8,8 @@ use crate::utils::{dimension_metadata_ident, to_lit_str};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub const fn dimension_j_meta() -> operon::schema::DimensionMetadata<1usize> {
-///     operon::schema::DimensionMetadata {
+/// pub const fn dimension_j_meta() -> operon::__private::DimensionMetadata<1usize> {
+///     operon::__private::DimensionMetadata {
 ///         id: "j",
 ///         deps: ["i"],
 ///     }
@@ -23,8 +23,8 @@ pub fn dimension_metadata(dimension: &DimensionConfig) -> syn::ItemFn {
     let deps = dimension.depends_on.iter().map(to_lit_str);
 
     parse_quote! {
-        pub const fn #fn_name() -> #operon::schema::DimensionMetadata<#n> {
-            #operon::schema::DimensionMetadata {
+        pub const fn #fn_name() -> #operon::__private::DimensionMetadata<#n> {
+            #operon::__private::DimensionMetadata {
                 id: #id,
                 deps: [#(#deps),*],
             }

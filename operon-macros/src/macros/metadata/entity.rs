@@ -8,8 +8,8 @@ use crate::utils::{entity_metadata_ident, to_lit_str, to_type};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub const fn entity_a_meta() -> operon::schema::EntityMetadata<1usize, A> {
-///     operon::schema::EntityMetadata {
+/// pub const fn entity_a_meta() -> operon::__private::EntityMetadata<1usize, A> {
+///     operon::__private::EntityMetadata {
 ///         id: "a",
 ///         dims: ["i"],
 ///         _phantom: std::marker::PhantomData,
@@ -25,8 +25,8 @@ pub fn entity_metadata(entity: &EntityConfig) -> syn::ItemFn {
     let dims = entity.dims.iter().map(to_lit_str);
 
     parse_quote! {
-        pub const fn #fn_name() -> #operon::schema::EntityMetadata<#n, #ty> {
-            #operon::schema::EntityMetadata {
+        pub const fn #fn_name() -> #operon::__private::EntityMetadata<#n, #ty> {
+            #operon::__private::EntityMetadata {
                 id: #id,
                 dims: [#(#dims),*],
                 _phantom: std::marker::PhantomData,

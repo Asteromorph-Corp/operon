@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::VecDeque;
 
 use async_trait::async_trait;
@@ -16,15 +14,15 @@ mod running;
 mod stale;
 mod start;
 
-pub use init::InitTransition;
+pub(super) use init::InitTransition;
 
-pub enum NextState {
+pub(super) enum NextState {
     Next(Box<dyn SchedulerState>),
     Exit { exit_ui: bool },
 }
 
 #[async_trait]
-pub trait SchedulerState: Send + Sync {
+pub(super) trait SchedulerState: Send + Sync {
     async fn handle_progress(self: Box<Self>) -> Result<NextState, SchedulerError>;
 
     async fn handle_control_event(
@@ -34,12 +32,12 @@ pub trait SchedulerState: Send + Sync {
 }
 
 #[async_trait]
-pub trait SchedulerTransition: Send + Sync + 'static {
+pub(super) trait SchedulerTransition: Send + Sync + 'static {
     fn warn_msg(&self) -> Option<&'static str>;
     async fn execute(self) -> Result<NextState, SchedulerError>;
 }
 
-pub struct TransitionState {
+pub(super) struct TransitionState {
     warn_msg: Option<&'static str>,
     handle: JoinHandle<Result<NextState, SchedulerError>>,
     events: VecDeque<ControlEvent>,

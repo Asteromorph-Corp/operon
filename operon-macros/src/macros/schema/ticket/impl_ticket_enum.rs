@@ -7,7 +7,7 @@ use crate::utils::{operon_ident, ticket_enum_ident};
 /// # Example
 /// ```rust,ignore
 /// #[automatically_derived]
-/// impl operon::schema::JobEnum for JobEnum {}
+/// impl operon::__private::JobEnum for JobEnum {}
 /// ```
 pub fn impl_ticket_enum() -> syn::ItemImpl {
     let operon = operon_ident();
@@ -15,7 +15,7 @@ pub fn impl_ticket_enum() -> syn::ItemImpl {
 
     parse_quote! {
         #[automatically_derived]
-        impl #operon::schema::TicketEnum for #ticket_enum_ident {}
+        impl #operon::__private::TicketEnum for #ticket_enum_ident {}
     }
 }
 

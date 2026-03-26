@@ -1,10 +1,10 @@
 #[allow(unused_variables, unreachable_code, clippy::match_single_binding)]
 async fn on_receive_resolution(
     &self,
-    client: operon::meta_storage::MetaClient<'_>,
+    client: operon::__private::MetaClient<'_>,
     peer_txs: &Self::PeerEventSenders,
     resolution: schema::ResolutionEnum,
-) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
     match resolution {
         schema::ResolutionEnum::I(res) => {
             let affected = client
@@ -21,8 +21,8 @@ async fn on_receive_resolution(
             for ticket in affected {
                 match peer_txs
                     .to_epsilon
-                    .send(operon::scheduler::PeerEvent::Explosion(
-                        operon::schema::TicketExplosion {
+                    .send(operon::__private::PeerEvent::Explosion(
+                        operon::__private::TicketExplosion {
                             ticket: schema::TicketEnum::Delta(ticket),
                             dim: "j",
                             ub: res.ub,
@@ -51,7 +51,7 @@ async fn on_receive_resolution(
             for ticket in affected {}
         }
         _ => {
-            return Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+            return Err(operon::error::SchedulerError::InvalidPeerEventReceived(
                 "resolution",
                 "delta",
             ));

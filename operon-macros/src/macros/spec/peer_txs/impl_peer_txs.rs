@@ -12,9 +12,9 @@ use crate::utils::{
 /// ```rust,ignore
 /// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
-/// impl operon::scheduler::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum> for BetaPeerTxs {
+/// impl operon::__private::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum> for BetaPeerTxs {
 ///     fn gather_from(
-///         mut senders: operon::scheduler::PeerEventSenderMap<schema::JobEnum, schema::ResolutionEnum>,
+///         mut senders: operon::__private::PeerEventSenderMap<schema::JobEnum, schema::ResolutionEnum>,
 ///     ) -> Self {
 ///         BetaPeerTxs {
 ///             to_delta: senders
@@ -60,9 +60,9 @@ pub fn impl_peer_txs(
     parse_quote! {
         #[#operon::__private::async_trait::async_trait]
         #[automatically_derived]
-        impl #operon::scheduler::PeerEventSenders<schema::#job_enum_ident, schema::#res_enum_ident, schema::#ticket_enum_ident> for #peer_txs_ident {
+        impl #operon::__private::PeerEventSenders<schema::#job_enum_ident, schema::#res_enum_ident, schema::#ticket_enum_ident> for #peer_txs_ident {
             fn gather_from(
-                mut senders: #operon::scheduler::PeerEventSenderMap<
+                mut senders: #operon::__private::PeerEventSenderMap<
                     schema::#job_enum_ident,
                     schema::#res_enum_ident,
                     schema::#ticket_enum_ident,

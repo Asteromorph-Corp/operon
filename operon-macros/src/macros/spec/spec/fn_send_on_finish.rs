@@ -14,10 +14,10 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///     peer_txs: &Self::PeerEventSenders,
 ///     job: Self::Job,
 ///     resolution: Self::Resolution,
-/// ) -> Result<(), operon::scheduler::SchedulerError> {
+/// ) -> Result<(), operon::error::SchedulerError> {
 ///     match peer_txs
 ///         .to_delta
-///         .send(operon::scheduler::PeerEvent::Resolution(
+///         .send(operon::__private::PeerEvent::Resolution(
 ///             schema::ResolutionEnum::J(resolution),
 ///         ))
 ///         .await
@@ -33,7 +33,7 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///     // out-dependencies (delta, epsilon)
 ///     match peer_txs
 ///         .to_delta
-///         .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+///         .send(operon::__private::PeerEvent::Job(schema::JobEnum::Beta(
 ///             job,
 ///         )))
 ///         .await
@@ -45,7 +45,7 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///     }
 ///     match peer_txs
 ///         .to_epsilon
-///         .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+///         .send(operon::__private::PeerEvent::Job(schema::JobEnum::Beta(
 ///             job,
 ///         )))
 ///         .await
@@ -84,7 +84,7 @@ pub(super) fn fn_send_on_finish(
             parse_quote! {
                 match peer_txs
                     .#sender_ident
-                    .send(#operon::scheduler::PeerEvent::Resolution(schema::#resolution_enum_ident::#resolution_variant_ident(resolution)))
+                    .send(#operon::__private::PeerEvent::Resolution(schema::#resolution_enum_ident::#resolution_variant_ident(resolution)))
                     .await
                 {
                     Ok(_) => #operon::__private::tracing::trace!(#ok_msg),
@@ -108,7 +108,7 @@ pub(super) fn fn_send_on_finish(
         parse_quote! {
             match peer_txs
                 .#sender_ident
-                .send(#operon::scheduler::PeerEvent::Job(schema::JobEnum::#job_variant_ident(job)))
+                .send(#operon::__private::PeerEvent::Job(schema::JobEnum::#job_variant_ident(job)))
                 .await
             {
                 Ok(_) => #operon::__private::tracing::trace!(#ok_msg),
@@ -123,7 +123,7 @@ pub(super) fn fn_send_on_finish(
             peer_txs: &Self::PeerEventSenders,
             job: Self::Job,
             resolution: Self::Resolution,
-        ) -> Result<(), #operon::scheduler::SchedulerError> {
+        ) -> Result<(), #operon::error::SchedulerError> {
             #(#send_resolutions)*
             #(#send_jobs)*
             Ok(())

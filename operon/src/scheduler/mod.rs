@@ -1,5 +1,5 @@
 mod scheduler;
-pub use scheduler::Scheduler;
+pub(crate) use scheduler::Scheduler;
 
 mod spec;
 pub use spec::{
@@ -7,13 +7,13 @@ pub use spec::{
 };
 
 mod events;
-pub use events::{
-    ControlEvent, ControlEventError, ControlEventSender, PeerEvent, PeerEventSender,
-    PeerEventSenderMap, PeerEventSenders, SchedulerStateReceiver,
+pub(crate) use events::{
+    ControlEvent, ControlEventError, ControlEventSender, SchedulerStateReceiver,
 };
+pub use events::{PeerEvent, PeerEventSender, PeerEventSenderMap, PeerEventSenders};
 
 mod options;
-pub use options::SchedulerOptions;
+pub(crate) use options::SchedulerOptions;
 
 mod error;
 pub use error::SchedulerError;
