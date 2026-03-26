@@ -2,7 +2,7 @@
 //
 // This example demonstrates operon's tracing integration:
 //
-// 1. `operon::tracing::*` macros — structured logging with span context
+// 1. `tracing::*` macros — structured logging with span context
 // 2. `log` crate bridge — third-party crates using `log` are captured via tracing-log
 // 3. `println!` / `eprintln!` capture — raw stdout/stderr is intercepted and forwarded
 // 4. Custom `tracing::info_span!` — user-defined span context
@@ -18,24 +18,20 @@
 
 use std::sync::Arc;
 
-use operon::async_trait::async_trait;
-use operon::define_operon;
-use operon::operon::{Operon, OperonOptions, UserError};
-use operon::serde::{Deserialize, Serialize};
-use operon::service::OperonService;
-use operon::storage::StorageOptions;
+use async_trait::async_trait;
+use operon::error::UserError;
+use operon::{Operon, OperonOptions, OperonService, StorageOptions, define_operon};
+use serde::{Deserialize, Serialize};
 
 // ———————————————— Entity Definitions ———————————————— //
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(crate = "operon::serde")]
 struct Sensor {
     name: String,
     readings: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(crate = "operon::serde")]
 struct Summary {
     sensor_name: String,
     mean: f64,
@@ -44,7 +40,6 @@ struct Summary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(crate = "operon::serde")]
 struct Report(String);
 
 // ———————————————— Pipeline Definition ———————————————— //
@@ -65,9 +60,9 @@ struct SensorService;
 #[async_trait]
 impl SensorsService for SensorService {
     /// Produces sensor data.
-    /// Uses `operon::tracing` — the native, recommended logging facade.
+    /// Uses `tracing` — the native, recommended logging facade.
     async fn collect(&self) -> Result<Vec<Sensor>, UserError> {
-        operon::tracing::info!("Collecting sensor data");
+        tracing::info!("Collecting sensor data");
 
         Ok(vec![
             Sensor {
@@ -94,7 +89,7 @@ impl SensorsService for SensorService {
     async fn aggregate(&self, sensor: Sensor) -> Result<Vec<Summary>, UserError> {
         // Custom span — wraps this job's work with structured context.
         // Any tracing events inside will carry [sensor=temperature] in the UI.
-        let span = operon::tracing::info_span!("aggregate", sensor = %sensor.name);
+        let span = tracing::info_span!("aggregate", sensor = %sensor.name);
         let _guard = span.enter();
 
         // log crate — bridged to tracing via tracing-log::LogTracer
@@ -106,8 +101,16 @@ impl SensorsService for SensorService {
 
         let sum: f64 = sensor.readings.iter().sum();
         let mean = sum / sensor.readings.len() as f64;
-        let min = sensor.readings.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max = sensor.readings.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let min = sensor
+            .readings
+            .iter()
+            .cloned()
+            .fold(f64::INFINITY, f64::min);
+        let max = sensor
+            .readings
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
 
         let summary = Summary {
             sensor_name: sensor.name.clone(),
@@ -120,19 +123,15 @@ impl SensorsService for SensorService {
     }
 
     /// Generates reports.
-    /// Uses `operon::tracing` with structured fields to demonstrate span context.
+    /// Uses `tracing` with structured fields to demonstrate span context.
     async fn report(&self, summary: Summary) -> Result<Report, UserError> {
-        operon::tracing::info!(
+        tracing::info!(
             sensor = %summary.sensor_name,
             mean = %format!("{:.1}", summary.mean),
             "Generating report"
         );
 
-        operon::tracing::debug!(
-            "Range: {:.1} - {:.1}",
-            summary.min,
-            summary.max
-        );
+        tracing::debug!("Range: {:.1} - {:.1}", summary.min, summary.max);
 
         let text = format!(
             "{}: mean={:.1}, range=[{:.1}, {:.1}]",

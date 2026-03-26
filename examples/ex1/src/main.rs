@@ -14,11 +14,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use operon::define_operon;
-use operon::operon::{Operon, OperonOptions, UserError};
+use operon::error::UserError;
+use operon::{Operon, OperonOptions, OperonService, StorageOptions, define_operon};
 use serde::{Deserialize, Serialize};
-use operon::service::OperonService;
-use operon::storage::StorageOptions;
 
 //# —————————————————————— A. Entity Definitions —————————————————————— #//
 // Define the entities that will be used.
@@ -33,9 +31,6 @@ type Input = String;
 
 // For composite types, we need to implement or derive the necessary traits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// The following attribute can be omitted
-// if you use `serde::{Serialize, Deserialize}`
-// instead of `operon::serde::{Serialize, Deserialize}`.
 struct Intermediate(String);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

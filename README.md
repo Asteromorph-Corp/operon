@@ -137,7 +137,7 @@ An example of entity declarations is as follows:
 ```rust
 // In examples/ex1/src/main.rs:
 
-use operon::serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize};
 
 // Strings already implement all the necessary traits,
 // so using a type alias of `String` is sufficient for our `Input` type.
@@ -145,14 +145,9 @@ type Input = String;
 
 // For composite types, we need to implement or derive the necessary traits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// The following attribute can be omitted
-// if you use `serde::{Serialize, Deserialize}`
-// instead of `operon::serde::{Serialize, Deserialize}`.
-#[serde(crate = "operon::serde")]
 struct Intermediate(String);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(crate = "operon::serde")]
 struct Output(char);
 ```
 
@@ -241,7 +236,9 @@ Continuing with the previous example, you would implement the `splitter` pipelin
 ```rust
 // In examples/ex1/src/main.rs (slightly modified):
 
-use operon::{async_trait::async_trait, service::OperonService};
+use async_trait::async_trait;
+use operon::OperonService;
+
 struct MySplitterService;
 impl OperonService for MySplitterService {
     type JobEnum = schema::JobEnum;
@@ -285,7 +282,7 @@ We provide a struct `Psql{PipelineName}Storage` that already implements this tra
 ```rust
 // In examples/ex1/src/main.rs (slightly modified):
 
-use operon::storage::StorageOptions;
+use operon::StorageOptions;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -311,10 +308,7 @@ Once you have all the pieces in place, you can run the Operon engine by construc
 ```rust
 // In examples/ex1/src/main.rs (slightly modified):
 
-use operon::{
-    operon::{Operon, OperonOptions},
-    storage::{OperonStorage, StorageOptions},
-};
+use operon::{Operon, OperonOptions, OperonStorage, StorageOptions};
 use std::sync::Arc;
 
 #[tokio::main]

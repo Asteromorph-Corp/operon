@@ -484,9 +484,12 @@ dependencies = [
 name = "ex4"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "log",
  "operon",
+ "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
