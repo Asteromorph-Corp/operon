@@ -10,17 +10,26 @@ mod storage;
 mod ui;
 mod utils;
 
-pub use operon::{Operon, OperonOptions};
+pub use operon::Operon;
 pub use operon_macros::define_operon;
 pub use schema::Entity;
 pub use service::OperonService;
-pub use storage::{OperonStorage, StorageOptions};
+pub use storage::OperonStorage;
 
 pub mod error {
     pub use crate::meta_storage::MetaStorageError;
     pub use crate::operon::{OperonError, UserError};
     pub use crate::scheduler::SchedulerError;
     pub use crate::storage::StorageError;
+}
+
+pub mod options {
+    pub use crate::operon::OperonOptions;
+    pub use crate::storage::StorageOptions;
+    pub use crate::ui::UiMode;
+
+    /// A logging level, type alias for `tracing::Level`
+    pub type LogLevel = tracing::Level;
 }
 
 // Re-export the external crates used in the macro expansions

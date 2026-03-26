@@ -1,5 +1,6 @@
 use operon::error::UserError;
-use operon::{Operon, OperonOptions, OperonService, StorageOptions, define_operon};
+use operon::{Operon,  OperonService,  define_operon};
+use operon::options::{OperonOptions,StorageOptions,};
 use rand::Rng;
 
 type A = ();

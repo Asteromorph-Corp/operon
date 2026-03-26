@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage};
 use operon::error::UserError;
-use operon::{Operon, OperonOptions, OperonService, StorageOptions};
+use operon::options::{OperonOptions, StorageOptions};
+use operon::{Operon, OperonService};
 use rand::Rng;
 
 // Example service implementation
