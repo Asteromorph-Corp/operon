@@ -113,12 +113,13 @@ impl LogRecord {
         lines
     }
 
-    pub fn format_for_dump(&self) -> String {
+    pub fn write_dump(&self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
         let msg = match &self.span_context {
             Some(ctx) => format!("[{ctx}] {}", self.msg),
             None => self.msg.clone(),
         };
-        format!(
+        writeln!(
+            writer,
             "{},{},{},{},{},{},\"{}\"",
             self.timestamp.format("%Y-%m-%d %H:%M:%S%.f %:z"),
             self.level,
@@ -130,7 +131,7 @@ impl LogRecord {
         )
     }
 
-    pub fn format_for_print(&self) -> String {
+    pub fn write_print(&self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
         let level_colour = match self.level {
             ::tracing::Level::ERROR => ansi_term::Colour::Red,
             ::tracing::Level::WARN => ansi_term::Colour::Yellow,
@@ -142,7 +143,8 @@ impl LogRecord {
             Some(ctx) => format!("[{ctx}] {}", self.msg),
             None => self.msg.clone(),
         };
-        format!(
+        writeln!(
+            writer,
             "{} {} | {}",
             self.timestamp.format("%Y-%m-%d %H:%M:%S"),
             level_colour.paint(format!("{:>5}", self.level)),

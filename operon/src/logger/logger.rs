@@ -72,7 +72,7 @@ impl UiBroadcastLayer {
             }
         };
         let mut writer = ::std::io::BufWriter::new(log_file);
-        let _ = writeln!(writer, "{}", record.format_for_dump());
+        let _ = record.write_dump(&mut writer);
     }
 }
 

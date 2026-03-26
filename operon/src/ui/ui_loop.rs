@@ -208,9 +208,7 @@ impl UiLoop {
                     // Draw all remaining logs.
                     loop {
                         match self.log_rx.try_recv() {
-                            Ok(record) => {
-                                eprintln!("{}", record.format_for_print());
-                            }
+                            Ok(record) => record.write_print(&mut std::io::stderr())?,
                             // Skip fallen-behind logs
                             Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
                             // Drained all logs
