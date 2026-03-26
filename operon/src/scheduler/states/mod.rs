@@ -5,7 +5,8 @@ use std::collections::VecDeque;
 use async_trait::async_trait;
 use tokio::task::JoinHandle;
 
-use crate::scheduler::{ControlEvent, SchedulerError};
+use crate::scheduler::SchedulerError;
+use crate::scheduler::events::ControlEvent;
 
 mod clean;
 mod fresh;

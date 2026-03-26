@@ -6,10 +6,11 @@ use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
-use crate::scheduler::{
-    IndividualControlEventSender, JobHandler, JobRebuilder, PeerEvent, PeerEventSenderMap,
-    SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
+use crate::scheduler::events::{
+    IndividualControlEventSender, PeerEvent, PeerEventSenderMap, ServicePeerEventReceiver,
+    ServicePeerEventSenderMap,
 };
+use crate::scheduler::{JobHandler, JobRebuilder, SchedulerError};
 use crate::schema::{CheckMode, Progress, SharedProgressMap};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;

@@ -4,9 +4,11 @@ use async_trait::async_trait;
 use tokio::task::JoinSet;
 use uuid::Uuid;
 
+use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
+use crate::scheduler::events::{ControlEvent, IndividualControlEvent};
+use crate::scheduler::spec::ControlChannel;
 use crate::scheduler::states::{NextState, SchedulerState};
-use crate::scheduler::{ControlChannel, ControlEvent, IndividualControlEvent, SchedulerError};
 use crate::schema::{RunFootprint, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;

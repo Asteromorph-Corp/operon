@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::scheduler::ControlEvent;
 use crate::scheduler::context::SchedulerContext;
+use crate::scheduler::events::ControlEvent;
 use crate::scheduler::states::start::StartTransition;
 use crate::scheduler::states::{NextState, SchedulerState, TransitionState};
 use crate::service::OperonService;

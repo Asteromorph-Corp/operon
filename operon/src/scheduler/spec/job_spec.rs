@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
-use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
+use crate::scheduler::events::PeerEventSenders;
+use crate::scheduler::{JobRebuilder, SchedulerError};
 use crate::schema::{
     CheckMode, JobLike, JobMetadata, ResolutionLike, SharedProgress, TicketExplosion, TicketLike,
 };

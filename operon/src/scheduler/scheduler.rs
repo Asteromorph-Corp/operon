@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use crate::meta_storage::MetaStorage;
 use crate::scheduler::context::SchedulerContext;
+use crate::scheduler::events::{ControlEventReceiver, SchedulerStateSender};
 use crate::scheduler::states::{InitTransition, NextState, SchedulerState};
-use crate::scheduler::{
-    ControlEventReceiver, SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender,
-};
+use crate::scheduler::{SchedulerError, SchedulerHandler, SchedulerOptions};
 use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;

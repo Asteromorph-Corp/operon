@@ -4,10 +4,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
-use crate::scheduler::{
-    IndividualControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, SchedulerError,
-    ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
+use crate::scheduler::events::{
+    IndividualControlEventReceiver, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
+use crate::scheduler::individual_scheduler::IndividualScheduler;
+use crate::scheduler::spec::SpecWithMetadata;
+use crate::scheduler::{JobRebuilder, JobSpec, SchedulerError};
 use crate::schema::{CheckMode, Job, SharedProgress, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
