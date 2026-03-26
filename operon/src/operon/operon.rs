@@ -67,19 +67,6 @@ where
         // Set up the tracing subscriber
         UiBroadcastLayer::new(log_tx, log_options).setup()?;
 
-        // Capture stdout/stderr and forward to tracing (must be after subscriber setup).
-        // Best-effort: if capture fails or is unavailable (non-Unix), fall back to normal stdout.
-        #[cfg(unix)]
-        let (_fd_redirect, original_stdout) = match crate::ui::capture_std_outputs() {
-            Ok(redirect) => {
-                let stdout = redirect.original_fd(&std::io::stdout());
-                (Some(redirect), stdout)
-            }
-            Err(_) => (None, None),
-        };
-        #[cfg(not(unix))]
-        let original_stdout: Option<std::fs::File> = None;
-
         let progresses = SharedProgressMap::from_jobs(&handler.job_handlers);
 
         // Create the scheduler
@@ -92,7 +79,7 @@ where
             sched_tx,
             scheduler_options,
         )?;
-        let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options, original_stdout);
+        let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
         let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };

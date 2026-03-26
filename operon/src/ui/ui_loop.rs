@@ -58,7 +58,6 @@ pub struct UiLoop {
     sched_rx: SchedulerStateReceiver,
     finished: bool,
     exit_on_finish: bool,
-    stdout: Option<std::fs::File>,
 }
 
 impl UiLoop {
@@ -70,7 +69,6 @@ impl UiLoop {
         ctrl_tx: ControlEventSender,
         sched_rx: SchedulerStateReceiver,
         options: UiOptions,
-        stdout: Option<std::fs::File>,
     ) -> Self {
         Self {
             mode: options.mode,
@@ -83,7 +81,6 @@ impl UiLoop {
             sched_rx,
             finished: false,
             exit_on_finish: false,
-            stdout,
         }
     }
 
@@ -95,13 +92,34 @@ impl UiLoop {
     }
 
     pub async fn run_interactive(mut self) -> Result<(), UiError> {
+        // Capture stdout/stderr and forward to tracing (must be after subscriber setup).
+        // Best-effort: if capture fails or is unavailable (non-Unix), fall back to normal stdout.
+        #[cfg(unix)]
+        let (_fd_redirect, original_stdout) = match crate::ui::capture_std_outputs() {
+            Ok(redirect) => {
+                let stdout = redirect.original_fd(&std::io::stdout());
+                (Some(redirect), stdout)
+            }
+            Err(_) => {
+                tracing::warn!(
+                    "Failed to capture stdout/stderr, falling back to normal output. This may cause display issues in the TUI."
+                );
+                (None, None)
+            }
+        };
+
+        #[cfg(not(unix))]
+        let original_stdout: Option<std::fs::File> = None;
+
         enable_raw_mode()?;
-        let mut stdout: Box<dyn std::io::Write> = match self.stdout.take() {
+
+        let mut stdout_writer: Box<dyn ::std::io::Write> = match original_stdout {
             Some(file) => Box::new(file),
             None => Box::new(::std::io::stdout()),
         };
-        execute!(stdout, EnterAlternateScreen)?;
-        let backend = CrosstermBackend::new(stdout);
+
+        execute!(stdout_writer, EnterAlternateScreen)?;
+        let backend = CrosstermBackend::new(stdout_writer);
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
 
