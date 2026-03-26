@@ -53,6 +53,13 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         Self { job_handlers }
     }
 
+    pub(crate) fn job_ids(&self) -> Vec<&'static str> {
+        self.job_handlers
+            .iter()
+            .map(|job_handler| job_handler.job_id())
+            .collect()
+    }
+
     pub(crate) fn prepare_channels(
         &self,
         channel_size: usize,

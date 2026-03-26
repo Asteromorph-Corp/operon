@@ -67,7 +67,7 @@ where
         // Set up the tracing subscriber
         UiBroadcastLayer::new(log_tx, log_options).setup()?;
 
-        let progresses = SharedProgressMap::from_jobs(&handler.job_handlers);
+        let progresses = SharedProgressMap::from_jobs(&handler.job_ids());
 
         // Create the scheduler
         let scheduler = Scheduler::<Svc, Sto>::new(

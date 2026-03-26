@@ -3,17 +3,13 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use tokio::sync::RwLock;
 
-use crate::scheduler::JobHandler;
-use crate::service::OperonService;
-use crate::storage::OperonStorage;
+#[derive(Default, Debug, Clone)]
+#[repr(transparent)]
+pub struct SharedProgressMap(pub IndexMap<&'static str, SharedProgress>);
 
 #[derive(Default, Debug, Clone)]
 #[repr(transparent)]
-pub struct SharedProgressMap(pub IndexMap<String, SharedProgress>);
-
-#[derive(Default, Debug, Clone)]
-#[repr(transparent)]
-pub struct ProgressMap(pub IndexMap<String, Progress>);
+pub struct ProgressMap(pub IndexMap<&'static str, Progress>);
 
 pub type SharedProgress = Arc<RwLock<Progress>>;
 
@@ -37,15 +33,10 @@ pub enum TaskState {
 }
 
 impl SharedProgressMap {
-    pub fn from_jobs<Svc: OperonService, Sto: OperonStorage>(
-        jobs: &[Box<dyn JobHandler<Svc, Sto>>],
-    ) -> Self {
-        let progress = jobs
+    pub fn from_jobs(job_ids: &[&'static str]) -> Self {
+        let progress = job_ids
             .iter()
-            .map(|job| {
-                let id = job.job_id().to_owned();
-                (id, Arc::new(RwLock::new(Progress::default())))
-            })
+            .map(|job_id| (*job_id, Arc::new(RwLock::new(Progress::default()))))
             .collect();
         Self(progress)
     }
@@ -54,7 +45,7 @@ impl SharedProgressMap {
         let futures: Vec<_> = self
             .0
             .iter()
-            .map(|(id, shared)| async { (id.clone(), *shared.read().await) })
+            .map(|(id, shared)| async { (*id, *shared.read().await) })
             .collect();
         let results = futures::future::join_all(futures).await;
         ProgressMap(results.into_iter().collect())
