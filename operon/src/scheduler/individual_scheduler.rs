@@ -90,6 +90,7 @@ where
         let (done, queued, waiting) = client.ticket(self.meta).get_status().await?;
         let finished = (*self.progress.write().await).update(done, queued, waiting);
         if finished {
+            self.state = TaskState::Finished;
             tracing::info!("All `{}` jobs are finished.", self.meta.id);
         }
         Ok(())
