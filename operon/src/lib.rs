@@ -21,6 +21,7 @@ pub mod error {
     pub use crate::operon::{OperonError, UserError};
     pub use crate::scheduler::SchedulerError;
     pub use crate::storage::StorageError;
+    pub use crate::ui::UiError;
 }
 
 pub mod options {
