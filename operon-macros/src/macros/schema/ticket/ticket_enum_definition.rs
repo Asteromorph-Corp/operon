@@ -10,12 +10,12 @@ use crate::utils::{ticket_enum_ident, to_pascal_case};
 /// ```rust,ignore
 /// #[derive(Debug, Clone)]
 /// pub enum TicketEnum {
-///     Alpha(operon::schema::Ticket<0usize>),
-///     Beta(operon::schema::Ticket<1usize>),
-///     Gamma(operon::schema::Ticket<1usize>),
-///     Delta(operon::schema::Ticket<3usize>),
-///     Epsilon(operon::schema::Ticket<2usize>),
-///     Zeta(operon::schema::Ticket<1usize>),
+///     Alpha(operon::__private::Ticket<0usize>),
+///     Beta(operon::__private::Ticket<1usize>),
+///     Gamma(operon::__private::Ticket<1usize>),
+///     Delta(operon::__private::Ticket<3usize>),
+///     Epsilon(operon::__private::Ticket<2usize>),
+///     Zeta(operon::__private::Ticket<1usize>),
 /// }
 /// ```
 pub fn ticket_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
@@ -26,7 +26,7 @@ pub fn ticket_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
         let variant_ident = to_pascal_case(&job.id);
         let n = job.dims.len();
         parse_quote! {
-            #variant_ident(#operon::schema::Ticket<#n>)
+            #variant_ident(#operon::__private::Ticket<#n>)
         }
     });
     let doc = "An enum representing any job.";

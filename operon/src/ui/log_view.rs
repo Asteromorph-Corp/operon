@@ -1,6 +1,7 @@
 use ratatui::text::Text;
 
-use crate::ui::{LogBuffer, LogRecord};
+use crate::logger::LogRecord;
+use crate::ui::log_buffer::LogBuffer;
 
 /// Owns the log buffer and scroll state.
 pub struct LogView {
@@ -59,14 +60,10 @@ impl LogView {
 
     /// Render log text for a given area, clamping the cursor if needed.
     /// Returns the widget to render.
-    pub fn to_text(&mut self, width: u16, height: u16) -> Text<'static> {
+    pub fn format(&mut self, width: u16, height: u16) -> Text<'static> {
         let (text, clamped) = self.buffer.to_text(width, height, self.cursor);
         self.cursor = clamped;
         text
-    }
-
-    pub fn cursor(&self) -> usize {
-        self.cursor
     }
 
     pub fn unread(&self) -> usize {

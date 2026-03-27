@@ -1,18 +1,18 @@
-#[operon::async_trait::async_trait]
+#[async_trait::async_trait]
 #[automatically_derived]
-impl operon::scheduler::JobRebuilder for BetaRebuilder {
+impl operon::__private::JobRebuilder for BetaRebuilder {
     async fn rebuild(
         &self,
-        client: operon::meta_storage::MetaClient<'_>,
-    ) -> Result<(), operon::scheduler::SchedulerError> {
+        client: operon::__private::MetaClient<'_>,
+    ) -> Result<(), operon::error::SchedulerError> {
         let ready_tickets = client
             .ticket(self.job_meta)
-            .get_all(operon::schema::TicketStatus::Queued)
+            .get_all(operon::__private::TicketStatus::Queued)
             .await?
             .into_iter()
             .map(|ticket| match ticket.resolve() {
                 Some(job) => Ok(job.coordinate),
-                None => Err(operon::scheduler::SchedulerError::Other(
+                None => Err(operon::error::SchedulerError::Other(
                     "Failed to resolve a beta ticket".into(),
                 )),
             })
@@ -65,7 +65,7 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                     count - 2
                 )
             };
-            operon::tracing::warn!(
+            operon::__private::tracing::warn!(
                 "The following {} beta ticket(s) were incorrectly marked as done: {}",
                 count,
                 ticket_display

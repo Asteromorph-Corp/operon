@@ -2,15 +2,16 @@ use async_trait::async_trait;
 use tokio::time::Instant;
 use uuid::Uuid;
 
+use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
+use crate::scheduler::events::ControlEvent;
 use crate::scheduler::states::clean::CleanTransition;
 use crate::scheduler::states::rebuild::RebuildTransition;
 use crate::scheduler::states::start::StartTransition;
 use crate::scheduler::states::{NextState, SchedulerState, TransitionState};
-use crate::scheduler::{ControlEvent, SchedulerError};
+use crate::schema::CheckMode;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::CheckMode;
 
 pub struct StaleState<Svc, Sto>
 where

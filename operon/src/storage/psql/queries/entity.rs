@@ -1,10 +1,12 @@
+use bytes::Bytes;
+use futures::SinkExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::schema::{Entity, EntityMetadata};
 use crate::storage::StorageError;
-use crate::storage::psql::StorageClient;
-use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams, hash_metadata, replace_if_updated};
+use crate::storage::psql::client::StorageClient;
+use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams, replace_if_updated};
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
 impl<T> PsqlEntity for T where T: Serialize + DeserializeOwned + Send + Sync + 'static {}
@@ -100,13 +102,13 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     ) -> Result<(), StorageError> {
         const { assert!(M + 1 == N) }
 
-        let schema_prefix = self.client.schema_prefix().into_owned();
+        let schema_prefix = self.client.schema_prefix().to_owned();
         let tx = self.client.transaction().await?;
 
         let temp_table_stmt = BatchPutTempTableQuery(&schema_prefix, self.entity_meta).to_string();
         tx.execute(&temp_table_stmt, &[]).await?;
 
-        let mut writer = crate::csv::WriterBuilder::new()
+        let mut writer = csv::WriterBuilder::new()
             .has_headers(false)
             .from_writer(vec![]);
         for (idx, value) in entity.value.iter().enumerate() {
@@ -120,12 +122,8 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         let copy_stmt = BatchPutCopyQuery(self.entity_meta).to_string();
         let sink = tx.copy_in(&copy_stmt).await?;
         let mut sink = Box::pin(sink);
-        crate::futures::sink::SinkExt::send(
-            &mut sink,
-            crate::bytes::Bytes::from(writer.into_inner()?),
-        )
-        .await?;
-        crate::futures::sink::SinkExt::close(&mut sink).await?;
+        sink.send(Bytes::from(writer.into_inner()?)).await?;
+        sink.close().await?;
 
         let insert_stmt = BatchPutInsertQuery(&schema_prefix, self.entity_meta).to_string();
         tx.execute(&insert_stmt, &[]).await?;
@@ -142,10 +140,9 @@ pub trait EntityQueries: Send + Sync + 'static {
 
 impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<N, T> {
     fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String {
-        let hash = hash_metadata(self);
         replace_if_updated(
             self.id,
-            &hash,
+            self,
             schema,
             "_entity_hash",
             InitEntityQuery(schema, *self),
@@ -502,7 +499,7 @@ mod test {
         #[case] metadata: EntityMetadata<N, ()>,
         #[case] expected: &str,
     ) {
-        let stmt = BatchPutTempTableQuery(&schema_prefix.into_owned(), metadata).to_string();
+        let stmt = BatchPutTempTableQuery(&schema_prefix.to_owned(), metadata).to_string();
         assert_eq!(stmt, expected);
     }
 
@@ -530,7 +527,7 @@ mod test {
         #[case] metadata: EntityMetadata<N, ()>,
         #[case] expected: &str,
     ) {
-        let query = BatchPutInsertQuery(&schema_prefix.into_owned(), metadata).to_string();
+        let query = BatchPutInsertQuery(&schema_prefix.to_owned(), metadata).to_string();
         assert_eq!(query, expected);
     }
 }

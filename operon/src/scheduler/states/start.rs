@@ -54,7 +54,7 @@ where
             self.channel_size,
             self.run_id,
             execution_id,
-            false,
+            self.clean,
         )
     }
 }

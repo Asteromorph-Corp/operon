@@ -1,3 +1,3 @@
-fn default_ticket(&self) -> operon::schema::Ticket<1usize> {
-    operon::schema::Ticket::new(1usize)
+fn default_ticket(&self) -> operon::__private::Ticket<1usize> {
+    operon::__private::Ticket::new(1usize)
 }

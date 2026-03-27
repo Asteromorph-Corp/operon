@@ -1,26 +1,29 @@
-mod metadata;
-pub use metadata::*;
-
 mod job;
-pub use job::*;
-
-mod resolution;
-pub use resolution::*;
+pub(crate) use job::JobLike;
+pub use job::{Job, JobEnum};
 
 mod ticket;
-pub use ticket::*;
+pub(crate) use ticket::TicketLike;
+pub use ticket::{Ticket, TicketEnum, TicketExplosion, TicketStatus};
 
 mod entity;
-pub use entity::*;
+pub use entity::Entity;
 
-mod run_metadata;
-pub use run_metadata::*;
+mod resolution;
+pub(crate) use resolution::ResolutionLike;
+pub use resolution::{Resolution, ResolutionEnum};
+
+mod metadata;
+pub use metadata::{DimensionMetadata, EntityMetadata, JobMetadata};
 
 mod option_coordinate;
-pub use option_coordinate::*;
+pub use option_coordinate::OptionCoordinate;
 
-mod ticket_status;
-pub use ticket_status::*;
+mod run_metadata;
+pub(crate) use run_metadata::{RunFootprint, RunMetadata, RunState};
 
 mod progress;
 pub use progress::{Progress, SharedProgress, SharedProgressMap, TaskState};
+
+mod check_mode;
+pub use check_mode::CheckMode;

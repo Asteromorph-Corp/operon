@@ -5,11 +5,11 @@ use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
-use crate::scheduler::{
-    IndividualControlEvent, IndividualControlEventReceiver, InternalEvent, JobSpec, PeerEvent,
-    PeerEventSenders, SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
-    SpecWithMetadata,
+use crate::scheduler::events::{
+    IndividualControlEvent, IndividualControlEventReceiver, InternalEvent, PeerEvent,
+    PeerEventSenders, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
+use crate::scheduler::{JobSpec, SchedulerError, SpecWithMetadata};
 use crate::schema::{Job, JobMetadata, SharedProgress, TaskState, Ticket, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;

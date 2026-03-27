@@ -1,9 +1,9 @@
 #[allow(unused_variables, clippy::match_single_binding)]
 async fn on_receive_job(
     &self,
-    client: operon::meta_storage::MetaClient<'_>,
+    client: operon::__private::MetaClient<'_>,
     job: schema::JobEnum,
-) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
     match job {
         schema::JobEnum::Beta(job) => Ok([client
             .ticket(self.job_meta())
@@ -15,7 +15,7 @@ async fn on_receive_job(
             .raise_deps_done(metadata::job_delta_meta(), job, &["j"])
             .await?]
         .concat()),
-        _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+        _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
             "job", "epsilon",
         )),
     }

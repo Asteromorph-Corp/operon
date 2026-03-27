@@ -1,7 +1,10 @@
-#[allow(clippy::module_inception)]
 mod logger;
-mod options;
-mod visitors;
-
 pub use logger::UiBroadcastLayer;
+
+mod options;
 pub use options::LoggerOptions;
+
+mod log_record;
+pub(crate) use log_record::{LogRecord, LogRecordReceiver, LogRecordSender};
+
+mod visitors;

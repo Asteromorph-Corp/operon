@@ -14,10 +14,10 @@ use crate::utils::{
 /// #[allow(unused_variables, clippy::match_single_binding)]
 /// async fn on_receive_resolution(
 ///     &self,
-///     client: operon::meta_storage::MetaClient<'_>,
+///     client: operon::__private::MetaClient<'_>,
 ///     peer_txs: &Self::PeerEventSenders,
 ///     resolution: schema::ResolutionEnum,
-/// ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
 ///     match resolution {
 ///         schema::ResolutionEnum::I(res) => Ok(client
 ///             .ticket(self.job_meta())
@@ -26,16 +26,16 @@ use crate::utils::{
 ///         schema::ResolutionEnum::J(res) => {
 ///             match peer_txs
 ///                 .to_epsilon
-///                 .send(operon::scheduler::PeerEvent::Explosion(
+///                 .send(operon::__private::PeerEvent::Explosion(
 ///                     schema::ResolutionEnum::J(res),
 ///                 ))
 ///                 .await
 ///             {
 ///                 Ok(_) => {
-///                     operon::tracing::trace!("`delta` sent peer event to `epsilon`: {resolution:?}")
+///                     operon::__private::tracing::trace!("`delta` sent peer event to `epsilon`: {resolution:?}")
 ///                 }
 ///                 Err(_) => {
-///                     operon::tracing::trace!(
+///                     operon::__private::tracing::trace!(
 ///                         "`epsilon`'s peer channel closed before handling `delta`'s {resolution:?}"
 ///                     )
 ///                 }
@@ -49,7 +49,7 @@ use crate::utils::{
 ///             .ticket(self.job_meta())
 ///             .explode::<_, 2usize>(metadata::dimension_k_meta(), res)
 ///             .await?),
-///         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+///         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
 ///             "resolution",
 ///             "delta",
 ///         )),
@@ -84,15 +84,15 @@ pub(super) fn fn_on_receive_resolution(
             let stmt: syn::Stmt = parse_quote! {
                 match peer_txs
                     .#sender_ident
-                    .send(#operon::scheduler::PeerEvent::Explosion(#operon::schema::TicketExplosion {
+                    .send(#operon::__private::PeerEvent::Explosion(#operon::__private::TicketExplosion {
                         ticket: schema::#ticket_enum_ident::#ticket_variant_ident(ticket),
                         dim: #dim_str,
                         ub: res.ub,
                     }))
                     .await
                 {
-                    Ok(_) => #operon::tracing::trace!(#ok_msg),
-                    Err(_) => #operon::tracing::trace!(#err_msg),
+                    Ok(_) => #operon::__private::tracing::trace!(#ok_msg),
+                    Err(_) => #operon::__private::tracing::trace!(#err_msg),
                 }
             };
             std::iter::repeat_n(stmt, cnt)
@@ -112,13 +112,13 @@ pub(super) fn fn_on_receive_resolution(
         #[allow(unused_variables, unreachable_code, clippy::match_single_binding)]
         async fn on_receive_resolution(
             &self,
-            client: #operon::meta_storage::MetaClient<'_>,
+            client: #operon::__private::MetaClient<'_>,
             peer_txs: &Self::PeerEventSenders,
             resolution: schema::#res_enum_ident,
-        ) -> Result<Vec<Self::Ticket>, #operon::scheduler::SchedulerError> {
+        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError> {
             match resolution {
                 #(#explode_arms)*
-                _ => return Err(#operon::scheduler::SchedulerError::InvalidPeerEventReceived("resolution", #job_id)),
+                _ => return Err(#operon::error::SchedulerError::InvalidPeerEventReceived("resolution", #job_id)),
             }
             Ok(vec![])
         }

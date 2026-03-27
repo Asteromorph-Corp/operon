@@ -68,17 +68,17 @@ fn format_signature(job: &JobConfig) -> String {
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::async_trait::async_trait]
+/// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
 /// pub trait CookingService:
-///     operon::service::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum>
+///     operon::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum>
 /// {
-///     async fn alpha(&self) -> Result<Vec<A>, operon::operon::UserError>;
-///     async fn beta(&self, a: A) -> Result<Vec<B>, operon::operon::UserError>;
-///     async fn gamma(&self, a: A) -> Result<Vec<C>, operon::operon::UserError>;
-///     async fn delta(&self, a: A, b: B, c: C) -> Result<D, operon::operon::UserError>;
-///     async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, operon::operon::UserError>;
-///     async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, operon::operon::UserError>;
+///     async fn alpha(&self) -> Result<Vec<A>, operon::error::UserError>;
+///     async fn beta(&self, a: A) -> Result<Vec<B>, operon::error::UserError>;
+///     async fn gamma(&self, a: A) -> Result<Vec<C>, operon::error::UserError>;
+///     async fn delta(&self, a: A, b: B, c: C) -> Result<D, operon::error::UserError>;
+///     async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, operon::error::UserError>;
+///     async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, operon::error::UserError>;
 /// }
 /// ```
 pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
@@ -123,7 +123,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
             parse_quote! {
                 #[doc = #doc]
                 #[allow(clippy::too_many_arguments)]
-                async fn #fn_name(&self, #(#args),*) -> Result<#return_ty, #operon::operon::UserError>;
+                async fn #fn_name(&self, #(#args),*) -> Result<#return_ty, #operon::error::UserError>;
             },
         )
     }).unzip::<_, _, Vec<_>, Vec<_>>();
@@ -139,9 +139,9 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     };
 
     parse_quote! {
-        #[#operon::async_trait::async_trait]
+        #[#operon::__private::async_trait::async_trait]
         #[doc = #doc_comment]
-        pub trait #svc_ident: #operon::service::OperonService<
+        pub trait #svc_ident: #operon::OperonService<
             JobEnum = schema::#job_enum_ident,
             ResolutionEnum = schema::#res_enum_ident,
             TicketEnum = schema::#ticket_enum_ident

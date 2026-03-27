@@ -1,11 +1,10 @@
-#[allow(clippy::module_inception)]
 mod storage;
-pub use storage::*;
+pub use storage::OperonStorage;
 
 pub mod psql;
 
 mod options;
-pub use options::*;
+pub use options::StorageOptions;
 
 mod error;
-pub use error::*;
+pub use error::StorageError;

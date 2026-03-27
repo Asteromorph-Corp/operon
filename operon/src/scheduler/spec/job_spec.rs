@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 
 use crate::meta_storage::MetaClient;
-use crate::scheduler::{JobRebuilder, PeerEventSenders, SchedulerError};
+use crate::scheduler::events::PeerEventSenders;
+use crate::scheduler::{JobRebuilder, SchedulerError};
 use crate::schema::{
-    JobLike, JobMetadata, ResolutionLike, SharedProgress, TicketExplosion, TicketLike,
+    CheckMode, JobLike, JobMetadata, ResolutionLike, SharedProgress, TicketExplosion, TicketLike,
 };
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -71,7 +72,7 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-        mode: crate::ui::CheckMode,
+        mode: CheckMode,
     ) -> Result<bool, SchedulerError>;
 
     /// Prepare the job rebuilder for the given storage and metadata client by fetching the

@@ -1,12 +1,12 @@
 impl EpsilonSpec {
-    pub const fn job_meta(&self) -> operon::schema::JobMetadata<2usize> {
+    pub const fn job_meta(&self) -> operon::__private::JobMetadata<2usize> {
         metadata::job_epsilon_meta()
     }
 
     pub fn into_handler<Svc: CookingService, Sto: CookingStorage>(
         self,
-    ) -> Box<dyn operon::scheduler::JobHandler<Svc, Sto>> {
+    ) -> Box<dyn operon::__private::JobHandler<Svc, Sto>> {
         let job_meta = self.job_meta();
-        Box::new(operon::scheduler::SpecWithMetadata::new(self, job_meta))
+        Box::new(operon::__private::SpecWithMetadata::new(self, job_meta))
     }
 }

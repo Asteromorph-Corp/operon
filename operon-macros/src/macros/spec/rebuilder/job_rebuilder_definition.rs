@@ -12,13 +12,13 @@ use crate::utils::rebuilder_ident;
 /// ```rust,ignore
 /// #[derive(Debug)]
 /// pub struct BetaRebuilder {
-///     job_meta: operon::schema::JobMetadata<1usize>,
-///     spawn_dim_meta: operon::schema::DimensionMetadata<1usize>,
+///     job_meta: operon::__private::JobMetadata<1usize>,
+///     spawn_dim_meta: operon::__private::DimensionMetadata<1usize>,
 ///     data: Vec<(
-///         operon::schema::Job<1usize>,
-///         operon::schema::Resolution<1usize>,
+///         operon::__private::Job<1usize>,
+///         operon::__private::Resolution<1usize>,
 ///     )>,
-///     progress: operon::schema::SharedProgress,
+///     progress: operon::__private::SharedProgress,
 /// }
 /// ```
 pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
@@ -28,16 +28,16 @@ pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
     let n = job.dims.len();
 
     let maybe_spawn_dim_meta = job.spawn_dim.is_some().then(|| {
-        quote! { spawn_dim_meta: #operon::schema::DimensionMetadata<#n>, }
+        quote! { spawn_dim_meta: #operon::__private::DimensionMetadata<#n>, }
     });
 
     parse_quote! {
         #[derive(Debug)]
         pub struct #rebuilder_ident {
-            job_meta: #operon::schema::JobMetadata<#n>,
+            job_meta: #operon::__private::JobMetadata<#n>,
             #maybe_spawn_dim_meta
-            data: Vec<(#operon::schema::Job<#n>, #resolution_type)>,
-            progress: #operon::schema::SharedProgress,
+            data: Vec<(#operon::__private::Job<#n>, #resolution_type)>,
+            progress: #operon::__private::SharedProgress,
         }
     }
 }

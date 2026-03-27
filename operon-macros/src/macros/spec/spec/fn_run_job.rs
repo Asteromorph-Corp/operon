@@ -111,7 +111,7 @@ fn resolution_inserts(
         dim.fetched_over.iter().rfold(
             quote! {
                 let Some(resolution) = client.resolution(metadata::#dim_meta()).get([#(#get_args),*]).await? else {
-                    return Err(#operon::meta_storage::MetaStorageError::MissingResolution(
+                    return Err(#operon::error::MetaStorageError::MissingResolution(
                         format!(#not_found_msg)
                     ).into());
                 };
@@ -154,7 +154,7 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
             .#get_ident([#(#get_args),*])
             .await?
         else {
-            return Err(#operon::storage::StorageError::NotFound(format!(#not_found_msg)).into());
+            return Err(#operon::error::StorageError::NotFound(format!(#not_found_msg)).into());
         };
     }
 }
@@ -216,7 +216,7 @@ fn arg_def_collected(
             let len = elem.len();
             let ub = #res_map_ident.get(&[#(#res_map_key,)*]).unwrap_or(&0); // TODO: Handle this better
             if len < *ub {
-                return Err(#operon::storage::StorageError::NotFound(
+                return Err(#operon::error::StorageError::NotFound(
                     format!(#not_found_msg)
                 ).into());
             }
@@ -224,7 +224,7 @@ fn arg_def_collected(
                 .take(*ub)
                 .enumerate()
                 .map(|(#dim, elem)| { #acc })
-                .collect::<Result<Vec<_>, #operon::scheduler::SchedulerError>>()
+                .collect::<Result<Vec<_>, #operon::error::SchedulerError>>()
         }
     });
 
@@ -244,24 +244,24 @@ fn arg_def_collected(
 ///     &self,
 ///     service: &Svc,
 ///     storage: &Sto,
-///     client: operon::meta_storage::MetaClient<'_>,
+///     client: operon::__private::MetaClient<'_>,
 ///     job: Self::Job,
-/// ) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
+/// ) -> Result<Self::Resolution, operon::error::SchedulerError> {
 ///     let [i] = job.coordinate;
 ///
 ///     let Some(a) = storage.get_a([i]).await? else {
-///         return Err(operon::storage::StorageError::NotFound(format!("a (i = {i})")).into());
+///         return Err(operon::error::StorageError::NotFound(format!("a (i = {i})")).into());
 ///     };
 ///
 ///     let b_j = service
 ///         .beta(a)
 ///         .await
-///         .map_err(operon::scheduler::SchedulerError::UserError)?;
-///     let entity = operon::schema::Entity {
+///         .map_err(operon::error::SchedulerError::UserError)?;
+///     let entity = operon::Entity {
 ///         coordinate: job.coordinate,
 ///         value: b_j,
 ///     };
-///     let resolution = operon::schema::Resolution::new(entity.value.len(), job.coordinate);
+///     let resolution = operon::__private::Resolution::new(entity.value.len(), job.coordinate);
 ///
 ///     storage.put_all_b(entity).await?;
 ///     client
@@ -313,13 +313,13 @@ pub(super) fn fn_run_job(
     };
 
     let entity: syn::Expr = parse_quote! {
-        #operon::schema::Entity {
+        #operon::Entity {
             coordinate: job.coordinate,
             value: #result_ident,
         }
     };
     let resolution: syn::Expr = if job.spawn_dim.is_some() {
-        parse_quote! { #operon::schema::Resolution::new(entity.value.len(), job.coordinate)  }
+        parse_quote! { #operon::__private::Resolution::new(entity.value.len(), job.coordinate)  }
     } else {
         parse_quote! { () }
     };
@@ -336,9 +336,9 @@ pub(super) fn fn_run_job(
             &self,
             service: &Svc,
             storage: &Sto,
-            client: #operon::meta_storage::MetaClient<'_>,
+            client: #operon::__private::MetaClient<'_>,
             job: Self::Job,
-        ) -> Result<Self::Resolution, #operon::scheduler::SchedulerError> {
+        ) -> Result<Self::Resolution, #operon::error::SchedulerError> {
             let [#(#job_coord_vars),*] = job.coordinate;
             #(#resolution_defs)*
             #(#resolution_inserts)*
@@ -348,7 +348,7 @@ pub(super) fn fn_run_job(
             let #result_ident = service
                 .#job_fn_name(#(#args),*)
                 .await
-                .map_err(operon::scheduler::SchedulerError::UserError)?;
+                .map_err(operon::error::SchedulerError::UserError)?;
             let entity = #entity;
             let resolution = #resolution;
 

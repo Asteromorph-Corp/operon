@@ -1,4 +1,4 @@
-use crate::ui::CheckMode;
+use crate::schema::CheckMode;
 
 pub type ControlEventReceiver = tokio::sync::mpsc::Receiver<ControlEvent>;
 pub type ControlEventSender = tokio::sync::mpsc::Sender<ControlEvent>;

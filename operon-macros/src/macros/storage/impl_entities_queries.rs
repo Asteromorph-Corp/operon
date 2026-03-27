@@ -8,8 +8,8 @@ use crate::utils::{entities_ident, to_snake_case};
 ///
 /// # Example
 /// ```rust,ignore
-/// impl operon::storage::psql::EntityQueries for CookingEntities {
-///     fn init_stmt(&self, schema: operon::utils::SchemaPrefix<'_>) -> String {
+/// impl operon::__private::EntityQueries for CookingEntities {
+///     fn init_stmt(&self, schema: operon::__private::SchemaPrefix<'_>) -> String {
 ///         [
 ///             self.a.init_stmt(schema),
 ///             self.b.init_stmt(schema),
@@ -21,7 +21,7 @@ use crate::utils::{entities_ident, to_snake_case};
 ///         .join("\n")
 ///     }
 ///
-///     fn clear_stmt(&self, schema: operon::utils::SchemaPrefix<'_>) -> String {
+///     fn clear_stmt(&self, schema: operon::__private::SchemaPrefix<'_>) -> String {
 ///         let tables = [
 ///             self.a.id, self.b.id, self.c.id, self.d.id, self.e.id, self.f.id,
 ///         ]
@@ -37,13 +37,13 @@ pub fn impl_entities_queries(service_id: &syn::Ident, entities: &EntityConfigMap
     let fields = entities.keys().map(to_snake_case).collect::<Vec<_>>();
 
     parse_quote! {
-        impl #operon::storage::psql::EntityQueries for #entities_ident {
-            fn init_stmt(&self, schema: #operon::utils::SchemaPrefix<'_>) -> String {
+        impl #operon::__private::EntityQueries for #entities_ident {
+            fn init_stmt(&self, schema: #operon::__private::SchemaPrefix<'_>) -> String {
                 [#(self.#fields.init_stmt(schema),)*]
                     .join("\n")
             }
 
-            fn clear_stmt(&self, schema: #operon::utils::SchemaPrefix<'_>) -> String {
+            fn clear_stmt(&self, schema: #operon::__private::SchemaPrefix<'_>) -> String {
                 let tables = [#(self.#fields.id,)*].map(|t| format!("{schema}{t}")).join(",");
                 format!("TRUNCATE TABLE {tables};")
             }

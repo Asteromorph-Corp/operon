@@ -6,9 +6,9 @@ use tracing_subscriber::Layer;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::registry::LookupSpan;
 
-use crate::logger::LoggerOptions;
 use crate::logger::visitors::{EventVisitor, FieldVisitor};
-use crate::ui::{LogRecord, UiError};
+use crate::logger::{LogRecord, LogRecordSender, LoggerOptions};
+use crate::ui::UiError;
 
 /// Stored on each span to hold its recorded fields.
 #[derive(Debug, Default, Clone)]
@@ -16,16 +16,13 @@ struct SpanFields(Vec<(String, String)>);
 
 #[derive(Debug)]
 pub struct UiBroadcastLayer {
-    sender: ::tokio::sync::broadcast::Sender<LogRecord>,
+    sender: LogRecordSender,
     level: tracing::Level,
     dump: Option<String>,
 }
 
 impl UiBroadcastLayer {
-    pub fn new(
-        sender: ::tokio::sync::broadcast::Sender<LogRecord>,
-        options: LoggerOptions,
-    ) -> Self {
+    pub fn new(sender: LogRecordSender, options: LoggerOptions) -> Self {
         Self {
             sender,
             level: options.level,
@@ -75,7 +72,7 @@ impl UiBroadcastLayer {
             }
         };
         let mut writer = ::std::io::BufWriter::new(log_file);
-        let _ = writeln!(writer, "{}", record.format_for_dump());
+        let _ = record.write_dump(&mut writer);
     }
 }
 

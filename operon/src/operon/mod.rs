@@ -1,9 +1,8 @@
-#[allow(clippy::module_inception)]
 mod operon;
-pub use operon::*;
+pub use operon::Operon;
 
 mod options;
-pub use options::*;
+pub use options::OperonOptions;
 
 mod error;
-pub use error::*;
+pub use error::{OperonError, UserError};

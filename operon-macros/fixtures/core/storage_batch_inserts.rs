@@ -1,10 +1,10 @@
 async fn put_all_a(
     &self,
-    entity: operon::schema::Entity<0usize, Vec<A>>,
-) -> Result<(), operon::storage::StorageError> {
+    entity: operon::Entity<0usize, Vec<A>>,
+) -> Result<(), operon::error::StorageError> {
     let [] = entity.coordinate;
     for (i, value) in entity.value.into_iter().enumerate() {
-        let entity_single = operon::schema::Entity {
+        let entity_single = operon::Entity {
             coordinate: [i],
             value,
         };
@@ -15,11 +15,11 @@ async fn put_all_a(
 
 async fn put_all_b(
     &self,
-    entity: operon::schema::Entity<1usize, Vec<B>>,
-) -> Result<(), operon::storage::StorageError> {
+    entity: operon::Entity<1usize, Vec<B>>,
+) -> Result<(), operon::error::StorageError> {
     let [i] = entity.coordinate;
     for (j, value) in entity.value.into_iter().enumerate() {
-        let entity_single = operon::schema::Entity {
+        let entity_single = operon::Entity {
             coordinate: [i, j],
             value,
         };
@@ -30,11 +30,11 @@ async fn put_all_b(
 
 async fn put_all_c(
     &self,
-    entity: operon::schema::Entity<1usize, Vec<C>>,
-) -> Result<(), operon::storage::StorageError> {
+    entity: operon::Entity<1usize, Vec<C>>,
+) -> Result<(), operon::error::StorageError> {
     let [i] = entity.coordinate;
     for (k, value) in entity.value.into_iter().enumerate() {
-        let entity_single = operon::schema::Entity {
+        let entity_single = operon::Entity {
             coordinate: [i, k],
             value,
         };

@@ -6,11 +6,12 @@ use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
-use crate::scheduler::{
-    IndividualControlEventSender, JobHandler, JobRebuilder, PeerEvent, PeerEventSenderMap,
-    SchedulerError, ServicePeerEventReceiver, ServicePeerEventSenderMap,
+use crate::scheduler::events::{
+    IndividualControlEventSender, PeerEvent, PeerEventSenderMap, ServicePeerEventReceiver,
+    ServicePeerEventSenderMap,
 };
-use crate::schema::{Progress, SharedProgressMap};
+use crate::scheduler::{JobHandler, JobRebuilder, SchedulerError};
+use crate::schema::{CheckMode, Progress, SharedProgressMap};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -51,6 +52,13 @@ pub(crate) struct ControlChannel {
 impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     pub fn new(job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>) -> Self {
         Self { job_handlers }
+    }
+
+    pub(crate) fn job_ids(&self) -> Vec<&'static str> {
+        self.job_handlers
+            .iter()
+            .map(|job_handler| job_handler.job_id())
+            .collect()
     }
 
     pub(crate) fn prepare_channels(
@@ -103,7 +111,7 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-        mode: crate::ui::CheckMode,
+        mode: CheckMode,
     ) -> Result<bool, SchedulerError> {
         for schedule in &self.job_handlers {
             if !schedule.check_consistency(storage, client, mode).await? {

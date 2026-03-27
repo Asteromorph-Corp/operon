@@ -20,7 +20,7 @@ pub(super) fn impl_service_storage(
     let batch_puts = batch_puts(jobs);
 
     parse_quote! {
-        #[#operon::async_trait::async_trait]
+        #[#operon::__private::async_trait::async_trait]
         impl #storage_ident for #sql_storage_ident
         {
             #(#single_ops)*

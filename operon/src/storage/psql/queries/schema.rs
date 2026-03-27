@@ -1,5 +1,5 @@
 use crate::storage::StorageError;
-use crate::storage::psql::StorageClient;
+use crate::storage::psql::client::StorageClient;
 
 impl<'a> StorageClient<'a> {
     /// Initializes the data storage schema, if specified.

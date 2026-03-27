@@ -3,7 +3,7 @@ use futures::SinkExt;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
 use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
-use crate::utils::{SchemaPrefix, SqlParams, hash_metadata, replace_if_updated};
+use crate::utils::{SchemaPrefix, SqlParams, replace_if_updated};
 
 /// Helper struct for building SQL queries related to tickets.
 pub struct TicketQueryBuilder<'a, const N: usize> {
@@ -25,13 +25,12 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     /// Initializes the ticket table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
-        let hash = hash_metadata(self.job_meta);
 
         let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
         let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.job_meta);
         let stmt = replace_if_updated(
             self.job_meta.id,
-            &hash,
+            &self.job_meta,
             schema_prefix,
             "_ticket_hash",
             format!("{init_stmt}\n{trigger_stmts}"),

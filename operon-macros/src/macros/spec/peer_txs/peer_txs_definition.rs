@@ -12,8 +12,8 @@ use crate::utils::{
 /// ```rust,ignore
 /// #[derive(Debug)]
 /// pub struct BetaPeerTxs {
-///     pub to_delta: operon::scheduler::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
-///     pub to_epsilon: operon::scheduler::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
+///     pub to_delta: operon::__private::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
+///     pub to_epsilon: operon::__private::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
 /// }
 /// ```
 pub fn peer_txs_definition(
@@ -33,7 +33,7 @@ pub fn peer_txs_definition(
     parse_quote! {
         #[derive(Debug)]
         pub struct #peer_txs_ident {
-            #(pub #senders: #operon::scheduler::PeerEventSender<schema::#job_enum_ident, schema::#res_enum_ident, schema::#ticket_enum_ident>,)*
+            #(pub #senders: #operon::__private::PeerEventSender<schema::#job_enum_ident, schema::#res_enum_ident, schema::#ticket_enum_ident>,)*
         }
     }
 }

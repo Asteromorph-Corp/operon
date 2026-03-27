@@ -1,11 +1,11 @@
-#[operon::async_trait::async_trait]
+#[async_trait::async_trait]
 #[automatically_derived]
 impl
-    operon::scheduler::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum, schema::TicketEnum>
+    operon::__private::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum, schema::TicketEnum>
     for BetaPeerTxs
 {
     fn gather_from(
-        mut senders: operon::scheduler::PeerEventSenderMap<
+        mut senders: operon::__private::PeerEventSenderMap<
             schema::JobEnum,
             schema::ResolutionEnum,
             schema::TicketEnum,

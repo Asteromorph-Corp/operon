@@ -4,11 +4,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::meta_storage::{MetaClient, MetaStorage};
-use crate::scheduler::{
-    IndividualControlEventReceiver, IndividualScheduler, JobRebuilder, JobSpec, SchedulerError,
-    ServicePeerEventReceiver, ServicePeerEventSenderMap, SpecWithMetadata,
+use crate::scheduler::events::{
+    IndividualControlEventReceiver, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
-use crate::schema::{Job, SharedProgress, Ticket};
+use crate::scheduler::individual_scheduler::IndividualScheduler;
+use crate::scheduler::spec::SpecWithMetadata;
+use crate::scheduler::{JobRebuilder, JobSpec, SchedulerError};
+use crate::schema::{CheckMode, Job, SharedProgress, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -64,7 +66,7 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-        mode: crate::ui::CheckMode,
+        mode: CheckMode,
     ) -> Result<bool, SchedulerError>; // `Scheduler::check_consistency`, 5611~
 
     /// Prepare the job rebuilder for the given storage and metadata client by fetching the
@@ -149,7 +151,7 @@ where
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
-        mode: crate::ui::CheckMode,
+        mode: CheckMode,
     ) -> Result<bool, SchedulerError> {
         self.spec.check_consistency(storage, client, mode).await
     }

@@ -1,8 +1,7 @@
 mod storage;
-pub use storage::*;
-
-mod client;
-pub use client::*;
+pub use storage::PsqlStorage;
 
 mod queries;
 pub use queries::EntityQueries;
+
+mod client;

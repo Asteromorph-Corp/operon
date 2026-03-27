@@ -9,12 +9,12 @@ use crate::utils::{entities_ident, to_snake_case, to_type};
 /// # Example
 /// ```rust,ignore
 /// pub struct CookingEntities {
-///     a: operon::schema::EntityMetadata<1usize, A>,
-///     b: operon::schema::EntityMetadata<2usize, B>,
-///     c: operon::schema::EntityMetadata<2usize, C>,
-///     d: operon::schema::EntityMetadata<3usize, D>,
-///     e: operon::schema::EntityMetadata<2usize, E>,
-///     f: operon::schema::EntityMetadata<1usize, F>,
+///     a: operon::__private::EntityMetadata<1usize, A>,
+///     b: operon::__private::EntityMetadata<2usize, B>,
+///     c: operon::__private::EntityMetadata<2usize, C>,
+///     d: operon::__private::EntityMetadata<3usize, D>,
+///     e: operon::__private::EntityMetadata<2usize, E>,
+///     f: operon::__private::EntityMetadata<1usize, F>,
 /// }
 /// ```
 pub fn entities_definition(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemStruct {
@@ -25,7 +25,7 @@ pub fn entities_definition(service_id: &syn::Ident, entities: &EntityConfigMap) 
         let n = entity.dims.len();
         let ty = to_type(&entity.id);
         let meta_ty: syn::Type = parse_quote! {
-            #operon::schema::EntityMetadata<#n, #ty>
+            #operon::__private::EntityMetadata<#n, #ty>
         };
         parse_quote! { #field_ident: #meta_ty }
     });

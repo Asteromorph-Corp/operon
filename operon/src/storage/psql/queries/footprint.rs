@@ -1,6 +1,6 @@
 use crate::schema::{RunFootprint, RunMetadata};
 use crate::storage::StorageError;
-use crate::storage::psql::StorageClient;
+use crate::storage::psql::client::StorageClient;
 use crate::utils::GLOBAL;
 
 impl StorageClient<'_> {

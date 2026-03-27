@@ -13,12 +13,11 @@
 
 use std::sync::Arc;
 
-use operon::async_trait::async_trait;
-use operon::define_operon;
-use operon::operon::{Operon, OperonOptions, UserError};
-use operon::serde::{Deserialize, Serialize};
-use operon::service::OperonService;
-use operon::storage::StorageOptions;
+use async_trait::async_trait;
+use operon::error::UserError;
+use operon::options::{OperonOptions, StorageOptions};
+use operon::{Operon, OperonService, define_operon};
+use serde::{Deserialize, Serialize};
 
 //# —————————————————————— A. Entity Definitions —————————————————————— #//
 // Define the entities that will be used.
@@ -33,14 +32,9 @@ type Input = String;
 
 // For composite types, we need to implement or derive the necessary traits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// The following attribute can be omitted
-// if you use `serde::{Serialize, Deserialize}`
-// instead of `operon::serde::{Serialize, Deserialize}`.
-#[serde(crate = "operon::serde")]
 struct Intermediate(String);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(crate = "operon::serde")]
 struct Output(char);
 //# ——————————————————————————————————————————————————————————————————— #//
 
@@ -101,10 +95,9 @@ impl SplitterService for MySplitterService {
     async fn get_chars(&self, intermediate: Intermediate) -> Result<Vec<Output>, UserError> {
         // To print something to the UI,
         // we can use the `log` crate directly,
-        // or use the provided `operon::log` module.
         // Do not write to `stdout` or `stderr` directly,
         // as it will interfere with the Operon UI.
-        operon::log::info!("Processing intermediate: {}", intermediate.0);
+        log::info!("Processing intermediate: {}", intermediate.0);
         Ok(intermediate.0.chars().map(Output).collect())
     }
 }

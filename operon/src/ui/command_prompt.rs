@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 
-use crate::ui::Command;
+use crate::ui::command::Command;
 
 #[derive(Default, Debug, Clone)]
 pub struct CommandPrompt {

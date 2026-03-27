@@ -7,9 +7,13 @@ use futures::StreamExt;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 
+use crate::logger::LogRecordReceiver;
 use crate::scheduler::{ControlEvent, ControlEventSender, SchedulerStateReceiver};
 use crate::schema::{Progress, SharedProgressMap, TaskState};
-use crate::ui::{Command, CommandPrompt, LogRecordReceiver, LogView, UiError, UiMode, UiOptions};
+use crate::ui::command::Command;
+use crate::ui::command_prompt::CommandPrompt;
+use crate::ui::log_view::LogView;
+use crate::ui::{UiError, UiMode, UiOptions};
 use crate::utils::SplitFirstOwned;
 
 const SEVENTY_SIX: u16 = 76;
@@ -186,7 +190,7 @@ impl UiLoop {
                     }
                     self.finished = true;
                 }
-                Ok(record) = self.log_rx.recv() => eprintln!("{}", record.format_for_print()),
+                Ok(record) = self.log_rx.recv() => record.write_print(&mut std::io::stderr())?,
             }
 
             // Snapshot the current overall state.
@@ -423,7 +427,7 @@ impl UiLoop {
                 logs_head,
             );
 
-            let logs_widget = self.logs.to_text(logs_area.width, logs_area.height);
+            let logs_widget = self.logs.format(logs_area.width, logs_area.height);
             frame.render_widget(logs_widget, logs_area);
 
             let separator_widget = separator(self.logs.unread());

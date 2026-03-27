@@ -12,9 +12,9 @@ use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, to_lit_str,
 /// #[allow(unused_variables, clippy::match_single_binding)]
 /// async fn on_receive_job(
 ///     &self,
-///     client: operon::meta_storage::MetaClient<'_>,
+///     client: operon::__private::MetaClient<'_>,
 ///     job: schema::JobEnum,
-/// ) -> Result<Vec<Self::Ticket>, operon::scheduler::SchedulerError> {
+/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
 ///     match job {
 ///         schema::JobEnum::Beta(job) => Ok([client
 ///             .ticket(self.job_meta())
@@ -26,7 +26,7 @@ use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, to_lit_str,
 ///             .raise_deps_done(metadata::job_delta_meta(), job, &["j"])
 ///             .await?]
 ///         .concat()),
-///         _ => Err(operon::scheduler::SchedulerError::InvalidPeerEventReceived(
+///         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
 ///             "job", "epsilon",
 ///         )),
 ///     }
@@ -68,12 +68,12 @@ pub(super) fn fn_on_receive_job(
         #[allow(unused_variables, clippy::match_single_binding)]
         async fn on_receive_job(
             &self,
-            client: #operon::meta_storage::MetaClient<'_>,
+            client: #operon::__private::MetaClient<'_>,
             job: schema::#job_enum_ident,
-        ) -> Result<Vec<Self::Ticket>, #operon::scheduler::SchedulerError> {
+        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError> {
             match job {
                 #(#job_arms)*
-                _ => Err(#operon::scheduler::SchedulerError::InvalidPeerEventReceived("job", #job_id)),
+                _ => Err(#operon::error::SchedulerError::InvalidPeerEventReceived("job", #job_id)),
             }
         }
     }

@@ -1,16 +1,16 @@
 async fn check_consistency(
     &self,
     storage: &Sto,
-    client: operon::meta_storage::MetaClient<'_>,
-    mode: operon::ui::CheckMode,
-) -> Result<bool, operon::scheduler::SchedulerError> {
-    if mode == operon::ui::CheckMode::TrustAll {
+    client: operon::__private::MetaClient<'_>,
+    mode: operon::__private::CheckMode,
+) -> Result<bool, operon::error::SchedulerError> {
+    if mode == operon::__private::CheckMode::TrustAll {
         return Ok(true);
     }
 
     let tickets = client
         .ticket(self.job_meta())
-        .get_all(operon::schema::TicketStatus::Done)
+        .get_all(operon::__private::TicketStatus::Done)
         .await?;
     // Pull the "done" beta jobs from the metadata storage...
     let Some(coordinates) = tickets
@@ -18,7 +18,9 @@ async fn check_consistency(
         .map(|ticket| ticket.resolve().map(|job| job.coordinate))
         .collect::<Option<Vec<_>>>()
     else {
-        operon::tracing::info!("Some `beta` tickets are corrupt in the metadata storage.");
+        operon::__private::tracing::info!(
+            "Some `beta` tickets are corrupt in the metadata storage."
+        );
         return Ok(false);
     };
 
@@ -30,7 +32,7 @@ async fn check_consistency(
             .get(coordinate)
             .await?
         else {
-            operon::tracing::info!(
+            operon::__private::tracing::info!(
                 "No `j` resolution found for `beta_{:?}` in the metadata storage.",
                 coordinate
             );
@@ -43,15 +45,15 @@ async fn check_consistency(
 
     // ...and check if the data storage holds all the data for them.
     let tags_to_check = match mode {
-        operon::ui::CheckMode::MetadataOnly => return Ok(true),
-        operon::ui::CheckMode::Exhaustive => tags,
-        operon::ui::CheckMode::Quick => operon::utils::get_dop_tags(&tags),
+        operon::__private::CheckMode::MetadataOnly => return Ok(true),
+        operon::__private::CheckMode::Exhaustive => tags,
+        operon::__private::CheckMode::Quick => operon::__private::get_dop_tags(&tags),
         _ => unreachable!(),
     };
 
     for ([i], j) in tags_to_check {
         if storage.get_b([i, j]).await?.is_none() {
-            operon::tracing::info!("Data storage does not hold `B_{:?}`.", [i, j]);
+            operon::__private::tracing::info!("Data storage does not hold `B_{:?}`.", [i, j]);
             return Ok(false);
         }
     }
