@@ -124,9 +124,8 @@ impl UiLoop {
         terminal.clear()?;
 
         // Main loop for the UI.
-        // Note: breaking this loop exits the UI, at least guard against `any_alive` before
-        // breaking.
         let mut events = EventStream::new();
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
         loop {
             if self.finished && self.exit_on_finish {
                 break;
@@ -154,24 +153,11 @@ impl UiLoop {
                         }
                     };
                 }
-                _ = ::tokio::time::sleep(::std::time::Duration::from_millis(10)) => {
-                    // Drain the log channel before drawing the UI.
+                Ok(record) = self.log_rx.recv() => {
                     let width = terminal.size()?.width;
-                    loop {
-                        match self.log_rx.try_recv() {
-                            Ok(record) => self.logs.push(record, width),
-                            // Skip fallen-behind logs
-                            Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
-                            // Drained all logs
-                            Err(::tokio::sync::broadcast::error::TryRecvError::Empty) => break,
-                            // Channel unexpectedly closed
-                            Err(e) => return Err(e.into()),
-                        }
-                    }
-
-                    // Draw the UI state after the command execution
-                    self.draw(&mut terminal).await?;
+                    self.logs.push(record, width);
                 }
+                _ = interval.tick() => self.draw(&mut terminal).await?,
             }
         }
 
@@ -200,22 +186,7 @@ impl UiLoop {
                     }
                     self.finished = true;
                 }
-                _ = ::tokio::time::sleep(::std::time::Duration::from_millis(10)) => {
-                    // Draw all remaining logs.
-                    loop {
-                        match self.log_rx.try_recv() {
-                            Ok(record) => {
-                                eprintln!("{}", record.format_for_print());
-                            }
-                            // Skip fallen-behind logs
-                            Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
-                            // Drained all logs
-                            Err(::tokio::sync::broadcast::error::TryRecvError::Empty) => break,
-                            // Channel unexpectedly closed
-                            Err(e) => return Err(e.into()),
-                        }
-                    }
-                }
+                Ok(record) = self.log_rx.recv() => eprintln!("{}", record.format_for_print()),
             }
 
             // Snapshot the current overall state.
@@ -226,7 +197,6 @@ impl UiLoop {
                 tracing::error!("Aborting execution due to previous error.");
                 self.ctrl_tx.send(ControlEvent::FORCE_QUIT).await?;
             }
-            ::tokio::time::sleep(::std::time::Duration::from_millis(10)).await;
         }
 
         Ok(())
