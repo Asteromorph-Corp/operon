@@ -20,7 +20,7 @@ pub mod error {
     pub use crate::meta_storage::MetaStorageError;
     pub use crate::operon::{OperonError, UserError};
     pub use crate::scheduler::SchedulerError;
-    pub use crate::storage::StorageError;
+    pub use crate::storage::{DimState, StorageError};
     pub use crate::ui::UiError;
 }
 

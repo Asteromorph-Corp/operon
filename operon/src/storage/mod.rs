@@ -7,4 +7,4 @@ mod options;
 pub use options::StorageOptions;
 
 mod error;
-pub use error::StorageError;
+pub use error::{DimState, StorageError};

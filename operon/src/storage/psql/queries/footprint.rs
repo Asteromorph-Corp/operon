@@ -1,4 +1,6 @@
-use crate::schema::{RunFootprint, RunMetadata};
+use std::str::FromStr;
+
+use crate::schema::{RunFootprint, RunMetadata, RunState};
 use crate::storage::StorageError;
 use crate::storage::psql::client::StorageClient;
 use crate::utils::GLOBAL;
@@ -43,7 +45,7 @@ impl StorageClient<'_> {
 
         let run_id = row.get(0);
         let updated_at = row.get(1);
-        let state = row.get::<_, &str>(2).parse().map_err(StorageError::Other)?;
+        let state = RunState::from_str(row.get(2)).map_err(StorageError::InvalidRunState)?;
 
         let footprint = RunFootprint {
             metadata: RunMetadata { run_id, state },

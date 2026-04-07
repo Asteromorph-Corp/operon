@@ -49,10 +49,15 @@ async fn run_job(
         let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
-            return Err(operon::error::StorageError::NotFound(format!(
-                "C (j = *) expects {ub} elements, but only {len} were found"
-            ))
-            .into());
+            return Err(
+                operon::error::StorageError::EntityLengthMismatch {
+                    entity: "C",
+                    dims: vec![("j", operon::error::DimState::Aggregated)],
+                    expected: *ub,
+                    actual: len,
+                }
+                .into(),
+            );
         }
         elem.into_iter()
             .take(*ub)
@@ -65,10 +70,19 @@ async fn run_job(
         let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
-            return Err(operon::error::StorageError::NotFound(format!(
-                "D (i = {i}, j = *, k = _) expects {ub} elements, but only {len} were found"
-            ))
-            .into());
+            return Err(
+                operon::error::StorageError::EntityLengthMismatch {
+                    entity: "D",
+                    dims: vec![
+                        ("i", operon::error::DimState::Value(i)),
+                        ("j", operon::error::DimState::Aggregated),
+                        ("k", operon::error::DimState::Unresolved),
+                    ],
+                    expected: *ub,
+                    actual: len,
+                }
+                .into(),
+            );
         }
         elem.into_iter()
             .take(*ub)
@@ -77,10 +91,19 @@ async fn run_job(
                 let len = elem.len();
                 let ub = resolution_k_j.get(&[j]).unwrap_or(&0);
                 if len < *ub {
-                    return Err(operon::error::StorageError::NotFound(format!(
-                        "D (i = {i}, j = {j}, k = *) expects {ub} elements, but only {len} were found"
-                    ))
-                    .into());
+                    return Err(
+                        operon::error::StorageError::EntityLengthMismatch {
+                            entity: "D",
+                            dims: vec![
+                                ("i", operon::error::DimState::Value(i)),
+                                ("j", operon::error::DimState::Value(j)),
+                                ("k", operon::error::DimState::Aggregated),
+                            ],
+                            expected: *ub,
+                            actual: len,
+                        }
+                        .into(),
+                    );
                 }
                 elem.into_iter()
                     .take(*ub)

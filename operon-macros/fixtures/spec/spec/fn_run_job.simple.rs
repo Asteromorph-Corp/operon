@@ -9,7 +9,13 @@ async fn run_job(
     let [i] = job.coordinate;
 
     let Some(a) = storage.get_a([i]).await? else {
-        return Err(operon::error::StorageError::NotFound(format!("A (i = {i})")).into());
+        return Err(
+            operon::error::StorageError::EntityNotFound {
+                entity: "A",
+                dims: vec![("i", i)],
+            }
+            .into(),
+        );
     };
 
     let b_j = service
