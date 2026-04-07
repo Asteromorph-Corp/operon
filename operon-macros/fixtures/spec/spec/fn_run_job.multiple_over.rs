@@ -17,7 +17,11 @@ async fn run_job(
         .await?
     else {
         return Err(
-            operon::error::MetaStorageError::MissingResolution(format!("j (i = {i})")).into(),
+            operon::error::MetaStorageError::MissingResolution {
+                dim: "j",
+                deps: vec![("i", i)],
+            }
+            .into(),
         );
     };
     resolution_j.insert([], resolution.ub);
@@ -29,10 +33,13 @@ async fn run_job(
             .get([i, j])
             .await?
         else {
-            return Err(operon::error::MetaStorageError::MissingResolution(format!(
-                "k (i = {i}, j = {j})",
-            ))
-            .into());
+            return Err(
+                operon::error::MetaStorageError::MissingResolution {
+                    dim: "k",
+                    deps: vec![("i", i), ("j", j)],
+                }
+                .into(),
+            );
         };
         resolution_k_j.insert([j], resolution.ub);
     }

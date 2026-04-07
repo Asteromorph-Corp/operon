@@ -78,13 +78,16 @@ impl FromStr for RunState {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "running" => Ok(RunState::Running),
-            "paused" => Ok(RunState::Paused),
-            "completed" => Ok(RunState::Completed),
-            "aborted" => Ok(RunState::Aborted),
-            // TODO: handle this
-            _ => Err(format!("Invalid run state: {}", s)),
+        if s.eq_ignore_ascii_case("running") {
+            Ok(RunState::Running)
+        } else if s.eq_ignore_ascii_case("paused") {
+            Ok(RunState::Paused)
+        } else if s.eq_ignore_ascii_case("completed") {
+            Ok(RunState::Completed)
+        } else if s.eq_ignore_ascii_case("aborted") {
+            Ok(RunState::Aborted)
+        } else {
+            Err(s.to_owned())
         }
     }
 }

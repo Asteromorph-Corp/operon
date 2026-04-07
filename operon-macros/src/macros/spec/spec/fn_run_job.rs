@@ -105,15 +105,17 @@ fn resolution_inserts(
             .map(clear_span);
         let dep_vars = dim.fetched_over.iter().cloned().map(clear_span);
 
-        let dim_msgs = dim.config.depends_on.iter().map(dim_msg).collect::<Vec<_>>();
-        let not_found_msg = format!("{} ({})", dim.config.id, dim_msgs.join(", "));
+        let dim_id = dim.config.id.to_string();
+        let dep_names = dim.config.depends_on.iter().map(|d| d.to_string());
+        let dep_values = dim.config.depends_on.iter().map(clear_span);
 
         dim.fetched_over.iter().rfold(
             quote! {
                 let Some(resolution) = client.resolution(metadata::#dim_meta()).get([#(#get_args),*]).await? else {
-                    return Err(#operon::error::MetaStorageError::MissingResolution(
-                        format!(#not_found_msg)
-                    ).into());
+                    return Err(#operon::error::MetaStorageError::MissingResolution {
+                        dim: #dim_id,
+                        deps: vec![#( (#dep_names, #dep_values) ),*],
+                    }.into());
                 };
                 #res_map.insert([#(#dep_vars),*], resolution.ub);
             },
