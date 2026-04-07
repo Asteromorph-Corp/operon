@@ -20,8 +20,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use operon::error::UserError;
-use operon::{Operon, OperonService,  define_operon};
-use operon::{OperonOptions, StorageOptions};
+use operon::options::{OperonOptions, StorageOptions};
+use operon::{Operon, OperonService, define_operon};
 use serde::{Deserialize, Serialize};
 
 // ———————————————— Entity Definitions ———————————————— //
