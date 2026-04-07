@@ -29,12 +29,6 @@ pub enum OperonError {
     /// Error in the terminal UI
     #[error("Terminal UI error: {0}")]
     UI(#[from] UiError),
-    /// Error caused by missing data
-    #[error("Data expected but not found: {0}")]
-    NotFound(String),
-    /// Tried to resolve a ticket with an irrelevant resolution
-    #[error("Invalid resolution: {0}")]
-    InvalidResolution(String),
     /// Error in the scheduler loop join
     #[error("Scheduler loop join error: {0}")]
     SchedulerJoinError(#[from] tokio::task::JoinError),
@@ -42,26 +36,14 @@ pub enum OperonError {
 
 pub type UserError = Box<dyn std::error::Error + Send + Sync>;
 
-impl OperonError {
-    pub fn not_found(data: impl Into<String>) -> Self {
-        OperonError::NotFound(data.into())
-    }
-
-    pub fn invalid_resolution(resolution: impl Into<String>) -> Self {
-        OperonError::InvalidResolution(resolution.into())
-    }
-}
-
 impl From<SchedulerError> for OperonError {
     fn from(e: SchedulerError) -> Self {
         match e {
             SchedulerError::Storage(e) => OperonError::Storage(e),
             SchedulerError::MetaStorage(e) => OperonError::MetaStorage(e),
-            SchedulerError::Ui(e) => OperonError::UI(e),
-            other => {
-                // Convert other scheduler errors to OperonError::Scheduler
-                OperonError::Scheduler(other)
-            }
+            SchedulerError::UserError(e) => OperonError::User(e),
+            // Convert other scheduler errors to OperonError::Scheduler
+            other => OperonError::Scheduler(other),
         }
     }
 }
