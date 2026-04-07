@@ -59,7 +59,7 @@ fn format_signature(job: &JobConfig) -> String {
         .map_or_else(|| job.to.to_string(), |_| format!("Vec<{}>", job.to));
 
     format!(
-        "async fn {}({}) -> Result<{}, {}::operon::UserError>",
+        "async fn {}({}) -> Result<{}, {}::error::UserError>",
         job.id, args, return_ty, operon
     )
 }
