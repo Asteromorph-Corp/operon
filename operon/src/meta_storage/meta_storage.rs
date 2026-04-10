@@ -1,8 +1,10 @@
+use std::str::FromStr;
 use std::time::Duration;
 
 use secrecy::ExposeSecret;
 
-use crate::meta_storage::{ConnectionWithSchema, MetaStorageError, MetaStorageOptions};
+use crate::meta_storage::meta_client::ConnectionWithSchema;
+use crate::meta_storage::{MetaStorageError, MetaStorageOptions};
 
 #[derive(Debug, Clone)]
 pub struct MetaStorage {
@@ -48,9 +50,9 @@ impl MetaStorage {
         Ok(ConnectionWithSchema::new(client, schema))
     }
 
-    pub async fn ui_conn(&self) -> Result<ConnectionWithSchema<'_>, MetaStorageError> {
+    pub async fn ui_conn(&self) -> Result<ConnectionWithSchema<'static>, MetaStorageError> {
         let client = self.ui_pool.get().await?;
-        let schema = self.schema.as_deref();
+        let schema = self.schema.clone();
 
         Ok(ConnectionWithSchema::new(client, schema))
     }
@@ -63,9 +65,7 @@ fn create_pool(
     pool_size: usize,
 ) -> Result<deadpool_postgres::Pool, MetaStorageError> {
     // Might want to make these hardcoded config values configurable.
-    let mut pg_config = uri
-        .parse::<tokio_postgres::Config>()
-        .map_err(|e| MetaStorageError::DatabaseUriParseError(e.to_string()))?;
+    let mut pg_config = tokio_postgres::Config::from_str(uri)?;
     pg_config
         .keepalives(true)
         .keepalives_idle(keepalives_idle)

@@ -4,16 +4,14 @@ use crate::scheduler::ControlEventError;
 
 #[derive(Debug, Error)]
 pub enum UiError {
-    #[error("Progress not found for UUID: {0}")]
-    ProgressNotFound(String),
     #[error("Control event send error: {0}")]
     ControlEventSendFailed(#[from] ControlEventError),
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Log buffer error: {0}")]
     LogReceiveFailed(tokio::sync::broadcast::error::TryRecvError),
-    #[error("Set logger error: {0}")]
-    SetLoggerError(#[from] log::SetLoggerError),
+    #[error("Set subscriber error: {0}")]
+    SetSubscriberError(#[from] tracing::subscriber::SetGlobalDefaultError),
     #[error("Other error: {0}")]
     Other(String),
 }

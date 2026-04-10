@@ -1,4 +1,4 @@
-async fn get_all_c_j(&self, []: [usize; 0usize]) -> Result<Vec<C>, operon::storage::StorageError> {
+async fn get_all_c_j(&self, []: [usize; 0usize]) -> Result<Vec<C>, operon::error::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut j = 0usize;
@@ -14,7 +14,7 @@ async fn get_all_c_j(&self, []: [usize; 0usize]) -> Result<Vec<C>, operon::stora
 async fn get_all_d_jk(
     &self,
     [i]: [usize; 1usize],
-) -> Result<Vec<Vec<D>>, operon::storage::StorageError> {
+) -> Result<Vec<Vec<D>>, operon::error::StorageError> {
     let final_results = {
         let mut results_0 = Vec::new();
         let mut j = 0usize;

@@ -10,9 +10,9 @@ use crate::utils::{resolution_enum_ident, to_pascal_case};
 /// ```rust,ignore
 /// #[derive(Debug, Clone)]
 /// pub enum ResolutionEnum {
-///     I(operon::schema::Resolution<0usize>),
-///     J(operon::schema::Resolution<1usize>),
-///     K(operon::schema::Resolution<1usize>),
+///     I(operon::__private::Resolution<0usize>),
+///     J(operon::__private::Resolution<1usize>),
+///     K(operon::__private::Resolution<1usize>),
 /// }
 /// ```
 pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
@@ -22,7 +22,7 @@ pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemE
         let variant_ident = to_pascal_case(&dim.id);
         let n = dim.depends_on.len();
         parse_quote! {
-            #variant_ident(#operon::schema::Resolution<#n>)
+            #variant_ident(#operon::__private::Resolution<#n>)
         }
     });
 

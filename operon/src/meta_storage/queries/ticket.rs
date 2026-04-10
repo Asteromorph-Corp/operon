@@ -3,7 +3,7 @@ use futures::SinkExt;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
 use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
-use crate::utils::{SchemaPrefix, SqlParams, hash_metadata, replace_if_updated};
+use crate::utils::{SchemaPrefix, SqlParams, replace_if_updated};
 
 /// Helper struct for building SQL queries related to tickets.
 pub struct TicketQueryBuilder<'a, const N: usize> {
@@ -25,13 +25,12 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     /// Initializes the ticket table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
-        let hash = hash_metadata(self.job_meta);
 
         let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
         let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.job_meta);
         let stmt = replace_if_updated(
             self.job_meta.id,
-            &hash,
+            &self.job_meta,
             schema_prefix,
             "_ticket_hash",
             format!("{init_stmt}\n{trigger_stmts}"),
@@ -148,7 +147,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
         const { assert!(IDX < N) }
         if self.job_meta.dims[IDX] != res_meta.id {
-            log::warn!("Invalid resolution received for explosion.");
+            tracing::warn!("Invalid resolution received for explosion.");
             return Ok(vec![]);
         }
 
@@ -168,16 +167,14 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
             .map(|row| Ticket::from_sql_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let err_msg = format!(
-            "Called `explode({})` on `{}`, but `{}` was resolved",
-            res_meta.id, self.job_meta.id, res_meta.id
-        );
-
         if tickets
             .iter()
             .any(|ticket| ticket.coordinate[IDX].is_some())
         {
-            return Err(MetaStorageError::InvalidExplosion(err_msg));
+            return Err(MetaStorageError::invalid_explosion(
+                self.job_meta.id,
+                res_meta.id,
+            ));
         }
 
         let new_tickets = tickets
@@ -215,9 +212,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
 
         let job_id = self.job_meta.id;
         let Some(row) = self.client.query_opt_stmt(&stmt, &[&job_id]).await? else {
-            return Err(MetaStorageError::NotFound(format!(
-                "Ticket summary for job {job_id}",
-            )));
+            return Err(MetaStorageError::missing_ticket_summary(job_id));
         };
 
         let done: i64 = row.get("done");

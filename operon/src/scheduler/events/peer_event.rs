@@ -21,11 +21,6 @@ pub type PeerEventSender<J, R, T> = tokio::sync::mpsc::Sender<PeerEvent<J, R, T>
 pub type PeerEventReceiver<J, R, T> = tokio::sync::mpsc::Receiver<PeerEvent<J, R, T>>;
 pub type PeerEventSenderMap<J, R, T> = HashMap<&'static str, PeerEventSender<J, R, T>>;
 
-pub type ServicePeerEventSender<Svc> = PeerEventSender<
-    <Svc as OperonService>::JobEnum,
-    <Svc as OperonService>::ResolutionEnum,
-    <Svc as OperonService>::TicketEnum,
->;
 pub type ServicePeerEventReceiver<Svc> = PeerEventReceiver<
     <Svc as OperonService>::JobEnum,
     <Svc as OperonService>::ResolutionEnum,

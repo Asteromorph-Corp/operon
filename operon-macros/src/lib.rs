@@ -37,17 +37,17 @@ pub fn derive_operon_service(input: TokenStream) -> TokenStream {
 
     quote! {
         #[automatically_derived]
-        impl #operon::service::OperonService for #service {
+        impl #operon::OperonService for #service {
             type JobEnum = #definition::schema::JobEnum;
             type ResolutionEnum = #definition::schema::ResolutionEnum;
             type TicketEnum = #definition::schema::TicketEnum;
         }
 
         #[automatically_derived]
-        impl<Sto: #definition::__misc::StorageTrait> operon::scheduler::ValidOperon<#service, Sto>
+        impl<Sto: #definition::__misc::StorageTrait> operon::__private::ValidOperon<#service, Sto>
             for (#service, Sto)
         {
-            fn scheduler_handler() -> operon::scheduler::SchedulerHandler<#service, Sto> {
+            fn scheduler_handler() -> operon::__private::SchedulerHandler<#service, Sto> {
                 #definition::__misc::scheduler_handler()
             }
         }

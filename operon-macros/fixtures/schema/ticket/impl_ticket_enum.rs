@@ -1,2 +1,2 @@
 #[automatically_derived]
-impl operon::schema::TicketEnum for TicketEnum {}
+impl operon::__private::TicketEnum for TicketEnum {}

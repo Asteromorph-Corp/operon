@@ -3,9 +3,9 @@ async fn run_job(
     &self,
     service: &Svc,
     storage: &Sto,
-    client: operon::meta_storage::MetaClient<'_>,
+    client: operon::__private::MetaClient<'_>,
     job: Self::Job,
-) -> Result<Self::Resolution, operon::scheduler::SchedulerError> {
+) -> Result<Self::Resolution, operon::error::SchedulerError> {
     let [i, k] = job.coordinate;
 
     let mut resolution_j: std::collections::HashMap<[usize; 0usize], usize> = Default::default();
@@ -16,8 +16,11 @@ async fn run_job(
         .await?
     else {
         return Err(
-            operon::meta_storage::MetaStorageError::MissingResolution(format!("j (i = {i})"))
-                .into(),
+            operon::error::MetaStorageError::MissingResolution {
+                dim: "j",
+                deps: vec![("i", i)],
+            }
+            .into(),
         );
     };
     resolution_j.insert([], resolution.ub);
@@ -27,39 +30,56 @@ async fn run_job(
         let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
-            return Err(operon::storage::StorageError::NotFound(format!(
-                "B (i = {i}, j = *) expects {ub} elements, but only {len} were found"
-            ))
-            .into());
+            return Err(
+                operon::error::StorageError::EntityLengthMismatch {
+                    entity: "B",
+                    dims: vec![
+                        ("i", operon::error::DimState::Value(i)),
+                        ("j", operon::error::DimState::Aggregated),
+                    ],
+                    expected: *ub,
+                    actual: len,
+                }
+                .into(),
+            );
         }
         elem.into_iter()
             .take(*ub)
             .enumerate()
             .map(|(j, elem)| Ok(elem))
-            .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
+            .collect::<Result<Vec<_>, operon::error::SchedulerError>>()
     }?;
     let d_j = {
         let elem = storage.get_all_d_j([i, k]).await?;
         let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
-            return Err(operon::storage::StorageError::NotFound(format!(
-                "D (i = {i}, j = *, k = {k}) expects {ub} elements, but only {len} were found"
-            ))
-            .into());
+            return Err(
+                operon::error::StorageError::EntityLengthMismatch {
+                    entity: "D",
+                    dims: vec![
+                        ("i", operon::error::DimState::Value(i)),
+                        ("j", operon::error::DimState::Aggregated),
+                        ("k", operon::error::DimState::Value(k)),
+                    ],
+                    expected: *ub,
+                    actual: len,
+                }
+                .into(),
+            );
         }
         elem.into_iter()
             .take(*ub)
             .enumerate()
             .map(|(j, elem)| Ok(elem))
-            .collect::<Result<Vec<_>, operon::scheduler::SchedulerError>>()
+            .collect::<Result<Vec<_>, operon::error::SchedulerError>>()
     }?;
 
     let e = service
         .epsilon(b_j, d_j)
         .await
-        .map_err(operon::scheduler::SchedulerError::UserError)?;
-    let entity = operon::schema::Entity {
+        .map_err(operon::error::SchedulerError::UserError)?;
+    let entity = operon::Entity {
         coordinate: job.coordinate,
         value: e,
     };

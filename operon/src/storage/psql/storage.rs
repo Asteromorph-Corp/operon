@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use secrecy::ExposeSecret;
 
 use crate::schema::RunFootprint;
-use crate::storage::psql::{EntityQueries, StorageClient};
+use crate::storage::psql::EntityQueries;
+use crate::storage::psql::client::StorageClient;
 use crate::storage::{OperonStorage, StorageError, StorageOptions};
 use crate::utils::SchemaPrefix;
 
@@ -35,8 +36,7 @@ impl<T: Default> PsqlStorage<T> {
             let mut config = options
                 .database_uri
                 .expose_secret()
-                .parse::<tokio_postgres::Config>()
-                .map_err(|e| StorageError::DatabaseUriParseError(e.to_string()))?;
+                .parse::<tokio_postgres::Config>()?;
             config
                 .keepalives(true)
                 .keepalives_idle(options.keepalives_idle)

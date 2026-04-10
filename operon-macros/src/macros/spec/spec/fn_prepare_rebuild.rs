@@ -11,29 +11,29 @@ use crate::utils::{operon_ident, rebuilder_ident};
 /// async fn prepare_rebuild(
 ///     &self,
 ///     storage: &Sto,
-///     client: operon::meta_storage::MetaClient<'_>,
-/// ) -> Result<Box<dyn operon::scheduler::JobRebuilder>, operon::scheduler::SchedulerError> {
+///     client: operon::__private::MetaClient<'_>,
+/// ) -> Result<Box<dyn operon::__private::JobRebuilder>, operon::error::SchedulerError> {
 ///     let tickets = client
 ///         .ticket(self.job_meta())
-///         .get_all(operon::schema::TicketStatus::Done)
+///         .get_all(operon::__private::TicketStatus::Done)
 ///         .await?;
 ///     let data =
-///         operon::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
+///         operon::__private::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
 ///             let job = ticket.resolve().ok_or_else(|| {
-///                 operon::scheduler::SchedulerError::Other("Failed to resolve a beta ticket".into())
+///                 operon::error::SchedulerError::Other("Failed to resolve a beta ticket".into())
 ///             })?;
 ///             let resolution = client
 ///                 .resolution(self.spawn_dim_meta())
 ///                 .get(job.coordinate)
 ///                 .await?
 ///                 .ok_or_else(|| {
-///                     operon::scheduler::SchedulerError::Other(format!(
+///                     operon::error::SchedulerError::Other(format!(
 ///                         "No resolution found for j_{:?}",
 ///                         job.coordinate
 ///                     ))
 ///                 })?;
 ///
-///             Ok::<_, operon::scheduler::SchedulerError>((job, resolution))
+///             Ok::<_, operon::error::SchedulerError>((job, resolution))
 ///         }))
 ///         .await?;
 ///
@@ -57,7 +57,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
                 client.resolution(self.spawn_dim_meta()).get(job.coordinate)
                     .await?
                     .ok_or_else(|| {
-                        #operon::scheduler::SchedulerError::Other(format!(
+                        #operon::error::SchedulerError::Other(format!(
                             #missing_resolution_msg,
                             job.coordinate
                         ))
@@ -74,23 +74,24 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
         async fn prepare_rebuild(
             &self,
             storage: &Sto,
-            client: #operon::meta_storage::MetaClient<'_>,
-        ) -> Result<Box<dyn #operon::scheduler::JobRebuilder>, #operon::scheduler::SchedulerError>
+            progress: #operon::__private::SharedProgress,
+            client: #operon::__private::MetaClient<'_>,
+        ) -> Result<Box<dyn #operon::__private::JobRebuilder>, #operon::error::SchedulerError>
         {
             let tickets = client
                 .ticket(self.job_meta())
-                .get_all(#operon::schema::TicketStatus::Done)
+                .get_all(#operon::__private::TicketStatus::Done)
                 .await?;
-            let data = #operon::futures::future::try_join_all(tickets.into_iter().map(
+            let data = #operon::__private::futures::future::try_join_all(tickets.into_iter().map(
                 |ticket| async move {
                     let job = ticket.resolve().ok_or_else(|| {
-                        #operon::scheduler::SchedulerError::Other(
+                        #operon::error::SchedulerError::Other(
                             #resolve_fail_msg.into()
                         )
                     })?;
                     let resolution = #resolution_expr;
 
-                    Ok::<_, #operon::scheduler::SchedulerError>((job, resolution))
+                    Ok::<_, #operon::error::SchedulerError>((job, resolution))
                 }
             ))
             .await?;
@@ -98,7 +99,8 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             Ok(Box::new(#rebuilder_ident {
                 job_meta: self.job_meta(),
                 #maybe_spawn_dim_meta
-                data
+                data,
+                progress,
             }))
         }
     }

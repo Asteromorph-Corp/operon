@@ -1,8 +1,9 @@
 mod helper;
 pub(crate) use helper::*;
 
-mod schema_prefix;
-pub use schema_prefix::*;
-
 mod dop;
-pub use dop::*;
+pub use dop::{get_dop_coords, get_dop_tags};
+
+mod sql;
+pub use sql::SchemaPrefix;
+pub(crate) use sql::*;

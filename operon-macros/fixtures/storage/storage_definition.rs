@@ -1,1 +1,1 @@
-pub type PsqlCookingStorage = operon::storage::psql::PsqlStorage<CookingEntities>;
+pub type PsqlCookingStorage = operon::__private::PsqlStorage<CookingEntities>;

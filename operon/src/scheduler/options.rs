@@ -1,9 +1,11 @@
 use secrecy::SecretString;
 
 use crate::meta_storage::MetaStorageOptions;
+use crate::ui::UiMode;
 
 pub struct SchedulerOptions {
     pub(crate) internal_channel_size: usize,
+    pub(crate) ui_mode: UiMode,
     pub(crate) database_uri: SecretString,
     pub(crate) pool_size: usize,
     pub(crate) schema: Option<String>,
@@ -12,8 +14,7 @@ pub struct SchedulerOptions {
 }
 
 impl SchedulerOptions {
-    pub(crate) fn split(self) -> (usize, MetaStorageOptions) {
-        let internal_channel_size = self.internal_channel_size;
+    pub(crate) fn split(self) -> (usize, UiMode, MetaStorageOptions) {
         let meta_storage_options = MetaStorageOptions {
             database_uri: self.database_uri,
             pool_size: self.pool_size,
@@ -21,6 +22,10 @@ impl SchedulerOptions {
             keepalives_interval: self.keepalives_interval,
             schema: self.schema,
         };
-        (internal_channel_size, meta_storage_options)
+        (
+            self.internal_channel_size,
+            self.ui_mode,
+            meta_storage_options,
+        )
     }
 }

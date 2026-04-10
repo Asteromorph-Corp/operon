@@ -255,12 +255,12 @@ The `{PipelineName}Storage` trait provides entity persistence methods:
 #[async_trait::async_trait]
 pub trait ExampleStorage: OperonStorage {
     async fn get_output_entity(&self, coordinate: [usize; N]) -> Result<Option<OutputEntity>, Self::Error>;
-    async fn put_output_entity(&self, entity: operon::schema::Entity<N, OutputEntity>) -> Result<(), Self::Error>;
+    async fn put_output_entity(&self, entity: operon::Entity<N, OutputEntity>) -> Result<(), Self::Error>;
     // ... methods for each entity type
 }
 ```
 
-where `N` is a constant representing the total number of dimensions in the pipeline and `operon::schema::Entity<N, T>` is defined as the following:
+where `N` is a constant representing the total number of dimensions in the pipeline and `operon::Entity<N, T>` is defined as the following:
 
 ```rust
 pub struct Entity<const N: usize, T> {
@@ -292,18 +292,6 @@ pub mod schema {
 ```
 
 where `DimensionTuple` is `(usize, ...)` ordered by the canonical dimension order.
-
-### Handler Function
-
-A `{pipeline_name}_handler()` function having a following signature:
-
-```rust
-pub fn {pipeline_name}_handler<Svc, Sto>()
-  -> operon::scheduler::SchedulerHandler<schema::JobEnum, Svc, Sto>
-where
-  Svc: {PipelineName}Service,
-  Sto: {PipelineName}Storage;
-```
 
 ## Validation and Error Handling
 
@@ -341,7 +329,7 @@ C = create_c(B) for i;
 The generated artifacts integrate with the Operon runtime system:
 
 ```rust
-use operon::{{Operon, OperonOptions}, storage::StorageOptions};
+use operon::{Operon, OperonOptions, StorageOptions};
 
 // Implement the generated service trait
 struct MyService;
@@ -358,7 +346,7 @@ let storage = PsqlMyPipelineStorage::new(
 
 // Run the pipeline
 let operon = Operon::new(Arc::new(MyService), Arc::new(storage), options);
-operon.run(my_pipeline_handler()).await?;
+operon.run().await?;
 ```
 
 ## Limitations

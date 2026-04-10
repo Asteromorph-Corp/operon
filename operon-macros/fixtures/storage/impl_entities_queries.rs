@@ -1,5 +1,5 @@
-impl operon::storage::psql::EntityQueries for CookingEntities {
-    fn init_stmt(&self, schema: operon::utils::SchemaPrefix<'_>) -> String {
+impl operon::__private::EntityQueries for CookingEntities {
+    fn init_stmt(&self, schema: operon::__private::SchemaPrefix<'_>) -> String {
         [
             self.a.init_stmt(schema),
             self.b.init_stmt(schema),
@@ -10,7 +10,7 @@ impl operon::storage::psql::EntityQueries for CookingEntities {
         ]
         .join("\n")
     }
-    fn clear_stmt(&self, schema: operon::utils::SchemaPrefix<'_>) -> String {
+    fn clear_stmt(&self, schema: operon::__private::SchemaPrefix<'_>) -> String {
         let tables = [
             self.a.id, self.b.id, self.c.id, self.d.id, self.e.id, self.f.id,
         ]

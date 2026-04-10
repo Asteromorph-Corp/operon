@@ -1,2 +1,2 @@
 #[automatically_derived]
-impl operon::schema::JobEnum for JobEnum {}
+impl operon::__private::JobEnum for JobEnum {}

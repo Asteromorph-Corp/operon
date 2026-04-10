@@ -1,2 +1,2 @@
 #[automatically_derived]
-impl operon::schema::ResolutionEnum for ResolutionEnum {}
+impl operon::__private::ResolutionEnum for ResolutionEnum {}

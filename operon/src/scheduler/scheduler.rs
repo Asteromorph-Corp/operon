@@ -1,20 +1,14 @@
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
-use tokio::task::JoinSet;
-use tokio::time::Instant;
-use uuid::Uuid;
-
-use crate::meta_storage::{MetaClient, MetaStorage};
-use crate::operon::RunningState;
-use crate::scheduler::{
-    ControlEvent, ControlEventReceiver, RecoveryState, RecoveryStateSender, RunMode,
-    SchedulerError, SchedulerHandler, SchedulerOptions, SchedulerStateSender,
-};
-use crate::schema::{RunFootprint, RunMetadata, RunState};
+use crate::meta_storage::MetaStorage;
+use crate::scheduler::context::SchedulerContext;
+use crate::scheduler::events::{ControlEventReceiver, SchedulerStateSender};
+use crate::scheduler::states::{InitTransition, NextState, SchedulerState};
+use crate::scheduler::{SchedulerError, SchedulerHandler, SchedulerOptions};
+use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::{UiOptions, UiState};
+use crate::ui::UiMode;
 
 /// # Scheduler
 ///
@@ -30,15 +24,11 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
 {
-    service: Arc<Svc>,
-    storage: Arc<Sto>,
-    meta_storage: MetaStorage,
-    handler: SchedulerHandler<Svc, Sto>,
-    ui_state: Arc<RwLock<UiState>>,
+    ctx: SchedulerContext<Svc, Sto>,
     ctrl_rx: ControlEventReceiver,
-    rec_tx: RecoveryStateSender,
     sched_tx: SchedulerStateSender,
-    internal_channel_size: usize,
+    channel_size: usize,
+    ui_mode: UiMode,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -52,384 +42,69 @@ where
         service: Arc<Svc>,
         storage: Arc<Sto>,
         handler: SchedulerHandler<Svc, Sto>,
-        ui_state: Arc<RwLock<UiState>>,
+        progresses: SharedProgressMap,
         ctrl_rx: ControlEventReceiver,
-        rec_tx: RecoveryStateSender,
         sched_tx: SchedulerStateSender,
         options: SchedulerOptions,
     ) -> Result<Self, SchedulerError> {
-        let (internal_channel_size, meta_storage_options) = options.split();
+        let (channel_size, ui_mode, meta_storage_options) = options.split();
         let meta_storage = MetaStorage::new(meta_storage_options)?;
 
-        Ok(Self {
+        let ctx = SchedulerContext {
             service,
             storage,
             meta_storage,
             handler,
-            ui_state,
+            progresses,
+        };
+
+        Ok(Self {
+            ctx,
             ctrl_rx,
-            rec_tx,
             sched_tx,
-            internal_channel_size,
+            channel_size,
+            ui_mode,
         })
     }
 
     /// Main entry point for the scheduler.
     pub async fn work(mut self) -> Result<(), SchedulerError> {
-        self.storage.init().await?;
+        self.ctx.storage.init().await?;
         self.init_meta_storage().await?;
 
-        // First, check the recovery state.
-        let RunMetadata { run_id, state } = self.check_run_metadata().await.map_err(|e| {
-            log::error!("Failed to check the state from last run.");
-            if let Err(e) = self.rec_tx.send(RecoveryState::Error) {
-                return SchedulerError::RecoverySendFailed(e.0);
-            };
-            e
-        })?;
+        let mut state: Box<dyn SchedulerState> = Box::new(InitTransition::state(
+            self.ctx,
+            self.ui_mode,
+            self.channel_size,
+        ));
 
-        let ui_options = self.ui_state.read().await.options();
-        self.rec_tx.send(RecoveryState::from(state))?;
-        match state {
-            _ if ui_options == UiOptions::Headless => {
-                log::info!("Starting in headless mode.");
-            }
-            RunState::Fresh => log::info!("Type `run` to begin running jobs."),
-            RunState::Completed => log::info!(
-                "Found a finished run. \n\
-                Type `run` to begin running jobs and overwrite the existing data, or `exit` to cancel.\n\
-                You can also type `check` to check the consistency of the data."
-            ),
-            RunState::Paused => log::info!(
-                "Found a gracefully stopped run. \n\
-                Type `run` to resume running jobs from the last run, or `help` for additional options."
-            ),
-            RunState::Running | RunState::Aborted => log::info!(
-                "Found an aborted run. \n\
-                Type `check` to check if the data is recoverable, `run` to start a new run and \
-                overwrite the existing data, or `help` for additional options."
-            ),
-        }
-
-        // Then, wait for the UI to decide what to do next.
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
         loop {
-            self.ctrl_rx.changed().await?;
-            let ctrl_event = self.ctrl_rx.borrow_and_update().clone();
-            match ctrl_event {
-                ControlEvent::Check { mode } => {
-                    let check_start = Instant::now();
-                    let consistent = self
-                        .handler
-                        .check_consistency(
-                            &self.storage,
-                            self.meta_storage.conn().await?.as_client(),
-                            mode,
-                        )
-                        .await
-                        .map_err(|e| {
-                            log::error!("Failed to check data consistency: {e}");
-                            if let Err(e) = self.rec_tx.send(RecoveryState::Error) {
-                                return SchedulerError::RecoverySendFailed(e.0);
-                            };
-                            e
-                        })?;
-                    let state_after_check = match (state, consistent) {
-                        (RunState::Aborted, true) => RecoveryState::AbortedChecked,
-                        (RunState::Paused, true) => RecoveryState::GracefullyStoppedChecked,
-                        (RunState::Completed, true) => RecoveryState::FinishedChecked,
-                        (_, true) => {
-                            unreachable!("Ran `check_consistency` in an unexpected state: {state}")
-                        }
-                        (_, false) => RecoveryState::MissingData,
+            let next = tokio::select! {
+                _ = interval.tick() => state.handle_progress().await?,
+                Some(evt) = self.ctrl_rx.recv() => state.handle_control_event(evt).await?,
+            };
+
+            match next {
+                NextState::Next(new_state) => state = new_state,
+                NextState::Exit { exit_ui } => {
+                    if self.sched_tx.send(exit_ui).is_err() {
+                        tracing::error!("UI exited before scheduler.")
                     };
-                    self.rec_tx.send(state_after_check)?;
-
-                    log::info!(
-                        "Consistency check completed in: {:?}.",
-                        check_start.elapsed()
-                    );
-                    match state_after_check {
-                        RecoveryState::MissingData => log::info!(
-                            "Some data is corrupted or missing. \n\
-                            Type `run` to start a new run and overwrite the existing data, or `exit` to cancel."
-                        ),
-                        RecoveryState::AbortedChecked => log::info!(
-                            "The data is recoverable. \n\
-                            Type `run` to rebuild and resume running jobs from the last run, \
-                            or `help` for additional options."
-                        ),
-                        RecoveryState::GracefullyStoppedChecked => log::info!(
-                            "No inconsistencies were found. \n\
-                            Type `run` to resume running jobs from the last run, or `help` for additional options."
-                        ),
-                        RecoveryState::FinishedChecked => log::info!(
-                            "No inconsistencies were found. \n\
-                            Type `run` to resume running jobs from the last run, or `help` for additional options."
-                        ),
-                        _ => unreachable!(
-                            "Unexpected recovery state after consistency check: {consistent:?}"
-                        ),
-                    }
-                }
-                ControlEvent::CleanRun => return self.run(run_id, RunMode::Clean).await,
-                ControlEvent::RebuildRun => return self.run(run_id, RunMode::Rebuild).await,
-                ControlEvent::RestoreRun => return self.run(run_id, RunMode::Restore).await,
-                // Decided to not start a new run.
-                ControlEvent::Abort => return Ok(()),
-                _ => {
-                    // Other control events should not be passed in here.
-                    log::warn!("Received an unexpected control event: {ctrl_event:?}");
-                    return Err(SchedulerError::UnexpectedControlEvent(ctrl_event));
+                    break;
                 }
             }
         }
-    }
-
-    /// Find out the recovery state.
-    pub async fn check_run_metadata(&self) -> Result<RunMetadata, SchedulerError> {
-        let meta_conn = self.meta_storage.conn().await?;
-
-        // Get footprints from both storages.
-        let data_footprint = self.storage.get_footprint().await?;
-        let meta_footprint = meta_conn.as_client().get_footprint().await?;
-
-        // Early return if the state can be inferred through the footprints.
-        match (data_footprint, meta_footprint) {
-            (Some(df), Some(mf)) if df == mf => Ok(mf.metadata),
-            (Some(df), Some(mf)) if df != mf => {
-                log::warn!(
-                    "Inconsistent footprints between data and metadata storage: \
-                    data footprint: {df:?}, metadata footprint: {mf:?}. \
-                    treating the run as aborted."
-                );
-                Ok(RunMetadata::new(mf.metadata.run_id, RunState::Aborted))
-            }
-            (None, Some(_)) => {
-                log::info!(
-                    "Footprint found in metadata storage, but not in data storage, treating the run as fresh."
-                );
-                Ok(RunMetadata::new(Uuid::new_v4(), RunState::Fresh))
-            }
-            (None, None) => Ok(RunMetadata::new(Uuid::new_v4(), RunState::Fresh)),
-            _ => Ok(RunMetadata::new(Uuid::new_v4(), RunState::Fresh)),
-        }
-    }
-
-    async fn run(self, run_id: Uuid, run_mode: RunMode) -> Result<(), SchedulerError> {
-        let start = Instant::now();
-        let sched_tx = self.sched_tx.clone();
-        let res = self.run_inner(run_id, run_mode).await;
-        log::info!("All jobs closed in: {:?}.", start.elapsed());
-        // Notify the UI that the schedulers have finished.
-        if let Err(e) = sched_tx.send(true) {
-            log::error!("Failed to send scheduler finished state to UI: {}", e);
-        }
-        res
-    }
-
-    async fn run_inner(self, run_id: Uuid, run_mode: RunMode) -> Result<(), SchedulerError> {
-        let execution_id = Uuid::new_v4();
-
-        let footprint = RunFootprint::new(run_id, RunState::Running);
-
-        // Set up the initial storage setup and initial tickets for the individual schedulers.
-        let mut handles = match run_mode {
-            RunMode::Clean => self.run_clean(&footprint, execution_id).await?,
-            RunMode::Rebuild => self.run_rebuild(&footprint, execution_id).await?,
-            RunMode::Restore => self.run_restore(&footprint, execution_id).await?,
-        };
-
-        let mut returned_states = vec![];
-        while let Some(res) = handles.join_next().await {
-            // Bubble up JoinError and push the resulting state.
-            returned_states.push(res?);
-        }
-
-        // Here, we have the following possible states:
-        // 1. All jobs finished successfully.
-        // 2. All jobs are `Finished` or `Stopped`, and the control signal is a `GracefulStop`
-        //    event.
-        // 3-1. All jobs are `Finished` or `Stopped`, and the control signal is an `Abort` event.
-        // 3-2. Some jobs returned an `Error`.
-        // On `1`, we set the footprint to "F@{now}".
-        // On `2`, we set the footprint to "S@{now}".
-        // On `3`, we don't set the footprint.
-        let state = if returned_states.iter().all(|&s| s == RunningState::Finished) {
-            RunState::Completed
-        } else if returned_states
-            .iter()
-            .all(|&s| s == RunningState::Stopped || s == RunningState::Finished)
-            && self.ctrl_rx.borrow().clone() == ControlEvent::GracefulStop
-        {
-            RunState::Paused
-        } else {
-            RunState::Aborted
-        };
-
-        let footprint = RunFootprint::new(run_id, state);
-
-        // Write the footprint to the data storage...
-        self.storage.put_footprint(&footprint).await?;
-
-        // ...and to the metadata storage.
-        let mut conn = self.meta_storage.conn().await?;
-        let tx = conn.transaction().await?;
-        tx.as_client().upsert_run(&footprint).await?;
-        tx.as_client()
-            .update_execution_on_finish(&footprint, execution_id)
-            .await?;
-        tx.commit().await?;
 
         Ok(())
-    }
-
-    async fn run_clean(
-        &self,
-        footprint: &RunFootprint,
-        execution_id: Uuid,
-    ) -> Result<JoinSet<RunningState>, SchedulerError> {
-        let run_id = footprint.metadata.run_id;
-
-        // Wipe the data storage clean.
-        self.storage.clear().await?;
-        self.storage.put_footprint(footprint).await?;
-
-        let mut conn = self.meta_storage.conn().await?;
-        let tx = conn.transaction().await?;
-        self.handler.clear_resolution(tx.as_client()).await?;
-        self.handler.clear_tickets(tx.as_client()).await?;
-        tx.as_client().clear_footprint().await?;
-
-        tx.as_client().upsert_run(footprint).await?;
-        tx.as_client().put_execution(run_id, execution_id).await?;
-        self.handler.put_default_tickets(tx.as_client()).await?;
-        tx.commit().await?;
-
-        let handles = self
-            .handler
-            .prepare_channels(self.internal_channel_size)
-            .run_schedulers(
-                &self.service,
-                &self.storage,
-                &self.meta_storage,
-                &self.ui_state,
-                &self.ctrl_rx,
-                true,
-            );
-
-        Ok(handles)
-    }
-
-    async fn run_rebuild(
-        &self,
-        footprint: &RunFootprint,
-        execution_id: Uuid,
-    ) -> Result<JoinSet<RunningState>, SchedulerError> {
-        self.storage.put_footprint(footprint).await?;
-
-        let rebuild_start = Instant::now();
-
-        // * We *trust* the following data to be correct:
-        //   - The data storage,
-        //   - All dimension resolutions,
-        //   - All done tickets.
-        // * What we need to do:
-        //   - Pull the done tickets and potentially their associated resolutions,
-        //   - couple them into internal events `JobSuccess(job, resolution)`,
-        //   - wipe the metadata storage once that's done,
-        //   - roll the internal events out manually,
-        //   - and finally feed the resulting queued tickets to the individual schedulers.
-
-        // Clear the data storage's footprint. (The metadata storage will be cleared later.)
-        let mut conn = self.meta_storage.conn().await?;
-        let tx = conn.transaction().await?;
-        let rebuilders = self
-            .handler
-            .prepare_rebuilders(&self.storage, tx.as_client())
-            .await?;
-
-        self.handler.clear_resolution(tx.as_client()).await?;
-        self.handler.clear_tickets(tx.as_client()).await?;
-
-        tx.as_client().upsert_run(footprint).await?;
-        tx.as_client()
-            .put_execution(footprint.metadata.run_id, execution_id)
-            .await?;
-        self.handler.put_default_tickets(tx.as_client()).await?;
-        self.update_ui(tx.as_client()).await?;
-
-        for rebuilder in rebuilders {
-            rebuilder
-                .rebuild(tx.as_client(), self.ui_state.as_ref())
-                .await?;
-            self.update_ui(tx.as_client()).await?;
-        }
-        tx.commit().await?;
-        log::info!(
-            "Rebuild completed in: {:?}, starting the run.",
-            rebuild_start.elapsed()
-        );
-
-        let handles = self
-            .handler
-            .prepare_channels(self.internal_channel_size)
-            .run_schedulers(
-                &self.service,
-                &self.storage,
-                &self.meta_storage,
-                &self.ui_state,
-                &self.ctrl_rx,
-                false,
-            );
-        Ok(handles)
-    }
-
-    async fn run_restore(
-        &self,
-        footprint: &RunFootprint,
-        execution_id: Uuid,
-    ) -> Result<JoinSet<RunningState>, SchedulerError> {
-        // * The persistent storage is fully trusted.
-        // * Just pull the queued tickets, and have the individual schedulers' initial
-        //   `ready_to_run` set to them.
-        // * We need to clear the footprint only.
-        self.storage.clear_footprint().await?;
-        self.storage.put_footprint(footprint).await?;
-
-        let mut conn = self.meta_storage.conn().await?;
-        let tx = conn.transaction().await?;
-        tx.as_client().upsert_run(footprint).await?;
-        tx.as_client()
-            .put_execution(footprint.metadata.run_id, execution_id)
-            .await?;
-        tx.commit().await?;
-
-        let handles = self
-            .handler
-            .prepare_channels(self.internal_channel_size)
-            .run_schedulers(
-                &self.service,
-                &self.storage,
-                &self.meta_storage,
-                &self.ui_state,
-                &self.ctrl_rx,
-                false,
-            );
-        Ok(handles)
     }
 
     /// An helper function to call `self.spec.init_meta_storage` with a transaction.
     async fn init_meta_storage(&self) -> Result<(), SchedulerError> {
-        let mut conn = self.meta_storage.conn().await?;
+        let mut conn = self.ctx.meta_storage.conn().await?;
         let tx = conn.transaction().await?;
-        self.handler.init_meta_storage(tx.as_client()).await?;
+        self.ctx.handler.init_meta_storage(tx.as_client()).await?;
         tx.commit().await?;
         Ok(())
-    }
-
-    /// An helper function to call `self.spec.update_ui` with a `RwLock` write guard.
-    async fn update_ui(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
-        let mut ui_state = self.ui_state.write().await;
-        self.handler.update_ui(client, &mut ui_state).await
     }
 }

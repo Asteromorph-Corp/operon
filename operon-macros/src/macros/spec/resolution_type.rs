@@ -7,7 +7,7 @@ pub fn resolution_type(job: &JobConfig) -> syn::Type {
     let operon = operon_ident();
     if job.spawn_dim.is_some() {
         let n = job.dims.len();
-        parse_quote! { #operon::schema::Resolution<#n> }
+        parse_quote! { #operon::__private::Resolution<#n> }
     } else {
         parse_quote! { () }
     }

@@ -1,19 +1,18 @@
-#[operon::async_trait::async_trait]
+#[operon::__private::async_trait::async_trait]
 #[automatically_derived]
-impl operon::scheduler::JobRebuilder for BetaRebuilder {
+impl operon::__private::JobRebuilder for BetaRebuilder {
     async fn rebuild(
         &self,
-        client: operon::meta_storage::MetaClient<'_>,
-        ui_state: &operon::tokio::sync::RwLock<operon::ui::UiState>,
-    ) -> Result<(), operon::scheduler::SchedulerError> {
+        client: operon::__private::MetaClient<'_>,
+    ) -> Result<(), operon::error::SchedulerError> {
         let ready_tickets = client
             .ticket(self.job_meta)
-            .get_all(operon::schema::TicketStatus::Queued)
+            .get_all(operon::__private::TicketStatus::Queued)
             .await?
             .into_iter()
             .map(|ticket| match ticket.resolve() {
                 Some(job) => Ok(job.coordinate),
-                None => Err(operon::scheduler::SchedulerError::Other(
+                None => Err(operon::error::SchedulerError::Other(
                     "Failed to resolve a beta ticket".into(),
                 )),
             })
@@ -50,22 +49,13 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                 .raise_deps_done(self.job_meta, job, &["j"])
                 .await?;
 
-            let mut ui_state = ui_state.write().await;
             let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
-            let state = if queued + waiting == 0 {
-                operon::operon::RunningState::Finished
-            } else {
-                operon::operon::RunningState::Running
-            };
-            ui_state.update_ui_state(operon::ui::UiStateUpdate::ProgressUpdate(
-                "beta".to_string(),
-                (done, queued, waiting, state, false),
-            ))?;
+            (*self.progress.write().await).update(done, queued, waiting);
         }
 
         if !invalid_tickets.is_empty() {
             let count = invalid_tickets.len();
-            let display = if count <= 3 {
+            let ticket_display = if count <= 3 {
                 format!("{:?}", invalid_tickets)
             } else {
                 format!(
@@ -75,10 +65,10 @@ impl operon::scheduler::JobRebuilder for BetaRebuilder {
                     count - 2
                 )
             };
-            operon::log::warn!(
+            operon::__private::tracing::warn!(
                 "The following {} beta ticket(s) were incorrectly marked as done: {}",
                 count,
-                display
+                ticket_display
             );
         }
 

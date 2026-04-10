@@ -14,45 +14,45 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///     peer_txs: &Self::PeerEventSenders,
 ///     job: Self::Job,
 ///     resolution: Self::Resolution,
-/// ) -> Result<(), operon::scheduler::SchedulerError> {
+/// ) -> Result<(), operon::error::SchedulerError> {
 ///     match peer_txs
 ///         .to_delta
-///         .send(operon::scheduler::PeerEvent::Resolution(
+///         .send(operon::__private::PeerEvent::Resolution(
 ///             schema::ResolutionEnum::J(resolution),
 ///         ))
 ///         .await
 ///     {
-///         Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
+///         Ok(_) => operon::__private::tracing::trace!("`beta` sent peer event to `delta`: {resolution:?}"),
 ///         // Verbosity should be low here, since this can happen
 ///         // an arbitrary number of times
 ///         // if a descendant scheduler errored out.
-///         Err(_) => operon::log::trace!(
+///         Err(_) => operon::__private::tracing::trace!(
 ///             "`delta`'s peer channel closed before handling `beta`'s {resolution:?}"
 ///         ),
 ///     }
 ///     // out-dependencies (delta, epsilon)
 ///     match peer_txs
 ///         .to_delta
-///         .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+///         .send(operon::__private::PeerEvent::Job(schema::JobEnum::Beta(
 ///             job,
 ///         )))
 ///         .await
 ///     {
-///         Ok(_) => operon::log::trace!("`beta` sent peer event to `delta`: {job:?}"),
+///         Ok(_) => operon::__private::tracing::trace!("`beta` sent peer event to `delta`: {job:?}"),
 ///         Err(_) => {
-///             operon::log::trace!("`delta`'s peer channel closed before handling `beta`'s {job:?}")
+///             operon::__private::tracing::trace!("`delta`'s peer channel closed before handling `beta`'s {job:?}")
 ///         }
 ///     }
 ///     match peer_txs
 ///         .to_epsilon
-///         .send(operon::scheduler::PeerEvent::Job(schema::JobEnum::Beta(
+///         .send(operon::__private::PeerEvent::Job(schema::JobEnum::Beta(
 ///             job,
 ///         )))
 ///         .await
 ///     {
-///         Ok(_) => operon::log::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
+///         Ok(_) => operon::__private::tracing::trace!("`beta` sent peer event to `epsilon`: {job:?}"),
 ///         Err(_) => {
-///             operon::log::trace!("`epsilon`'s peer channel closed before handling `beta`'s {job:?}")
+///             operon::__private::tracing::trace!("`epsilon`'s peer channel closed before handling `beta`'s {job:?}")
 ///         }
 ///     }
 ///     Ok(())
@@ -84,11 +84,11 @@ pub(super) fn fn_send_on_finish(
             parse_quote! {
                 match peer_txs
                     .#sender_ident
-                    .send(#operon::scheduler::PeerEvent::Resolution(schema::#resolution_enum_ident::#resolution_variant_ident(resolution)))
+                    .send(#operon::__private::PeerEvent::Resolution(schema::#resolution_enum_ident::#resolution_variant_ident(resolution)))
                     .await
                 {
-                    Ok(_) => #operon::log::trace!(#ok_msg),
-                    Err(_) => #operon::log::trace!(#err_msg),
+                    Ok(_) => #operon::__private::tracing::trace!(#ok_msg),
+                    Err(_) => #operon::__private::tracing::trace!(#err_msg),
                 }
             }
         });
@@ -108,11 +108,11 @@ pub(super) fn fn_send_on_finish(
         parse_quote! {
             match peer_txs
                 .#sender_ident
-                .send(#operon::scheduler::PeerEvent::Job(schema::JobEnum::#job_variant_ident(job)))
+                .send(#operon::__private::PeerEvent::Job(schema::JobEnum::#job_variant_ident(job)))
                 .await
             {
-                Ok(_) => #operon::log::trace!(#ok_msg),
-                Err(_) => #operon::log::trace!(#err_msg),
+                Ok(_) => #operon::__private::tracing::trace!(#ok_msg),
+                Err(_) => #operon::__private::tracing::trace!(#err_msg),
             }
         }
     });
@@ -123,7 +123,7 @@ pub(super) fn fn_send_on_finish(
             peer_txs: &Self::PeerEventSenders,
             job: Self::Job,
             resolution: Self::Resolution,
-        ) -> Result<(), #operon::scheduler::SchedulerError> {
+        ) -> Result<(), #operon::error::SchedulerError> {
             #(#send_resolutions)*
             #(#send_jobs)*
             Ok(())
