@@ -1,7 +1,7 @@
 # Operon
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](https://arxiv.org/abs/2511.16080)
-[![Kellnr](https://img.shields.io/badge/kellnr-v0.1.1-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
+[![Kellnr](https://img.shields.io/badge/kellnr-v0.2.0-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-yellow.svg)](LICENSE-MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.91+-lightgray.svg)](https://blog.rust-lang.org/2025/10/30/Rust-1.91.0/)
 
