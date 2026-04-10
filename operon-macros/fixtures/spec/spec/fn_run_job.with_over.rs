@@ -16,7 +16,11 @@ async fn run_job(
         .await?
     else {
         return Err(
-            operon::error::MetaStorageError::MissingResolution(format!("j (i = {i})")).into(),
+            operon::error::MetaStorageError::MissingResolution {
+                dim: "j",
+                deps: vec![("i", i)],
+            }
+            .into(),
         );
     };
     resolution_j.insert([], resolution.ub);
@@ -26,10 +30,18 @@ async fn run_job(
         let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
-            return Err(operon::error::StorageError::NotFound(format!(
-                "B (i = {i}, j = *) expects {ub} elements, but only {len} were found"
-            ))
-            .into());
+            return Err(
+                operon::error::StorageError::EntityLengthMismatch {
+                    entity: "B",
+                    dims: vec![
+                        ("i", operon::error::DimState::Value(i)),
+                        ("j", operon::error::DimState::Aggregated),
+                    ],
+                    expected: *ub,
+                    actual: len,
+                }
+                .into(),
+            );
         }
         elem.into_iter()
             .take(*ub)
@@ -42,10 +54,19 @@ async fn run_job(
         let len = elem.len();
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
-            return Err(operon::error::StorageError::NotFound(format!(
-                "D (i = {i}, j = *, k = {k}) expects {ub} elements, but only {len} were found"
-            ))
-            .into());
+            return Err(
+                operon::error::StorageError::EntityLengthMismatch {
+                    entity: "D",
+                    dims: vec![
+                        ("i", operon::error::DimState::Value(i)),
+                        ("j", operon::error::DimState::Aggregated),
+                        ("k", operon::error::DimState::Value(k)),
+                    ],
+                    expected: *ub,
+                    actual: len,
+                }
+                .into(),
+            );
         }
         elem.into_iter()
             .take(*ub)

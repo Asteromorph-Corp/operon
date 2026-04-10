@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::time::Duration;
 
 use secrecy::ExposeSecret;
@@ -64,9 +65,7 @@ fn create_pool(
     pool_size: usize,
 ) -> Result<deadpool_postgres::Pool, MetaStorageError> {
     // Might want to make these hardcoded config values configurable.
-    let mut pg_config = uri
-        .parse::<tokio_postgres::Config>()
-        .map_err(|e| MetaStorageError::DatabaseUriParseError(e.to_string()))?;
+    let mut pg_config = tokio_postgres::Config::from_str(uri)?;
     pg_config
         .keepalives(true)
         .keepalives_idle(keepalives_idle)

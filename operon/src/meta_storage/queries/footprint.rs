@@ -2,10 +2,12 @@
 //! Given a connection with an optional schema, this module provides operations footprint the
 //! metadata storage.
 
+use std::str::FromStr;
+
 use uuid::Uuid;
 
 use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema::RunFootprint;
+use crate::schema::{RunFootprint, RunState};
 use crate::utils::GLOBAL;
 
 impl MetaClient<'_> {
@@ -61,10 +63,7 @@ impl MetaClient<'_> {
 
         let run_id = row.get(0);
         let updated_at = row.get(1);
-        let state = row
-            .get::<_, &str>(2)
-            .parse()
-            .map_err(MetaStorageError::Other)?;
+        let state = RunState::from_str(row.get(2)).map_err(MetaStorageError::InvalidRunState)?;
 
         Ok(Some(RunFootprint::at(run_id, state, updated_at)))
     }

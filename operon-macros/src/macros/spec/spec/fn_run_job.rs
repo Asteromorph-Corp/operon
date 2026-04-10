@@ -9,7 +9,7 @@ use crate::configs::{
     DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg, JobConfig,
 };
 use crate::utils::{
-    batch_get_entity_ident, batch_put_entity_ident, clear_span, dim_msg, dimension_metadata_ident,
+    batch_get_entity_ident, batch_put_entity_ident, clear_span, dimension_metadata_ident,
     entity_over_dim_ident, get_entity_ident, operon_ident, put_entity_ident,
 };
 
@@ -105,15 +105,17 @@ fn resolution_inserts(
             .map(clear_span);
         let dep_vars = dim.fetched_over.iter().cloned().map(clear_span);
 
-        let dim_msgs = dim.config.depends_on.iter().map(dim_msg).collect::<Vec<_>>();
-        let not_found_msg = format!("{} ({})", dim.config.id, dim_msgs.join(", "));
+        let dim_id = dim.config.id.to_string();
+        let dep_names = dim.config.depends_on.iter().map(|d| d.to_string());
+        let dep_values = dim.config.depends_on.iter().map(clear_span);
 
         dim.fetched_over.iter().rfold(
             quote! {
                 let Some(resolution) = client.resolution(metadata::#dim_meta()).get([#(#get_args),*]).await? else {
-                    return Err(#operon::error::MetaStorageError::MissingResolution(
-                        format!(#not_found_msg)
-                    ).into());
+                    return Err(#operon::error::MetaStorageError::MissingResolution {
+                        dim: #dim_id,
+                        deps: vec![#( (#dep_names, #dep_values) ),*],
+                    }.into());
                 };
                 #res_map.insert([#(#dep_vars),*], resolution.ub);
             },
@@ -146,15 +148,19 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
     // These dimensions are expected to be present in the job struct
     let get_args = arg_entity.dims.iter().map(clear_span);
 
-    let dim_msgs = arg_entity.dims.iter().map(dim_msg).collect::<Vec<_>>();
-    let not_found_msg = format!("{} ({})", arg_entity.id, dim_msgs.join(", "));
+    let entity_name = arg_entity.id.to_string();
+    let dim_names = arg_entity.dims.iter().map(|d| d.to_string());
+    let dim_values = arg_entity.dims.iter().map(clear_span);
 
     parse_quote! {
         let Some(#arg_ident) = storage
             .#get_ident([#(#get_args),*])
             .await?
         else {
-            return Err(#operon::error::StorageError::NotFound(format!(#not_found_msg)).into());
+            return Err(#operon::error::StorageError::EntityNotFound {
+                entity: #entity_name,
+                dims: vec![#( (#dim_names, #dim_values) ),*],
+            }.into());
         };
     }
 }
@@ -189,36 +195,33 @@ fn arg_def_collected(
         let res_map_ident = resolution_map_ident(&dim_required);
         let res_map_key = dim_required.fetched_over.iter().cloned().map(clear_span);
 
-        let dim_msgs = entity
+        let entity_name = entity.id.to_string();
+        let dim_entries: Vec<proc_macro2::TokenStream> = entity
             .dims
             .iter()
             .map(|arg_dim| {
+                let name = arg_dim.to_string();
                 if *arg_dim == dim {
-                    format!("{arg_dim} = *")
-                } else if dim_config.depends_on.contains(arg_dim) {
-                    dim_msg(arg_dim)
-                } else if over.contains(arg_dim) {
-                    format!("{arg_dim} = _")
-                } else if job.dims.contains(arg_dim) {
-                    dim_msg(arg_dim)
+                    quote! { (#name, #operon::error::DimState::Aggregated) }
+                } else if dim_config.depends_on.contains(arg_dim) || job.dims.contains(arg_dim) {
+                    let arg_dim = clear_span(arg_dim);
+                    quote! { (#name, #operon::error::DimState::Value(#arg_dim)) }
                 } else {
-                    format!("{arg_dim} = _")
+                    quote! { (#name, #operon::error::DimState::Unresolved) }
                 }
             })
-            .collect::<Vec<_>>();
-        let not_found_msg = format!(
-            "{} ({}) expects {{ub}} elements, but only {{len}} were found",
-            entity.id,
-            dim_msgs.join(", ")
-        );
+            .collect();
 
         quote! {
             let len = elem.len();
             let ub = #res_map_ident.get(&[#(#res_map_key,)*]).unwrap_or(&0); // TODO: Handle this better
             if len < *ub {
-                return Err(#operon::error::StorageError::NotFound(
-                    format!(#not_found_msg)
-                ).into());
+                return Err(#operon::error::StorageError::EntityLengthMismatch {
+                    entity: #entity_name,
+                    dims: vec![#( #dim_entries ),*],
+                    expected: *ub,
+                    actual: len,
+                }.into());
             }
             elem.into_iter()
                 .take(*ub)
@@ -250,7 +253,10 @@ fn arg_def_collected(
 ///     let [i] = job.coordinate;
 ///
 ///     let Some(a) = storage.get_a([i]).await? else {
-///         return Err(operon::error::StorageError::NotFound(format!("a (i = {i})")).into());
+///         return Err(operon::error::StorageError::EntityNotFound {
+///             entity: "a",
+///             dims: vec![("i", i)],
+///         }.into());
 ///     };
 ///
 ///     let b_j = service

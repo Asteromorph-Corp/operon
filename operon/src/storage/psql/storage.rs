@@ -36,8 +36,7 @@ impl<T: Default> PsqlStorage<T> {
             let mut config = options
                 .database_uri
                 .expose_secret()
-                .parse::<tokio_postgres::Config>()
-                .map_err(|e| StorageError::DatabaseUriParseError(e.to_string()))?;
+                .parse::<tokio_postgres::Config>()?;
             config
                 .keepalives(true)
                 .keepalives_idle(options.keepalives_idle)

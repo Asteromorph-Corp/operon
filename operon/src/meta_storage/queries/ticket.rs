@@ -167,16 +167,14 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
             .map(|row| Ticket::from_sql_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let err_msg = format!(
-            "Called `explode({})` on `{}`, but `{}` was resolved",
-            res_meta.id, self.job_meta.id, res_meta.id
-        );
-
         if tickets
             .iter()
             .any(|ticket| ticket.coordinate[IDX].is_some())
         {
-            return Err(MetaStorageError::InvalidExplosion(err_msg));
+            return Err(MetaStorageError::invalid_explosion(
+                self.job_meta.id,
+                res_meta.id,
+            ));
         }
 
         let new_tickets = tickets
@@ -214,9 +212,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
 
         let job_id = self.job_meta.id;
         let Some(row) = self.client.query_opt_stmt(&stmt, &[&job_id]).await? else {
-            return Err(MetaStorageError::NotFound(format!(
-                "Ticket summary for job {job_id}",
-            )));
+            return Err(MetaStorageError::missing_ticket_summary(job_id));
         };
 
         let done: i64 = row.get("done");
