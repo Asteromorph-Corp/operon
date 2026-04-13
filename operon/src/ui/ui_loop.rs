@@ -267,7 +267,10 @@ impl UiLoop {
                 Command::Quit { .. } | Command::Exit => return Ok(true),
                 Command::Pause { .. } => tracing::warn!("Nothing to pause."),
                 Command::Resume { .. } => tracing::warn!("Nothing to resume"),
-                Command::Clear => self.logs.clear(),
+                Command::Clear => {
+                    self.logs.clear();
+                    self.log_rx = self.log_rx.resubscribe();
+                }
                 Command::Help => tracing::info!("{HELP_TEXT}"),
             };
 
@@ -296,7 +299,10 @@ impl UiLoop {
             Command::Resume { targets } => {
                 self.ctrl_tx.send(ControlEvent::Resume { targets }).await?
             }
-            Command::Clear => self.logs.clear(),
+            Command::Clear => {
+                self.logs.clear();
+                self.log_rx = self.log_rx.resubscribe();
+            }
             Command::Help => tracing::info!("{HELP_TEXT}"),
         }
 
