@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use crossterm::event::{Event, EventStream, KeyCode, KeyModifiers, MouseEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -49,6 +51,7 @@ Commands:
     resume [<JOB_TYPE>[ ...]]
                         Resume paused jobs.
     help                Print this help message."#;
+static MAX_JOB_NAME_LEN: OnceLock<u16> = OnceLock::new();
 
 /// The main UI loop that handles user input and updates the UI state.
 pub struct UiLoop {
@@ -127,6 +130,19 @@ impl UiLoop {
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
 
+        let snapshot = self.progresses.snapshot().await;
+        MAX_JOB_NAME_LEN
+            .set(
+                snapshot
+                    .0
+                    .keys()
+                    .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
+                    .max()
+                    .expect("At least one job name exists")
+                    .clamp(3, 20),
+            )
+            .ok();
+
         // Main loop for the UI.
         let mut events = EventStream::new();
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
@@ -159,7 +175,12 @@ impl UiLoop {
                 }
                 Ok(record) = self.log_rx.recv() => {
                     let width = terminal.size()?.width;
-                    self.logs.push(record, width);
+                    let verbose = width
+                        >= SEVENTY_SIX
+                            + MAX_JOB_NAME_LEN
+                                .get()
+                                .ok_or(UiError::Other("Max job name length not set".to_string()))?;
+                    self.logs.push(record, width, verbose);
                 }
                 _ = interval.tick() => self.draw(&mut terminal).await?,
             }
@@ -283,16 +304,14 @@ impl UiLoop {
     }
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
+        let size = terminal.size()?;
         let draw_snapshot = self.progresses.snapshot().await;
-        let max_len = draw_snapshot
-            .0
-            .keys()
-            .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
-            .max()
-            .expect("At least one job name exists")
-            .clamp(3, 20);
+        let max_len = *MAX_JOB_NAME_LEN
+            .get()
+            .ok_or(UiError::Other("Max job name length not set".to_string()))?;
+        let verbose = size.width >= SEVENTY_SIX + max_len;
 
-        let height = terminal.size()?.height;
+        let height = size.height;
         let total_progress_bars = draw_snapshot.0.len() as u16;
         let max_progress_bars = height
             .saturating_sub(height.saturating_div(2).max(9))
@@ -361,7 +380,7 @@ impl UiLoop {
                 .expect("Progress area must have at least one bar");
 
             frame.render_widget(
-                Line::from(if progress_description.width >= SEVENTY_SIX + max_len {
+                Line::from(if verbose {
                     vec![
                         Span::raw(format!(
                             "{:width$}",
@@ -427,7 +446,7 @@ impl UiLoop {
                 logs_head,
             );
 
-            let logs_widget = self.logs.format(logs_area.width, logs_area.height);
+            let logs_widget = self.logs.format(logs_area.width, logs_area.height, verbose);
             frame.render_widget(logs_widget, logs_area);
 
             let separator_widget = separator(self.logs.unread());

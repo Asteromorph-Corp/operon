@@ -22,11 +22,11 @@ impl LogView {
 
     /// Push a new log record. If the cursor is scrolled back,
     /// adjust it to keep the viewport stable and track unread count.
-    pub fn push(&mut self, record: LogRecord, width: u16) {
+    pub fn push(&mut self, record: LogRecord, width: u16, verbose: bool) {
         if self.cursor != 0 {
             self.cursor = self
                 .cursor
-                .saturating_add(record.format_for_term(width).len());
+                .saturating_add(record.format_for_term(width, verbose).len());
             self.unread += 1;
         }
         self.buffer.push(record);
@@ -60,8 +60,8 @@ impl LogView {
 
     /// Render log text for a given area, clamping the cursor if needed.
     /// Returns the widget to render.
-    pub fn format(&mut self, width: u16, height: u16) -> Text<'static> {
-        let (text, clamped) = self.buffer.to_text(width, height, self.cursor);
+    pub fn format(&mut self, width: u16, height: u16, verbose: bool) -> Text<'static> {
+        let (text, clamped) = self.buffer.to_text(width, height, self.cursor, verbose);
         self.cursor = clamped;
         text
     }

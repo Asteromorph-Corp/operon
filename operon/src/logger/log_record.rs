@@ -50,7 +50,7 @@ impl LogRecord {
         }
     }
 
-    pub fn format_for_term(&self, width: u16) -> Vec<Line<'static>> {
+    pub fn format_for_term(&self, width: u16, verbose: bool) -> Vec<Line<'static>> {
         let timestamp = self.timestamp.format("%y-%m-%d %H:%M:%S").to_string();
         let level_colour = match (self.source_type, self.level) {
             (SourceType::Stderr, _) => {
@@ -96,7 +96,11 @@ impl LogRecord {
             None => String::new(),
         };
 
-        let prefix = format!("{timestamp} ");
+        let prefix = if verbose {
+            format!("{timestamp} ")
+        } else {
+            String::new()
+        };
         let level = format!("{level_label:>6}");
         let sep = "│ ";
         let prefix_width = prefix.chars().count() + level.chars().count() + sep.chars().count();
