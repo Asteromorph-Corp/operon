@@ -18,7 +18,8 @@ use crate::ui::log_view::LogView;
 use crate::ui::{UiError, UiMode, UiOptions};
 use crate::utils::SplitFirstOwned;
 
-const SEVENTY_SIX: u16 = 76;
+const MIN_TERMINAL_WIDTH_THRESHOLD: u16 = 27;
+const VERBOSE_THRESHOLD: u16 = 76;
 const HELP_TEXT: &str = r#"Operon TUI.
 Navigation keys:
     Ctrl+C              Clear input.
@@ -176,7 +177,7 @@ impl UiLoop {
                 Ok(record) = self.log_rx.recv() => {
                     let width = terminal.size()?.width;
                     let verbose = width
-                        >= SEVENTY_SIX
+                        >= VERBOSE_THRESHOLD
                             + MAX_JOB_NAME_LEN
                                 .get()
                                 .ok_or(UiError::Other("Max job name length not set".to_string()))?;
@@ -311,7 +312,12 @@ impl UiLoop {
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
         let size = terminal.size()?;
-        if size.width < 36 || size.height < 10 {
+        let max_len = *MAX_JOB_NAME_LEN
+            .get()
+            .ok_or(UiError::Other("Max job name length not set".to_string()))?;
+
+        let min_width = MIN_TERMINAL_WIDTH_THRESHOLD + max_len;
+        if size.width < min_width || size.height < 10 {
             terminal.draw(|frame| {
                 let vertical = Layout::vertical([
                     Constraint::Fill(1),
@@ -330,7 +336,7 @@ impl UiLoop {
                     vertical[1],
                 );
                 frame.render_widget(
-                    Line::from("Need: 36x10.".to_string())
+                    Line::from(format!("Need: {min_width}x10."))
                         .dark_gray()
                         .centered(),
                     vertical[2],
@@ -340,7 +346,11 @@ impl UiLoop {
                         Span::styled("Current: ", dark_gray),
                         Span::styled(
                             format!("{}", size.width),
-                            if size.width < 36 { red } else { dark_gray },
+                            if size.width < min_width {
+                                red
+                            } else {
+                                dark_gray
+                            },
                         ),
                         Span::styled("x", dark_gray),
                         Span::styled(
@@ -357,10 +367,7 @@ impl UiLoop {
         }
 
         let draw_snapshot = self.progresses.snapshot().await;
-        let max_len = *MAX_JOB_NAME_LEN
-            .get()
-            .ok_or(UiError::Other("Max job name length not set".to_string()))?;
-        let verbose = size.width >= SEVENTY_SIX + max_len;
+        let verbose = size.width >= VERBOSE_THRESHOLD + max_len;
 
         let height = size.height;
         let total_progress_bars = draw_snapshot.0.len() as u16;
