@@ -305,6 +305,51 @@ impl UiLoop {
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
         let size = terminal.size()?;
+        if size.width < 36 || size.height < 10 {
+            terminal.draw(|frame| {
+                let vertical = Layout::vertical([
+                    Constraint::Fill(1),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Fill(1),
+                ])
+                .split(frame.area());
+                let dark_gray = ::ratatui::style::Style::new().dark_gray();
+                let red = ::ratatui::style::Style::new().red();
+                frame.render_widget(
+                    Line::from("Terminal size too small.".to_string())
+                        .dark_gray()
+                        .centered(),
+                    vertical[1],
+                );
+                frame.render_widget(
+                    Line::from("Need: 36x10.".to_string())
+                        .dark_gray()
+                        .centered(),
+                    vertical[2],
+                );
+                frame.render_widget(
+                    Line::from(vec![
+                        Span::styled("Current: ", dark_gray),
+                        Span::styled(
+                            format!("{}", size.width),
+                            if size.width < 36 { red } else { dark_gray },
+                        ),
+                        Span::styled("x", dark_gray),
+                        Span::styled(
+                            format!("{}", size.height),
+                            if size.height < 10 { red } else { dark_gray },
+                        ),
+                    ])
+                    .centered(),
+                    vertical[3],
+                );
+            })?;
+
+            return Ok(());
+        }
+
         let draw_snapshot = self.progresses.snapshot().await;
         let max_len = *MAX_JOB_NAME_LEN
             .get()
