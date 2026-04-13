@@ -29,17 +29,17 @@ impl LogBuffer {
         self.records.clear();
     }
 
-    pub fn to_lines(&self, width: u16) -> Vec<Line<'static>> {
+    pub fn to_lines(&self, width: u16, verbose: bool) -> Vec<Line<'static>> {
         self.records
             .iter()
-            .flat_map(|r| r.format_for_term(width))
+            .flat_map(|r| r.format_for_term(width, verbose))
             .collect()
     }
 
     /// Display the bottom `height` lines, skipping `cursor` lines.
     /// If `cursor + height` exceeds the number of lines, `cursor` will be clamped down.
-    pub fn to_text(&self, width: u16, height: u16, cursor: usize) -> (Text<'static>, usize) {
-        let lines = self.to_lines(width);
+    pub fn to_text(&self, width: u16, height: u16, cursor: usize, verbose: bool) -> (Text<'static>, usize) {
+        let lines = self.to_lines(width, verbose);
         let cursor = cursor.min(lines.len().saturating_sub(height as usize));
         let num_buffer_lines = height.saturating_sub((lines.len() - cursor) as u16);
         let visible_lines = lines

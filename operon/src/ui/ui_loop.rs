@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use crossterm::event::{Event, EventStream, KeyCode, KeyModifiers, MouseEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -16,7 +18,8 @@ use crate::ui::log_view::LogView;
 use crate::ui::{UiError, UiMode, UiOptions};
 use crate::utils::SplitFirstOwned;
 
-const SEVENTY_SIX: u16 = 76;
+const MIN_TERMINAL_WIDTH_THRESHOLD: u16 = 27;
+const VERBOSE_THRESHOLD: u16 = 76;
 const HELP_TEXT: &str = r#"Operon TUI.
 Navigation keys:
     Ctrl+C              Clear input.
@@ -49,6 +52,7 @@ Commands:
     resume [<JOB_TYPE>[ ...]]
                         Resume paused jobs.
     help                Print this help message."#;
+static MAX_JOB_NAME_LEN: OnceLock<u16> = OnceLock::new();
 
 /// The main UI loop that handles user input and updates the UI state.
 pub struct UiLoop {
@@ -127,6 +131,19 @@ impl UiLoop {
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
 
+        let snapshot = self.progresses.snapshot().await;
+        MAX_JOB_NAME_LEN
+            .set(
+                snapshot
+                    .0
+                    .keys()
+                    .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
+                    .max()
+                    .expect("At least one job name exists")
+                    .clamp(3, 20),
+            )
+            .ok();
+
         // Main loop for the UI.
         let mut events = EventStream::new();
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
@@ -159,7 +176,12 @@ impl UiLoop {
                 }
                 Ok(record) = self.log_rx.recv() => {
                     let width = terminal.size()?.width;
-                    self.logs.push(record, width);
+                    let verbose = width
+                        >= VERBOSE_THRESHOLD
+                            + MAX_JOB_NAME_LEN
+                                .get()
+                                .ok_or(UiError::Other("Max job name length not set".to_string()))?;
+                    self.logs.push(record, width, verbose);
                 }
                 _ = interval.tick() => self.draw(&mut terminal).await?,
             }
@@ -246,7 +268,10 @@ impl UiLoop {
                 Command::Quit { .. } | Command::Exit => return Ok(true),
                 Command::Pause { .. } => tracing::warn!("Nothing to pause."),
                 Command::Resume { .. } => tracing::warn!("Nothing to resume"),
-                Command::Clear => self.logs.clear(),
+                Command::Clear => {
+                    self.logs.clear();
+                    self.log_rx = self.log_rx.resubscribe();
+                }
                 Command::Help => tracing::info!("{HELP_TEXT}"),
             };
 
@@ -275,7 +300,10 @@ impl UiLoop {
             Command::Resume { targets } => {
                 self.ctrl_tx.send(ControlEvent::Resume { targets }).await?
             }
-            Command::Clear => self.logs.clear(),
+            Command::Clear => {
+                self.logs.clear();
+                self.log_rx = self.log_rx.resubscribe();
+            }
             Command::Help => tracing::info!("{HELP_TEXT}"),
         }
 
@@ -283,16 +311,65 @@ impl UiLoop {
     }
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
-        let draw_snapshot = self.progresses.snapshot().await;
-        let max_len = draw_snapshot
-            .0
-            .keys()
-            .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
-            .max()
-            .expect("At least one job name exists")
-            .clamp(3, 20);
+        let size = terminal.size()?;
+        let max_len = *MAX_JOB_NAME_LEN
+            .get()
+            .ok_or(UiError::Other("Max job name length not set".to_string()))?;
 
-        let height = terminal.size()?.height;
+        let min_width = MIN_TERMINAL_WIDTH_THRESHOLD + max_len;
+        if size.width < min_width || size.height < 10 {
+            terminal.draw(|frame| {
+                let vertical = Layout::vertical([
+                    Constraint::Fill(1),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Fill(1),
+                ])
+                .split(frame.area());
+                let dark_gray = ::ratatui::style::Style::new().dark_gray();
+                let red = ::ratatui::style::Style::new().red();
+                frame.render_widget(
+                    Line::from("Terminal size too small.".to_string())
+                        .dark_gray()
+                        .centered(),
+                    vertical[1],
+                );
+                frame.render_widget(
+                    Line::from(format!("Need: {min_width}x10."))
+                        .dark_gray()
+                        .centered(),
+                    vertical[2],
+                );
+                frame.render_widget(
+                    Line::from(vec![
+                        Span::styled("Current: ", dark_gray),
+                        Span::styled(
+                            format!("{}", size.width),
+                            if size.width < min_width {
+                                red
+                            } else {
+                                dark_gray
+                            },
+                        ),
+                        Span::styled("x", dark_gray),
+                        Span::styled(
+                            format!("{}", size.height),
+                            if size.height < 10 { red } else { dark_gray },
+                        ),
+                    ])
+                    .centered(),
+                    vertical[3],
+                );
+            })?;
+
+            return Ok(());
+        }
+
+        let draw_snapshot = self.progresses.snapshot().await;
+        let verbose = size.width >= VERBOSE_THRESHOLD + max_len;
+
+        let height = size.height;
         let total_progress_bars = draw_snapshot.0.len() as u16;
         let max_progress_bars = height
             .saturating_sub(height.saturating_div(2).max(9))
@@ -361,7 +438,7 @@ impl UiLoop {
                 .expect("Progress area must have at least one bar");
 
             frame.render_widget(
-                Line::from(if progress_description.width >= SEVENTY_SIX + max_len {
+                Line::from(if verbose {
                     vec![
                         Span::raw(format!(
                             "{:width$}",
@@ -427,7 +504,7 @@ impl UiLoop {
                 logs_head,
             );
 
-            let logs_widget = self.logs.format(logs_area.width, logs_area.height);
+            let logs_widget = self.logs.format(logs_area.width, logs_area.height, verbose);
             frame.render_widget(logs_widget, logs_area);
 
             let separator_widget = separator(self.logs.unread());
