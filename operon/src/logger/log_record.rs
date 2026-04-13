@@ -4,10 +4,18 @@ use ratatui::text::{Line, Span};
 pub type LogRecordSender = tokio::sync::broadcast::Sender<LogRecord>;
 pub type LogRecordReceiver = tokio::sync::broadcast::Receiver<LogRecord>;
 
+#[derive(Debug, Clone, Copy)]
+pub enum SourceType {
+    Levelled,
+    Stdout,
+    Stderr,
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct LogRecord {
     timestamp: ::chrono::DateTime<::chrono::offset::Local>,
+    source_type: SourceType,
     level: ::tracing::Level,
     target: String,
     file: Option<String>,
@@ -18,7 +26,9 @@ pub struct LogRecord {
 }
 
 impl LogRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        source_type: SourceType,
         level: ::tracing::Level,
         target: String,
         file: Option<String>,
@@ -29,6 +39,7 @@ impl LogRecord {
     ) -> Self {
         LogRecord {
             timestamp: ::chrono::Local::now(),
+            source_type,
             level,
             target,
             file,
@@ -41,12 +52,26 @@ impl LogRecord {
 
     pub fn format_for_term(&self, width: u16) -> Vec<Line<'static>> {
         let timestamp = self.timestamp.format("%y-%m-%d %H:%M:%S").to_string();
-        let level_colour = match self.level {
-            ::tracing::Level::ERROR => ::ratatui::style::Style::new().red(),
-            ::tracing::Level::WARN => ::ratatui::style::Style::new().yellow(),
-            ::tracing::Level::INFO => ::ratatui::style::Style::new().green(),
-            ::tracing::Level::DEBUG => ::ratatui::style::Style::new().cyan(),
-            ::tracing::Level::TRACE => ::ratatui::style::Style::new().white(),
+        let level_colour = match (self.source_type, self.level) {
+            (SourceType::Stderr, _) => {
+                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(168, 168, 168))
+            }
+            (SourceType::Stdout, _) => {
+                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(168, 168, 168))
+            }
+            (SourceType::Levelled, ::tracing::Level::ERROR) => ::ratatui::style::Style::new().red(),
+            (SourceType::Levelled, ::tracing::Level::WARN) => {
+                ::ratatui::style::Style::new().yellow()
+            }
+            (SourceType::Levelled, ::tracing::Level::INFO) => {
+                ::ratatui::style::Style::new().green()
+            }
+            (SourceType::Levelled, ::tracing::Level::DEBUG) => {
+                ::ratatui::style::Style::new().cyan()
+            }
+            (SourceType::Levelled, ::tracing::Level::TRACE) => {
+                ::ratatui::style::Style::new().white()
+            }
         };
         // Colour messages that echo shell input.
         let msg_colour = if self.msg.starts_with("$ ") {
@@ -58,7 +83,12 @@ impl LogRecord {
         } else {
             ::ratatui::style::Style::new()
         };
-        let level_label = self.level.as_str();
+
+        let level_label = match self.source_type  {
+            SourceType::Stdout => "STDOUT",
+            SourceType::Stderr => "STDERR",
+            SourceType::Levelled => self.level.as_str()
+        };      
         let span_style = ::ratatui::style::Style::new().dark_gray();
 
         let span_ctx = match &self.span_context {
@@ -67,7 +97,7 @@ impl LogRecord {
         };
 
         let prefix = format!("{timestamp} ");
-        let level = format!("{level_label:>5}");
+        let level = format!("{level_label:>6}");
         let sep = "│ ";
         let prefix_width = prefix.chars().count() + level.chars().count() + sep.chars().count();
         let available = (width as usize).saturating_sub(prefix_width).max(1);
@@ -154,7 +184,7 @@ impl LogRecord {
 }
 
 /// Split the first line of a message into styled segments:
-/// `[span context] ` (gray) + `!stdout ` / `!stderr ` (yellow/red) + message (default).
+/// `[span context] ` (gray) + message (default).
 fn style_message_segments(
     text: &str,
     span_ctx: &str,
@@ -171,20 +201,7 @@ fn style_message_segments(
         remaining = remaining.chars().skip(n).collect();
     }
 
-    // 2. Strip !stdout / !stderr capture prefix
-    let capture_prefixes: &[(&str, ::ratatui::style::Style)] = &[
-        ("!stdout ", ::ratatui::style::Style::new().yellow()),
-        ("!stderr ", ::ratatui::style::Style::new().red()),
-    ];
-    for &(prefix, style) in capture_prefixes {
-        if remaining.starts_with(prefix) {
-            result.push((prefix.to_string(), style));
-            remaining = remaining[prefix.len()..].to_string();
-            break;
-        }
-    }
-
-    // 3. The rest is the actual message
+    // 2. The rest is the actual message
     result.push((remaining, msg_style));
     result
 }

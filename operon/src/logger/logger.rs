@@ -7,7 +7,7 @@ use tracing_subscriber::layer::Context;
 use tracing_subscriber::registry::LookupSpan;
 
 use crate::logger::visitors::{EventVisitor, FieldVisitor};
-use crate::logger::{LogRecord, LogRecordSender, LoggerOptions};
+use crate::logger::{LogRecord, LogRecordSender, LoggerOptions, SourceType};
 use crate::ui::UiError;
 
 /// Stored on each span to hold its recorded fields.
@@ -146,6 +146,15 @@ where
             return;
         }
 
+        // Extract the source type
+        let source_type = if target.starts_with("stdio::stdout") {
+            SourceType::Stdout
+        } else if target.starts_with("stdio::stderr") {
+            SourceType::Stderr
+        } else {
+            SourceType::Levelled
+        };
+
         // Collect span context
         let mut span_parts: Vec<String> = Vec::new();
         if let Some(scope) = ctx.event_scope(event) {
@@ -183,6 +192,7 @@ where
         };
 
         let record = LogRecord::new(
+            source_type,
             level,
             target,
             file,

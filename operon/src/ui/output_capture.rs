@@ -126,12 +126,14 @@ impl Drop for FdRedirectHandle {
 }
 
 pub fn capture_std_outputs() -> io::Result<FdRedirectHandle> {
+    // Capture standard outputs at the Error level,
+    // since the standard I/O shouldn't be filtered out by log level filters.
     FdRedirect::new()
         .with_fd(&std::io::stdout(), "stdout", |line| {
-            tracing::warn!("!stdout {}", line);
+            tracing::error!(target: "stdio::stdout", "{}", line);
         })
         .with_fd(&std::io::stderr(), "stderr", |line| {
-            tracing::error!("!stderr {}", line);
+            tracing::error!(target: "stdio::stderr", "{}", line);
         })
         .capture()
 }
