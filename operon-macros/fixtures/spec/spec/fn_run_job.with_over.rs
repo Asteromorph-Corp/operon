@@ -3,31 +3,38 @@ async fn run_job(
     &self,
     service: &Svc,
     storage: &Sto,
-    client: operon::__private::MetaClient<'_>,
+    meta_storage: operon::__private::MetaStorage,
     job: Self::Job,
 ) -> Result<Self::Resolution, operon::error::SchedulerError> {
     let [i, k] = job.coordinate;
 
-    let mut resolution_j: std::collections::HashMap<[usize; 0usize], usize> = Default::default();
+    let (resolution_j) = {
+        let mut resolution_j: std::collections::HashMap<[usize; 0usize], usize> = Default::default();
 
-    let Some(resolution) = client
-        .resolution(metadata::dimension_j_meta())
-        .get([i])
-        .await?
-    else {
-        return Err(
-            operon::error::MetaStorageError::MissingResolution {
-                dim: "j",
-                deps: vec![("i", i)],
-            }
-            .into(),
-        );
+        let conn = meta_storage.conn().await?;
+        let client = conn.as_client();
+
+        let Some(resolution) = client
+            .resolution(metadata::dimension_j_meta())
+            .get([i])
+            .await?
+        else {
+            return Err(
+                operon::error::MetaStorageError::MissingResolution {
+                    dim: "j",
+                    deps: vec![("i", i)],
+                }
+                .into(),
+            );
+        };
+        resolution_j.insert([], resolution.ub);
+        (resolution_j)
     };
-    resolution_j.insert([], resolution.ub);
 
     let b_j = {
         let elem = storage.get_all_b_j([i]).await?;
         let len = elem.len();
+
         let ub = resolution_j.get(&[]).unwrap_or(&0);
         if len < *ub {
             return Err(
@@ -86,5 +93,15 @@ async fn run_job(
     let resolution = ();
 
     storage.put_e(entity).await?;
+
+    let mut conn = meta_storage.conn().await?;
+    let tx = conn.transaction().await?;
+
+    tx.as_client()
+        .ticket(self.job_meta())
+        .mark_done(job)
+        .await?;
+    tx.commit().await?;
+
     Ok(resolution)
 }

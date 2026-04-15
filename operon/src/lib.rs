@@ -38,7 +38,7 @@ pub mod options {
 pub mod __private {
     pub use {async_trait, futures, tracing};
 
-    pub use crate::meta_storage::MetaClient;
+    pub use crate::meta_storage::{MetaClient, MetaStorage};
     pub use crate::scheduler::{
         JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
         PeerEventSenders, SchedulerHandler, SpecWithMetadata, ValidOperon,

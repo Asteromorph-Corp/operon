@@ -247,18 +247,21 @@ fn arg_def_collected(
 ///     &self,
 ///     service: &Svc,
 ///     storage: &Sto,
-///     client: operon::__private::MetaClient<'_>,
+///     meta_storage: operon::__private::MetaStorage,
 ///     job: Self::Job,
 /// ) -> Result<Self::Resolution, operon::error::SchedulerError> {
 ///     let [i] = job.coordinate;
-///
+/// 
 ///     let Some(a) = storage.get_a([i]).await? else {
-///         return Err(operon::error::StorageError::EntityNotFound {
-///             entity: "a",
-///             dims: vec![("i", i)],
-///         }.into());
+///         return Err(
+///             operon::error::StorageError::EntityNotFound {
+///                 entity: "A",
+///                 dims: vec![("i", i)],
+///             }
+///             .into(),
+///         );
 ///     };
-///
+/// 
 ///     let b_j = service
 ///         .beta(a)
 ///         .await
@@ -268,12 +271,22 @@ fn arg_def_collected(
 ///         value: b_j,
 ///     };
 ///     let resolution = operon::__private::Resolution::new(entity.value.len(), job.coordinate);
-///
+/// 
 ///     storage.put_all_b(entity).await?;
-///     client
+/// 
+///     let mut conn = meta_storage.conn().await?;
+///     let tx = conn.transaction().await?;
+/// 
+///     tx.as_client()
 ///         .resolution(self.spawn_dim_meta())
 ///         .put(resolution)
 ///         .await?;
+///     tx.as_client()
+///         .ticket(self.job_meta())
+///         .mark_done(job)
+///         .await?;
+///     tx.commit().await?;
+/// 
 ///     Ok(resolution)
 /// }
 /// ```
@@ -297,6 +310,23 @@ pub(super) fn fn_run_job(
         parse_quote! { let mut #res_map_var: #ty = Default::default(); }
     });
     let resolution_inserts = resolution_inserts(&required_dims, dimensions);
+
+    let maybe_define_resolutions: Option<syn::Stmt> = (!required_dims.is_empty()).then(|| {
+        let res_map_vars = required_dims.iter().map(resolution_map_ident);
+        let res_map_vars_clone = res_map_vars.clone();
+        parse_quote! {
+            let (#(#res_map_vars),*) = {
+                #(#resolution_defs)*
+
+                let conn = meta_storage.conn().await?;
+                let client = conn.as_client();
+
+                #(#resolution_inserts)*
+
+                (#(#res_map_vars_clone),*)
+            };
+        }
+    });
 
     let job_fn_name = clear_span(&job.id);
     let args = job
@@ -332,7 +362,7 @@ pub(super) fn fn_run_job(
 
     let maybe_put_resolution: Option<syn::Stmt> = job.spawn_dim.is_some().then(|| {
         parse_quote! {
-            client.resolution(self.spawn_dim_meta()).put(resolution).await?;
+            tx.as_client().resolution(self.spawn_dim_meta()).put(resolution).await?;
         }
     });
 
@@ -342,12 +372,12 @@ pub(super) fn fn_run_job(
             &self,
             service: &Svc,
             storage: &Sto,
-            client: #operon::__private::MetaClient<'_>,
+            meta_storage: #operon::__private::MetaStorage,
             job: Self::Job,
         ) -> Result<Self::Resolution, #operon::error::SchedulerError> {
             let [#(#job_coord_vars),*] = job.coordinate;
-            #(#resolution_defs)*
-            #(#resolution_inserts)*
+
+            #maybe_define_resolutions;
 
             #(#arg_defs)*
 
@@ -359,7 +389,14 @@ pub(super) fn fn_run_job(
             let resolution = #resolution;
 
             storage.#put_fn_name(entity).await?;
+            let mut conn = meta_storage.conn().await?;
+            let tx = conn.transaction().await?;
             #maybe_put_resolution;
+            tx.as_client()
+                .ticket(self.job_meta())
+                .mark_done(job)
+                .await?;
+            tx.commit().await?;
             Ok(resolution)
         }
     }
