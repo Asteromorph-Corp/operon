@@ -15,11 +15,14 @@ pub struct MetaStorage {
 
 impl MetaStorage {
     pub fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
+        if options.pool_size < 6 {
+            return Err(MetaStorageError::PoolSizeTooSmall(options.pool_size));
+        }
         let pool = create_pool(
             options.database_uri.expose_secret(),
             options.keepalives_idle,
             options.keepalives_interval,
-            options.pool_size,
+            options.pool_size.saturating_sub(5),
         )?;
         let ui_pool = create_pool(
             options.database_uri.expose_secret(),
@@ -39,13 +42,6 @@ impl MetaStorage {
     pub async fn conn(&self) -> Result<ConnectionWithSchema<'_>, MetaStorageError> {
         let client = self.pool.get().await?;
         let schema = self.schema.as_deref();
-
-        Ok(ConnectionWithSchema::new(client, schema))
-    }
-
-    pub async fn conn_static(&self) -> Result<ConnectionWithSchema<'static>, MetaStorageError> {
-        let client = self.pool.get().await?;
-        let schema = self.schema.clone();
 
         Ok(ConnectionWithSchema::new(client, schema))
     }

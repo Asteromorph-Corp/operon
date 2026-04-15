@@ -53,7 +53,7 @@ where
 
     /// Fetch the metadata of a previous run if it exists.
     async fn get_run_metadata(&self) -> Result<Option<RunMetadata>, SchedulerError> {
-        let meta_conn = self.ctx.meta_storage.conn().await?;
+        let meta_conn = self.ctx.meta_storage.ui_conn().await?;
 
         // Get footprints from both storages.
         let data_footprint = self.ctx.storage.get_footprint().await?;

@@ -97,7 +97,7 @@ where
     }
 
     async fn initial_ready_tickets(&self) -> Result<Vec<Ticket<N>>, MetaStorageError> {
-        let conn = self.meta_storage.conn().await?;
+        let conn = self.meta_storage.ui_conn().await?;
         conn.as_client()
             .ticket(self.meta)
             .get_all(TicketStatus::Queued)
@@ -112,7 +112,7 @@ where
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
         peer_txs: &JS::PeerEventSenders,
     ) -> Result<Vec<Ticket<N>>, SchedulerError> {
-        let mut conn = self.meta_storage.conn_static().await?;
+        let mut conn = self.meta_storage.ui_conn().await?;
         let tx = conn.transaction().await?;
         let ready_tickets = match event {
             PeerEvent::Job(job) => self.spec.on_receive_job(tx.as_client(), job).await?,

@@ -101,7 +101,7 @@ where
 
     /// An helper function to call `self.spec.init_meta_storage` with a transaction.
     async fn init_meta_storage(&self) -> Result<(), SchedulerError> {
-        let mut conn = self.ctx.meta_storage.conn().await?;
+        let mut conn = self.ctx.meta_storage.ui_conn().await?;
         let tx = conn.transaction().await?;
         self.ctx.handler.init_meta_storage(tx.as_client()).await?;
         tx.commit().await?;

@@ -55,7 +55,7 @@ where
     }
 
     async fn execute(self) -> Result<NextState, SchedulerError> {
-        let mut conn = self.ctx.meta_storage.conn().await?;
+        let mut conn = self.ctx.meta_storage.ui_conn().await?;
         let tx = conn.transaction().await?;
 
         self.ctx.handler.clear_resolution(tx.as_client()).await?;
