@@ -73,7 +73,7 @@ where
         let footprint = RunFootprint::new(self.run_id, RunState::Running);
         let execution_id = Uuid::new_v4();
 
-        let conn = self.ctx.meta_storage.ui_conn().await?;
+        let conn = self.ctx.meta_storage.scheduler_conn().await?;
 
         conn.as_client().upsert_run(&footprint).await?;
         conn.as_client()

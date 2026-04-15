@@ -11,7 +11,7 @@ async fn run_job(
     let (resolution_j) = {
         let mut resolution_j: std::collections::HashMap<[usize; 0usize], usize> = Default::default();
 
-        let conn = meta_storage.conn().await?;
+        let conn = meta_storage.worker_conn().await?;
         let client = conn.as_client();
 
         let Some(resolution) = client
@@ -94,7 +94,7 @@ async fn run_job(
 
     storage.put_e(entity).await?;
 
-    let mut conn = meta_storage.conn().await?;
+    let mut conn = meta_storage.worker_conn().await?;
     let tx = conn.transaction().await?;
 
     tx.as_client()

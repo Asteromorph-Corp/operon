@@ -251,7 +251,7 @@ fn arg_def_collected(
 ///     job: Self::Job,
 /// ) -> Result<Self::Resolution, operon::error::SchedulerError> {
 ///     let [i] = job.coordinate;
-/// 
+///
 ///     let Some(a) = storage.get_a([i]).await? else {
 ///         return Err(
 ///             operon::error::StorageError::EntityNotFound {
@@ -261,7 +261,7 @@ fn arg_def_collected(
 ///             .into(),
 ///         );
 ///     };
-/// 
+///
 ///     let b_j = service
 ///         .beta(a)
 ///         .await
@@ -271,12 +271,12 @@ fn arg_def_collected(
 ///         value: b_j,
 ///     };
 ///     let resolution = operon::__private::Resolution::new(entity.value.len(), job.coordinate);
-/// 
+///
 ///     storage.put_all_b(entity).await?;
-/// 
-///     let mut conn = meta_storage.conn().await?;
+///
+///     let mut conn = meta_storage.worker_conn().await?;
 ///     let tx = conn.transaction().await?;
-/// 
+///
 ///     tx.as_client()
 ///         .resolution(self.spawn_dim_meta())
 ///         .put(resolution)
@@ -286,7 +286,7 @@ fn arg_def_collected(
 ///         .mark_done(job)
 ///         .await?;
 ///     tx.commit().await?;
-/// 
+///
 ///     Ok(resolution)
 /// }
 /// ```
@@ -318,7 +318,7 @@ pub(super) fn fn_run_job(
             let (#(#res_map_vars),*) = {
                 #(#resolution_defs)*
 
-                let conn = meta_storage.conn().await?;
+                let conn = meta_storage.worker_conn().await?;
                 let client = conn.as_client();
 
                 #(#resolution_inserts)*
@@ -389,7 +389,7 @@ pub(super) fn fn_run_job(
             let resolution = #resolution;
 
             storage.#put_fn_name(entity).await?;
-            let mut conn = meta_storage.conn().await?;
+            let mut conn = meta_storage.worker_conn().await?;
             let tx = conn.transaction().await?;
             #maybe_put_resolution;
             tx.as_client()

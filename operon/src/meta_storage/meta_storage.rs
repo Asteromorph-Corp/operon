@@ -8,8 +8,8 @@ use crate::meta_storage::{MetaStorageError, MetaStorageOptions};
 
 #[derive(Debug, Clone)]
 pub struct MetaStorage {
-    pub pool: deadpool_postgres::Pool,
-    pub ui_pool: deadpool_postgres::Pool,
+    pub worker_pool: deadpool_postgres::Pool,
+    pub scheduler_pool: deadpool_postgres::Pool,
     pub schema: Option<String>,
 }
 
@@ -18,13 +18,13 @@ impl MetaStorage {
         if options.pool_size < 6 {
             return Err(MetaStorageError::PoolSizeTooSmall(options.pool_size));
         }
-        let pool = create_pool(
+        let worker_pool = create_pool(
             options.database_uri.expose_secret(),
             options.keepalives_idle,
             options.keepalives_interval,
             options.pool_size.saturating_sub(5),
         )?;
-        let ui_pool = create_pool(
+        let scheduler_pool = create_pool(
             options.database_uri.expose_secret(),
             options.keepalives_idle,
             options.keepalives_interval,
@@ -33,21 +33,21 @@ impl MetaStorage {
         let schema = options.schema;
 
         Ok(MetaStorage {
-            pool,
-            ui_pool,
+            worker_pool,
+            scheduler_pool,
             schema,
         })
     }
 
-    pub async fn conn(&self) -> Result<ConnectionWithSchema<'_>, MetaStorageError> {
-        let client = self.pool.get().await?;
+    pub async fn worker_conn(&self) -> Result<ConnectionWithSchema<'_>, MetaStorageError> {
+        let client = self.worker_pool.get().await?;
         let schema = self.schema.as_deref();
 
         Ok(ConnectionWithSchema::new(client, schema))
     }
 
-    pub async fn ui_conn(&self) -> Result<ConnectionWithSchema<'static>, MetaStorageError> {
-        let client = self.ui_pool.get().await?;
+    pub async fn scheduler_conn(&self) -> Result<ConnectionWithSchema<'static>, MetaStorageError> {
+        let client = self.scheduler_pool.get().await?;
         let schema = self.schema.clone();
 
         Ok(ConnectionWithSchema::new(client, schema))

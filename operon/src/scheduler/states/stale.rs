@@ -96,7 +96,7 @@ where
             .handler
             .check_consistency(
                 &self.ctx.storage,
-                self.ctx.meta_storage.ui_conn().await?.as_client(),
+                self.ctx.meta_storage.scheduler_conn().await?.as_client(),
                 mode,
             )
             .await
