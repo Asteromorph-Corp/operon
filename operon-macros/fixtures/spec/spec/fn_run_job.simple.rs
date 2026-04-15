@@ -30,7 +30,7 @@ async fn run_job(
 
     storage.put_all_b(entity).await?;
 
-    let mut conn = meta_storage.conn().await?;
+    let mut conn = meta_storage.worker_conn().await?;
     let tx = conn.transaction().await?;
 
     tx.as_client()
