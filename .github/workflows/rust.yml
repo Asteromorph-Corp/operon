@@ -55,13 +55,13 @@ jobs:
       - name: Run cargo clippy
         env:
           CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
-        run: cargo clippy --workspace --locked --all-features --all-targets -- -D warnings
+        run: cargo +stable clippy --workspace --locked --all-features --all-targets -- -D warnings
 
       - name: Check documentation
         env:
           RUSTDOCFLAGS: "-D warnings"
           CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
-        run: cargo doc --workspace --locked --no-deps --document-private-items
+        run: cargo +stable doc --workspace --locked --no-deps --document-private-items
 
   test:
     name: Test
@@ -72,8 +72,6 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
       - name: Configure Cargo auth
         env:
