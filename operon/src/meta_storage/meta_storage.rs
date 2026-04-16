@@ -15,21 +15,24 @@ pub struct MetaStorage {
 
 impl MetaStorage {
     pub fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
-        if options.pool_size < 6 {
-            return Err(MetaStorageError::PoolSizeTooSmall(options.pool_size));
-        }
-        let worker_pool = create_pool(
-            options.database_uri.expose_secret(),
-            options.keepalives_idle,
-            options.keepalives_interval,
-            options.pool_size.saturating_sub(5),
-        )?;
-        let scheduler_pool = create_pool(
-            options.database_uri.expose_secret(),
-            options.keepalives_idle,
-            options.keepalives_interval,
-            5,
-        )?;
+        let mk_pool = |size| {
+            create_pool(
+                options.database_uri.expose_secret(),
+                options.keepalives_idle,
+                options.keepalives_interval,
+                size,
+            )
+        };
+
+        let (worker_pool, scheduler_pool) = match options.pool_size {
+            0 => return Err(MetaStorageError::PoolSizeTooSmall(0)),
+            1 => {
+                let p = mk_pool(1)?;
+                (p.clone(), p)
+            }
+            n @ ..=5 => (mk_pool(n - 1)?, mk_pool(1)?),
+            n => (mk_pool(n - 5)?, mk_pool(5)?),
+        };
         let schema = options.schema;
 
         Ok(MetaStorage {
