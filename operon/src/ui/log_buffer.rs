@@ -38,7 +38,13 @@ impl LogBuffer {
 
     /// Display the bottom `height` lines, skipping `cursor` lines.
     /// If `cursor + height` exceeds the number of lines, `cursor` will be clamped down.
-    pub fn to_text(&self, width: u16, height: u16, cursor: usize, verbose: bool) -> (Text<'static>, usize) {
+    pub fn to_text(
+        &self,
+        width: u16,
+        height: u16,
+        cursor: usize,
+        verbose: bool,
+    ) -> (Text<'static>, usize) {
         let lines = self.to_lines(width, verbose);
         let cursor = cursor.min(lines.len().saturating_sub(height as usize));
         let num_buffer_lines = height.saturating_sub((lines.len() - cursor) as u16);

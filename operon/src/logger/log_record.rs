@@ -84,11 +84,11 @@ impl LogRecord {
             ::ratatui::style::Style::new()
         };
 
-        let level_label = match self.source_type  {
+        let level_label = match self.source_type {
             SourceType::Stdout => "STDOUT",
             SourceType::Stderr => "STDERR",
-            SourceType::Levelled => self.level.as_str()
-        };      
+            SourceType::Levelled => self.level.as_str(),
+        };
         let span_style = ::ratatui::style::Style::new().dark_gray();
 
         let span_ctx = match &self.span_context {

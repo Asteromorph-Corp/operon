@@ -77,7 +77,7 @@ where
     }
 
     async fn update_progress(&mut self) -> Result<(), SchedulerError> {
-        let conn = self.meta_storage.ui_conn().await?;
+        let conn = self.meta_storage.scheduler_conn().await?;
         self.update_progress_with_client(conn.as_client()).await?;
         Ok(())
     }
@@ -97,7 +97,7 @@ where
     }
 
     async fn initial_ready_tickets(&self) -> Result<Vec<Ticket<N>>, MetaStorageError> {
-        let conn = self.meta_storage.conn().await?;
+        let conn = self.meta_storage.scheduler_conn().await?;
         conn.as_client()
             .ticket(self.meta)
             .get_all(TicketStatus::Queued)
@@ -112,7 +112,7 @@ where
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
         peer_txs: &JS::PeerEventSenders,
     ) -> Result<Vec<Ticket<N>>, SchedulerError> {
-        let mut conn = self.meta_storage.conn_static().await?;
+        let mut conn = self.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
         let ready_tickets = match event {
             PeerEvent::Job(job) => self.spec.on_receive_job(tx.as_client(), job).await?,
@@ -326,26 +326,17 @@ where
                     let job = ticket.resolve().ok_or(SchedulerError::other("Ticket is not ready to run"))?;
                     let job_id = self.meta.id;
                     let spec = self.spec.clone();
-                    let job_meta = self.meta;
                     let storage = self.storage.clone();
                     let service = self.service.clone();
                     let meta_storage = self.meta_storage.clone();
-                    // let int_sender = int_tx.clone();
 
                     // Move the permit into the task so it is released on drop.
-                    // The metadata storage operations are grouped in one transaction here.
                     self.handles.spawn(async move {
                         // Trace the job start.
                         tracing::trace!("Running job {job:?} in `{job_id}` scheduler.");
                         let _permit = permit;
-                        let mut conn = meta_storage.conn().await?;
-                        let tx = conn.transaction().await?;
-                        match spec.run_job(&*service, &*storage, tx.as_client(), job).await {
+                        match spec.run_job(&*service, &*storage, meta_storage, job).await {
                             Ok(resolution) => {
-                                // Mark the ticket as done in the ticket storage
-                                tx.as_client().ticket(job_meta).mark_done(job).await?;
-                                tx.commit().await?;
-
                                 // Alert the results to the scheduler
                                 tracing::trace!(
                                     "{job_id} worker exited with: JobSuccess({job:?}, {resolution:?}).",
@@ -353,9 +344,6 @@ where
                                 Ok(InternalEvent::JobSuccess(job, resolution))
                             }
                             Err(e) => {
-                                // Rollback the transaction
-                                tx.rollback().await?;
-
                                 // Alert the error to the scheduler
                                 tracing::trace!(
                                     "{job_id} worker exited with: JobFailure({job:?}, {e:?});",

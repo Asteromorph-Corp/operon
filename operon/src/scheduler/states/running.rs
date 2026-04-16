@@ -97,7 +97,7 @@ where
         self.ctx.storage.put_footprint(&footprint).await?;
 
         // ...and to the metadata storage.
-        let mut conn = self.ctx.meta_storage.conn().await?;
+        let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
         tx.as_client().upsert_run(&footprint).await?;
         tx.as_client()

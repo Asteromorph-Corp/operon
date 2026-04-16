@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::meta_storage::MetaClient;
+use crate::meta_storage::{MetaClient, MetaStorage};
 use crate::scheduler::events::PeerEventSenders;
 use crate::scheduler::{JobRebuilder, SchedulerError};
 use crate::schema::{
@@ -91,7 +91,7 @@ where
         &self,
         service: &Svc,
         storage: &Sto,
-        client: MetaClient<'_>,
+        client: MetaStorage,
         job: Self::Job,
     ) -> Result<Self::Resolution, SchedulerError>;
 

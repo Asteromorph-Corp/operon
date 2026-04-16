@@ -27,6 +27,8 @@ pub enum MetaStorageError {
     },
     #[error("Internal error: {0}")]
     Internal(&'static str),
+    #[error("Metadata pool size {0} is not allowed")]
+    PoolSizeTooSmall(usize),
 }
 
 fn fmt_deps(deps: &[(&'static str, usize)]) -> String {

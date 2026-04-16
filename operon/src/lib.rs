@@ -36,9 +36,11 @@ pub mod options {
 // Re-export the external crates used in the macro expansions
 #[doc(hidden)]
 pub mod __private {
-    pub use {async_trait, futures, tracing};
+    pub use async_trait;
+    pub use futures;
+    pub use tracing;
 
-    pub use crate::meta_storage::MetaClient;
+    pub use crate::meta_storage::{MetaClient, MetaStorage};
     pub use crate::scheduler::{
         JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
         PeerEventSenders, SchedulerHandler, SpecWithMetadata, ValidOperon,

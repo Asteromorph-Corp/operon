@@ -3,7 +3,7 @@ async fn run_job(
     &self,
     service: &Svc,
     storage: &Sto,
-    client: operon::__private::MetaClient<'_>,
+    meta_storage: operon::__private::MetaStorage,
     job: Self::Job,
 ) -> Result<Self::Resolution, operon::error::SchedulerError> {
     let [i] = job.coordinate;
@@ -29,9 +29,19 @@ async fn run_job(
     let resolution = operon::__private::Resolution::new(entity.value.len(), job.coordinate);
 
     storage.put_all_b(entity).await?;
-    client
+
+    let mut conn = meta_storage.worker_conn().await?;
+    let tx = conn.transaction().await?;
+
+    tx.as_client()
         .resolution(self.spawn_dim_meta())
         .put(resolution)
         .await?;
+    tx.as_client()
+        .ticket(self.job_meta())
+        .mark_done(job)
+        .await?;
+    tx.commit().await?;
+
     Ok(resolution)
 }

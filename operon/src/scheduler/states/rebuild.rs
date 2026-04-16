@@ -58,7 +58,7 @@ where
     async fn execute(self) -> Result<NextState, SchedulerError> {
         let start = Instant::now();
 
-        let mut conn = self.ctx.meta_storage.conn().await?;
+        let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
 
         let rebuilders = self
