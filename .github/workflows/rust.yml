@@ -2,21 +2,37 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+
+      - name: Configure Cargo auth
+        env:
+          KELLNR_REGISTRY_URL: ${{ secrets.KELLNR_REGISTRY_URL }}
+        run: |
+          mkdir -p ~/.cargo
+          cat > ~/.cargo/config.toml <<EOF
+          [registries.kellnr]
+          index = "sparse+https://${KELLNR_REGISTRY_URL}/api/v1/crates/"
+          credential-provider = ["cargo:token"]
+          EOF
+
+      - name: Build
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo build --verbose
+
+      - name: Run tests
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo test --verbose
