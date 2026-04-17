@@ -48,7 +48,7 @@ where
     }
 
     fn into_stale(self, run_id: Uuid, kind: StaleKind) -> StaleState<Svc, Sto> {
-        StaleState::new(self.ctx, self.channel_size, run_id, kind)
+        StaleState::new(self.ctx, self.ui_mode, self.channel_size, run_id, kind)
     }
 
     /// Fetch the metadata of a previous run if it exists.
@@ -94,9 +94,9 @@ where
     async fn execute(self) -> Result<NextState, SchedulerError> {
         let RunMetadata { run_id, state } = self.get_run_metadata().await?.unwrap_or_default();
 
-        if self.ui_mode == UiMode::Headless {
-            return Ok(NextState::from(self.into_fresh(run_id)));
-        }
+        // if self.ui_mode == UiMode::Headless {
+        //     return Ok(NextState::from(self.into_fresh(run_id)));
+        // }
 
         let next = match state {
             RunState::Fresh => NextState::from(self.into_fresh(run_id)),
