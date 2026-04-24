@@ -12,6 +12,7 @@ use crate::scheduler::states::{NextState, SchedulerState, TransitionState};
 use crate::schema::CheckMode;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
+use crate::ui::UiMode;
 
 pub struct StaleState<Svc, Sto>
 where
@@ -47,21 +48,23 @@ where
 {
     pub fn new(
         ctx: SchedulerContext<Svc, Sto>,
+        ui_mode: UiMode,
         channel_size: usize,
         run_id: Uuid,
         kind: StaleKind,
     ) -> Self {
-        match kind {
-            StaleKind::Complete => tracing::info!(
+        match (ui_mode, kind) {
+            (UiMode::Headless, _) => tracing::info!("Restoration is not supported in headless mode."),
+            (_, StaleKind::Complete) => tracing::info!(
                 "Found a finished run.\n\
                 Type `run` to begin running jobs and overwrite the existing data, or `exit` to cancel.\n\
                 You can also type `check` to check the consistency of the data."
             ),
-            StaleKind::GracefulStop => tracing::info!(
+            (_, StaleKind::GracefulStop) => tracing::info!(
                 "Found a gracefully stopped run.\n\
                 Type `run` to resume running jobs from the last run, or `help` for additional options."
             ),
-            StaleKind::Abort => tracing::info!(
+            (_, StaleKind::Abort) => tracing::info!(
                 "Found an aborted run.\n\
                 Type `check` to check if the data is recoverable, `run` to start a new run and \
                 overwrite the existing data, or `help` for additional options."
@@ -151,8 +154,10 @@ where
                     tracing::error!("Cannot rebuild before checking for consistency.");
                     None
                 }
-                // Previous run was either gracefully stopped or complete.
-                _ => {
+                // Previous run was either aborted but consistent, gracefully stopped, or complete.
+                (StaleKind::Abort, Some(true))
+                | (StaleKind::GracefulStop, _)
+                | (StaleKind::Complete, _) => {
                     tracing::info!("Rebuilding the run from trusted data.");
                     Some(RunMode::Rebuild)
                 }
@@ -165,13 +170,15 @@ where
             (_, Some(false)) => Some(RunMode::Clean),
             // Previous run was aborted, and no consistency check was performed.
             (StaleKind::Abort, None) => Some(RunMode::Clean),
+            // Previous run was complete.
+            (StaleKind::Complete, _) => Some(RunMode::Clean),
             // Previous run was aborted, but consistency check succeeded.
             (StaleKind::Abort, Some(true)) => {
                 tracing::info!("Rebuilding the run from trusted data.");
                 Some(RunMode::Rebuild)
             }
-            // Previous run was either gracefully stopped or complete.
-            _ => {
+            // Previous run was gracefully stopped.
+            (StaleKind::GracefulStop, _) => {
                 tracing::info!("Continuing the last run.");
                 Some(RunMode::Restore)
             }

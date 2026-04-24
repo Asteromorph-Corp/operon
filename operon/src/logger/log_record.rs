@@ -165,25 +165,43 @@ impl LogRecord {
         )
     }
 
-    pub fn write_print(&self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
-        let level_colour = match self.level {
-            ::tracing::Level::ERROR => ansi_term::Colour::Red,
-            ::tracing::Level::WARN => ansi_term::Colour::Yellow,
-            ::tracing::Level::INFO => ansi_term::Colour::Green,
-            ::tracing::Level::DEBUG => ansi_term::Colour::Cyan,
-            ::tracing::Level::TRACE => ansi_term::Colour::White,
-        };
-        let msg = match &self.span_context {
-            Some(ctx) => format!("[{ctx}] {}", self.msg),
-            None => self.msg.clone(),
-        };
-        writeln!(
-            writer,
-            "{} {} | {}",
-            self.timestamp.format("%Y-%m-%d %H:%M:%S"),
-            level_colour.paint(format!("{:>5}", self.level)),
-            msg
-        )
+    pub fn write_to_posix(
+        &self,
+        stdout: &mut impl std::io::Write,
+        stderr: &mut impl std::io::Write,
+    ) -> std::io::Result<()> {
+        match self.source_type {
+            SourceType::Stdout => writeln!(stdout, "{}", self.msg),
+            SourceType::Stderr => {
+                writeln!(
+                    stderr,
+                    "{} {} │ {}",
+                    self.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                    ansi_term::Colour::RGB(168, 168, 168).paint("STDERR"),
+                    self.msg
+                )
+            }
+            SourceType::Levelled => {
+                let level_colour = match self.level {
+                    ::tracing::Level::ERROR => ansi_term::Colour::Red,
+                    ::tracing::Level::WARN => ansi_term::Colour::Yellow,
+                    ::tracing::Level::INFO => ansi_term::Colour::Green,
+                    ::tracing::Level::DEBUG => ansi_term::Colour::Cyan,
+                    ::tracing::Level::TRACE => ansi_term::Colour::White,
+                };
+                let msg = match &self.span_context {
+                    Some(ctx) => format!("[{ctx}] {}", self.msg),
+                    None => self.msg.clone(),
+                };
+                writeln!(
+                    stderr,
+                    "{} {} │ {}",
+                    self.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                    level_colour.paint(format!("{:>6}", self.level)),
+                    msg
+                )
+            }
+        }
     }
 }
 

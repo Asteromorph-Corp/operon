@@ -212,7 +212,7 @@ impl UiLoop {
                     }
                     self.finished = true;
                 }
-                Ok(record) = self.log_rx.recv() => record.write_print(&mut std::io::stderr())?,
+                Ok(record) = self.log_rx.recv() => record.write_to_posix(&mut std::io::stdout(), &mut std::io::stderr())?,
             }
 
             // Snapshot the current overall state.
