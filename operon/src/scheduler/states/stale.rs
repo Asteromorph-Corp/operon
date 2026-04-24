@@ -54,7 +54,9 @@ where
         kind: StaleKind,
     ) -> Self {
         match (ui_mode, kind) {
-            (UiMode::Headless, _) => tracing::info!("Restoration is not supported in headless mode."),
+            (UiMode::Headless, _) => {
+                tracing::info!("Restoration is not supported in headless mode.")
+            }
             (_, StaleKind::Complete) => tracing::info!(
                 "Found a finished run.\n\
                 Type `run` to begin running jobs and overwrite the existing data, or `exit` to cancel.\n\
