@@ -1,0 +1,61 @@
+name: Feature Request
+description: Propose a new feature or enhancement.
+title: "[Feature] "
+labels: ["enhancement"]
+projects: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make this project better? We'd love to hear it!
+        Please fill out the form below with as much detail as you can.
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: What problem does this solve?
+      description: Describe the problem or limitation you're running into.
+      placeholder: "ex) I often need to export data in bulk, but currently I have to do it one record at a time."
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or change you'd like to see. Please be as specific as you can.
+      placeholder: "ex) Add a 'Export all' button on the data table that downloads a CSV of all visible rows."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried any workarounds, or considered other approaches?
+      placeholder: "ex) I've been exporting page by page, but this is tedious for large datasets."
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Who does this affect?
+      description: How broad is the impact of this feature?
+      options:
+        - Just me
+        - A specific use case or workflow
+        - Most users
+        - All users
+        - I'm not sure
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context (optional)
+      description: Add any mockups, sketches, links to prior art, or other context that might help.
+  # # Enable after writing a CONTRIBUTING.md file!
+  # - type: checkboxes
+  #   id: guidelines
+  #   attributes:
+  #     label: Contribution Guidelines
+  #     description: By submitting this request, you acknowledge that you follow our [Contribution Guidelines](https://example.com).
+  #     options:
+  #       - label: I have read and understood the Contribution Guidelines
+  #         required: true

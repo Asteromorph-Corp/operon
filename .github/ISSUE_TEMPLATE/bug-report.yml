@@ -1,0 +1,84 @@
+name: Bug Report
+description: File a bug report.
+title: "[Bug] "
+labels: ["bug"]
+projects: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: observed-behavior
+    attributes:
+      label: What happened?
+      description: Please describe your bug.
+      placeholder: "ex) The app crashes when I enter special characters."
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: What was supposed to happen?
+      description: Please describe the expected behavior.
+      placeholder: "ex) The app should accept special characters or display an error message."
+    validations:
+      required: true
+  - type: textarea
+    id: replication-steps
+    attributes:
+      label: Steps to replicate
+      description: If possible, please list the steps to reproduce the bug. This will help us investigate and fix the issue faster!
+      placeholder:
+        "ex)\n
+        1. Go to '...'\n
+        2. Type '...' and press Enter\n
+        3. See the error"
+  - type: textarea
+    id: suggested-fix
+    attributes:
+      label: Suggested fix (optional)
+      description: If you have an idea of how to fix the bug, please describe it here.
+  # For versioned projects only!
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version
+      description: What version of our software are you running?
+      options:
+        - pre-release (next)
+        - 0.2.2 (main)
+        - 0.1.2
+        - Other (please specify below)
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: other-version
+    attributes:
+      label: Other version (if applicable)
+      description: If you selected "Other" above, please specify the version here.
+      placeholder: "ex) v0.1.0, commit 123abcd, etc."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell
+  # # Enable after writing a CONTRIBUTING.md file!
+  # - type: checkboxes
+  #   id: guidelines
+  #   attributes:
+  #     label: Contribution Guidelines
+  #     description: By submitting this issue, you acknowledge that you follow our [Contribution Guidelines](https://example.com).
+  #     options:
+  #       - label: I have read and understood the Contribution Guidelines
+  #         required: true
+  - type: upload
+    id: screenshots
+    attributes:
+      label: Upload screenshots
+      description: If applicable, add screenshots to help explain your problem.
+    validations:
+      required: false
