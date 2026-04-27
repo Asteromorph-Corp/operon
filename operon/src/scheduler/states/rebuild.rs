@@ -74,7 +74,12 @@ where
         let rebuilders = self
             .ctx
             .handler
-            .prepare_rebuilders(&self.ctx.storage, &self.ctx.progresses, tx.as_client(), &self.skip)
+            .prepare_rebuilders(
+                &self.ctx.storage,
+                &self.ctx.progresses,
+                tx.as_client(),
+                &self.skip,
+            )
             .await?;
 
         self.ctx.handler.clear_resolution(tx.as_client()).await?;
