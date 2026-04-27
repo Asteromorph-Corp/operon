@@ -111,7 +111,7 @@ impl Progress {
     /// Updates the progress counters and automatically transitions to `Finished`
     /// when no queued or waiting tasks remain.
     ///
-    /// Returns `true` if the state transitioned to `Finished` as a result of this update.
+    /// Returns `true` if the state is `Finished` after this update.
     pub fn update(&mut self, done: i64, queued: i64, waiting: i64) -> bool {
         self.done = done;
         self.queued = queued;
@@ -119,9 +119,8 @@ impl Progress {
 
         if queued + waiting == 0 && self.state != TaskState::Finished {
             self.state = TaskState::Finished;
-            return true;
         }
-        false
+        self.state == TaskState::Finished
     }
 
     /// Sets the execution state, unless the progress has already finished.

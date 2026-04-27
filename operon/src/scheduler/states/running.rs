@@ -25,6 +25,7 @@ where
     ctrl_channels: Vec<ControlChannel>,
     force_exited: bool,
     exit_ui: bool,
+    time_started: std::time::Instant,
 }
 
 impl<Svc, Sto> RunningState<Svc, Sto>
@@ -55,6 +56,7 @@ where
             ctrl_channels,
             force_exited: false,
             exit_ui: false,
+            time_started: std::time::Instant::now(),
         }
     }
 
@@ -104,6 +106,8 @@ where
             .update_execution_on_finish(&footprint, self.execution_id)
             .await?;
         tx.commit().await?;
+
+        tracing::info!("Run completed in {:?}.", self.time_started.elapsed());
 
         Ok(NextState::Exit {
             exit_ui: self.exit_ui,
