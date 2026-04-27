@@ -19,8 +19,11 @@ pub enum Command {
         #[clap(short, long, requires = "rebuild", num_args = 1..)]
         skip: Vec<String>,
         /// Shorthand for `--rebuild --skip <...>`.
-        #[clap(short='R', long, conflicts_with_all = ["fresh", "rebuild", "skip"], num_args = 1..)]
+        #[clap(short = 'R', long, conflicts_with_all = ["fresh", "rebuild", "skip"], num_args = 1..)]
         redo: Vec<String>,
+        /// Rebuild the run while skipping inconsistent jobs.
+        #[clap(short = 'i', long, conflicts_with = "fresh")]
+        redo_inconsistent_jobs: bool,
     },
 
     /// Check the consistency of the data from the last run.
@@ -101,10 +104,11 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[case::run_fresh("run --fresh", Command::Run { fresh: true, rebuild: false, skip: vec![], redo: vec![] })]
-    #[case::run_rebuild("run --rebuild", Command::Run { fresh: false, rebuild: true, skip: vec![], redo: vec![] })]
-    #[case::run_skip("run --rebuild --skip job1 job2", Command::Run { fresh: false, rebuild: true, skip: vec!["job1".to_owned(), "job2".to_owned()], redo: vec![] })]
-    #[case::run_redo("run --redo job1 job2", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec!["job1".to_owned(), "job2".to_owned()] })]
+    #[case::run_fresh("run --fresh", Command::Run { fresh: true, rebuild: false, skip: vec![], redo: vec![], redo_inconsistent_jobs: false })]
+    #[case::run_rebuild("run --rebuild", Command::Run { fresh: false, rebuild: true, skip: vec![], redo: vec![], redo_inconsistent_jobs: false })]
+    #[case::run_skip("run --rebuild --skip job1 job2", Command::Run { fresh: false, rebuild: true, skip: vec!["job1".to_owned(), "job2".to_owned()], redo: vec![], redo_inconsistent_jobs: false })]
+    #[case::run_redo("run --redo job1 job2", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec!["job1".to_owned(), "job2".to_owned()], redo_inconsistent_jobs: false })]
+    #[case::run_redo_inconsistent("run --redo-inconsistent-jobs", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec![], redo_inconsistent_jobs: true })]
     #[case::check_trust_all("check --mode trust-all", Command::Check { mode: CheckMode::TrustAll })]
     #[case::check_metadata_only("check --mode metadata-only", Command::Check { mode: CheckMode::MetadataOnly })]
     #[case::check_quick("check", Command::Check { mode: CheckMode::Quick })]

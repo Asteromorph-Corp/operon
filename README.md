@@ -349,7 +349,8 @@ Navigation keys:
     Esc                 Show most recent logs.
 
 Commands:
-    run [OPTIONS]       Start a new run using the best available restoration (unless specified by options).
+    run [OPTIONS]       Start a new run using the best available restoration
+                        (unless specified by options).
                         --fresh, --rebuild, and --redo are mutually exclusive.
         -f, --fresh         Start a fresh run, ignoring any existing data.
         -r, --rebuild       Rebuild the run from trusted data before starting.
@@ -357,6 +358,12 @@ Commands:
                             With --rebuild, do not rebuild the given 1 or more job(s).
         -R, --redo <JOB_TYPE>[ ...]
                             Shorthand for --rebuild --skip <...>.
+        -i, --redo-inconsistent-jobs
+                            Rebuild the run even on a failed check,
+                            ignoring jobs with corrupt data and their downstream jobs.
+                            Cannot be used with --fresh.
+                            Note that --redo <INCONSISTENT_JOBS> will NOT allow a rebuild
+                            on a failed check without this flag.
     check [OPTIONS]     Check the consistency of the data from the last run.
         -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
             trust-all           Assume all data is trustworthy, skipping checks.

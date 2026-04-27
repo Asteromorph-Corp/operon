@@ -8,9 +8,14 @@ pub type ControlEventError = tokio::sync::mpsc::error::SendError<ControlEvent>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunEventInner {
-    Unspecified,
+    Unspecified {
+        redo_inconsistent_jobs: bool,
+    },
     Fresh,
-    Rebuild { skip: HashSet<String> },
+    Rebuild {
+        skip: HashSet<String>,
+        redo_inconsistent_jobs: bool,
+    },
 }
 
 /// `IndividualScheduler`-UI communication events.

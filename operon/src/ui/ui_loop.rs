@@ -32,7 +32,8 @@ Navigation keys:
     Esc                 Show most recent logs.
 
 Commands:
-    run [OPTIONS]       Start a new run using the best available restoration (unless specified by options).
+    run [OPTIONS]       Start a new run using the best available restoration
+                        (unless specified by options).
                         --fresh, --rebuild, and --redo are mutually exclusive.
         -f, --fresh         Start a fresh run, ignoring any existing data.
         -r, --rebuild       Rebuild the run from trusted data before starting.
@@ -40,6 +41,12 @@ Commands:
                             With --rebuild, do not rebuild the given 1 or more job(s).
         -R, --redo <JOB_TYPE>[ ...]
                             Shorthand for --rebuild --skip <...>.
+        -i, --redo-inconsistent-jobs
+                            Rebuild the run even on a failed check,
+                            ignoring jobs with corrupt data and their downstream jobs.
+                            Cannot be used with --fresh.
+                            Note that --redo <INCONSISTENT_JOBS> will NOT allow a rebuild
+                            on a failed check without this flag.
     check [OPTIONS]     Check the consistency of the data from the last run.
         -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
             trust-all           Assume all data is trustworthy, skipping checks.
@@ -293,17 +300,26 @@ impl UiLoop {
                 rebuild,
                 skip,
                 redo,
+                redo_inconsistent_jobs,
             } => {
                 let event_inner = if fresh {
                     RunEventInner::Fresh
                 } else if rebuild {
-                    RunEventInner::Rebuild { skip: skip.into_iter().collect() }
+                    RunEventInner::Rebuild {
+                        skip: skip.into_iter().collect(),
+                        redo_inconsistent_jobs,
+                    }
                 } else if !redo.is_empty() {
-                    RunEventInner::Rebuild { skip: redo.into_iter().collect() }
+                    RunEventInner::Rebuild {
+                        skip: redo.into_iter().collect(),
+                        redo_inconsistent_jobs,
+                    }
                 } else {
-                    RunEventInner::Unspecified
+                    RunEventInner::Unspecified {
+                        redo_inconsistent_jobs,
+                    }
                 };
-                if let RunEventInner::Rebuild { skip } = &event_inner
+                if let RunEventInner::Rebuild { skip, .. } = &event_inner
                     && let Some(invalid_job) = skip.iter().find(|job| !self.is_job(job))
                 {
                     tracing::error!("Unknown job name: {invalid_job}")
