@@ -8,7 +8,7 @@ pub use spec::{
 
 mod events;
 pub(crate) use events::{
-    ControlEvent, ControlEventError, ControlEventSender, SchedulerStateReceiver,
+    ControlEvent, ControlEventError, ControlEventSender, RunEventInner, SchedulerStateReceiver,
 };
 pub use events::{PeerEvent, PeerEventSender, PeerEventSenderMap, PeerEventSenders};
 

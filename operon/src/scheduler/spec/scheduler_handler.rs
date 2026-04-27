@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
@@ -172,18 +172,23 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         storage: &Sto,
         progresses: &SharedProgressMap,
         client: MetaClient<'_>,
+        skip: &HashSet<String>,
     ) -> Result<Vec<Box<dyn JobRebuilder>>, SchedulerError> {
-        futures::stream::iter(&self.job_handlers)
-            .then(|schedule| async {
-                let Some(progress) = progresses.0.get(schedule.job_id()) else {
-                    return Err(SchedulerError::missing_progress(schedule.job_id()));
-                };
-                schedule
-                    .prepare_rebuild(storage, progress.clone(), client)
-                    .await
-            })
-            .try_collect::<Vec<_>>()
-            .await
+        futures::stream::iter(self.job_handlers.iter().filter(|handler| {
+            std::iter::once(handler.job_id())
+                .chain(handler.all_upstream_jobs())
+                .all(|job_id| !skip.contains(&job_id.to_string()))
+        }))
+        .then(|schedule| async {
+            let Some(progress) = progresses.0.get(schedule.job_id()) else {
+                return Err(SchedulerError::missing_progress(schedule.job_id()));
+            };
+            schedule
+                .prepare_rebuild(storage, progress.clone(), client)
+                .await
+        })
+        .try_collect::<Vec<_>>()
+        .await
     }
 }
 

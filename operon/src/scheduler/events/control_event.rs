@@ -1,8 +1,17 @@
+use std::collections::HashSet;
+
 use crate::schema::CheckMode;
 
 pub type ControlEventReceiver = tokio::sync::mpsc::Receiver<ControlEvent>;
 pub type ControlEventSender = tokio::sync::mpsc::Sender<ControlEvent>;
 pub type ControlEventError = tokio::sync::mpsc::error::SendError<ControlEvent>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RunEventInner {
+    Unspecified,
+    Fresh,
+    Rebuild { skip: HashSet<String> },
+}
 
 /// `IndividualScheduler`-UI communication events.
 ///
@@ -14,11 +23,7 @@ pub enum ControlEvent {
         mode: CheckMode,
     },
     /// Perform a run.
-    Run {
-        fresh: bool,
-        rebuild: bool,
-    },
-
+    Run(RunEventInner),
     /// Pause executing new jobs.
     /// Note that pausing the scheduler does not stop ongoing jobs,
     /// neither does it stop handling events (i.e. updating the ticket storage).
@@ -38,10 +43,7 @@ pub enum ControlEvent {
 }
 
 impl ControlEvent {
-    pub const FRESH_RUN: Self = Self::Run {
-        fresh: true,
-        rebuild: false,
-    };
+    pub const FRESH_RUN: Self = Self::Run(RunEventInner::Fresh);
 
     pub const FORCE_QUIT: Self = Self::Quit {
         force: true,

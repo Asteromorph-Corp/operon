@@ -10,7 +10,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::*;
 
 use crate::logger::LogRecordReceiver;
-use crate::scheduler::{ControlEvent, ControlEventSender, SchedulerStateReceiver};
+use crate::scheduler::{ControlEvent, ControlEventSender, RunEventInner, SchedulerStateReceiver};
 use crate::schema::{Progress, SharedProgressMap, TaskState};
 use crate::ui::command::Command;
 use crate::ui::command_prompt::CommandPrompt;
@@ -32,9 +32,14 @@ Navigation keys:
     Esc                 Show most recent logs.
 
 Commands:
-    run [OPTIONS]       Start a new run using the best available restoration (unless overridden by options).
-        -f, --fresh         Start a fresh run, ignoring any existing data. Takes precedence over `rebuild`.
+    run [OPTIONS]       Start a new run using the best available restoration (unless specified by options).
+                        --fresh, --rebuild, and --redo are mutually exclusive.
+        -f, --fresh         Start a fresh run, ignoring any existing data.
         -r, --rebuild       Rebuild the run from trusted data before starting.
+        -s, --skip <JOB_TYPE>[ ...]
+                            With --rebuild, do not rebuild the given 1 or more job(s).
+        -R, --redo <JOB_TYPE>[ ...]
+                            Shorthand for --rebuild --skip <...>.
     check [OPTIONS]     Check the consistency of the data from the last run.
         -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
             trust-all           Assume all data is trustworthy, skipping checks.
@@ -90,6 +95,10 @@ impl UiLoop {
             finished: false,
             exit_on_finish: false,
         }
+    }
+
+    pub fn is_job(&self, job_name: &str) -> bool {
+        self.progresses.0.contains_key(job_name)
     }
 
     pub async fn run(self) -> Result<(), UiError> {
@@ -279,10 +288,28 @@ impl UiLoop {
         }
 
         match command {
-            Command::Run { fresh, rebuild } => {
-                self.ctrl_tx
-                    .send(ControlEvent::Run { fresh, rebuild })
-                    .await?
+            Command::Run {
+                fresh,
+                rebuild,
+                skip,
+                redo,
+            } => {
+                let event_inner = if fresh {
+                    RunEventInner::Fresh
+                } else if rebuild {
+                    RunEventInner::Rebuild { skip: skip.into_iter().collect() }
+                } else if !redo.is_empty() {
+                    RunEventInner::Rebuild { skip: redo.into_iter().collect() }
+                } else {
+                    RunEventInner::Unspecified
+                };
+                if let RunEventInner::Rebuild { skip } = &event_inner
+                    && let Some(invalid_job) = skip.iter().find(|job| !self.is_job(job))
+                {
+                    tracing::error!("Unknown job name: {invalid_job}")
+                } else {
+                    self.ctrl_tx.send(ControlEvent::Run(event_inner)).await?
+                }
             }
             Command::Check { mode } => self.ctrl_tx.send(ControlEvent::Check { mode }).await?,
             Command::Quit { force, no_exit } => {
@@ -293,12 +320,20 @@ impl UiLoop {
             }
             Command::Exit => self.ctrl_tx.send(ControlEvent::Exit).await?,
             Command::Pause { targets, cascade } => {
-                self.ctrl_tx
-                    .send(ControlEvent::Pause { targets, cascade })
-                    .await?
+                if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
+                    tracing::error!("Unknown job name: {invalid_job}")
+                } else {
+                    self.ctrl_tx
+                        .send(ControlEvent::Pause { targets, cascade })
+                        .await?
+                }
             }
             Command::Resume { targets } => {
-                self.ctrl_tx.send(ControlEvent::Resume { targets }).await?
+                if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
+                    tracing::error!("Unknown job name: {invalid_job}")
+                } else {
+                    self.ctrl_tx.send(ControlEvent::Resume { targets }).await?
+                }
             }
             Command::Clear => {
                 self.logs.clear();
