@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
@@ -102,27 +102,32 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     }
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
-    /// Return `true` if the data storage holds all needed data to restore, or `false` if it does
-    /// not.
+    /// Return the list of jobs that are found to be inconsistent.
     ///
-    /// This should be called only when the recovery state is either `AbortedUnchecked` or
-    /// `GracefullyStopped`.
+    /// This should be called only when the stale state is either `Abort`, `GracefulStop`, or
+    /// `Complete`.
     pub(crate) async fn check_consistency(
         &self,
         storage: &Sto,
         client: MetaClient<'_>,
         mode: CheckMode,
-    ) -> Result<bool, SchedulerError> {
+    ) -> Result<Vec<&'static str>, SchedulerError> {
+        let mut inconsistent_jobs = Vec::new();
         for schedule in &self.job_handlers {
             if !schedule.check_consistency(storage, client, mode).await? {
-                return Ok(false);
+                inconsistent_jobs.push(schedule.job_id());
+                tracing::warn!(
+                    "Consistency check failed for job handler: {}",
+                    schedule.job_id()
+                );
+            } else {
+                tracing::info!(
+                    "Consistency check passed for job handler: {}",
+                    schedule.job_id()
+                );
             }
-            tracing::info!(
-                "Consistency check passed for job handler: {}",
-                schedule.job_id()
-            );
         }
-        Ok(true)
+        Ok(inconsistent_jobs)
     }
 
     pub(crate) async fn clear_resolution(
@@ -172,18 +177,23 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         storage: &Sto,
         progresses: &SharedProgressMap,
         client: MetaClient<'_>,
+        skip: &HashSet<String>,
     ) -> Result<Vec<Box<dyn JobRebuilder>>, SchedulerError> {
-        futures::stream::iter(&self.job_handlers)
-            .then(|schedule| async {
-                let Some(progress) = progresses.0.get(schedule.job_id()) else {
-                    return Err(SchedulerError::missing_progress(schedule.job_id()));
-                };
-                schedule
-                    .prepare_rebuild(storage, progress.clone(), client)
-                    .await
-            })
-            .try_collect::<Vec<_>>()
-            .await
+        futures::stream::iter(self.job_handlers.iter().filter(|handler| {
+            std::iter::once(handler.job_id())
+                .chain(handler.all_upstream_jobs())
+                .all(|job_id| !skip.contains(&job_id.to_string()))
+        }))
+        .then(|schedule| async {
+            let Some(progress) = progresses.0.get(schedule.job_id()) else {
+                return Err(SchedulerError::missing_progress(schedule.job_id()));
+            };
+            schedule
+                .prepare_rebuild(storage, progress.clone(), client)
+                .await
+        })
+        .try_collect::<Vec<_>>()
+        .await
     }
 }
 

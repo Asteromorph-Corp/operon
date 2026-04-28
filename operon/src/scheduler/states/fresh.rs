@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::scheduler::context::SchedulerContext;
-use crate::scheduler::events::ControlEvent;
+use crate::scheduler::events::{ControlEvent, RunEventInner};
 use crate::scheduler::states::start::StartTransition;
 use crate::scheduler::states::{NextState, SchedulerState, TransitionState};
 use crate::service::OperonService;
@@ -65,10 +65,10 @@ where
     ) -> Result<NextState, crate::scheduler::SchedulerError> {
         match evt {
             ControlEvent::Check { .. } => tracing::warn!("Cannot check on a fresh run"),
-            ControlEvent::Run { rebuild: true, .. } => {
+            ControlEvent::Run(RunEventInner::Rebuild { .. }) => {
                 tracing::error!("Cannot rebuild on a fresh run.")
             }
-            ControlEvent::Run { .. } => return Ok(NextState::from(self.into_running())),
+            ControlEvent::Run(..) => return Ok(NextState::from(self.into_running())),
             ControlEvent::Pause { .. } => {
                 tracing::warn!("Cannot pause before the run has started.")
             }

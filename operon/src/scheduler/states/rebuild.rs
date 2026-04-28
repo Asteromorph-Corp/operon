@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -17,6 +19,7 @@ where
     ctx: SchedulerContext<Svc, Sto>,
     channel_size: usize,
     run_id: Uuid,
+    skip: HashSet<String>,
 }
 
 impl<Svc, Sto> RebuildTransition<Svc, Sto>
@@ -24,11 +27,17 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
 {
-    pub fn new(ctx: SchedulerContext<Svc, Sto>, channel_size: usize, run_id: Uuid) -> Self {
+    pub fn new(
+        ctx: SchedulerContext<Svc, Sto>,
+        channel_size: usize,
+        run_id: Uuid,
+        skip: HashSet<String>,
+    ) -> Self {
         Self {
             ctx,
             channel_size,
             run_id,
+            skip,
         }
     }
 
@@ -36,8 +45,9 @@ where
         ctx: SchedulerContext<Svc, Sto>,
         channel_size: usize,
         run_id: Uuid,
+        skip: HashSet<String>,
     ) -> TransitionState {
-        TransitionState::new(Self::new(ctx, channel_size, run_id))
+        TransitionState::new(Self::new(ctx, channel_size, run_id, skip))
     }
 
     fn into_start(self) -> TransitionState {
@@ -64,7 +74,12 @@ where
         let rebuilders = self
             .ctx
             .handler
-            .prepare_rebuilders(&self.ctx.storage, &self.ctx.progresses, tx.as_client())
+            .prepare_rebuilders(
+                &self.ctx.storage,
+                &self.ctx.progresses,
+                tx.as_client(),
+                &self.skip,
+            )
             .await?;
 
         self.ctx.handler.clear_resolution(tx.as_client()).await?;
