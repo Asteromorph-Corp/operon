@@ -48,7 +48,7 @@ body:
       description: What version of our software are you running?
       options:
         - pre-release (next)
-        - 0.2.3 (main)
+        - 0.2.4 (main)
         - 0.1.2
         - Other (please specify below)
       default: 0

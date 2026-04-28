@@ -1,7 +1,7 @@
 # Operon
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](https://arxiv.org/abs/2511.16080)
-[![Kellnr](https://img.shields.io/badge/kellnr-v0.2.3-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
+[![Kellnr](https://img.shields.io/badge/kellnr-v0.2.4-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-yellow.svg)](LICENSE-MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.91+-lightgray.svg)](https://blog.rust-lang.org/2025/10/30/Rust-1.91.0/)
 
@@ -110,7 +110,7 @@ Add Operon to your project's dependencies by including the following in your `Ca
 
 ```toml
 [dependencies]
-operon = { version = "0.2.3", registry = "kellnr" }
+operon = { version = "0.2.4", registry = "kellnr" }
 ```
 
 Alternatively, clone this repository:
@@ -349,9 +349,21 @@ Navigation keys:
     Esc                 Show most recent logs.
 
 Commands:
-    run [OPTIONS]       Start a new run using the best available restoration (unless overridden by options).
-        -f, --fresh         Start a fresh run, ignoring any existing data. Takes precedence over `rebuild`.
+    run [OPTIONS]       Start a new run using the best available restoration
+                        (unless specified by options).
+                        --fresh, --rebuild, and --redo are mutually exclusive.
+        -f, --fresh         Start a fresh run, ignoring any existing data.
         -r, --rebuild       Rebuild the run from trusted data before starting.
+        -s, --skip <JOB_TYPE>[ ...]
+                            With --rebuild, do not rebuild the given 1 or more job(s).
+        -R, --redo <JOB_TYPE>[ ...]
+                            Shorthand for --rebuild --skip <...>.
+        -i, --redo-inconsistent-jobs
+                            Rebuild the run even on a failed check,
+                            ignoring jobs with corrupt data and their downstream jobs.
+                            Cannot be used with --fresh.
+                            Note that --redo <INCONSISTENT_JOBS> will NOT allow a rebuild
+                            on a failed check without this flag.
     check [OPTIONS]     Check the consistency of the data from the last run.
         -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
             trust-all           Assume all data is trustworthy, skipping checks.
