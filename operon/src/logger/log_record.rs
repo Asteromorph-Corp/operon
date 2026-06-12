@@ -74,8 +74,8 @@ impl LogRecord {
                 ::ratatui::style::Style::new().cyan(),
             ),
             (SourceType::Levelled, ::tracing::Level::TRACE) => (
-                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(168, 168, 168)),
                 ::ratatui::style::Style::new().white(),
+                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(168, 168, 168)),
             ),
         };
         // Colour messages that echo shell input.
