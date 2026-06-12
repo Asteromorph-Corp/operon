@@ -118,7 +118,7 @@ impl LogRecord {
             };
 
             for (l, wrapped) in ::textwrap::wrap(&content, &wrap_options).iter().enumerate() {
-                let mut spans = if l == 0 {
+                let mut spans = if l == 0 && i == 0 {
                     vec![
                         Span::raw(prefix.clone()),
                         Span::styled(level.clone(), level_colour),
