@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::sync::Arc;
 
 use tokio::sync::Semaphore;
@@ -9,6 +8,7 @@ use crate::scheduler::events::{
     IndividualControlEvent, IndividualControlEventReceiver, InternalEvent, PeerEvent,
     PeerEventSenders, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
+use crate::scheduler::queue::{AnyJobQueue, JobQueue};
 use crate::scheduler::{JobSpec, SchedulerError, SpecWithMetadata};
 use crate::schema::{Job, JobMetadata, SharedProgress, TaskState, Ticket, TicketStatus};
 use crate::service::OperonService;
@@ -227,7 +227,7 @@ where
     ) -> Result<(), SchedulerError> {
         let pool = self.pool.clone();
 
-        let mut ready_tickets: VecDeque<Ticket<N>> = initial_tickets.into();
+        let mut ready_tickets = AnyJobQueue::from_meta(initial_tickets, &self.meta)?;
         let mut got_all_updates = false;
         let mut is_stopping = false;
 
@@ -302,7 +302,7 @@ where
                                 Peer channel has {} events left.",
                                 self.meta.id, peer_rx.len()
                             );
-                            ready_tickets.extend(self.on_event_ready_tickets(evt, peer_txs).await?)
+                            ready_tickets.extend(self.on_event_ready_tickets(evt, peer_txs).await?)?
                         },
                         None => {
                             // The peer channel was closed,
@@ -322,7 +322,7 @@ where
                     if !ready_tickets.is_empty()
                 => {
                     let permit = permit?;
-                    let ticket = ready_tickets.pop_front().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
+                    let ticket = ready_tickets.pop().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
                     let job = ticket.resolve().ok_or(SchedulerError::other("Ticket is not ready to run"))?;
                     let job_id = self.meta.id;
                     let spec = self.spec.clone();

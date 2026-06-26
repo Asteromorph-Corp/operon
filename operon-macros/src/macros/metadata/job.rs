@@ -13,6 +13,7 @@ use crate::utils::{job_metadata_ident, to_lit_str};
 ///         id: "beta",
 ///         dims: ["i"],
 ///         spawn_dim: Some("j"),
+///         priority: &[],
 ///     }
 /// }
 /// ```
@@ -36,6 +37,7 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
                 id: #id,
                 dims: [#(#dims),*],
                 spawn_dim: #spawn_dim,
+                priority: &[],
             }
         }
     }

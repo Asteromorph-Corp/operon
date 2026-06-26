@@ -6,6 +6,7 @@ pub struct JobMetadata<const N: usize> {
     pub id: &'static str,
     pub dims: [&'static str; N],
     pub spawn_dim: Option<&'static str>,
+    pub priority: &'static [(&'static str, bool)],
 }
 
 /// A metadata for an entity.

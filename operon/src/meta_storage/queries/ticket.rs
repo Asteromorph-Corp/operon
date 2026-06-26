@@ -546,6 +546,7 @@ mod tests {
             id: "alpha",
             spawn_dim: Some("i"),
             dims: [],
+            priority: &[],
         }
     }
 
@@ -554,6 +555,7 @@ mod tests {
             id: "beta",
             spawn_dim: Some("j"),
             dims: ["i"],
+            priority: &[],
         }
     }
 
