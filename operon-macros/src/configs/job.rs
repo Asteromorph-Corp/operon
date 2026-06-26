@@ -21,6 +21,8 @@ pub struct JobConfig {
     pub spawn_dim: Option<syn::Ident>,
     /// The pool size for this job.
     pub pool_size: usize,
+    /// Priority ordering: (dimension, is_descending). Empty means FIFO.
+    pub priority: Vec<(syn::Ident, bool)>,
 }
 
 pub type JobConfigMap = IndexMap<syn::Ident, JobConfig>;
