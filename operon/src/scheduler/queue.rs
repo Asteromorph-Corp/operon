@@ -204,3 +204,117 @@ impl<const N: usize> JobQueue<Ticket<N>> for AnyJobQueue<N> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{AnyJobQueue, JobQueue, PriorityJobQueue};
+    use crate::schema::{Direction, JobMetadata, OptionCoordinate, Ticket};
+
+    fn ticket<const N: usize>(coords: [usize; N]) -> Ticket<N> {
+        let mut t = Ticket::new(0);
+        for (i, c) in coords.into_iter().enumerate() {
+            t.coordinate[i] = OptionCoordinate::some(c);
+        }
+        t
+    }
+
+    fn drain_coords<const N: usize>(q: &mut impl JobQueue<Ticket<N>>) -> Vec<[usize; N]> {
+        std::iter::from_fn(|| q.pop())
+            .map(|t| std::array::from_fn(|i| t.coordinate[i].0.unwrap()))
+            .collect()
+    }
+
+    #[test]
+    fn ascending_single_dim() {
+        let mut q = PriorityJobQueue::<1>::new(
+            vec![ticket([3]), ticket([1]), ticket([2])],
+            &[("i", Direction::Ascending)],
+            &["i"],
+        )
+        .unwrap();
+        assert_eq!(drain_coords(&mut q), [[1], [2], [3]]);
+    }
+
+    #[test]
+    fn descending_single_dim() {
+        let mut q = PriorityJobQueue::<1>::new(
+            vec![ticket([1]), ticket([3]), ticket([2])],
+            &[("i", Direction::Descending)],
+            &["i"],
+        )
+        .unwrap();
+        assert_eq!(drain_coords(&mut q), [[3], [2], [1]]);
+    }
+
+    #[test]
+    fn lexicographic_multi_dim() {
+        let mut q = PriorityJobQueue::<2>::new(
+            vec![ticket([2, 1]), ticket([1, 2]), ticket([1, 1])],
+            &[("tier", Direction::Ascending), ("id", Direction::Ascending)],
+            &["tier", "id"],
+        )
+        .unwrap();
+        assert_eq!(drain_coords(&mut q), [[1, 1], [1, 2], [2, 1]]);
+    }
+
+    #[test]
+    fn mixed_directions() {
+        // tier asc, id desc: tier=1 before tier=2; within tier=1, higher id first
+        let mut q = PriorityJobQueue::<2>::new(
+            vec![ticket([1, 1]), ticket([1, 2]), ticket([2, 1])],
+            &[
+                ("tier", Direction::Ascending),
+                ("id", Direction::Descending),
+            ],
+            &["tier", "id"],
+        )
+        .unwrap();
+        assert_eq!(drain_coords(&mut q), [[1, 2], [1, 1], [2, 1]]);
+    }
+
+    #[test]
+    fn fifo_tiebreak_within_equal_priority() {
+        // Only `tier` is a priority dim; `id` is a passenger coordinate for identification.
+        let mut q =
+            PriorityJobQueue::<2>::new(vec![], &[("tier", Direction::Ascending)], &["tier", "id"])
+                .unwrap();
+        q.push(ticket([1, 10])).unwrap();
+        q.push(ticket([1, 20])).unwrap();
+        q.push(ticket([1, 30])).unwrap();
+        // All same tier: pop in push order (FIFO)
+        assert_eq!(drain_coords(&mut q), [[1, 10], [1, 20], [1, 30]]);
+    }
+
+    #[test]
+    fn any_job_queue_dispatches_deque_for_empty_priority() {
+        let meta = JobMetadata {
+            id: "test",
+            dims: ["i"],
+            spawn_dim: None,
+            priority: &[],
+        };
+        let q = AnyJobQueue::from_meta(vec![], &meta).unwrap();
+        assert!(matches!(q, AnyJobQueue::Deque(_)));
+    }
+
+    #[test]
+    fn any_job_queue_dispatches_priority_for_nonempty_priority() {
+        let meta = JobMetadata {
+            id: "test",
+            dims: ["i"],
+            spawn_dim: None,
+            priority: &[("i", Direction::Ascending)],
+        };
+        let q = AnyJobQueue::from_meta(vec![], &meta).unwrap();
+        assert!(matches!(q, AnyJobQueue::Priority(_)));
+    }
+
+    #[test]
+    fn push_unresolved_priority_coordinate_errors() {
+        let mut q =
+            PriorityJobQueue::<1>::new(vec![], &[("i", Direction::Ascending)], &["i"]).unwrap();
+        // coordinate[0] is None (unresolved)
+        let unresolved = Ticket::new(0);
+        assert!(q.push(unresolved).is_err());
+    }
+}
