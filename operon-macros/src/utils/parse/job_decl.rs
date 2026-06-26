@@ -4,11 +4,12 @@ use syn::token::Paren;
 use syn::{Ident, LitInt, Token};
 
 use super::entity_decl::EntityDecl;
+use crate::configs::Direction;
 
 /// Parsed contents of `#[operon(...)]` on a job declaration.
 #[derive(Debug, Default)]
 pub(super) struct OperonJobAttrs {
-    pub(super) priority: Vec<(Ident, bool)>,
+    pub(super) priority: Vec<(Ident, Direction)>,
 }
 
 #[derive(Debug)]
@@ -194,12 +195,17 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
                 let content;
                 syn::parenthesized!(content in value);
                 while !content.is_empty() {
-                    let descending = content.peek(Token![-]);
-                    if descending {
+                    let is_desc = content.peek(Token![-]);
+                    if is_desc {
                         content.parse::<Token![-]>()?;
                     }
                     let dim: Ident = content.parse()?;
-                    result.priority.push((dim, descending));
+                    let dir = if is_desc {
+                        Direction::Descending
+                    } else {
+                        Direction::Ascending
+                    };
+                    result.priority.push((dim, dir));
                     if !content.is_empty() {
                         content.parse::<Token![,]>()?;
                     }
@@ -266,9 +272,9 @@ mod tests {
         let parsed: JobDecl = parse_str(input).expect("Failed to parse");
         assert_eq!(parsed.operon_attrs.priority.len(), 2);
         assert_eq!(parsed.operon_attrs.priority[0].0.to_string(), "k");
-        assert!(parsed.operon_attrs.priority[0].1, "k should be descending");
+        assert_eq!(parsed.operon_attrs.priority[0].1, Direction::Descending);
         assert_eq!(parsed.operon_attrs.priority[1].0.to_string(), "i");
-        assert!(!parsed.operon_attrs.priority[1].1, "i should be ascending");
+        assert_eq!(parsed.operon_attrs.priority[1].1, Direction::Ascending);
     }
 
     #[test]

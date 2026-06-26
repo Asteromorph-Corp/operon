@@ -1,7 +1,7 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::{Direction, JobConfig};
 use crate::operon_ident;
 use crate::utils::{job_metadata_ident, to_lit_str};
 
@@ -14,7 +14,7 @@ use crate::utils::{job_metadata_ident, to_lit_str};
 ///         id: "beta",
 ///         dims: ["i"],
 ///         spawn_dim: Some("j"),
-///         priority: &[("i", false)],
+///         priority: &[("i", operon::__private::Direction::Ascending)],
 ///     }
 /// }
 /// ```
@@ -31,9 +31,13 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
         }
         None => parse_quote! { None },
     };
-    let priority_items = job.priority.iter().map(|(dim, desc)| {
+    let priority_items = job.priority.iter().map(|(dim, dir)| {
         let dim_str = to_lit_str(dim);
-        quote! { (#dim_str, #desc) }
+        let dir_tokens = match dir {
+            Direction::Ascending => quote! { #operon::__private::Direction::Ascending },
+            Direction::Descending => quote! { #operon::__private::Direction::Descending },
+        };
+        quote! { (#dim_str, #dir_tokens) }
     });
 
     parse_quote! {
@@ -59,7 +63,7 @@ mod tests {
 
     fn job_beta_with_priority() -> JobConfig {
         JobConfig {
-            priority: vec![(format_ident!("i"), false)],
+            priority: vec![(format_ident!("i"), Direction::Ascending)],
             ..job_beta()
         }
     }

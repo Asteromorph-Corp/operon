@@ -1,5 +1,13 @@
 use indexmap::IndexMap;
 
+/// Ordering direction for an `ord=` priority dimension (macro-internal mirror of
+/// `operon::Direction`; no value-level import of the runtime crate required).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Direction {
+    Ascending,
+    Descending,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JobArg {
     pub id: syn::Ident,
@@ -21,8 +29,8 @@ pub struct JobConfig {
     pub spawn_dim: Option<syn::Ident>,
     /// The pool size for this job.
     pub pool_size: usize,
-    /// Priority ordering: (dimension, is_descending). Empty means FIFO.
-    pub priority: Vec<(syn::Ident, bool)>,
+    /// Priority ordering for the job queue. Empty means FIFO.
+    pub priority: Vec<(syn::Ident, Direction)>,
 }
 
 pub type JobConfigMap = IndexMap<syn::Ident, JobConfig>;
