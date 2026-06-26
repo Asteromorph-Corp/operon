@@ -186,7 +186,7 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
             ));
         }
         attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("priority") {
+            if meta.path.is_ident("ord") {
                 let value = meta.value()?;
                 let content;
                 syn::parenthesized!(content in value);
@@ -203,7 +203,7 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
                 }
                 Ok(())
             } else {
-                Err(meta.error("Unknown key in `#[operon(...)]`; expected `priority`"))
+                Err(meta.error("Unknown key in `#[operon(...)]`; accepted keys are: {`ord`}"))
             }
         })?;
     }
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_job_decl_priority_valid_dims() {
-        let input = "#[operon(priority=(-k, i))] E = epsilon(B<j>, D<j>) for(4) i, k;";
+        let input = "#[operon(ord=(-k, i))] E = epsilon(B<j>, D<j>) for(4) i, k;";
         let parsed: JobDecl = parse_str(input).expect("Failed to parse");
         assert_eq!(parsed.operon_attrs.priority.len(), 2);
         assert_eq!(parsed.operon_attrs.priority[0].0.to_string(), "k");
@@ -278,8 +278,8 @@ mod tests {
             "Entity = JobName for(8) i;",                        // Missing argument parens
             "Entity = JobName() for i, j k;",                    // Missing comma
             "Entity = JobName() for(8) i, j, k; SomeExtraToken", // Extra token after semicolon
-            "#[operon(priority=(z))] E = job() for i;",          // Unknown priority dim
-            "#[operon(priority=(i, i))] E = job() for i;",       // Duplicate priority dim
+            "#[operon(ord=(z))] E = job() for i;",               // Unknown priority dim
+            "#[operon(ord=(i, i))] E = job() for i;",            // Duplicate priority dim
             "#[unknown] E = job() for i;",                       // Unknown attribute
             "#[operon(unknown_key)] E = job() for i;",           // Unknown operon key
         ];
