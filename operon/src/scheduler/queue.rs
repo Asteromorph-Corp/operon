@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
+use std::sync::Arc;
 
 use super::SchedulerError;
-use crate::schema::{JobMetadata, Ticket};
+use crate::schema::{Direction, JobMetadata, Ticket};
 
 pub(super) trait JobQueue<T> {
     fn push(&mut self, item: T) -> Result<(), SchedulerError>;
@@ -43,87 +44,93 @@ impl<T> JobQueue<T> for DequeJobQueue<T> {
     }
 }
 
-struct PriorityEntry<T> {
-    key: Box<[i64]>,
+struct PriorityEntry<const N: usize> {
+    order: Arc<[(usize, Direction)]>,
     seq: u64,
-    item: T,
+    item: Ticket<N>,
 }
-impl<T> Eq for PriorityEntry<T> {}
-impl<T> PartialEq for PriorityEntry<T> {
+impl<const N: usize> Eq for PriorityEntry<N> {}
+impl<const N: usize> PartialEq for PriorityEntry<N> {
     fn eq(&self, other: &Self) -> bool {
         self.seq == other.seq
     }
 }
-impl<T> PartialOrd for PriorityEntry<T> {
+impl<const N: usize> PartialOrd for PriorityEntry<N> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
-impl<T> Ord for PriorityEntry<T> {
+impl<const N: usize> Ord for PriorityEntry<N> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.key
-            .cmp(&other.key)
-            .then_with(|| (other.seq.wrapping_sub(self.seq) as i64).cmp(&0))
+        for &(idx, dir) in self.order.iter() {
+            // Both are Some() since the JobQueue only ever pushes ready tickets,
+            // with all coordinates resolved.
+            let a = self.item.coordinate[idx].0;
+            let b = other.item.coordinate[idx].0;
+            let ord = dir.apply(a.cmp(&b));
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        // Monotonic FIFO tie-break, robust to `next_seq` wrapping.
+        // Correct as long as the live-entry seq window stays below 2^63.
+        // Notably does not simplify to `other.seq.cmp(&self.seq)`.
+        (other.seq.wrapping_sub(self.seq) as i64).cmp(&0)
     }
 }
 
 pub(super) struct PriorityJobQueue<const N: usize> {
-    queue: BinaryHeap<PriorityEntry<Ticket<N>>>,
+    queue: BinaryHeap<PriorityEntry<N>>,
     next_seq: u64,
-    priority_indices: Box<[(usize, bool)]>,
+    order: Arc<[(usize, Direction)]>,
 }
 
 impl<const N: usize> PriorityJobQueue<N> {
     fn new(
         vec: Vec<Ticket<N>>,
-        priority: &[(&'static str, bool)],
+        priority: &[(&'static str, Direction)],
         dims: &[&'static str; N],
     ) -> Result<Self, SchedulerError> {
-        let priority_indices = priority
+        let order: Arc<[(usize, Direction)]> = priority
             .iter()
-            .map(|&(dim, desc)| {
+            .map(|&(dim, dir)| {
                 dims.iter()
                     .position(|d| *d == dim)
-                    .map(|idx| (idx, desc))
+                    .map(|idx| (idx, dir))
                     .ok_or_else(|| {
                         SchedulerError::other(format!(
                             "Priority dimension `{dim}` not found in job dimensions"
                         ))
                     })
             })
-            .collect::<Result<Box<[_]>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?
+            .into();
         let mut queue = Self {
             queue: BinaryHeap::with_capacity(vec.len()),
             next_seq: 0,
-            priority_indices,
+            order,
         };
         queue.extend(vec)?;
         Ok(queue)
-    }
-
-    fn make_key(&self, ticket: &Ticket<N>) -> Result<Box<[i64]>, SchedulerError> {
-        self.priority_indices
-            .iter()
-            .map(|&(idx, desc)| {
-                ticket.coordinate[idx]
-                    .0
-                    .map(|val| if desc { val as i64 } else { -(val as i64) })
-                    .ok_or_else(|| {
-                        SchedulerError::other(format!(
-                            "Unresolved coordinate at index {idx} pushed to priority job queue"
-                        ))
-                    })
-            })
-            .collect()
     }
 }
 
 impl<const N: usize> JobQueue<Ticket<N>> for PriorityJobQueue<N> {
     fn push(&mut self, item: Ticket<N>) -> Result<(), SchedulerError> {
-        let key = self.make_key(&item)?;
+        for &(idx, _) in self.order.iter() {
+            if item.coordinate[idx].0.is_none() {
+                return Err(SchedulerError::other(format!(
+                    "Unresolved coordinate at index {idx} pushed to priority job queue"
+                )));
+            }
+        }
         let seq = self.next_seq;
         self.next_seq = self.next_seq.wrapping_add(1);
-        self.queue.push(PriorityEntry { key, seq, item });
+        self.queue.push(PriorityEntry {
+            order: Arc::clone(&self.order),
+            seq,
+            item,
+        });
         Ok(())
     }
 
