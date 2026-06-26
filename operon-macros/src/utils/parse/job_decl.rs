@@ -93,7 +93,10 @@ impl JobDecl {
             }
         }
         for (i, (dim, _)) in self.operon_attrs.priority.iter().enumerate() {
-            if self.operon_attrs.priority[..i].iter().any(|(d, _)| d == dim) {
+            if self.operon_attrs.priority[..i]
+                .iter()
+                .any(|(d, _)| d == dim)
+            {
                 return Err(syn::Error::new(
                     dim.span(),
                     format!(

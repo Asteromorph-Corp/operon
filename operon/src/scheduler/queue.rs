@@ -1,9 +1,8 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 
-use crate::schema::{JobMetadata, Ticket};
-
 use super::SchedulerError;
+use crate::schema::{JobMetadata, Ticket};
 
 pub(super) trait JobQueue<T> {
     fn push(&mut self, item: T) -> Result<(), SchedulerError>;
@@ -153,10 +152,7 @@ pub(super) enum AnyJobQueue<const N: usize> {
 }
 
 impl<const N: usize> AnyJobQueue<N> {
-    pub fn from_meta(
-        vec: Vec<Ticket<N>>,
-        meta: &JobMetadata<N>,
-    ) -> Result<Self, SchedulerError> {
+    pub fn from_meta(vec: Vec<Ticket<N>>, meta: &JobMetadata<N>) -> Result<Self, SchedulerError> {
         if meta.priority.is_empty() {
             Ok(Self::Deque(vec.into()))
         } else {

@@ -21,5 +21,5 @@ pub use error::SchedulerError;
 mod individual_scheduler;
 
 mod context;
-mod states;
 mod queue;
+mod states;
