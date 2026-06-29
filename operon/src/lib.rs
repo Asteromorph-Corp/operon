@@ -12,7 +12,7 @@ mod utils;
 
 pub use operon::Operon;
 pub use operon_macros::define_operon;
-pub use schema::Entity;
+pub use schema::{Direction, Entity};
 pub use service::OperonService;
 pub use storage::OperonStorage;
 

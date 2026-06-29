@@ -3,6 +3,6 @@ pub const fn job_beta_meta() -> operon::__private::JobMetadata<1usize> {
         id: "beta",
         dims: ["i"],
         spawn_dim: Some("j"),
-        priority: &[],
+        priority: &[("i", operon::__private::Direction::Ascending)],
     }
 }

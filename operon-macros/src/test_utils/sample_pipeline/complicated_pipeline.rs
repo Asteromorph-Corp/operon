@@ -26,6 +26,7 @@ pub fn job_alpha() -> JobConfig {
         dims: vec![],
         spawn_dim: None,
         pool_size: 1,
+        priority: vec![],
     }
 }
 
@@ -37,6 +38,7 @@ pub fn job_beta() -> JobConfig {
         dims: vec![],
         spawn_dim: Some(format_ident!("i")),
         pool_size: 1,
+        priority: vec![],
     }
 }
 
@@ -57,6 +59,7 @@ pub fn job_gamma() -> JobConfig {
         dims: vec![format_ident!("i")],
         spawn_dim: Some(format_ident!("j")),
         pool_size: 8,
+        priority: vec![],
     }
 }
 
@@ -71,6 +74,7 @@ pub fn job_delta() -> JobConfig {
         dims: vec![format_ident!("i"), format_ident!("j")],
         spawn_dim: Some(format_ident!("k")),
         pool_size: 4,
+        priority: vec![],
     }
 }
 
@@ -91,6 +95,7 @@ pub fn job_epsilon() -> JobConfig {
         dims: vec![format_ident!("i")],
         spawn_dim: Some(format_ident!("l")),
         pool_size: 2,
+        priority: vec![],
     }
 }
 

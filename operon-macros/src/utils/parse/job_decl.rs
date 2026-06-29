@@ -4,6 +4,13 @@ use syn::token::Paren;
 use syn::{Ident, LitInt, Token};
 
 use super::entity_decl::EntityDecl;
+use crate::configs::Direction;
+
+/// Parsed contents of `#[operon(...)]` on a job declaration.
+#[derive(Debug, Default)]
+pub(super) struct OperonJobAttrs {
+    pub(super) priority: Option<Vec<(Ident, Direction)>>,
+}
 
 #[derive(Debug)]
 pub(super) struct JobDecl {
@@ -17,6 +24,7 @@ pub(super) struct JobDecl {
     pub(super) pool: Option<LitInt>,
     pub(super) dims: Vec<Ident>,
     pub(super) _semi_token: Token![;],
+    pub(super) operon_attrs: OperonJobAttrs,
     pub(super) _span: proc_macro2::Span,
 }
 impl JobDecl {
@@ -74,13 +82,43 @@ impl JobDecl {
                 ));
             }
         }
-
+        if let Some(priority) = &self.operon_attrs.priority {
+            for (dim, _) in priority {
+                if !self.dims.iter().any(|d| d == dim) {
+                    return Err(syn::Error::new(
+                        dim.span(),
+                        format!(
+                            "Priority dimension '{}' is not in the dimension set of job '{}'",
+                            dim, self.id
+                        ),
+                    ));
+                }
+            }
+        }
+        if let Some(priority) = &self.operon_attrs.priority {
+            for (i, (dim, _)) in priority.iter().enumerate() {
+                if priority[..i].iter().any(|(d, _)| d == dim) {
+                    return Err(syn::Error::new(
+                        dim.span(),
+                        format!(
+                            "Priority dimension '{}' appears more than once in job '{}'",
+                            dim, self.id
+                        ),
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 }
 impl Parse for JobDecl {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let start = input.span();
+
+        // Parse optional #[operon(...)] attribute before the job line.
+        let attrs = input.call(syn::Attribute::parse_outer)?;
+        let operon_attrs = parse_operon_attrs(&attrs)?;
+
         let spawned_entity: EntityDecl = input.parse()?;
         let eq_token: Token![=] = input.parse()?;
         let id: Ident = input.parse()?;
@@ -133,11 +171,58 @@ impl Parse for JobDecl {
             pool,
             dims,
             _semi_token: semi_token,
+            operon_attrs,
             _span,
         };
         job_decl.validate()?;
         Ok(job_decl)
     }
+}
+
+/// Parses `#[operon(...)]` attributes on a job declaration into [`OperonJobAttrs`].
+/// Rejects non-`operon` attributes and unknown keys inside `#[operon(...)]`.
+fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
+    let mut result = OperonJobAttrs::default();
+    for attr in attrs {
+        if !attr.path().is_ident("operon") {
+            return Err(syn::Error::new_spanned(
+                attr,
+                "Unknown attribute on job declaration; only `#[operon(...)]` is supported",
+            ));
+        }
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("ord") {
+                if result.priority.is_some() {
+                    return Err(meta.error("Multiple `ord` keys found in `#[operon(...)]`"));
+                }
+                let mut priority = Vec::new();
+                let value = meta.value()?;
+                let content;
+                syn::parenthesized!(content in value);
+                while !content.is_empty() {
+                    let is_desc = content.peek(Token![-]);
+                    if is_desc {
+                        content.parse::<Token![-]>()?;
+                    }
+                    let dim: Ident = content.parse()?;
+                    let dir = if is_desc {
+                        Direction::Descending
+                    } else {
+                        Direction::Ascending
+                    };
+                    priority.push((dim, dir));
+                    if !content.is_empty() {
+                        content.parse::<Token![,]>()?;
+                    }
+                }
+                result.priority = Some(priority);
+                Ok(())
+            } else {
+                Err(meta.error("Unknown key in `#[operon(...)]`; accepted keys are: {`ord`}"))
+            }
+        })?;
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -156,6 +241,7 @@ mod tests {
         assert!(parsed._for_token.is_none());
         assert!(parsed.pool.is_none());
         assert!(parsed.dims.is_empty());
+        assert!(parsed.operon_attrs.priority.is_none());
     }
     #[test]
     fn test_job_decl_all() {
@@ -185,6 +271,22 @@ mod tests {
         assert_eq!(parsed_epsilon.args[0].dims[0].to_string(), "j");
         assert!(parsed_zeta.pool.is_none());
     }
+
+    #[test]
+    fn test_job_decl_priority_valid_dims() {
+        let input = "#[operon(ord=(-k, i))] E = epsilon(B<j>, D<j>) for(4) i, k;";
+        let parsed: JobDecl = parse_str(input).expect("Failed to parse");
+        let priority = parsed
+            .operon_attrs
+            .priority
+            .expect("Priority should be present");
+        assert_eq!(priority.len(), 2);
+        assert_eq!(priority[0].0.to_string(), "k");
+        assert_eq!(priority[0].1, Direction::Descending);
+        assert_eq!(priority[1].0.to_string(), "i");
+        assert_eq!(priority[1].1, Direction::Ascending);
+    }
+
     #[test]
     fn test_job_decl_malformed() {
         let malformed_inputs = [
@@ -195,14 +297,15 @@ mod tests {
             "Entity = JobName for(8) i;",                        // Missing argument parens
             "Entity = JobName() for i, j k;",                    // Missing comma
             "Entity = JobName() for(8) i, j, k; SomeExtraToken", // Extra token after semicolon
+            "#[operon(ord=(z))] E = job() for i;",               // Unknown priority dim
+            "#[operon(ord=(i, i))] E = job() for i;",            // Duplicate priority dim
+            "#[unknown] E = job() for i;",                       // Unknown attribute
+            "#[operon(unknown_key)] E = job() for i;",           // Unknown operon key
         ];
         let results = malformed_inputs
             .into_iter()
             .map(parse_str::<JobDecl>)
             .collect::<Vec<_>>();
         assert!(results.iter().all(|result| result.is_err()));
-        // for result in results {
-        //     println!("Result: {result:?}");
-        // }
     }
 }
