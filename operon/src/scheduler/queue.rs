@@ -98,13 +98,21 @@ impl<const N: usize> PriorityJobQueue<N> {
             })
             .collect::<Vec<_>>()
             .leak();
-        let mut queue = Self {
-            queue: BinaryHeap::with_capacity(vec.len()),
-            next_seq: 0,
+        let len = vec.len() as u64;
+        let entries: Vec<_> = vec
+            .into_iter()
+            .enumerate()
+            .map(|(i, item)| PriorityEntry {
+                order,
+                seq: i as u64,
+                item,
+            })
+            .collect();
+        Self {
+            queue: BinaryHeap::from(entries),
+            next_seq: len,
             order,
-        };
-        queue.extend(vec);
-        queue
+        }
     }
 }
 
