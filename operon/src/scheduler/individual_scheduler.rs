@@ -107,11 +107,11 @@ where
     /// Handle a received event.
     ///
     /// One event corresponds to one metadata transaction.
-    async fn on_event_ready_tickets(
+    async fn on_event_ready_jobs(
         &mut self,
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
         peer_txs: &JS::PeerEventSenders,
-    ) -> Result<Vec<Ticket<N>>, SchedulerError> {
+    ) -> Result<Vec<Job<N>>, SchedulerError> {
         let mut conn = self.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
         let ready_tickets = match event {
@@ -129,7 +129,14 @@ where
         };
         self.update_progress_with_client(tx.as_client()).await?;
         tx.commit().await?;
-        Ok(ready_tickets)
+        let ready_jobs = ready_tickets
+            .iter()
+            .map(|t| t.resolve())
+            .collect::<Option<Vec<_>>>()
+            .ok_or(SchedulerError::other(
+                "Some ready tickets are not actually ready to run",
+            ))?;
+        Ok(ready_jobs)
     }
 
     fn check_initial_data(&self, tickets: &[Ticket<N>]) -> bool {
@@ -227,7 +234,14 @@ where
     ) -> Result<(), SchedulerError> {
         let pool = self.pool.clone();
 
-        let mut ready_tickets = AnyJobQueue::from_meta(initial_tickets, &self.meta)?;
+        let initial_jobs = initial_tickets
+            .iter()
+            .map(|t| t.resolve())
+            .collect::<Option<Vec<_>>>()
+            .ok_or(SchedulerError::other(
+                "Some initial tickets are not actually ready to run",
+            ))?;
+        let mut ready_jobs = AnyJobQueue::from_meta(initial_jobs, &self.meta)?;
         let mut got_all_updates = false;
         let mut is_stopping = false;
 
@@ -302,7 +316,7 @@ where
                                 Peer channel has {} events left.",
                                 self.meta.id, peer_rx.len()
                             );
-                            ready_tickets.extend(self.on_event_ready_tickets(evt, peer_txs).await?)?
+                            ready_jobs.extend(self.on_event_ready_jobs(evt, peer_txs).await?)?
                         },
                         None => {
                             // The peer channel was closed,
@@ -319,11 +333,10 @@ where
                 // If the scheduler is paused, the pool will not yield a permit
                 // since the pool will have forgotten the permits.
                 permit = pool.clone().acquire_owned(),
-                    if !ready_tickets.is_empty()
+                    if !ready_jobs.is_empty()
                 => {
                     let permit = permit?;
-                    let ticket = ready_tickets.pop().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
-                    let job = ticket.resolve().ok_or(SchedulerError::other("Ticket is not ready to run"))?;
+                    let job = ready_jobs.pop().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
                     let job_id = self.meta.id;
                     let spec = self.spec.clone();
                     let storage = self.storage.clone();
