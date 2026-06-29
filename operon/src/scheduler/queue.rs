@@ -151,7 +151,7 @@ pub(super) enum AnyJobQueue<const N: usize> {
 }
 
 impl<const N: usize> AnyJobQueue<N> {
-    pub fn from_meta(vec: Vec<Job<N>>, meta: &JobMetadata<N>) -> Self {
+    pub(super) fn from_meta(vec: Vec<Job<N>>, meta: &JobMetadata<N>) -> Self {
         if meta.priority.is_empty() {
             Self::Deque(vec.into())
         } else {
