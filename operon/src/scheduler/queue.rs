@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
-use std::sync::Arc;
 
 use crate::schema::{Direction, Job, JobMetadata};
 
@@ -42,7 +41,7 @@ impl<T> JobQueue<T> for DequeJobQueue<T> {
 }
 
 struct PriorityEntry<const N: usize> {
-    order: Arc<[(usize, Direction)]>,
+    order: &'static [(usize, Direction)],
     seq: u64,
     item: Job<N>,
 }
@@ -79,7 +78,7 @@ impl<const N: usize> Ord for PriorityEntry<N> {
 pub(super) struct PriorityJobQueue<const N: usize> {
     queue: BinaryHeap<PriorityEntry<N>>,
     next_seq: u64,
-    order: Arc<[(usize, Direction)]>,
+    order: &'static [(usize, Direction)],
 }
 
 impl<const N: usize> PriorityJobQueue<N> {
@@ -88,7 +87,7 @@ impl<const N: usize> PriorityJobQueue<N> {
         priority: &[(&'static str, Direction)],
         dims: &[&'static str; N],
     ) -> Self {
-        let order: Arc<[(usize, Direction)]> = priority
+        let order: &'static [(usize, Direction)] = priority
             .iter()
             .map(|&(dim, dir)| {
                 dims.iter()
@@ -98,7 +97,7 @@ impl<const N: usize> PriorityJobQueue<N> {
                     .expect("priority dimension not found in job dims")
             })
             .collect::<Vec<_>>()
-            .into();
+            .leak();
         let mut queue = Self {
             queue: BinaryHeap::with_capacity(vec.len()),
             next_seq: 0,
@@ -114,7 +113,7 @@ impl<const N: usize> JobQueue<Job<N>> for PriorityJobQueue<N> {
         let seq = self.next_seq;
         self.next_seq = self.next_seq.wrapping_add(1);
         self.queue.push(PriorityEntry {
-            order: Arc::clone(&self.order),
+            order: self.order,
             seq,
             item,
         });
