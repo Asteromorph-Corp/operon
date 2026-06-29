@@ -201,7 +201,7 @@ impl<const N: usize> JobQueue<Job<N>> for AnyJobQueue<N> {
 #[cfg(test)]
 mod tests {
     use super::{AnyJobQueue, JobQueue, PriorityJobQueue};
-    use crate::schema::{Direction, JobMetadata, Job};
+    use crate::schema::{Direction, Job, JobMetadata};
 
     fn job<const N: usize>(coords: [usize; N]) -> Job<N> {
         Job { coordinate: coords }
