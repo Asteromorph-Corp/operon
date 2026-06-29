@@ -52,26 +52,31 @@ impl LogRecord {
 
     pub fn format_for_term(&self, width: u16, verbose: bool) -> Vec<Line<'static>> {
         let timestamp = self.timestamp.format("%y-%m-%d %H:%M:%S").to_string();
-        let level_colour = match (self.source_type, self.level) {
-            (SourceType::Stderr, _) => {
-                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(168, 168, 168))
-            }
-            (SourceType::Stdout, _) => {
-                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(168, 168, 168))
-            }
-            (SourceType::Levelled, ::tracing::Level::ERROR) => ::ratatui::style::Style::new().red(),
-            (SourceType::Levelled, ::tracing::Level::WARN) => {
-                ::ratatui::style::Style::new().yellow()
-            }
-            (SourceType::Levelled, ::tracing::Level::INFO) => {
-                ::ratatui::style::Style::new().green()
-            }
-            (SourceType::Levelled, ::tracing::Level::DEBUG) => {
-                ::ratatui::style::Style::new().cyan()
-            }
-            (SourceType::Levelled, ::tracing::Level::TRACE) => {
-                ::ratatui::style::Style::new().white()
-            }
+        let (level_colour, dim_level_colour) = match (self.source_type, self.level) {
+            (SourceType::Stderr, _) | (SourceType::Stdout, _) => (
+                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(168, 168, 168)),
+                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(128, 128, 128)),
+            ),
+            (SourceType::Levelled, ::tracing::Level::ERROR) => (
+                ::ratatui::style::Style::new().light_red(),
+                ::ratatui::style::Style::new().red(),
+            ),
+            (SourceType::Levelled, ::tracing::Level::WARN) => (
+                ::ratatui::style::Style::new().light_yellow(),
+                ::ratatui::style::Style::new().yellow(),
+            ),
+            (SourceType::Levelled, ::tracing::Level::INFO) => (
+                ::ratatui::style::Style::new().light_green(),
+                ::ratatui::style::Style::new().green(),
+            ),
+            (SourceType::Levelled, ::tracing::Level::DEBUG) => (
+                ::ratatui::style::Style::new().light_cyan(),
+                ::ratatui::style::Style::new().cyan(),
+            ),
+            (SourceType::Levelled, ::tracing::Level::TRACE) => (
+                ::ratatui::style::Style::new().white(),
+                ::ratatui::style::Style::new().fg(::ratatui::style::Color::Rgb(168, 168, 168)),
+            ),
         };
         // Colour messages that echo shell input.
         let msg_colour = if self.msg.starts_with("$ ") {
@@ -106,7 +111,6 @@ impl LogRecord {
         let prefix_width = prefix.chars().count() + level.chars().count() + sep.chars().count();
         let available = (width as usize).saturating_sub(prefix_width).max(1);
         let sep_pos = prefix.chars().count() + level.chars().count();
-        let wrap_indent = " ".repeat(sep_pos.saturating_sub(3)) + "...│ ";
         let wrap_options = ::textwrap::Options::new(available);
 
         let mut lines: Vec<Line<'_>> = vec![];
@@ -118,14 +122,22 @@ impl LogRecord {
             };
 
             for (l, wrapped) in ::textwrap::wrap(&content, &wrap_options).iter().enumerate() {
-                let mut spans = if l == 0 {
+                let mut spans = if l == 0 && i == 0 {
                     vec![
                         Span::raw(prefix.clone()),
                         Span::styled(level.clone(), level_colour),
-                        Span::raw(sep.to_string()),
+                        Span::styled(sep.to_string(), dim_level_colour),
+                    ]
+                } else if l != 0 {
+                    vec![
+                        Span::raw(" ".repeat(sep_pos)),
+                        Span::styled(sep.to_string(), dim_level_colour),
                     ]
                 } else {
-                    vec![Span::raw(wrap_indent.clone())]
+                    vec![
+                        Span::styled(format!("{:>sep_pos$}", i + 1), dim_level_colour),
+                        Span::styled(sep.to_string(), dim_level_colour),
+                    ]
                 };
 
                 // NOTE: span context styling is only applied to the first wrapped fragment.

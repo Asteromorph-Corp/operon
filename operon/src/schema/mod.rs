@@ -14,7 +14,7 @@ pub(crate) use resolution::ResolutionLike;
 pub use resolution::{Resolution, ResolutionEnum};
 
 mod metadata;
-pub use metadata::{DimensionMetadata, EntityMetadata, JobMetadata};
+pub use metadata::{DimensionMetadata, Direction, EntityMetadata, JobMetadata};
 
 mod option_coordinate;
 pub use option_coordinate::OptionCoordinate;

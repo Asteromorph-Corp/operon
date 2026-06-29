@@ -1,6 +1,7 @@
+use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::{Direction, JobConfig};
 use crate::operon_ident;
 use crate::utils::{job_metadata_ident, to_lit_str};
 
@@ -13,6 +14,7 @@ use crate::utils::{job_metadata_ident, to_lit_str};
 ///         id: "beta",
 ///         dims: ["i"],
 ///         spawn_dim: Some("j"),
+///         priority: &[("i", operon::__private::Direction::Ascending)],
 ///     }
 /// }
 /// ```
@@ -29,6 +31,14 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
         }
         None => parse_quote! { None },
     };
+    let priority_items = job.priority.iter().map(|(dim, dir)| {
+        let dim_str = to_lit_str(dim);
+        let dir_tokens = match dir {
+            Direction::Ascending => quote! { #operon::__private::Direction::Ascending },
+            Direction::Descending => quote! { #operon::__private::Direction::Descending },
+        };
+        quote! { (#dim_str, #dir_tokens) }
+    });
 
     parse_quote! {
         pub const fn #fn_name() -> #operon::__private::JobMetadata<#n> {
@@ -36,6 +46,7 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
                 id: #id,
                 dims: [#(#dims),*],
                 spawn_dim: #spawn_dim,
+                priority: &[#(#priority_items),*],
             }
         }
     }
@@ -43,14 +54,23 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
 
 #[cfg(test)]
 mod tests {
+    use quote::format_ident;
     use rstest::rstest;
 
     use super::*;
     use crate::test_utils::assert_item_eq;
     use crate::test_utils::simple_pipeline::job_beta;
 
+    fn job_beta_with_priority() -> JobConfig {
+        JobConfig {
+            priority: vec![(format_ident!("i"), Direction::Ascending)],
+            ..job_beta()
+        }
+    }
+
     #[rstest]
     #[case(job_beta(), "metadata/job.rs")]
+    #[case(job_beta_with_priority(), "metadata/job.with_priority.rs")]
     fn test_job_metadata(#[case] job: JobConfig, #[case] fixture_path: &str) {
         let result = job_metadata(&job);
         assert_item_eq(&result, fixture_path);

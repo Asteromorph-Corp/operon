@@ -1,7 +1,7 @@
 # Operon
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](https://arxiv.org/abs/2511.16080)
-[![Kellnr](https://img.shields.io/badge/kellnr-v0.2.4-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
+[![Kellnr](https://img.shields.io/badge/kellnr-v0.3.0-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-yellow.svg)](LICENSE-MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.91+-lightgray.svg)](https://blog.rust-lang.org/2025/10/30/Rust-1.91.0/)
 
@@ -10,20 +10,29 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 
 ## Table of Contents
 
-1. [Examples & Demo](#examples--demo)
-2. [Prerequisites](#prerequisites)
-3. [Quick Start](#quick-start)
-4. [Key Features](#key-features)
-5. [Usage](#usage)
+- [Operon](#operon)
+  - [Table of Contents](#table-of-contents)
+  - [Examples \& Demo](#examples--demo)
+  - [Prerequisites](#prerequisites)
+  - [Quick Start](#quick-start)
+  - [Key Features](#key-features)
+    - [Running DAG-Defined Tasks](#running-dag-defined-tasks)
+    - [Multiplexing](#multiplexing)
+    - [Incremental Scheduling](#incremental-scheduling)
+    - [Transactional Backend](#transactional-backend)
+    - [Interactive UI \& Workflow Control](#interactive-ui--workflow-control)
+    - [Per-Task Parallelism](#per-task-parallelism)
+  - [Usage](#usage)
     - [Installation](#installation)
     - [Defining Entities](#defining-entities)
     - [Defining the Pipeline](#defining-the-pipeline)
     - [Implementing the Service](#implementing-the-service)
     - [Implementing the Storage (Optional)](#implementing-the-storage-optional)
     - [Running Operon](#running-operon)
-        - [Operon TUI](#operon-tui)
-6. [Roadmap](#roadmap)
-7. [License](#license)
+      - [Operon TUI](#operon-tui)
+  - [Roadmap](#roadmap)
+  - [License](#license)
+    - [Contribution](#contribution)
 
 ## Examples & Demo
 
@@ -110,7 +119,7 @@ Add Operon to your project's dependencies by including the following in your `Ca
 
 ```toml
 [dependencies]
-operon = { version = "0.2.4", registry = "kellnr" }
+operon = { version = "0.3.0", registry = "kellnr" }
 ```
 
 Alternatively, clone this repository:
