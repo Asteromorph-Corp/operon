@@ -226,7 +226,7 @@ impl Parse for AllConfig {
                 dims: dims.clone(),
                 spawn_dim: new_entity.dims.first().cloned(),
                 pool_size: pool,
-                priority: job.operon_attrs.priority,
+                priority: job.operon_attrs.priority.unwrap_or_default(),
             };
             jobs.insert(job.id, job_config);
         }

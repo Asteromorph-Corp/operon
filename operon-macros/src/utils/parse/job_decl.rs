@@ -9,7 +9,7 @@ use crate::configs::Direction;
 /// Parsed contents of `#[operon(...)]` on a job declaration.
 #[derive(Debug, Default)]
 pub(super) struct OperonJobAttrs {
-    pub(super) priority: Vec<(Ident, Direction)>,
+    pub(super) priority: Option<Vec<(Ident, Direction)>>,
 }
 
 #[derive(Debug)]
@@ -82,29 +82,30 @@ impl JobDecl {
                 ));
             }
         }
-        for (dim, _) in &self.operon_attrs.priority {
-            if !self.dims.iter().any(|d| d == dim) {
-                return Err(syn::Error::new(
-                    dim.span(),
-                    format!(
-                        "Priority dimension '{}' is not in the dimension set of job '{}'",
-                        dim, self.id
-                    ),
-                ));
+        if let Some(priority) = &self.operon_attrs.priority {
+            for (dim, _) in priority {
+                if !self.dims.iter().any(|d| d == dim) {
+                    return Err(syn::Error::new(
+                        dim.span(),
+                        format!(
+                            "Priority dimension '{}' is not in the dimension set of job '{}'",
+                            dim, self.id
+                        ),
+                    ));
+                }
             }
         }
-        for (i, (dim, _)) in self.operon_attrs.priority.iter().enumerate() {
-            if self.operon_attrs.priority[..i]
-                .iter()
-                .any(|(d, _)| d == dim)
-            {
-                return Err(syn::Error::new(
-                    dim.span(),
-                    format!(
-                        "Priority dimension '{}' appears more than once in job '{}'",
-                        dim, self.id
-                    ),
-                ));
+        if let Some(priority) = &self.operon_attrs.priority {
+            for (i, (dim, _)) in priority.iter().enumerate() {
+                if priority[..i].iter().any(|(d, _)| d == dim) {
+                    return Err(syn::Error::new(
+                        dim.span(),
+                        format!(
+                            "Priority dimension '{}' appears more than once in job '{}'",
+                            dim, self.id
+                        ),
+                    ));
+                }
             }
         }
         Ok(())
@@ -191,6 +192,10 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
         }
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("ord") {
+                if let Some(_) = result.priority {
+                    return Err(meta.error("Multiple `ord` keys found in `#[operon(...)]`"));
+                }
+                let mut priority = Vec::new();
                 let value = meta.value()?;
                 let content;
                 syn::parenthesized!(content in value);
@@ -205,11 +210,12 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
                     } else {
                         Direction::Ascending
                     };
-                    result.priority.push((dim, dir));
+                    priority.push((dim, dir));
                     if !content.is_empty() {
                         content.parse::<Token![,]>()?;
                     }
                 }
+                result.priority = Some(priority);
                 Ok(())
             } else {
                 Err(meta.error("Unknown key in `#[operon(...)]`; accepted keys are: {`ord`}"))
@@ -235,7 +241,7 @@ mod tests {
         assert!(parsed._for_token.is_none());
         assert!(parsed.pool.is_none());
         assert!(parsed.dims.is_empty());
-        assert!(parsed.operon_attrs.priority.is_empty());
+        assert!(parsed.operon_attrs.priority.is_none());
     }
     #[test]
     fn test_job_decl_all() {
@@ -270,11 +276,15 @@ mod tests {
     fn test_job_decl_priority_valid_dims() {
         let input = "#[operon(ord=(-k, i))] E = epsilon(B<j>, D<j>) for(4) i, k;";
         let parsed: JobDecl = parse_str(input).expect("Failed to parse");
-        assert_eq!(parsed.operon_attrs.priority.len(), 2);
-        assert_eq!(parsed.operon_attrs.priority[0].0.to_string(), "k");
-        assert_eq!(parsed.operon_attrs.priority[0].1, Direction::Descending);
-        assert_eq!(parsed.operon_attrs.priority[1].0.to_string(), "i");
-        assert_eq!(parsed.operon_attrs.priority[1].1, Direction::Ascending);
+        let priority = parsed
+            .operon_attrs
+            .priority
+            .expect("Priority should be present");
+        assert_eq!(priority.len(), 2);
+        assert_eq!(priority[0].0.to_string(), "k");
+        assert_eq!(priority[0].1, Direction::Descending);
+        assert_eq!(priority[1].0.to_string(), "i");
+        assert_eq!(priority[1].1, Direction::Ascending);
     }
 
     #[test]
