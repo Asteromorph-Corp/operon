@@ -2,12 +2,11 @@ use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use std::sync::Arc;
 
-use super::SchedulerError;
 use crate::schema::{Direction, Job, JobMetadata};
 
 pub(super) trait JobQueue<T> {
-    fn push(&mut self, item: T) -> Result<(), SchedulerError>;
-    fn extend<I>(&mut self, iter: I) -> Result<(), SchedulerError>
+    fn push(&mut self, item: T);
+    fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = T>;
     fn pop(&mut self) -> Option<T>;
@@ -22,17 +21,15 @@ impl<T> From<Vec<T>> for DequeJobQueue<T> {
     }
 }
 impl<T> JobQueue<T> for DequeJobQueue<T> {
-    fn push(&mut self, item: T) -> Result<(), SchedulerError> {
+    fn push(&mut self, item: T) {
         self.0.push_back(item);
-        Ok(())
     }
 
-    fn extend<I>(&mut self, iter: I) -> Result<(), SchedulerError>
+    fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = T>,
     {
         self.0.extend(iter);
-        Ok(())
     }
 
     fn pop(&mut self) -> Option<T> {
@@ -90,33 +87,30 @@ impl<const N: usize> PriorityJobQueue<N> {
         vec: Vec<Job<N>>,
         priority: &[(&'static str, Direction)],
         dims: &[&'static str; N],
-    ) -> Result<Self, SchedulerError> {
+    ) -> Self {
         let order: Arc<[(usize, Direction)]> = priority
             .iter()
             .map(|&(dim, dir)| {
                 dims.iter()
                     .position(|d| *d == dim)
                     .map(|idx| (idx, dir))
-                    .ok_or_else(|| {
-                        SchedulerError::other(format!(
-                            "Priority dimension `{dim}` not found in job dimensions"
-                        ))
-                    })
+                    // Validated at macro-expansion time
+                    .expect("priority dimension not found in job dims")
             })
-            .collect::<Result<Vec<_>, _>>()?
+            .collect::<Vec<_>>()
             .into();
         let mut queue = Self {
             queue: BinaryHeap::with_capacity(vec.len()),
             next_seq: 0,
             order,
         };
-        queue.extend(vec)?;
-        Ok(queue)
+        queue.extend(vec);
+        queue
     }
 }
 
 impl<const N: usize> JobQueue<Job<N>> for PriorityJobQueue<N> {
-    fn push(&mut self, item: Job<N>) -> Result<(), SchedulerError> {
+    fn push(&mut self, item: Job<N>) {
         let seq = self.next_seq;
         self.next_seq = self.next_seq.wrapping_add(1);
         self.queue.push(PriorityEntry {
@@ -124,17 +118,15 @@ impl<const N: usize> JobQueue<Job<N>> for PriorityJobQueue<N> {
             seq,
             item,
         });
-        Ok(())
     }
 
-    fn extend<I>(&mut self, iter: I) -> Result<(), SchedulerError>
+    fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = Job<N>>,
     {
         for item in iter {
-            self.push(item)?;
+            self.push(item);
         }
-        Ok(())
     }
 
     fn pop(&mut self) -> Option<Job<N>> {
@@ -152,28 +144,24 @@ pub(super) enum AnyJobQueue<const N: usize> {
 }
 
 impl<const N: usize> AnyJobQueue<N> {
-    pub fn from_meta(vec: Vec<Job<N>>, meta: &JobMetadata<N>) -> Result<Self, SchedulerError> {
+    pub fn from_meta(vec: Vec<Job<N>>, meta: &JobMetadata<N>) -> Self {
         if meta.priority.is_empty() {
-            Ok(Self::Deque(vec.into()))
+            Self::Deque(vec.into())
         } else {
-            Ok(Self::Priority(PriorityJobQueue::new(
-                vec,
-                meta.priority,
-                &meta.dims,
-            )?))
+            Self::Priority(PriorityJobQueue::new(vec, meta.priority, &meta.dims))
         }
     }
 }
 
 impl<const N: usize> JobQueue<Job<N>> for AnyJobQueue<N> {
-    fn push(&mut self, item: Job<N>) -> Result<(), SchedulerError> {
+    fn push(&mut self, item: Job<N>) {
         match self {
             Self::Deque(q) => q.push(item),
             Self::Priority(q) => q.push(item),
         }
     }
 
-    fn extend<I>(&mut self, iter: I) -> Result<(), SchedulerError>
+    fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = Job<N>>,
     {
@@ -219,8 +207,7 @@ mod tests {
             vec![job([3]), job([1]), job([2])],
             &[("i", Direction::Ascending)],
             &["i"],
-        )
-        .unwrap();
+        );
         assert_eq!(drain_coords(&mut q), [[1], [2], [3]]);
     }
 
@@ -230,8 +217,7 @@ mod tests {
             vec![job([1]), job([3]), job([2])],
             &[("i", Direction::Descending)],
             &["i"],
-        )
-        .unwrap();
+        );
         assert_eq!(drain_coords(&mut q), [[3], [2], [1]]);
     }
 
@@ -241,8 +227,7 @@ mod tests {
             vec![job([2, 1]), job([1, 2]), job([1, 1])],
             &[("tier", Direction::Ascending), ("id", Direction::Ascending)],
             &["tier", "id"],
-        )
-        .unwrap();
+        );
         assert_eq!(drain_coords(&mut q), [[1, 1], [1, 2], [2, 1]]);
     }
 
@@ -256,8 +241,7 @@ mod tests {
                 ("id", Direction::Descending),
             ],
             &["tier", "id"],
-        )
-        .unwrap();
+        );
         assert_eq!(drain_coords(&mut q), [[1, 2], [1, 1], [2, 1]]);
     }
 
@@ -265,11 +249,10 @@ mod tests {
     fn fifo_tiebreak_within_equal_priority() {
         // Only `tier` is a priority dim; `id` is a passenger coordinate for identification.
         let mut q =
-            PriorityJobQueue::<2>::new(vec![], &[("tier", Direction::Ascending)], &["tier", "id"])
-                .unwrap();
-        q.push(job([1, 10])).unwrap();
-        q.push(job([1, 20])).unwrap();
-        q.push(job([1, 30])).unwrap();
+            PriorityJobQueue::<2>::new(vec![], &[("tier", Direction::Ascending)], &["tier", "id"]);
+        q.push(job([1, 10]));
+        q.push(job([1, 20]));
+        q.push(job([1, 30]));
         // All same tier: pop in push order (FIFO)
         assert_eq!(drain_coords(&mut q), [[1, 10], [1, 20], [1, 30]]);
     }
@@ -282,7 +265,7 @@ mod tests {
             spawn_dim: None,
             priority: &[],
         };
-        let q = AnyJobQueue::from_meta(vec![], &meta).unwrap();
+        let q = AnyJobQueue::from_meta(vec![], &meta);
         assert!(matches!(q, AnyJobQueue::Deque(_)));
     }
 
@@ -294,7 +277,7 @@ mod tests {
             spawn_dim: None,
             priority: &[("i", Direction::Ascending)],
         };
-        let q = AnyJobQueue::from_meta(vec![], &meta).unwrap();
+        let q = AnyJobQueue::from_meta(vec![], &meta);
         assert!(matches!(q, AnyJobQueue::Priority(_)));
     }
 }

@@ -241,7 +241,7 @@ where
             .ok_or(SchedulerError::other(
                 "Some initial tickets are not actually ready to run",
             ))?;
-        let mut ready_jobs = AnyJobQueue::from_meta(initial_jobs, &self.meta)?;
+        let mut ready_jobs = AnyJobQueue::from_meta(initial_jobs, &self.meta);
         let mut got_all_updates = false;
         let mut is_stopping = false;
 
@@ -316,7 +316,7 @@ where
                                 Peer channel has {} events left.",
                                 self.meta.id, peer_rx.len()
                             );
-                            ready_jobs.extend(self.on_event_ready_jobs(evt, peer_txs).await?)?
+                            ready_jobs.extend(self.on_event_ready_jobs(evt, peer_txs).await?)
                         },
                         None => {
                             // The peer channel was closed,
