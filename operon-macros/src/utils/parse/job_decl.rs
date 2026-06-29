@@ -192,7 +192,7 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
         }
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("ord") {
-                if let Some(_) = result.priority {
+                if result.priority.is_some() {
                     return Err(meta.error("Multiple `ord` keys found in `#[operon(...)]`"));
                 }
                 let mut priority = Vec::new();
