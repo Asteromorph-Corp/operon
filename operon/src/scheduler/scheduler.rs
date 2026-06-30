@@ -69,6 +69,7 @@ where
 
     /// Main entry point for the scheduler.
     pub async fn work(mut self) -> Result<(), SchedulerError> {
+        self.ctx.handler.validate_pool_sizes();
         self.ctx.storage.init().await?;
         self.init_meta_storage().await?;
 

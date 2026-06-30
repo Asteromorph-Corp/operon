@@ -4,9 +4,10 @@ use indexmap::IndexMap;
 use syn::parse::{Parse, ParseBuffer};
 
 use super::config_decl::ConfigDecl;
+use super::job_decl::OperonJobAttrs;
 use crate::configs::{
     AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
-    JobConfig, JobConfigMap,
+    JobConfig, JobConfigMap, PoolSizeSpec,
 };
 
 fn validate_downwards_closed<'a>(
@@ -75,15 +76,15 @@ impl Parse for AllConfig {
         for job in config_decl.jobs {
             let new_entity = job.spawned_entity;
             let args = job.args;
-            let pool = job
-                .pool
-                .map(|lit| {
-                    lit.base10_parse::<usize>().map_err(|_| {
-                        syn::Error::new(lit.span(), format!("Invalid pool value: '{lit}'"))
-                    })
-                })
-                .transpose()?
-                .unwrap_or(1);
+            let OperonJobAttrs { priority, concurrency } = job.operon_attrs;
+            let pool_size = if let Some(ref lit) = job.pool {
+                let val = lit.base10_parse::<usize>().map_err(|_| {
+                    syn::Error::new(lit.span(), format!("Invalid pool value: '{lit}'"))
+                })?;
+                PoolSizeSpec::Literal(val)
+            } else {
+                concurrency.unwrap_or(PoolSizeSpec::Literal(1))
+            };
             let dims = job.dims;
 
             // Deduplicate and verify
@@ -225,8 +226,8 @@ impl Parse for AllConfig {
                 to: new_entity.id,
                 dims: dims.clone(),
                 spawn_dim: new_entity.dims.first().cloned(),
-                pool_size: pool,
-                priority: job.operon_attrs.priority.unwrap_or_default(),
+                pool_size,
+                priority: priority.unwrap_or_default(),
             };
             jobs.insert(job.id, job_config);
         }
