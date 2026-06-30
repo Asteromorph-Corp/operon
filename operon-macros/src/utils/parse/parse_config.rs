@@ -76,7 +76,10 @@ impl Parse for AllConfig {
         for job in config_decl.jobs {
             let new_entity = job.spawned_entity;
             let args = job.args;
-            let OperonJobAttrs { priority, concurrency } = job.operon_attrs;
+            let OperonJobAttrs {
+                priority,
+                concurrency,
+            } = job.operon_attrs;
             let pool_size = if let Some(ref lit) = job.pool {
                 let val = lit.base10_parse::<usize>().map_err(|_| {
                     syn::Error::new(lit.span(), format!("Invalid pool value: '{lit}'"))

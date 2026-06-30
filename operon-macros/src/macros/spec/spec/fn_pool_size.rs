@@ -31,15 +31,12 @@ pub(super) fn fn_pool_size(job: &JobConfig) -> syn::ImplItemFn {
             }
         }
         PoolSizeSpec::Env(var_name) => {
-            let expect_not_set = format!(
-                "Environment variable `{var_name}` not set for job concurrency"
-            );
-            let expect_not_usize = format!(
-                "Environment variable `{var_name}` is not a valid concurrency value"
-            );
-            let expect_nonzero = format!(
-                "Environment variable `{var_name}` must not be zero for job concurrency"
-            );
+            let expect_not_set =
+                format!("Environment variable `{var_name}` not set for job concurrency");
+            let expect_not_usize =
+                format!("Environment variable `{var_name}` is not a valid concurrency value");
+            let expect_nonzero =
+                format!("Environment variable `{var_name}` must not be zero for job concurrency");
             parse_quote! {
                 fn pool_size(&self) -> usize {
                     let v = ::std::env::var(#var_name)

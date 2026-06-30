@@ -388,7 +388,7 @@ mod tests {
             "#[operon(unknown_key)] E = job() for i;",           // Unknown operon key
             "#[operon(concurrency=0)] E = job() for i;",         // Zero concurrency
             "#[operon(concurrency=8)] E = job() for(4) i;",      // Conflict with for(N)
-            "#[operon(concurrency=8)] #[operon(concurrency_env=X)] E = job() for i;", // Duplicate concurrency
+            "#[operon(concurrency=8)] #[operon(concurrency_env=X)] E = job() for i;", /* Duplicate concurrency */
         ];
         let results = malformed_inputs
             .into_iter()
