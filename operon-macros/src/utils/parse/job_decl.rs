@@ -4,12 +4,13 @@ use syn::token::Paren;
 use syn::{Ident, LitInt, Token};
 
 use super::entity_decl::EntityDecl;
-use crate::configs::Direction;
+use crate::configs::{Direction, PoolSizeSpec};
 
 /// Parsed contents of `#[operon(...)]` on a job declaration.
 #[derive(Debug, Default)]
 pub(super) struct OperonJobAttrs {
     pub(super) priority: Option<Vec<(Ident, Direction)>>,
+    pub(super) concurrency: Option<PoolSizeSpec>,
 }
 
 #[derive(Debug)]
@@ -107,6 +108,15 @@ impl JobDecl {
                     ));
                 }
             }
+        }
+        if self.pool.is_some() && self.operon_attrs.concurrency.is_some() {
+            return Err(syn::Error::new(
+                self._span,
+                format!(
+                    "Job '{}' specifies concurrency via both 'for(N)' and '#[operon(...)]'; use only one",
+                    self.id
+                ),
+            ));
         }
         Ok(())
     }
@@ -217,8 +227,62 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
                 }
                 result.priority = Some(priority);
                 Ok(())
+            } else if meta.path.is_ident("concurrency") {
+                if result.concurrency.is_some() {
+                    return Err(meta.error(
+                        "Multiple concurrency keys found in `#[operon(...)]`",
+                    ));
+                }
+                let value = meta.value()?;
+                let lit: LitInt = value.parse()?;
+                let val = lit.base10_parse::<usize>().map_err(|_| {
+                    syn::Error::new(
+                        lit.span(),
+                        "Invalid concurrency value; expected a positive integer",
+                    )
+                })?;
+                if val == 0 {
+                    return Err(syn::Error::new(
+                        lit.span(),
+                        "Concurrency value of 0 is not allowed",
+                    ));
+                }
+                result.concurrency = Some(PoolSizeSpec::Literal(val));
+                Ok(())
+            } else if meta.path.is_ident("concurrency_env") {
+                if result.concurrency.is_some() {
+                    return Err(meta.error(
+                        "Multiple concurrency keys found in `#[operon(...)]`",
+                    ));
+                }
+                let value = meta.value()?;
+                let ident: Ident = value.parse()?;
+                let var_name = ident.to_string();
+                // Validate at macro-expansion time if the variable is already in the environment.
+                // If not, we skip validation and let the runtime handle it.
+                if let Ok(val_str) = std::env::var(&var_name) {
+                    match val_str.parse::<usize>() {
+                        Err(_) => return Err(syn::Error::new(
+                            ident.span(),
+                            format!(
+                                "Environment variable `{var_name}` is not a valid concurrency value (got \"{val_str}\")"
+                            ),
+                        )),
+                        Ok(0) => return Err(syn::Error::new(
+                            ident.span(),
+                            format!(
+                                "Environment variable `{var_name}` must not be zero for job concurrency"
+                            ),
+                        )),
+                        Ok(_) => {}
+                    }
+                }
+                result.concurrency = Some(PoolSizeSpec::Env(var_name));
+                Ok(())
             } else {
-                Err(meta.error("Unknown key in `#[operon(...)]`; accepted keys are: {`ord`}"))
+                Err(meta.error(
+                    "Unknown key in `#[operon(...)]`; accepted keys are: `ord`, `concurrency`, `concurrency_env`",
+                ))
             }
         })?;
     }
@@ -288,6 +352,27 @@ mod tests {
     }
 
     #[test]
+    fn test_job_decl_concurrency_literal() {
+        let input = "#[operon(concurrency=8)] E = epsilon(B<j>, D<j>) for i, k;";
+        let parsed: JobDecl = parse_str(input).expect("Failed to parse");
+        assert_eq!(
+            parsed.operon_attrs.concurrency,
+            Some(PoolSizeSpec::Literal(8))
+        );
+        assert!(parsed.pool.is_none());
+    }
+
+    #[test]
+    fn test_job_decl_concurrency_env() {
+        let input = "#[operon(concurrency_env=JOB_CONCURRENCY)] E = epsilon(B<j>, D<j>) for i, k;";
+        let parsed: JobDecl = parse_str(input).expect("Failed to parse");
+        assert_eq!(
+            parsed.operon_attrs.concurrency,
+            Some(PoolSizeSpec::Env("JOB_CONCURRENCY".to_string()))
+        );
+    }
+
+    #[test]
     fn test_job_decl_malformed() {
         let malformed_inputs = [
             "Entity = JobName() for i",                          // Missing semicolon
@@ -301,6 +386,9 @@ mod tests {
             "#[operon(ord=(i, i))] E = job() for i;",            // Duplicate priority dim
             "#[unknown] E = job() for i;",                       // Unknown attribute
             "#[operon(unknown_key)] E = job() for i;",           // Unknown operon key
+            "#[operon(concurrency=0)] E = job() for i;",         // Zero concurrency
+            "#[operon(concurrency=8)] E = job() for(4) i;",      // Conflict with for(N)
+            "#[operon(concurrency=8)] #[operon(concurrency_env=X)] E = job() for i;", /* Duplicate concurrency */
         ];
         let results = malformed_inputs
             .into_iter()

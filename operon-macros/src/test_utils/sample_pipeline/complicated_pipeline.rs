@@ -15,7 +15,7 @@ use quote::format_ident;
 
 use crate::configs::{
     AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
-    JobConfig, JobConfigMap,
+    JobConfig, JobConfigMap, PoolSizeSpec,
 };
 
 pub fn job_alpha() -> JobConfig {
@@ -25,7 +25,7 @@ pub fn job_alpha() -> JobConfig {
         to: format_ident!("A"),
         dims: vec![],
         spawn_dim: None,
-        pool_size: 1,
+        pool_size: PoolSizeSpec::Literal(1),
         priority: vec![],
     }
 }
@@ -37,7 +37,7 @@ pub fn job_beta() -> JobConfig {
         to: format_ident!("B"),
         dims: vec![],
         spawn_dim: Some(format_ident!("i")),
-        pool_size: 1,
+        pool_size: PoolSizeSpec::Literal(1),
         priority: vec![],
     }
 }
@@ -58,7 +58,7 @@ pub fn job_gamma() -> JobConfig {
         to: format_ident!("C"),
         dims: vec![format_ident!("i")],
         spawn_dim: Some(format_ident!("j")),
-        pool_size: 8,
+        pool_size: PoolSizeSpec::Literal(8),
         priority: vec![],
     }
 }
@@ -73,7 +73,7 @@ pub fn job_delta() -> JobConfig {
         to: format_ident!("D"),
         dims: vec![format_ident!("i"), format_ident!("j")],
         spawn_dim: Some(format_ident!("k")),
-        pool_size: 4,
+        pool_size: PoolSizeSpec::Literal(4),
         priority: vec![],
     }
 }
@@ -94,7 +94,7 @@ pub fn job_epsilon() -> JobConfig {
         to: format_ident!("E"),
         dims: vec![format_ident!("i")],
         spawn_dim: Some(format_ident!("l")),
-        pool_size: 2,
+        pool_size: PoolSizeSpec::Literal(2),
         priority: vec![],
     }
 }

@@ -54,6 +54,15 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         Self { job_handlers }
     }
 
+    /// Eagerly resolve every handler's pool size, panicking immediately if an
+    /// environment variable is missing or invalid rather than waiting until
+    /// the user issues a `run` command.
+    pub(crate) fn validate_pool_sizes(&self) {
+        for handler in &self.job_handlers {
+            let _ = handler.pool_size();
+        }
+    }
+
     pub(crate) fn job_ids(&self) -> Vec<&'static str> {
         self.job_handlers
             .iter()

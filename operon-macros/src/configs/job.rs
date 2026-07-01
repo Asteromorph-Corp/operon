@@ -8,6 +8,15 @@ pub enum Direction {
     Descending,
 }
 
+/// The concurrency (pool size) specification for a job.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum PoolSizeSpec {
+    /// A fixed concurrency level, e.g. from `for(8)` or `#[operon(concurrency=8)]`.
+    Literal(usize),
+    /// Read from a named environment variable at runtime, e.g. `#[operon(concurrency_env=VAR)]`.
+    Env(String),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JobArg {
     pub id: syn::Ident,
@@ -27,8 +36,8 @@ pub struct JobConfig {
     pub dims: Vec<syn::Ident>,
     /// Dimension this job spawns.
     pub spawn_dim: Option<syn::Ident>,
-    /// The pool size for this job.
-    pub pool_size: usize,
+    /// The pool size specification for this job.
+    pub pool_size: PoolSizeSpec,
     /// Priority ordering for the job queue. Empty means FIFO.
     pub priority: Vec<(syn::Ident, Direction)>,
 }

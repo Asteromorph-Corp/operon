@@ -47,6 +47,7 @@ where
         sched_tx: SchedulerStateSender,
         options: SchedulerOptions,
     ) -> Result<Self, SchedulerError> {
+        handler.validate_pool_sizes();
         let (channel_size, ui_mode, meta_storage_options) = options.split();
         let meta_storage = MetaStorage::new(meta_storage_options)?;
 
