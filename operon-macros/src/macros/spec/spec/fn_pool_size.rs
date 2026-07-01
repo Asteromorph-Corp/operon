@@ -14,10 +14,12 @@ use crate::configs::{JobConfig, PoolSizeSpec};
 /// # Example (env var)
 /// ```rust,ignore
 /// fn pool_size(&self) -> usize {
-///     ::std::env::var("SOME_ENV")
+///     let v = ::std::env::var("SOME_ENV")
 ///         .expect("Environment variable `SOME_ENV` not set for job concurrency")
 ///         .parse::<usize>()
-///         .expect("Environment variable `SOME_ENV` is not a valid concurrency value")
+///         .expect("Environment variable `SOME_ENV` is not a valid concurrency value");
+///     assert!(v != 0, "Environment variable `SOME_ENV` must not be zero for job concurrency");
+///     v
 /// }
 /// ```
 pub(super) fn fn_pool_size(job: &JobConfig) -> syn::ImplItemFn {
