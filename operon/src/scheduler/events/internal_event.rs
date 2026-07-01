@@ -10,4 +10,7 @@ pub enum InternalEvent<J, R> {
     JobSuccess(J, R),
     /// A job failed.
     JobFailure(J, SchedulerError),
+    /// All outstanding pool permits were reclaimed and forgotten in the
+    /// background, following a `Pause` or graceful `Quit`.
+    PermitsReclaimed,
 }

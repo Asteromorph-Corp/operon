@@ -256,14 +256,15 @@ where
                 // 0. Check the control channel.
                 Some(ctrl_event) = ctrl_rx.recv() => {
                     match ctrl_event {
-                        IndividualControlEvent::Pause if self.state == TaskState::Running => self.handle_pause().await?,
+                        IndividualControlEvent::Pause if self.state == TaskState::Running => self.handle_pause().await,
                         IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await?,
                         IndividualControlEvent::Quit { force: false } => {
-                            self.handle_graceful_stop().await?;
+                            self.handle_graceful_stop().await;
                             is_stopping = true;
                         }
                         IndividualControlEvent::Quit { force: true } => {
                             tracing::info!("Aborting `{}` jobs.", self.meta.id);
+                            self.handles.abort_all();
                             // If this is a finished scheduler rolling out peer events,
                             // don't change the state to `Stopped`,
                             // since it is already `Finished`.
@@ -279,9 +280,9 @@ where
                 // 1. An internal event.
                 Some(int_event) = self.handles.join_next() => {
                     let int_event = int_event??;
-                    self.update_progress().await?;
                     match int_event {
                         InternalEvent::JobSuccess(job, resolution) => {
+                            self.update_progress().await?;
                             // Trace the job success
                             tracing::trace!(
                                 "{} received internal event: JobSuccess({job:?}, {resolution:?}).",
@@ -298,10 +299,14 @@ where
                             }
                         }
                         InternalEvent::JobFailure(job, e) => {
+                            self.update_progress().await?;
                             // Log the error
                             tracing::error!("Job {job:?} failed: {e}");
                             // Return the error to the top-level scheduler
                             return Err(e);
+                        }
+                        InternalEvent::PermitsReclaimed => {
+                            tracing::debug!("Reclaimed all `{}` permits.", self.meta.id);
                         }
                     }
                 }
@@ -330,10 +335,10 @@ where
                 }
 
                 // 3. Run a job.
-                // If the scheduler is paused, the pool will not yield a permit
-                // since the pool will have forgotten the permits.
+                // Gated on `Running` since permits stay held until the
+                // in-flight `PermitsReclaimed` task completes.
                 permit = pool.clone().acquire_owned(),
-                    if !ready_jobs.is_empty()
+                    if !ready_jobs.is_empty() && self.state == TaskState::Running
                 => {
                     let permit = permit?;
                     let job = ready_jobs.pop().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
@@ -370,18 +375,9 @@ where
         }
     }
 
-    async fn handle_pause(&mut self) -> Result<(), SchedulerError> {
+    async fn handle_pause(&mut self) {
         tracing::info!("Pausing `{}` jobs.", self.meta.id);
-        self.set_state(TaskState::Paused).await;
-        // Acquire and forget all permits.
-        let permit = self
-            .pool
-            .clone()
-            .acquire_many_owned(self.pool_size as u32)
-            .await?;
-        permit.forget();
-        tracing::debug!("Remaining `{}` jobs were finished.", self.meta.id);
-        Ok(())
+        self.spawn_permit_reclaim().await;
     }
 
     async fn handle_resume(&mut self) -> Result<(), SchedulerError> {
@@ -392,22 +388,25 @@ where
         Ok(())
     }
 
-    async fn handle_graceful_stop(&mut self) -> Result<(), SchedulerError> {
+    async fn handle_graceful_stop(&mut self) {
         if self.state == TaskState::Paused {
-            return Ok(());
+            return;
         }
 
         tracing::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
-        self.set_state(TaskState::Paused).await;
+        self.spawn_permit_reclaim().await;
+    }
 
-        // Acquire and forget all permits.
-        let permit = self
-            .pool
-            .clone()
-            .acquire_many_owned(self.pool_size as u32)
-            .await?;
-        permit.forget();
-        tracing::debug!("Remaining `{}` jobs were finished.", self.meta.id);
-        Ok(())
+    /// Mark the scheduler `Paused` and reclaim every pool permit via a task on
+    /// `self.handles`, so the `ctrl_rx` branch never blocks on in-flight jobs
+    /// and stays responsive to a subsequent `Quit { force: true }`.
+    async fn spawn_permit_reclaim(&mut self) {
+        self.set_state(TaskState::Paused).await;
+        let pool = self.pool.clone();
+        let pool_size = self.pool_size as u32;
+        self.handles.spawn(async move {
+            pool.acquire_many_owned(pool_size).await?.forget();
+            Ok(InternalEvent::PermitsReclaimed)
+        });
     }
 }
