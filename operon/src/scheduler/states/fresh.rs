@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::events::{ControlEvent, RunEventInner};
-use crate::scheduler::states::start::StartTransition;
+use crate::scheduler::states::clean::CleanTransition;
 use crate::scheduler::states::{NextState, SchedulerState, TransitionState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -43,7 +43,7 @@ where
     }
 
     fn into_running(self) -> TransitionState {
-        StartTransition::state(self.ctx, self.channel_size, self.run_id, true)
+        CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 }
 
