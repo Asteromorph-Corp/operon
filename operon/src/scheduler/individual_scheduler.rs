@@ -37,7 +37,6 @@ where
     pub storage: Arc<Sto>,
     pub meta_storage: MetaStorage,
     pub pool: Arc<Semaphore>,
-    pub pool_size: usize,
     pub progress: SharedProgress,
     pub state: TaskState,
     pub handles: JoinSet<Result<InternalEvent<Job<N>, JS::Resolution>, SchedulerError>>,
@@ -64,7 +63,6 @@ where
             service,
             meta_storage,
             pool: Arc::new(Semaphore::new(pool_size)),
-            pool_size,
             progress,
             state: TaskState::Running,
             handles: JoinSet::new(),
@@ -257,7 +255,7 @@ where
                 Some(ctrl_event) = ctrl_rx.recv() => {
                     match ctrl_event {
                         IndividualControlEvent::Pause if self.state == TaskState::Running => self.handle_pause().await,
-                        IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await?,
+                        IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await,
                         IndividualControlEvent::Quit { force: false } => {
                             self.handle_graceful_stop().await;
                             is_stopping = true;
@@ -280,9 +278,9 @@ where
                 // 1. An internal event.
                 Some(int_event) = self.handles.join_next() => {
                     let int_event = int_event??;
+                    self.update_progress().await?;
                     match int_event {
                         InternalEvent::JobSuccess(job, resolution) => {
-                            self.update_progress().await?;
                             // Trace the job success
                             tracing::trace!(
                                 "{} received internal event: JobSuccess({job:?}, {resolution:?}).",
@@ -299,14 +297,10 @@ where
                             }
                         }
                         InternalEvent::JobFailure(job, e) => {
-                            self.update_progress().await?;
                             // Log the error
                             tracing::error!("Job {job:?} failed: {e}");
                             // Return the error to the top-level scheduler
                             return Err(e);
-                        }
-                        InternalEvent::PermitsReclaimed => {
-                            tracing::debug!("Reclaimed all `{}` permits.", self.meta.id);
                         }
                     }
                 }
@@ -335,8 +329,8 @@ where
                 }
 
                 // 3. Run a job.
-                // Gated on `Running` since permits stay held until the
-                // in-flight `PermitsReclaimed` task completes.
+                // Gated on `Running`: this is what actually stops new jobs
+                // from starting while paused/stopping.
                 permit = pool.clone().acquire_owned(),
                     if !ready_jobs.is_empty() && self.state == TaskState::Running
                 => {
@@ -377,15 +371,12 @@ where
 
     async fn handle_pause(&mut self) {
         tracing::info!("Pausing `{}` jobs.", self.meta.id);
-        self.spawn_permit_reclaim().await;
+        self.set_state(TaskState::Paused).await;
     }
 
-    async fn handle_resume(&mut self) -> Result<(), SchedulerError> {
+    async fn handle_resume(&mut self) {
         tracing::info!("Resuming `{}` jobs.", self.meta.id);
         self.set_state(TaskState::Running).await;
-        // Add back all permits.
-        self.pool.add_permits(self.pool_size);
-        Ok(())
     }
 
     async fn handle_graceful_stop(&mut self) {
@@ -394,19 +385,6 @@ where
         }
 
         tracing::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
-        self.spawn_permit_reclaim().await;
-    }
-
-    /// Mark the scheduler `Paused` and reclaim every pool permit via a task on
-    /// `self.handles`, so the `ctrl_rx` branch never blocks on in-flight jobs
-    /// and stays responsive to a subsequent `Quit { force: true }`.
-    async fn spawn_permit_reclaim(&mut self) {
         self.set_state(TaskState::Paused).await;
-        let pool = self.pool.clone();
-        let pool_size = self.pool_size as u32;
-        self.handles.spawn(async move {
-            pool.acquire_many_owned(pool_size).await?.forget();
-            Ok(InternalEvent::PermitsReclaimed)
-        });
     }
 }
