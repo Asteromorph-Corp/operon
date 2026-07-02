@@ -37,7 +37,6 @@ where
     pub storage: Arc<Sto>,
     pub meta_storage: MetaStorage,
     pub pool: Arc<Semaphore>,
-    pub pool_size: usize,
     pub progress: SharedProgress,
     pub state: TaskState,
     pub handles: JoinSet<Result<InternalEvent<Job<N>, JS::Resolution>, SchedulerError>>,
@@ -64,7 +63,6 @@ where
             service,
             meta_storage,
             pool: Arc::new(Semaphore::new(pool_size)),
-            pool_size,
             progress,
             state: TaskState::Running,
             handles: JoinSet::new(),
@@ -256,14 +254,15 @@ where
                 // 0. Check the control channel.
                 Some(ctrl_event) = ctrl_rx.recv() => {
                     match ctrl_event {
-                        IndividualControlEvent::Pause if self.state == TaskState::Running => self.handle_pause().await?,
-                        IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await?,
+                        IndividualControlEvent::Pause if self.state == TaskState::Running => self.handle_pause().await,
+                        IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await,
                         IndividualControlEvent::Quit { force: false } => {
-                            self.handle_graceful_stop().await?;
+                            self.handle_graceful_stop().await;
                             is_stopping = true;
                         }
                         IndividualControlEvent::Quit { force: true } => {
                             tracing::info!("Aborting `{}` jobs.", self.meta.id);
+                            self.handles.abort_all();
                             // If this is a finished scheduler rolling out peer events,
                             // don't change the state to `Stopped`,
                             // since it is already `Finished`.
@@ -330,10 +329,10 @@ where
                 }
 
                 // 3. Run a job.
-                // If the scheduler is paused, the pool will not yield a permit
-                // since the pool will have forgotten the permits.
+                // Gated on `Running`: this is what actually stops new jobs
+                // from starting while paused/stopping.
                 permit = pool.clone().acquire_owned(),
-                    if !ready_jobs.is_empty()
+                    if !ready_jobs.is_empty() && self.state == TaskState::Running
                 => {
                     let permit = permit?;
                     let job = ready_jobs.pop().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
@@ -370,44 +369,22 @@ where
         }
     }
 
-    async fn handle_pause(&mut self) -> Result<(), SchedulerError> {
+    async fn handle_pause(&mut self) {
         tracing::info!("Pausing `{}` jobs.", self.meta.id);
         self.set_state(TaskState::Paused).await;
-        // Acquire and forget all permits.
-        let permit = self
-            .pool
-            .clone()
-            .acquire_many_owned(self.pool_size as u32)
-            .await?;
-        permit.forget();
-        tracing::debug!("Remaining `{}` jobs were finished.", self.meta.id);
-        Ok(())
     }
 
-    async fn handle_resume(&mut self) -> Result<(), SchedulerError> {
+    async fn handle_resume(&mut self) {
         tracing::info!("Resuming `{}` jobs.", self.meta.id);
         self.set_state(TaskState::Running).await;
-        // Add back all permits.
-        self.pool.add_permits(self.pool_size);
-        Ok(())
     }
 
-    async fn handle_graceful_stop(&mut self) -> Result<(), SchedulerError> {
+    async fn handle_graceful_stop(&mut self) {
         if self.state == TaskState::Paused {
-            return Ok(());
+            return;
         }
 
         tracing::info!("Pausing `{}` jobs for graceful stop.", self.meta.id);
         self.set_state(TaskState::Paused).await;
-
-        // Acquire and forget all permits.
-        let permit = self
-            .pool
-            .clone()
-            .acquire_many_owned(self.pool_size as u32)
-            .await?;
-        permit.forget();
-        tracing::debug!("Remaining `{}` jobs were finished.", self.meta.id);
-        Ok(())
     }
 }
