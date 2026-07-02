@@ -142,17 +142,6 @@ impl MetaStorage {
         let classid = (lock.key >> 32) as u32;
         let objid = lock.key as u32;
 
-        // Temporary: debug purposes.
-        let should_bit_flip_error = tokio::time::Instant::now()
-            .elapsed()
-            .as_nanos()
-            .is_multiple_of(3);
-        let objid = if should_bit_flip_error {
-            objid ^ 0x1
-        } else {
-            objid
-        };
-
         let held: bool = lock
             .conn
             .query_one(
@@ -169,16 +158,6 @@ impl MetaStorage {
             )
             .await?
             .get(0);
-
-        // Temporary: debug purposes.
-        tracing::info!(
-            "check_lock: schema={} key={}\nqueried classid={} objid={}\ngot {}",
-            lock.schema,
-            lock.key,
-            classid,
-            objid,
-            held
-        );
 
         if !held {
             return Err(MetaStorageError::LockLost(lock.schema.clone()));
