@@ -14,7 +14,15 @@ pub struct MetaStorage {
     pub scheduler_pool: deadpool_postgres::Pool,
     pub schema: Option<String>,
     lock_pool: deadpool_postgres::Pool,
-    lock_conn: Arc<OnceCell<deadpool_postgres::Object>>,
+    lock: Arc<OnceCell<AdvisoryLock>>,
+}
+
+/// The connection holding a schema's advisory lock, and everything needed to check on it later.
+#[derive(Debug)]
+struct AdvisoryLock {
+    conn: deadpool_postgres::Object,
+    schema: String,
+    key: i64,
 }
 
 impl MetaStorage {
@@ -55,7 +63,7 @@ impl MetaStorage {
             scheduler_pool,
             schema,
             lock_pool,
-            lock_conn: Arc::new(OnceCell::new()),
+            lock: Arc::new(OnceCell::new()),
         })
     }
 
@@ -76,42 +84,125 @@ impl MetaStorage {
     /// Acquires a Postgres session-level advisory lock scoped to this instance's schema,
     /// guarding against a second Operon instance corrupting this run's metadata.
     ///
-    /// The lock is tied to the connection `self.lock_conn` that acquires it,
-    /// and is held for the lifetime of the last `Arc` reference to this `MetaStorage` instance.\
+    /// The lock is tied to the connection that acquires it, held for the lifetime of the
+    /// last `Arc` reference to this `MetaStorage` instance.\
     /// Crash safety is provided by Postgres, which releases the lock when the connection closes.
+    /// Since that release can also happen silently (see `check_lock`), it isn't the sole guard.
     pub async fn acquire_lock(&self) -> Result<(), MetaStorageError> {
         let conn = self.lock_pool.get().await?;
-        let key = lock_key(self.schema.as_deref());
+        let schema = match &self.schema {
+            Some(schema) => schema.clone(),
+            // Unprefixed queries resolve against whatever schema is first in `search_path`.
+            None => conn
+                .query_one("SELECT current_schema()", &[])
+                .await?
+                .get::<_, Option<String>>(0)
+                .ok_or(MetaStorageError::Internal(
+                    "failed to find default schema; \
+                    try setting `meta_storage_schema` explicitly in `OperonOptions`",
+                ))?,
+        };
+
+        let key = lock_key(&schema);
         let locked: bool = conn
             .query_one("SELECT pg_try_advisory_lock($1)", &[&key])
             .await?
             .get(0);
 
         if !locked {
-            let schema = self.schema.as_deref().unwrap_or("public").to_owned();
             return Err(MetaStorageError::SchemaLocked(schema));
         }
 
         // `acquire_lock` is only ever called once per real instance (at scheduler
         // startup), so the cell is always empty here.
-        let _ = self.lock_conn.set(conn);
+        let _ = self.lock.set(AdvisoryLock { conn, schema, key });
+        Ok(())
+    }
+
+    /// Re-checks that the advisory lock acquired by `acquire_lock` is still held, by looking
+    /// it up in `pg_locks` rather than trusting the connection to still be alive.
+    ///
+    /// TCP keepalives (see `MetaStorageOptions`) only catch a peer that has gone completely
+    /// unreachable; they don't catch a connection pooler or an `idle_session_timeout` on the
+    /// server closing an idle session out from under us, which silently releases the lock
+    /// without either side telling us. Since `acquire_lock`'s connection is never used again
+    /// after startup, nothing else would ever notice this on its own.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called before `acquire_lock` has succeeded.
+    pub async fn check_lock(&self) -> Result<(), MetaStorageError> {
+        let lock = self
+            .lock
+            .get()
+            .expect("check_lock called before acquire_lock succeeded");
+
+        // A single `bigint` advisory lock is recorded in `pg_locks` as its key's upper and
+        // lower 32 bits, in `classid`/`objid` respectively, with `objsubid` fixed to 1.
+        let classid = (lock.key >> 32) as u32;
+        let objid = lock.key as u32;
+
+        // Temporary: debug purposes.
+        let should_bit_flip_error = tokio::time::Instant::now()
+            .elapsed()
+            .as_nanos()
+            .is_multiple_of(3);
+        let objid = if should_bit_flip_error {
+            objid ^ 0x1
+        } else {
+            objid
+        };
+
+        let held: bool = lock
+            .conn
+            .query_one(
+                "SELECT EXISTS (
+                    SELECT 1 FROM pg_locks
+                    WHERE locktype = 'advisory'
+                      AND granted
+                      AND pid = pg_backend_pid()
+                      AND objsubid = 1
+                      AND classid = $1
+                      AND objid = $2
+                )",
+                &[&classid, &objid],
+            )
+            .await?
+            .get(0);
+
+        // Temporary: debug purposes.
+        tracing::info!(
+            "check_lock: schema={} key={}\nqueried classid={} objid={}\ngot {}",
+            lock.schema,
+            lock.key,
+            classid,
+            objid,
+            held
+        );
+
+        if !held {
+            return Err(MetaStorageError::LockLost(lock.schema.clone()));
+        }
+
         Ok(())
     }
 }
 
 /// Derives a stable 64-bit key for use with Postgres advisory locks.
 ///
-/// Uses the FNV-1a hash algorithm on the schema name with `None` mapped to `"public"`.\
+/// Uses the FNV-1a hash algorithm on the schema name.\
 /// `std::hash::Hasher` was not used because its default algorithm is not guaranteed to be stable
 /// across builds.
-fn lock_key(schema: Option<&str>) -> i64 {
+fn lock_key(schema: &str) -> i64 {
     const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
     const FNV_PRIME: u64 = 0x100000001b3;
 
-    let bytes = schema.unwrap_or("public").as_bytes();
-    let hash = bytes.iter().fold(FNV_OFFSET_BASIS, |hash, byte| {
-        (hash ^ *byte as u64).wrapping_mul(FNV_PRIME)
-    });
+    let hash = schema
+        .as_bytes()
+        .iter()
+        .fold(FNV_OFFSET_BASIS, |hash, byte| {
+            (hash ^ *byte as u64).wrapping_mul(FNV_PRIME)
+        });
 
     hash as i64
 }

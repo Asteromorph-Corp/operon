@@ -74,17 +74,30 @@ where
         self.ctx.storage.init().await?;
         self.init_meta_storage().await?;
 
+        let heartbeat_handle = self.ctx.meta_storage.clone();
         let mut state: Box<dyn SchedulerState> = Box::new(InitTransition::state(
             self.ctx,
             self.ui_mode,
             self.channel_size,
         ));
 
+        // Main work tick
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
+        // Heartbeat tick
+        let heartbeat_period = std::time::Duration::from_secs(30);
+        let mut lock_heartbeat = tokio::time::interval_at(
+            tokio::time::Instant::now() + heartbeat_period,
+            heartbeat_period,
+        );
+
         loop {
             let next = tokio::select! {
                 _ = interval.tick() => state.handle_progress().await?,
                 Some(evt) = self.ctrl_rx.recv() => state.handle_control_event(evt).await?,
+                _ = lock_heartbeat.tick() => {
+                    heartbeat_handle.check_lock().await?;
+                    continue;
+                }
             };
 
             match next {
