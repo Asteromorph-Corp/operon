@@ -41,20 +41,14 @@ impl MetaStorage {
         // 1. One single connection for the advisory lock on the schema.
         // 2. One to five connections for synchronous (individual-)scheduler operations.
         // 3. The remaining connections for spawned workers.
-        let remaining = options
-            .pool_size
-            .checked_sub(1)
-            .ok_or(MetaStorageError::PoolSizeTooSmall(options.pool_size))?;
-        let lock_pool = mk_pool(1)?;
-
-        let (worker_pool, scheduler_pool) = match remaining {
-            0 => return Err(MetaStorageError::PoolSizeTooSmall(options.pool_size)),
-            1 => {
+        let (worker_pool, scheduler_pool, lock_pool) = match options.pool_size {
+            0..=1 => return Err(MetaStorageError::PoolSizeTooSmall(options.pool_size)),
+            2 => {
                 let p = mk_pool(1)?;
-                (p.clone(), p)
+                (p.clone(), p, mk_pool(1)?)
             }
-            n @ ..=5 => (mk_pool(n - 1)?, mk_pool(1)?),
-            n => (mk_pool(n - 5)?, mk_pool(5)?),
+            n @ ..=6 => (mk_pool(n - 2)?, mk_pool(1)?, mk_pool(1)?),
+            n => (mk_pool(n - 6)?, mk_pool(5)?, mk_pool(1)?),
         };
         let schema = options.schema;
 
