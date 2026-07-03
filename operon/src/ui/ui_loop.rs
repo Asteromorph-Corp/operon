@@ -207,10 +207,22 @@ impl UiLoop {
 
             tokio::select! {
                 scheduler_exit = &mut self.sched_rx, if !self.finished => {
-                    if scheduler_exit == Ok(true) {
-                        break;
+                    match scheduler_exit {
+                        // Scheduler exited gracefully with a signal to exit the UI
+                        Ok(true) => break,
+                        // Scheduler exited gracefully with a signal to continue the UI
+                        Ok(false) => self.finished = true,
+                        // Scheduler dropped the channel and early-returned
+                        Err(_) => {
+                            tracing::error!(
+                                "Operon could not continue execution due to a fatal error."
+                            );
+                            self.finished = true;
+                            for progress in self.progresses.0.iter() {
+                                progress.1.write().await.set_state(TaskState::Error);
+                            }
+                        }
                     }
-                    self.finished = true;
                 }
 
                 evt = events.next() => {
@@ -256,10 +268,19 @@ impl UiLoop {
 
             tokio::select! {
                 scheduler_exit = &mut self.sched_rx, if !self.finished => {
-                    if scheduler_exit == Ok(true) {
-                        break;
+                    match scheduler_exit {
+                        Ok(true) => break,
+                        Ok(false) => self.finished = true,
+                        Err(_) => {
+                            tracing::error!(
+                                "Operon could not continue execution due to a fatal error."
+                            );
+                            self.finished = true;
+                            for progress in self.progresses.0.iter() {
+                                progress.1.write().await.set_state(TaskState::Error);
+                            }
+                        }
                     }
-                    self.finished = true;
                 }
                 Ok(record) = self.log_rx.recv() => record.write_to_posix(&mut std::io::stdout(), &mut std::io::stderr())?,
             }
