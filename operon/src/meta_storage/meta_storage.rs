@@ -1,10 +1,9 @@
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use secrecy::ExposeSecret;
-use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
 use crate::meta_storage::meta_client::ConnectionWithSchema;
@@ -16,7 +15,7 @@ pub struct MetaStorage {
     pub scheduler_pool: deadpool_postgres::Pool,
     pub schema: Option<String>,
     lock_pool: deadpool_postgres::Pool,
-    lock: Arc<OnceCell<AdvisoryLock>>,
+    lock: Arc<OnceLock<AdvisoryLock>>,
 }
 
 /// The connection holding a schema's advisory lock, and everything needed to check on it later.
@@ -59,7 +58,7 @@ impl MetaStorage {
             scheduler_pool,
             schema,
             lock_pool,
-            lock: Arc::new(OnceCell::new()),
+            lock: Arc::new(OnceLock::new()),
         })
     }
 
@@ -170,8 +169,8 @@ impl MetaStorage {
 /// stable across builds;
 /// `XxHash3_64` (also used in `utils::sql::hash_metadata`) is used in its place.
 fn lock_key(schema: &str) -> i64 {
-        let mut hasher = XxHash3_64::new();
-schema.hash(&mut hasher);
+    let mut hasher = XxHash3_64::new();
+    schema.hash(&mut hasher);
     hasher.finish() as i64
 }
 
