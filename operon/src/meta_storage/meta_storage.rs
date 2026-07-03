@@ -1,9 +1,11 @@
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use secrecy::ExposeSecret;
 use tokio::sync::OnceCell;
+use twox_hash::XxHash3_64;
 
 use crate::meta_storage::meta_client::ConnectionWithSchema;
 use crate::meta_storage::{MetaStorageError, MetaStorageOptions};
@@ -163,21 +165,14 @@ impl MetaStorage {
 
 /// Derives a stable 64-bit key for use with Postgres advisory locks.
 ///
-/// Uses the FNV-1a hash algorithm on the schema name.\
-/// `std::hash::Hasher` was not used because its default algorithm is not guaranteed to be stable
-/// across builds.
+/// Uses `XxHash3_64` on the schema name.\
+/// `std::hash::Hasher`'s default algorithm was not used because it is not guaranteed to be
+/// stable across builds;
+/// `XxHash3_64` (also used in `utils::sql::hash_metadata`) is used in its place.
 fn lock_key(schema: &str) -> i64 {
-    const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
-    const FNV_PRIME: u64 = 0x100000001b3;
-
-    let hash = schema
-        .as_bytes()
-        .iter()
-        .fold(FNV_OFFSET_BASIS, |hash, byte| {
-            (hash ^ *byte as u64).wrapping_mul(FNV_PRIME)
-        });
-
-    hash as i64
+        let mut hasher = XxHash3_64::new();
+schema.hash(&mut hasher);
+    hasher.finish() as i64
 }
 
 fn create_pool(
