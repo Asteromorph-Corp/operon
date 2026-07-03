@@ -29,6 +29,13 @@ pub enum MetaStorageError {
     Internal(&'static str),
     #[error("Metadata pool size {0} is not allowed")]
     PoolSizeTooSmall(usize),
+    #[error("Another Operon instance is already running against metadata schema `{0}`")]
+    SchemaLocked(String),
+    #[error(
+        "Lost the advisory lock on metadata schema `{0}` (connection dropped or lock \
+         otherwise released); stopping to avoid running unguarded"
+    )]
+    LockLost(String),
 }
 
 fn fmt_deps(deps: &[(&'static str, usize)]) -> String {
