@@ -66,6 +66,41 @@ Commands:
     help                Print this help message."#;
 static MAX_JOB_NAME_LEN: OnceLock<u16> = OnceLock::new();
 
+/// `Drop`-guarded terminal wrapper.
+struct TerminalGuard<W: ::std::io::Write> {
+    terminal: Terminal<CrosstermBackend<W>>,
+}
+
+impl<W: ::std::io::Write> ::std::ops::Deref for TerminalGuard<W> {
+    type Target = Terminal<CrosstermBackend<W>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.terminal
+    }
+}
+
+impl<W: ::std::io::Write> ::std::ops::DerefMut for TerminalGuard<W> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.terminal
+    }
+}
+
+impl<W: ::std::io::Write> Drop for TerminalGuard<W> {
+    fn drop(&mut self) {
+        if let Err(err) = disable_raw_mode() {
+            tracing::error!("Failed to disable raw mode while restoring the terminal: {err}");
+        }
+        if let Err(err) = execute!(self.terminal.backend_mut(), LeaveAlternateScreen) {
+            tracing::error!(
+                "Failed to leave the alternate screen while restoring the terminal: {err}"
+            );
+        }
+        if let Err(err) = self.terminal.show_cursor() {
+            tracing::error!("Failed to show the cursor while restoring the terminal: {err}");
+        }
+    }
+}
+
 /// The main UI loop that handles user input and updates the UI state.
 pub struct UiLoop {
     mode: UiMode,
@@ -144,7 +179,9 @@ impl UiLoop {
 
         execute!(stdout_writer, EnterAlternateScreen)?;
         let backend = CrosstermBackend::new(stdout_writer);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = TerminalGuard {
+            terminal: Terminal::new(backend)?,
+        };
         terminal.clear()?;
 
         let snapshot = self.progresses.snapshot().await;
@@ -203,10 +240,6 @@ impl UiLoop {
             }
         }
 
-        // Cleanup:
-        disable_raw_mode()?;
-        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-        terminal.show_cursor()?;
         Ok(())
     }
 
