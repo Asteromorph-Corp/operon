@@ -66,6 +66,41 @@ Commands:
     help                Print this help message."#;
 static MAX_JOB_NAME_LEN: OnceLock<u16> = OnceLock::new();
 
+/// `Drop`-guarded terminal wrapper.
+struct TerminalGuard<W: ::std::io::Write> {
+    terminal: Terminal<CrosstermBackend<W>>,
+}
+
+impl<W: ::std::io::Write> ::std::ops::Deref for TerminalGuard<W> {
+    type Target = Terminal<CrosstermBackend<W>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.terminal
+    }
+}
+
+impl<W: ::std::io::Write> ::std::ops::DerefMut for TerminalGuard<W> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.terminal
+    }
+}
+
+impl<W: ::std::io::Write> Drop for TerminalGuard<W> {
+    fn drop(&mut self) {
+        if let Err(err) = disable_raw_mode() {
+            tracing::error!("Failed to disable raw mode while restoring the terminal: {err}");
+        }
+        if let Err(err) = execute!(self.terminal.backend_mut(), LeaveAlternateScreen) {
+            tracing::error!(
+                "Failed to leave the alternate screen while restoring the terminal: {err}"
+            );
+        }
+        if let Err(err) = self.terminal.show_cursor() {
+            tracing::error!("Failed to show the cursor while restoring the terminal: {err}");
+        }
+    }
+}
+
 /// The main UI loop that handles user input and updates the UI state.
 pub struct UiLoop {
     mode: UiMode,
@@ -144,7 +179,9 @@ impl UiLoop {
 
         execute!(stdout_writer, EnterAlternateScreen)?;
         let backend = CrosstermBackend::new(stdout_writer);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = TerminalGuard {
+            terminal: Terminal::new(backend)?,
+        };
         terminal.clear()?;
 
         let snapshot = self.progresses.snapshot().await;
@@ -170,10 +207,22 @@ impl UiLoop {
 
             tokio::select! {
                 scheduler_exit = &mut self.sched_rx, if !self.finished => {
-                    if scheduler_exit == Ok(true) {
-                        break;
+                    match scheduler_exit {
+                        // Scheduler exited gracefully with a signal to exit the UI
+                        Ok(true) => break,
+                        // Scheduler exited gracefully with a signal to continue the UI
+                        Ok(false) => self.finished = true,
+                        // Scheduler dropped the channel and early-returned
+                        Err(_) => {
+                            tracing::error!(
+                                "Operon could not continue execution due to a fatal error."
+                            );
+                            self.finished = true;
+                            for progress in self.progresses.0.iter() {
+                                progress.1.write().await.set_state(TaskState::Error);
+                            }
+                        }
                     }
-                    self.finished = true;
                 }
 
                 evt = events.next() => {
@@ -203,10 +252,6 @@ impl UiLoop {
             }
         }
 
-        // Cleanup:
-        disable_raw_mode()?;
-        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-        terminal.show_cursor()?;
         Ok(())
     }
 
@@ -223,10 +268,19 @@ impl UiLoop {
 
             tokio::select! {
                 scheduler_exit = &mut self.sched_rx, if !self.finished => {
-                    if scheduler_exit == Ok(true) {
-                        break;
+                    match scheduler_exit {
+                        Ok(true) => break,
+                        Ok(false) => self.finished = true,
+                        Err(_) => {
+                            tracing::error!(
+                                "Operon could not continue execution due to a fatal error."
+                            );
+                            self.finished = true;
+                            for progress in self.progresses.0.iter() {
+                                progress.1.write().await.set_state(TaskState::Error);
+                            }
+                        }
                     }
-                    self.finished = true;
                 }
                 Ok(record) = self.log_rx.recv() => record.write_to_posix(&mut std::io::stdout(), &mut std::io::stderr())?,
             }
@@ -283,7 +337,7 @@ impl UiLoop {
                 Command::Quit { no_exit: true, .. } => tracing::warn!("Nothing to quit."),
                 Command::Quit { .. } | Command::Exit => return Ok(true),
                 Command::Pause { .. } => tracing::warn!("Nothing to pause."),
-                Command::Resume { .. } => tracing::warn!("Nothing to resume"),
+                Command::Resume { .. } => tracing::warn!("Nothing to resume."),
                 Command::Clear => {
                     self.logs.clear();
                     self.log_rx = self.log_rx.resubscribe();

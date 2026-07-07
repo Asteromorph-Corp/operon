@@ -90,7 +90,11 @@ where
                 Ok::<_, OperonError>(())
             },
             async {
-                scheduler_handle.await??;
+                // A panic (`JoinError`) is fatal (kills the UI);
+                // a scheduler error is reported to the UI and the UI keeps running.
+                if let Err(err) = scheduler_handle.await? {
+                    tracing::error!("Scheduler exited abnormally: {err}");
+                }
                 Ok(())
             },
         )
