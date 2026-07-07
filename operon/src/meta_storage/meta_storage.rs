@@ -21,7 +21,7 @@ pub struct MetaStorage {
 
 /// The connection holding a schema's advisory lock, and everything needed to check on it later.
 #[derive(Debug)]
-struct AdvisoryLock {
+pub(crate) struct AdvisoryLock {
     conn: deadpool_postgres::Object,
     schema: String,
     key: i64,
@@ -87,7 +87,7 @@ impl MetaStorage {
     ///
     /// `Scheduler::work` forces this once, at startup; it is lazy and idempotent, so the lock
     /// acquisition path is guaranteed to be reached exactly once per `MetaStorage` instance.
-    pub(crate) async fn acquire_lock(&self) -> Result<(), MetaStorageError> {
+    pub(crate) async fn ensure_lock(&self) -> Result<&AdvisoryLock, MetaStorageError> {
         self.lock
             .get_or_try_init(|| async {
                 let conn = self.lock_pool.get().await?;
@@ -116,9 +116,7 @@ impl MetaStorage {
 
                 Ok(AdvisoryLock { conn, schema, key })
             })
-            .await?;
-
-        Ok(())
+            .await
     }
 
     /// Re-checks that the advisory lock acquired by `acquire_lock` is still held, by looking
@@ -134,10 +132,7 @@ impl MetaStorage {
     ///
     /// Panics if called before `acquire_lock` has succeeded.
     pub(crate) async fn check_lock(&self) -> Result<(), MetaStorageError> {
-        let lock = self
-            .lock
-            .get()
-            .expect("check_lock called before acquire_lock succeeded");
+        let lock = self.ensure_lock().await?;
 
         // A single `bigint` advisory lock is recorded in `pg_locks` as its key's upper and
         // lower 32 bits, in `classid`/`objid` respectively, with `objsubid` fixed to 1.
