@@ -1,9 +1,10 @@
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use secrecy::ExposeSecret;
+use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
 use crate::meta_storage::meta_client::ConnectionWithSchema;
@@ -15,12 +16,12 @@ pub struct MetaStorage {
     pub scheduler_pool: deadpool_postgres::Pool,
     pub schema: Option<String>,
     lock_pool: deadpool_postgres::Pool,
-    lock: Arc<OnceLock<AdvisoryLock>>,
+    lock: Arc<OnceCell<AdvisoryLock>>,
 }
 
 /// The connection holding a schema's advisory lock, and everything needed to check on it later.
 #[derive(Debug)]
-struct AdvisoryLock {
+pub(crate) struct AdvisoryLock {
     conn: deadpool_postgres::Object,
     schema: String,
     key: i64,
@@ -58,7 +59,7 @@ impl MetaStorage {
             scheduler_pool,
             schema,
             lock_pool,
-            lock: Arc::new(OnceLock::new()),
+            lock: Arc::new(OnceCell::new()),
         })
     }
 
@@ -83,35 +84,39 @@ impl MetaStorage {
     /// last `Arc` reference to this `MetaStorage` instance.\
     /// Crash safety is provided by Postgres, which releases the lock when the connection closes.
     /// Since that release can also happen silently (see `check_lock`), it isn't the sole guard.
-    pub async fn acquire_lock(&self) -> Result<(), MetaStorageError> {
-        let conn = self.lock_pool.get().await?;
-        let schema = match &self.schema {
-            Some(schema) => schema.clone(),
-            // Unprefixed queries resolve against whatever schema is first in `search_path`.
-            None => conn
-                .query_one("SELECT current_schema()", &[])
-                .await?
-                .get::<_, Option<String>>(0)
-                .ok_or(MetaStorageError::Internal(
-                    "failed to find default schema; \
-                    try setting `meta_storage_schema` explicitly in `OperonOptions`",
-                ))?,
-        };
+    ///
+    /// `Scheduler::work` forces this once, at startup; it is lazy and idempotent, so the lock
+    /// acquisition path is guaranteed to be reached exactly once per `MetaStorage` instance.
+    pub(crate) async fn ensure_lock(&self) -> Result<&AdvisoryLock, MetaStorageError> {
+        self.lock
+            .get_or_try_init(|| async {
+                let conn = self.lock_pool.get().await?;
+                let schema = match &self.schema {
+                    Some(schema) => schema.clone(),
+                    // Unprefixed queries resolve against whatever schema is first in `search_path`.
+                    None => conn
+                        .query_one("SELECT current_schema()", &[])
+                        .await?
+                        .get::<_, Option<String>>(0)
+                        .ok_or(MetaStorageError::Internal(
+                            "failed to find default schema; \
+                            try setting `meta_storage_schema` explicitly in `OperonOptions`",
+                        ))?,
+                };
 
-        let key = lock_key(&schema);
-        let locked: bool = conn
-            .query_one("SELECT pg_try_advisory_lock($1)", &[&key])
-            .await?
-            .get(0);
+                let key = lock_key(&schema);
+                let locked: bool = conn
+                    .query_one("SELECT pg_try_advisory_lock($1)", &[&key])
+                    .await?
+                    .get(0);
 
-        if !locked {
-            return Err(MetaStorageError::SchemaLocked(schema));
-        }
+                if !locked {
+                    return Err(MetaStorageError::SchemaLocked(schema));
+                }
 
-        // `acquire_lock` is only ever called once per real instance (at scheduler
-        // startup), so the cell is always empty here.
-        let _ = self.lock.set(AdvisoryLock { conn, schema, key });
-        Ok(())
+                Ok(AdvisoryLock { conn, schema, key })
+            })
+            .await
     }
 
     /// Re-checks that the advisory lock acquired by `acquire_lock` is still held, by looking
@@ -126,11 +131,8 @@ impl MetaStorage {
     /// # Panics
     ///
     /// Panics if called before `acquire_lock` has succeeded.
-    pub async fn check_lock(&self) -> Result<(), MetaStorageError> {
-        let lock = self
-            .lock
-            .get()
-            .expect("check_lock called before acquire_lock succeeded");
+    pub(crate) async fn check_lock(&self) -> Result<(), MetaStorageError> {
+        let lock = self.ensure_lock().await?;
 
         // A single `bigint` advisory lock is recorded in `pg_locks` as its key's upper and
         // lower 32 bits, in `classid`/`objid` respectively, with `objsubid` fixed to 1.
