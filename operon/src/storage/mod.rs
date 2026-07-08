@@ -4,7 +4,8 @@ pub use storage::OperonStorage;
 pub mod psql;
 
 mod options;
-pub use options::StorageOptions;
+#[allow(deprecated)]
+pub use options::{PsqlStorageOptions, StorageOptions};
 
 mod error;
 pub use error::{DimState, StorageError};
