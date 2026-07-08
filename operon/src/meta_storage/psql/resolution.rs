@@ -5,11 +5,12 @@ use crate::meta_storage::psql::PsqlClient;
 use crate::schema::{DimensionMetadata, Resolution};
 use crate::utils::{SchemaPrefix, SqlParams, replace_if_updated};
 
-/// Serializes a resolution into the ordered parameter list expected by the resolution table.
-fn resolution_as_sql_params<const N: usize>(
-    resolution: &Resolution<N>,
-) -> Result<SqlParams, TryFromIntError> {
-    SqlParams::from_usize(resolution.coordinate.into_iter().chain([resolution.ub]))
+/// Postgres wire serialization for [`Resolution`], alongside the query builders that use it.
+impl<const N: usize> Resolution<N> {
+    /// Serializes a resolution into the ordered parameter list expected by the resolution table.
+    fn as_sql_params(&self) -> Result<SqlParams, TryFromIntError> {
+        SqlParams::from_usize(self.coordinate.into_iter().chain([self.ub]))
+    }
 }
 
 /// Helper struct for building SQL queries related to resolutions.
@@ -74,7 +75,7 @@ impl<const N: usize> PsqlResolutionQuery<'_, N> {
     pub async fn put(&self, resolution: Resolution<N>) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
-        let params = resolution_as_sql_params(&resolution)?;
+        let params = resolution.as_sql_params()?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }

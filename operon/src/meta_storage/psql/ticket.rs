@@ -11,48 +11,50 @@ use crate::schema::{
 };
 use crate::utils::{SchemaPrefix, SqlParams, box_sql, replace_if_updated};
 
-/// Serializes a ticket into the ordered parameter list expected by the ticket table.
-fn ticket_as_sql_params<const N: usize>(ticket: &Ticket<N>) -> Result<SqlParams, TryFromIntError> {
-    let params = ticket
-        .coordinate
-        .iter()
-        .map(|c| c.as_sql_param().map(box_sql))
-        .chain([
-            i64::try_from(ticket.deps_done()).map(box_sql),
-            i64::try_from(ticket.deps_quota()).map(box_sql),
-            Ok(box_sql(ticket.status)),
-        ])
-        .collect::<Result<Vec<_>, _>>()?;
+/// Postgres wire (de)serialization for [`Ticket`], alongside the query builders that use it.
+///
+/// [`TicketStatus`] carries its own wire mapping via its `ToSql`/`FromSql` derive.
+impl<const N: usize> Ticket<N> {
+    /// Serializes a ticket into the ordered parameter list expected by the ticket table.
+    fn as_sql_params(&self) -> Result<SqlParams, TryFromIntError> {
+        let params = self
+            .coordinate
+            .iter()
+            .map(|c| c.as_sql_param().map(box_sql))
+            .chain([
+                i64::try_from(self.deps_done()).map(box_sql),
+                i64::try_from(self.deps_quota()).map(box_sql),
+                Ok(box_sql(self.status)),
+            ])
+            .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(SqlParams::new(params))
-}
-
-/// Serializes a ticket into a `COPY ... FROM STDIN` CSV row.
-fn ticket_to_copy_string<const N: usize>(ticket: Ticket<N>) -> Result<String, TryFromIntError> {
-    Ok(ticket_as_sql_params(&ticket)?.to_copy_string())
-}
-
-/// Materializes a ticket from a row of the ticket table.
-fn ticket_from_row<const N: usize>(
-    meta: JobMetadata<N>,
-    row: &Row,
-) -> Result<Ticket<N>, TryFromIntError> {
-    let mut coordinate = [OptionCoordinate::none(); N];
-    let mut i = 0;
-
-    while i < N {
-        let c = OptionCoordinate::from_sql_value(row.get(meta.dims[i]))?;
-        coordinate[i] = c;
-        i += 1;
+        Ok(SqlParams::new(params))
     }
 
-    let deps_done = usize::try_from(row.get::<_, i64>("deps_done"))?;
-    let deps_quota = usize::try_from(row.get::<_, i64>("deps_quota"))?;
-    let status = row.get::<_, TicketStatus>("status");
+    /// Serializes a ticket into a `COPY ... FROM STDIN` CSV row.
+    fn to_copy_string(self) -> Result<String, TryFromIntError> {
+        Ok(self.as_sql_params()?.to_copy_string())
+    }
 
-    Ok(Ticket::from_parts(
-        coordinate, deps_done, deps_quota, status,
-    ))
+    /// Materializes a ticket from a row of the ticket table.
+    fn from_row(meta: JobMetadata<N>, row: &Row) -> Result<Ticket<N>, TryFromIntError> {
+        let mut coordinate = [OptionCoordinate::none(); N];
+        let mut i = 0;
+
+        while i < N {
+            let c = OptionCoordinate::from_sql_value(row.get(meta.dims[i]))?;
+            coordinate[i] = c;
+            i += 1;
+        }
+
+        let deps_done = usize::try_from(row.get::<_, i64>("deps_done"))?;
+        let deps_quota = usize::try_from(row.get::<_, i64>("deps_quota"))?;
+        let status = row.get::<_, TicketStatus>("status");
+
+        Ok(Ticket::from_parts(
+            coordinate, deps_done, deps_quota, status,
+        ))
+    }
 }
 
 /// Helper struct for building SQL queries related to tickets.
@@ -63,7 +65,10 @@ pub struct PsqlTicketQuery<'a, const N: usize> {
 
 impl<'a> PsqlClient<'a> {
     /// Helper method to create a `PsqlTicketQuery` for a ticket of given job.
-    pub fn ticket<const N: usize>(&'a self, job_meta: JobMetadata<N>) -> PsqlTicketQuery<'a, N> {
+    pub fn ticket<const N: usize>(
+        &'a self,
+        job_meta: JobMetadata<N>,
+    ) -> PsqlTicketQuery<'a, N> {
         PsqlTicketQuery {
             client: self,
             job_meta,
@@ -110,7 +115,7 @@ impl<const N: usize> PsqlTicketQuery<'_, N> {
         let rows = self.client.query_stmt(&stmt, &[&status]).await?;
         let tickets = rows
             .iter()
-            .map(|row| ticket_from_row(self.job_meta, row))
+            .map(|row| Ticket::from_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
@@ -119,7 +124,7 @@ impl<const N: usize> PsqlTicketQuery<'_, N> {
     pub async fn put(&self, ticket: Ticket<N>) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutTicketQuery(schema_prefix, self.job_meta);
-        let params = ticket_as_sql_params(&ticket)?;
+        let params = ticket.as_sql_params()?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
@@ -147,7 +152,7 @@ impl<const N: usize> PsqlTicketQuery<'_, N> {
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| ticket_from_row(self.job_meta, row))
+            .map(|row| Ticket::from_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
@@ -182,7 +187,7 @@ impl<const N: usize> PsqlTicketQuery<'_, N> {
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| ticket_from_row(self.job_meta, row))
+            .map(|row| Ticket::from_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
@@ -214,7 +219,7 @@ impl<const N: usize> PsqlTicketQuery<'_, N> {
         let rows = self.client.query_stmt(&pop_stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| ticket_from_row(self.job_meta, row))
+            .map(|row| Ticket::from_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
 
         if tickets
@@ -240,7 +245,7 @@ impl<const N: usize> PsqlTicketQuery<'_, N> {
             .await?;
         let mut sink = Box::pin(sink);
         for ticket in &new_tickets {
-            sink.feed(ticket_to_copy_string(*ticket)?.into()).await?;
+            sink.feed(ticket.to_copy_string()?.into()).await?;
         }
         sink.close().await?;
 
