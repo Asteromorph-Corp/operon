@@ -1,27 +1,125 @@
+use std::num::TryFromIntError;
+
 use bytes::Bytes;
 use futures::SinkExt;
+use postgres_types::{FromSql, ToSql};
+use tokio_postgres::Row;
 
-use crate::meta_storage::{MetaClient, MetaStorageError};
-use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
-use crate::utils::{SchemaPrefix, SqlParams, replace_if_updated};
+use crate::meta_storage::MetaStorageError;
+use crate::meta_storage::psql::PsqlClient;
+use crate::schema::{
+    DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
+};
+use crate::utils::{SchemaPrefix, SqlParam, SqlParams, box_sql, replace_if_updated};
+
+/// The Postgres wire representation of [`TicketStatus`], mapped onto the `ticket_status` enum type.
+///
+/// Keeping the `ToSql`/`FromSql` derive on this backend-local wrapper lets [`TicketStatus`] itself
+/// stay free of any Postgres coupling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToSql, FromSql)]
+#[postgres(name = "ticket_status")]
+enum PgTicketStatus {
+    #[postgres(name = "waiting")]
+    Waiting,
+    #[postgres(name = "queued")]
+    Queued,
+    #[postgres(name = "done")]
+    Done,
+}
+
+impl From<TicketStatus> for PgTicketStatus {
+    fn from(status: TicketStatus) -> Self {
+        match status {
+            TicketStatus::Waiting => PgTicketStatus::Waiting,
+            TicketStatus::Queued => PgTicketStatus::Queued,
+            TicketStatus::Done => PgTicketStatus::Done,
+        }
+    }
+}
+
+impl From<PgTicketStatus> for TicketStatus {
+    fn from(status: PgTicketStatus) -> Self {
+        match status {
+            PgTicketStatus::Waiting => TicketStatus::Waiting,
+            PgTicketStatus::Queued => TicketStatus::Queued,
+            PgTicketStatus::Done => TicketStatus::Done,
+        }
+    }
+}
+
+impl std::fmt::Display for PgTicketStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        TicketStatus::from(*self).fmt(f)
+    }
+}
+
+impl SqlParam for PgTicketStatus {
+    fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
+        self
+    }
+}
+
+/// Serializes a ticket into the ordered parameter list expected by the ticket table.
+fn ticket_as_sql_params<const N: usize>(ticket: &Ticket<N>) -> Result<SqlParams, TryFromIntError> {
+    let params = ticket
+        .coordinate
+        .iter()
+        .map(|c| c.as_sql_param().map(box_sql))
+        .chain([
+            i64::try_from(ticket.deps_done()).map(box_sql),
+            i64::try_from(ticket.deps_quota()).map(box_sql),
+            Ok(box_sql(PgTicketStatus::from(ticket.status))),
+        ])
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(SqlParams::new(params))
+}
+
+/// Serializes a ticket into a `COPY ... FROM STDIN` CSV row.
+fn ticket_to_copy_string<const N: usize>(ticket: Ticket<N>) -> Result<String, TryFromIntError> {
+    Ok(ticket_as_sql_params(&ticket)?.to_copy_string())
+}
+
+/// Materializes a ticket from a row of the ticket table.
+fn ticket_from_row<const N: usize>(
+    meta: JobMetadata<N>,
+    row: &Row,
+) -> Result<Ticket<N>, TryFromIntError> {
+    let mut coordinate = [OptionCoordinate::none(); N];
+    let mut i = 0;
+
+    while i < N {
+        let c = OptionCoordinate::from_sql_value(row.get(meta.dims[i]))?;
+        coordinate[i] = c;
+        i += 1;
+    }
+
+    let deps_done = usize::try_from(row.get::<_, i64>("deps_done"))?;
+    let deps_quota = usize::try_from(row.get::<_, i64>("deps_quota"))?;
+    let status = TicketStatus::from(row.get::<_, PgTicketStatus>("status"));
+
+    Ok(Ticket::from_parts(
+        coordinate, deps_done, deps_quota, status,
+    ))
+}
 
 /// Helper struct for building SQL queries related to tickets.
-pub struct TicketQueryBuilder<'a, const N: usize> {
-    client: &'a MetaClient<'a>,
+pub struct PsqlTicketQuery<'a, const N: usize> {
+    client: &'a PsqlClient<'a>,
     job_meta: JobMetadata<N>,
 }
 
-impl<'a> MetaClient<'a> {
-    /// Helper method to create a `ResolutionQueryBuilder` for a ticket of given job.
-    pub fn ticket<const N: usize>(&'a self, job_meta: JobMetadata<N>) -> TicketQueryBuilder<'a, N> {
-        TicketQueryBuilder {
+impl<'a> PsqlClient<'a> {
+    /// Helper method to create a `PsqlTicketQuery` for a ticket of given job.
+    pub fn ticket<const N: usize>(&'a self, job_meta: JobMetadata<N>) -> PsqlTicketQuery<'a, N> {
+        PsqlTicketQuery {
             client: self,
             job_meta,
         }
     }
 }
 
-impl<const N: usize> TicketQueryBuilder<'_, N> {
+impl<const N: usize> PsqlTicketQuery<'_, N> {
     /// Initializes the ticket table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
@@ -57,10 +155,11 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     pub async fn get_all(&self, status: TicketStatus) -> Result<Vec<Ticket<N>>, MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetAllTicketQuery(schema_prefix, self.job_meta);
+        let status = PgTicketStatus::from(status);
         let rows = self.client.query_stmt(&stmt, &[&status]).await?;
         let tickets = rows
             .iter()
-            .map(|row| Ticket::from_sql_row(self.job_meta, row))
+            .map(|row| ticket_from_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
@@ -69,7 +168,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
     pub async fn put(&self, ticket: Ticket<N>) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutTicketQuery(schema_prefix, self.job_meta);
-        let params = ticket.as_sql_params()?;
+        let params = ticket_as_sql_params(&ticket)?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
@@ -97,7 +196,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| Ticket::from_sql_row(self.job_meta, row))
+            .map(|row| ticket_from_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
@@ -132,7 +231,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| Ticket::from_sql_row(self.job_meta, row))
+            .map(|row| ticket_from_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
@@ -164,7 +263,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
         let rows = self.client.query_stmt(&pop_stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| Ticket::from_sql_row(self.job_meta, row))
+            .map(|row| ticket_from_row(self.job_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
 
         if tickets
@@ -190,7 +289,7 @@ impl<const N: usize> TicketQueryBuilder<'_, N> {
             .await?;
         let mut sink = Box::pin(sink);
         for ticket in &new_tickets {
-            sink.feed(ticket.to_copy_string()?.into()).await?;
+            sink.feed(ticket_to_copy_string(*ticket)?.into()).await?;
         }
         sink.close().await?;
 
@@ -727,62 +826,6 @@ mod tests {
         let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job, aggregate_dims).to_string();
         assert_eq!(stmt, expected);
     }
-
-    // #[rstest]
-    // #[case::simple(job_beta(), dimension_i(), indoc! { "
-    //     WITH updated AS (
-    //         UPDATE test_meta.ticket_beta
-    //         SET
-    //             deps_done = deps_done + 1,
-    //             status = CASE
-    //                 WHEN deps_done + 1 >= deps_quota
-    //                     THEN 'queued'::test_meta.ticket_status
-    //                 ELSE 'waiting'::test_meta.ticket_status
-    //             END
-    //         WHERE status = 'waiting'::test_meta.ticket_status
-    //         RETURNING *
-    //     )
-    //     SELECT *
-    //     FROM updated
-    //     WHERE status = 'queued'::test_meta.ticket_status;"
-    // })]
-    // fn test_raise_deps_quota_query<const N: usize, const M: usize>(
-    //     schema_prefix: SchemaPrefix<'static>,
-    //     #[case] job: JobMetadata<N>,
-    //     #[case] upstream_job: DimensionMetadata<M>,
-    //     #[case] expected: &str,
-    // ) {
-    //     let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job).to_string();
-    //     assert_eq!(stmt, expected);
-    // }
-    //
-    // #[rstest]
-    // #[case::simple(
-    //     job_beta(),
-    //     dimension_i(),
-    //     indoc! { "
-    //         DELETE FROM test_meta.ticket_beta
-    //         RETURNING *;"
-    //     }
-    // )]
-    // #[case::multiple(
-    //     job_epsilon(),
-    //     dimension_k(),
-    //     indoc! {"
-    //         DELETE FROM test_meta.ticket_epsilon
-    //         WHERE i = $1
-    //         RETURNING *;"
-    //     }
-    // )]
-    // fn test_explode_pop_query<const N: usize, const M: usize>(
-    //     schema_prefix: SchemaPrefix<'static>,
-    //     #[case] job: JobMetadata<N>,
-    //     #[case] dim: DimensionMetadata<M>,
-    //     #[case] expected: &str,
-    // ) {
-    //     let stmt = ExplodePopQuery(schema_prefix, job, dim).to_string();
-    //     assert_eq!(stmt, expected);
-    // }
 
     #[rstest]
     #[case::empty(job_alpha(), "UPDATE test_meta.ticket_alpha SET status = 'done';")]

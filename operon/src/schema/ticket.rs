@@ -1,12 +1,7 @@
 use std::fmt::Debug;
-use std::num::TryFromIntError;
 use std::str::FromStr;
 
-use postgres_types::{FromSql, ToSql};
-use tokio_postgres::Row;
-
-use crate::schema::{Job, JobMetadata, OptionCoordinate};
-use crate::utils::{SqlParams, box_sql};
+use crate::schema::{Job, OptionCoordinate};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Ticket<const N: usize> {
@@ -16,15 +11,11 @@ pub struct Ticket<const N: usize> {
     pub status: TicketStatus,
 }
 
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, ToSql, FromSql)]
-#[postgres(name = "ticket_status")]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq)]
 pub enum TicketStatus {
     #[default]
-    #[postgres(name = "waiting")]
     Waiting,
-    #[postgres(name = "queued")]
     Queued,
-    #[postgres(name = "done")]
     Done,
 }
 
@@ -96,45 +87,29 @@ impl<const N: usize> Ticket<N> {
         Some(Job { coordinate })
     }
 
-    pub(crate) fn as_sql_params(&self) -> Result<SqlParams, TryFromIntError> {
-        let params = self
-            .coordinate
-            .iter()
-            .map(|c| c.as_sql_param().map(box_sql))
-            .chain([
-                i64::try_from(self.deps_done).map(box_sql),
-                i64::try_from(self.deps_quota).map(box_sql),
-                Ok(box_sql(self.status)),
-            ])
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(SqlParams::new(params))
-    }
-
-    pub(crate) fn to_copy_string(self) -> Result<String, TryFromIntError> {
-        Ok(self.as_sql_params()?.to_copy_string())
-    }
-
-    pub(crate) fn from_sql_row(meta: JobMetadata<N>, row: &Row) -> Result<Self, TryFromIntError> {
-        let mut coordinate = [OptionCoordinate::none(); N];
-        let mut i = 0;
-
-        while i < N {
-            let c = OptionCoordinate::from_sql_value(row.get(meta.dims[i]))?;
-            coordinate[i] = c;
-            i += 1;
-        }
-
-        let deps_done = usize::try_from(row.get::<_, i64>("deps_done"))?;
-        let deps_quota = usize::try_from(row.get::<_, i64>("deps_quota"))?;
-        let status: TicketStatus = row.get("status");
-
-        Ok(Self {
+    /// Reconstructs a ticket from its raw parts.
+    ///
+    /// Used by storage backends when materializing a ticket read back from persistence.
+    pub(crate) fn from_parts(
+        coordinate: [OptionCoordinate; N],
+        deps_done: usize,
+        deps_quota: usize,
+        status: TicketStatus,
+    ) -> Self {
+        Self {
             coordinate,
             deps_done,
             deps_quota,
             status,
-        })
+        }
+    }
+
+    pub(crate) fn deps_done(&self) -> usize {
+        self.deps_done
+    }
+
+    pub(crate) fn deps_quota(&self) -> usize {
+        self.deps_quota
     }
 }
 

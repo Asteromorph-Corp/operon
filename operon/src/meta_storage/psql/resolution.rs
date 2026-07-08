@@ -1,27 +1,37 @@
-use crate::meta_storage::{MetaClient, MetaStorageError};
+use std::num::TryFromIntError;
+
+use crate::meta_storage::MetaStorageError;
+use crate::meta_storage::psql::PsqlClient;
 use crate::schema::{DimensionMetadata, Resolution};
 use crate::utils::{SchemaPrefix, SqlParams, replace_if_updated};
 
+/// Serializes a resolution into the ordered parameter list expected by the resolution table.
+fn resolution_as_sql_params<const N: usize>(
+    resolution: &Resolution<N>,
+) -> Result<SqlParams, TryFromIntError> {
+    SqlParams::from_usize(resolution.coordinate.into_iter().chain([resolution.ub]))
+}
+
 /// Helper struct for building SQL queries related to resolutions.
-pub struct ResolutionQueryBuilder<'a, const N: usize> {
-    client: &'a MetaClient<'a>,
+pub struct PsqlResolutionQuery<'a, const N: usize> {
+    client: &'a PsqlClient<'a>,
     dim_meta: DimensionMetadata<N>,
 }
 
-impl<'a> MetaClient<'a> {
-    /// Helper method to create a `ResolutionQueryBuilder` for a resolution of given dimension.
+impl<'a> PsqlClient<'a> {
+    /// Helper method to create a `PsqlResolutionQuery` for a resolution of given dimension.
     pub fn resolution<const N: usize>(
         &'a self,
         dim_meta: DimensionMetadata<N>,
-    ) -> ResolutionQueryBuilder<'a, N> {
-        ResolutionQueryBuilder {
+    ) -> PsqlResolutionQuery<'a, N> {
+        PsqlResolutionQuery {
             client: self,
             dim_meta,
         }
     }
 }
 
-impl<const N: usize> ResolutionQueryBuilder<'_, N> {
+impl<const N: usize> PsqlResolutionQuery<'_, N> {
     /// Initializes the resolution table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
@@ -64,7 +74,7 @@ impl<const N: usize> ResolutionQueryBuilder<'_, N> {
     pub async fn put(&self, resolution: Resolution<N>) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
-        let params = resolution.as_sql_params()?;
+        let params = resolution_as_sql_params(&resolution)?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
