@@ -5,9 +5,10 @@ mod meta_client;
 pub use meta_client::{MetaClient, MetaConn};
 
 mod options;
-pub use options::{MetaBackendOptions, MetaStorageOptions};
+pub use options::MetaBackendOptions;
 
 mod error;
 pub use error::MetaStorageError;
 
 mod psql;
+pub use psql::PsqlMetaStorageOptions;

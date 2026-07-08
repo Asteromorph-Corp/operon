@@ -10,6 +10,9 @@
 mod client;
 pub use client::{PsqlClient, PsqlConn, PsqlTx};
 
+mod options;
+pub use options::PsqlMetaStorageOptions;
+
 mod storage;
 pub use storage::PsqlMetaStorage;
 

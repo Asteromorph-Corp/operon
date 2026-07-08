@@ -1,13 +1,14 @@
-use secrecy::SecretString;
+use crate::meta_storage::psql::PsqlMetaStorageOptions;
 
 /// Selects and parameterizes the metadata storage backend.
 ///
-/// This is the forward-looking, backend-agnostic way to say *where* the metadata lives.
+/// This is the forward-looking, backend-agnostic way to say *where* the metadata lives. Each
+/// variant owns its backend's full parameter set (e.g. [`Psql`](MetaBackendOptions::Psql) carries a
+/// [`PsqlMetaStorageOptions`]), so backend-specific knobs never leak into backend-agnostic options.
 ///
 /// # Stability
 ///
-/// This enum is `#[non_exhaustive]`: adding a backend variant must stay a non-breaking
-/// change.
+/// This enum is `#[non_exhaustive]`: adding a backend variant must stay a non-breaking change.
 /// Prefer the provided constructors (e.g. [`psql`]) over naming variants directly.
 ///
 /// Note that the *convenience* entry points that assume Postgres — notably
@@ -20,21 +21,16 @@ use secrecy::SecretString;
 /// [`psql`]: MetaBackendOptions::psql
 #[non_exhaustive]
 pub enum MetaBackendOptions {
-    /// The Postgres backend, parameterized by its connection URI.
-    Psql(SecretString),
+    /// The Postgres backend and its configuration.
+    Psql(PsqlMetaStorageOptions),
 }
 
 impl MetaBackendOptions {
-    /// Selects the Postgres backend with the given connection URI.
+    /// Selects the Postgres backend with the given connection URI and default tuning.
+    ///
+    /// For finer control, build a [`PsqlMetaStorageOptions`] and wrap it in
+    /// [`MetaBackendOptions::Psql`] directly.
     pub fn psql(uri: impl Into<String>) -> Self {
-        MetaBackendOptions::Psql(SecretString::from(uri.into()))
+        MetaBackendOptions::Psql(PsqlMetaStorageOptions::new(uri))
     }
-}
-
-pub struct MetaStorageOptions {
-    pub(crate) backend: MetaBackendOptions,
-    pub(crate) pool_size: usize,
-    pub(crate) keepalives_idle: std::time::Duration,
-    pub(crate) keepalives_interval: std::time::Duration,
-    pub(crate) schema: Option<String>,
 }

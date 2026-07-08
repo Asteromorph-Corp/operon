@@ -1,5 +1,5 @@
 use crate::meta_storage::psql::PsqlMetaStorage;
-use crate::meta_storage::{MetaBackendOptions, MetaConn, MetaStorageError, MetaStorageOptions};
+use crate::meta_storage::{MetaBackendOptions, MetaConn, MetaStorageError};
 
 /// The backend-agnostic handle over the concrete metadata store.
 #[derive(Debug, Clone)]
@@ -8,26 +8,14 @@ pub enum MetaStorage {
 }
 
 impl MetaStorage {
-    pub fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
-        let MetaStorageOptions {
-            backend,
-            pool_size,
-            keepalives_idle,
-            keepalives_interval,
-            schema,
-        } = options;
-
+    pub fn new(backend: MetaBackendOptions) -> Result<Self, MetaStorageError> {
         // The only backend right now.
         // When further backends are added they get their own arm here,
         // constructed from their variant's parameters.
         match backend {
-            MetaBackendOptions::Psql(uri) => Ok(MetaStorage::Psql(PsqlMetaStorage::new(
-                &uri,
-                pool_size,
-                keepalives_idle,
-                keepalives_interval,
-                schema,
-            )?)),
+            MetaBackendOptions::Psql(options) => {
+                Ok(MetaStorage::Psql(PsqlMetaStorage::new(options)?))
+            }
         }
     }
 

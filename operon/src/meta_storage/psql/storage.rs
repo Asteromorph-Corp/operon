@@ -3,12 +3,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use secrecy::{ExposeSecret, SecretString};
+use secrecy::ExposeSecret;
 use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
 use crate::meta_storage::MetaStorageError;
-use crate::meta_storage::psql::PsqlConn;
+use crate::meta_storage::psql::{PsqlConn, PsqlMetaStorageOptions};
 
 /// The Postgres implementation of the metadata backend.
 ///
@@ -32,13 +32,15 @@ pub(crate) struct AdvisoryLock {
 }
 
 impl PsqlMetaStorage {
-    pub fn new(
-        uri: &SecretString,
-        pool_size: usize,
-        keepalives_idle: Duration,
-        keepalives_interval: Duration,
-        schema: Option<String>,
-    ) -> Result<Self, MetaStorageError> {
+    pub fn new(options: PsqlMetaStorageOptions) -> Result<Self, MetaStorageError> {
+        let PsqlMetaStorageOptions {
+            uri,
+            pool_size,
+            schema,
+            keepalives_idle,
+            keepalives_interval,
+        } = options;
+
         let mk_pool = |size| {
             create_pool(
                 uri.expose_secret(),
@@ -131,7 +133,7 @@ impl PsqlMetaStorage {
     /// Re-checks that the advisory lock acquired by `ensure_lock` is still held, by looking
     /// it up in `pg_locks` rather than trusting the connection to still be alive.
     ///
-    /// TCP keepalives (see `MetaStorageOptions`) only catch a peer that has gone completely
+    /// TCP keepalives (see `PsqlMetaStorageOptions`) only catch a peer that has gone completely
     /// unreachable; they don't catch a connection pooler or an `idle_session_timeout` on the
     /// server closing an idle session out from under us, which silently releases the lock
     /// without either side telling us. Since `ensure_lock`'s connection is never used again
