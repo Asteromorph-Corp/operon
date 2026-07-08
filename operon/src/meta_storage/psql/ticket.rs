@@ -58,25 +58,25 @@ impl<const N: usize> Ticket<N> {
 }
 
 /// Helper struct for building SQL queries related to tickets.
-pub struct PsqlTicketQuery<'a, const N: usize> {
+pub struct PsqlTicketQueryBuilder<'a, const N: usize> {
     client: &'a PsqlClient<'a>,
     job_meta: JobMetadata<N>,
 }
 
 impl<'a> PsqlClient<'a> {
-    /// Helper method to create a `PsqlTicketQuery` for a ticket of given job.
+    /// Helper method to create a `PsqlTicketQueryBuilder` for a ticket of given job.
     pub fn ticket<const N: usize>(
         &'a self,
         job_meta: JobMetadata<N>,
-    ) -> PsqlTicketQuery<'a, N> {
-        PsqlTicketQuery {
+    ) -> PsqlTicketQueryBuilder<'a, N> {
+        PsqlTicketQueryBuilder {
             client: self,
             job_meta,
         }
     }
 }
 
-impl<const N: usize> PsqlTicketQuery<'_, N> {
+impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
     /// Initializes the ticket table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();

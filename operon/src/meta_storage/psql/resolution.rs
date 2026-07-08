@@ -14,25 +14,25 @@ impl<const N: usize> Resolution<N> {
 }
 
 /// Helper struct for building SQL queries related to resolutions.
-pub struct PsqlResolutionQuery<'a, const N: usize> {
+pub struct PsqlResolutionQueryBuilder<'a, const N: usize> {
     client: &'a PsqlClient<'a>,
     dim_meta: DimensionMetadata<N>,
 }
 
 impl<'a> PsqlClient<'a> {
-    /// Helper method to create a `PsqlResolutionQuery` for a resolution of given dimension.
+    /// Helper method to create a `PsqlResolutionQueryBuilder` for a resolution of given dimension.
     pub fn resolution<const N: usize>(
         &'a self,
         dim_meta: DimensionMetadata<N>,
-    ) -> PsqlResolutionQuery<'a, N> {
-        PsqlResolutionQuery {
+    ) -> PsqlResolutionQueryBuilder<'a, N> {
+        PsqlResolutionQueryBuilder {
             client: self,
             dim_meta,
         }
     }
 }
 
-impl<const N: usize> PsqlResolutionQuery<'_, N> {
+impl<const N: usize> PsqlResolutionQueryBuilder<'_, N> {
     /// Initializes the resolution table.
     pub async fn init(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
