@@ -3,6 +3,7 @@ use crate::meta_storage::{MetaBackendOptions, MetaConn, MetaStorageError};
 
 /// The backend-agnostic handle over the concrete metadata store.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum MetaStorage {
     Psql(PsqlMetaStorage),
 }

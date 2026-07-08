@@ -12,6 +12,7 @@ use crate::schema::{
 /// [`MetaStorage::worker_conn`](crate::meta_storage::MetaStorage::worker_conn) or
 /// [`scheduler_conn`](crate::meta_storage::MetaStorage::scheduler_conn).
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum MetaConn<'a> {
     Psql(PsqlConn<'a>),
 }
@@ -34,6 +35,7 @@ impl<'a> MetaConn<'a> {
 
 /// A backend-agnostic metadata transaction.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum MetaTx<'a> {
     Psql(PsqlTx<'a>),
 }
@@ -65,6 +67,7 @@ impl<'a> MetaTx<'a> {
 /// `RunFootprint`, …); translation to the concrete backend happens per-operation. Adding a backend
 /// is a matter of adding a variant and an arm to each method.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum MetaClient<'a> {
     Psql(PsqlClient<'a>),
 }
