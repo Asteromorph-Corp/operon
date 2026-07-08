@@ -5,6 +5,8 @@ use std::num::TryFromIntError;
 use postgres_types::ToSql;
 use twox_hash::XxHash3_64;
 
+use crate::schema::TicketStatus;
+
 /// The primary key for the run footprint table.
 pub(crate) const GLOBAL: &str = "global";
 
@@ -58,6 +60,11 @@ impl SqlParam for i64 {
     }
 }
 impl SqlParam for serde_json::Value {
+    fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
+        self
+    }
+}
+impl SqlParam for TicketStatus {
     fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
         self
     }

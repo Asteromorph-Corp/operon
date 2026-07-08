@@ -2,7 +2,6 @@ use std::num::TryFromIntError;
 
 use bytes::Bytes;
 use futures::SinkExt;
-use postgres_types::{FromSql, ToSql};
 use tokio_postgres::Row;
 
 use crate::meta_storage::MetaStorageError;
@@ -10,54 +9,7 @@ use crate::meta_storage::psql::PsqlClient;
 use crate::schema::{
     DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
 };
-use crate::utils::{SchemaPrefix, SqlParam, SqlParams, box_sql, replace_if_updated};
-
-/// The Postgres wire representation of [`TicketStatus`], mapped onto the `ticket_status` enum type.
-///
-/// Keeping the `ToSql`/`FromSql` derive on this backend-local wrapper lets [`TicketStatus`] itself
-/// stay free of any Postgres coupling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ToSql, FromSql)]
-#[postgres(name = "ticket_status")]
-enum PgTicketStatus {
-    #[postgres(name = "waiting")]
-    Waiting,
-    #[postgres(name = "queued")]
-    Queued,
-    #[postgres(name = "done")]
-    Done,
-}
-
-impl From<TicketStatus> for PgTicketStatus {
-    fn from(status: TicketStatus) -> Self {
-        match status {
-            TicketStatus::Waiting => PgTicketStatus::Waiting,
-            TicketStatus::Queued => PgTicketStatus::Queued,
-            TicketStatus::Done => PgTicketStatus::Done,
-        }
-    }
-}
-
-impl From<PgTicketStatus> for TicketStatus {
-    fn from(status: PgTicketStatus) -> Self {
-        match status {
-            PgTicketStatus::Waiting => TicketStatus::Waiting,
-            PgTicketStatus::Queued => TicketStatus::Queued,
-            PgTicketStatus::Done => TicketStatus::Done,
-        }
-    }
-}
-
-impl std::fmt::Display for PgTicketStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        TicketStatus::from(*self).fmt(f)
-    }
-}
-
-impl SqlParam for PgTicketStatus {
-    fn as_param(&self) -> &(dyn ToSql + Sync + 'static) {
-        self
-    }
-}
+use crate::utils::{SchemaPrefix, SqlParams, box_sql, replace_if_updated};
 
 /// Serializes a ticket into the ordered parameter list expected by the ticket table.
 fn ticket_as_sql_params<const N: usize>(ticket: &Ticket<N>) -> Result<SqlParams, TryFromIntError> {
@@ -68,7 +20,7 @@ fn ticket_as_sql_params<const N: usize>(ticket: &Ticket<N>) -> Result<SqlParams,
         .chain([
             i64::try_from(ticket.deps_done()).map(box_sql),
             i64::try_from(ticket.deps_quota()).map(box_sql),
-            Ok(box_sql(PgTicketStatus::from(ticket.status))),
+            Ok(box_sql(ticket.status)),
         ])
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -96,7 +48,7 @@ fn ticket_from_row<const N: usize>(
 
     let deps_done = usize::try_from(row.get::<_, i64>("deps_done"))?;
     let deps_quota = usize::try_from(row.get::<_, i64>("deps_quota"))?;
-    let status = TicketStatus::from(row.get::<_, PgTicketStatus>("status"));
+    let status = row.get::<_, TicketStatus>("status");
 
     Ok(Ticket::from_parts(
         coordinate, deps_done, deps_quota, status,
@@ -155,7 +107,6 @@ impl<const N: usize> PsqlTicketQuery<'_, N> {
     pub async fn get_all(&self, status: TicketStatus) -> Result<Vec<Ticket<N>>, MetaStorageError> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetAllTicketQuery(schema_prefix, self.job_meta);
-        let status = PgTicketStatus::from(status);
         let rows = self.client.query_stmt(&stmt, &[&status]).await?;
         let tickets = rows
             .iter()

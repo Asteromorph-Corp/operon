@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
+use postgres_types::{FromSql, ToSql};
+
 use crate::schema::{Job, OptionCoordinate};
 
 #[derive(Debug, Clone, Copy)]
@@ -11,11 +13,18 @@ pub struct Ticket<const N: usize> {
     pub status: TicketStatus,
 }
 
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq)]
+/// A ticket's lifecycle status.
+///
+/// The `ToSql`/`FromSql` derive maps this onto the Postgres `ticket_status` enum type.
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, ToSql, FromSql)]
+#[postgres(name = "ticket_status")]
 pub enum TicketStatus {
     #[default]
+    #[postgres(name = "waiting")]
     Waiting,
+    #[postgres(name = "queued")]
     Queued,
+    #[postgres(name = "done")]
     Done,
 }
 
