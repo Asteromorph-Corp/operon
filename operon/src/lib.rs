@@ -25,6 +25,7 @@ pub mod error {
 }
 
 pub mod options {
+    pub use crate::meta_storage::MetaBackendOptions;
     pub use crate::operon::OperonOptions;
     pub use crate::storage::StorageOptions;
     pub use crate::ui::UiMode;

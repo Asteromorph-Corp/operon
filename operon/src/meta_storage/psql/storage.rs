@@ -3,12 +3,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
+use crate::meta_storage::MetaStorageError;
 use crate::meta_storage::psql::PsqlConn;
-use crate::meta_storage::{MetaStorageError, MetaStorageOptions};
 
 /// The Postgres implementation of the metadata backend.
 ///
@@ -32,12 +32,18 @@ pub(crate) struct AdvisoryLock {
 }
 
 impl PsqlMetaStorage {
-    pub fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
+    pub fn new(
+        uri: &SecretString,
+        pool_size: usize,
+        keepalives_idle: Duration,
+        keepalives_interval: Duration,
+        schema: Option<String>,
+    ) -> Result<Self, MetaStorageError> {
         let mk_pool = |size| {
             create_pool(
-                options.database_uri.expose_secret(),
-                options.keepalives_idle,
-                options.keepalives_interval,
+                uri.expose_secret(),
+                keepalives_idle,
+                keepalives_interval,
                 size,
             )
         };
@@ -47,8 +53,8 @@ impl PsqlMetaStorage {
         // 1. One single connection for the advisory lock on the schema.
         // 2. One to five connections for synchronous (individual-)scheduler operations.
         // 3. The remaining connections for spawned workers.
-        let (worker_pool, scheduler_pool, lock_pool) = match options.pool_size {
-            0..=1 => return Err(MetaStorageError::PoolSizeTooSmall(options.pool_size)),
+        let (worker_pool, scheduler_pool, lock_pool) = match pool_size {
+            0..=1 => return Err(MetaStorageError::PoolSizeTooSmall(pool_size)),
             2 => {
                 let p = mk_pool(1)?;
                 (p.clone(), p, mk_pool(1)?)
@@ -56,7 +62,6 @@ impl PsqlMetaStorage {
             n @ ..=6 => (mk_pool(n - 2)?, mk_pool(1)?, mk_pool(1)?),
             n => (mk_pool(n - 6)?, mk_pool(5)?, mk_pool(1)?),
         };
-        let schema = options.schema;
 
         Ok(PsqlMetaStorage {
             worker_pool,

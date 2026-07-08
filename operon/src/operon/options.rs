@@ -1,6 +1,5 @@
-use secrecy::SecretString;
-
 use crate::logger::LoggerOptions;
+use crate::meta_storage::MetaBackendOptions;
 use crate::scheduler::SchedulerOptions;
 use crate::ui::{UiMode, UiOptions};
 
@@ -10,7 +9,7 @@ pub struct OperonOptions {
     // Scheduler options
     pub(crate) internal_channel_size: usize,
     // Meta storage options
-    pub(crate) meta_storage_uri: SecretString,
+    pub(crate) meta_storage_backend: MetaBackendOptions,
     pub(crate) meta_storage_pool_size: u32,
     pub(crate) meta_storage_schema: Option<String>,
     pub(crate) meta_storage_keepalives_idle: std::time::Duration,
@@ -22,11 +21,30 @@ pub struct OperonOptions {
 }
 
 impl OperonOptions {
+    /// Creates options for an Operon backed by a Postgres metadata store at `meta_storage_uri`.
+    ///
+    /// # Stability
+    ///
+    /// This is a **Postgres-specific convenience** that predates the backend-agnostic
+    /// [`MetaBackendOptions`]. It exists because Postgres is currently the only backend. Once a
+    /// second backend lands, this constructor will be **renamed** to make the Postgres assumption
+    /// explicit (e.g. `from_psql_uri`) — a breaking change. Code that wants to survive that
+    /// transition untouched should construct options through [`OperonOptions::from_backend`]
+    /// instead, passing a [`MetaBackendOptions`] explicitly.
     pub fn new(meta_storage_uri: impl Into<String>) -> Self {
+        Self::from_backend(MetaBackendOptions::psql(meta_storage_uri))
+    }
+
+    /// Creates options for an Operon whose metadata lives in the given backend.
+    ///
+    /// All other settings start at their defaults and can be overridden with the `with_*` builder
+    /// methods. Note that the metadata pool-size and keepalive knobs are Postgres-specific and are
+    /// ignored by backends that have no connection pool.
+    pub fn from_backend(backend: MetaBackendOptions) -> Self {
         Self {
             ui_mode: UiMode::Interactive,
             internal_channel_size: 1024,
-            meta_storage_uri: SecretString::from(meta_storage_uri.into()),
+            meta_storage_backend: backend,
             meta_storage_pool_size: 16,
             meta_storage_schema: Some("metadata".to_string()),
             meta_storage_keepalives_idle: std::time::Duration::from_secs(60),
@@ -98,7 +116,7 @@ impl OperonOptions {
         let scheduler_options = SchedulerOptions {
             internal_channel_size: self.internal_channel_size,
             ui_mode: self.ui_mode,
-            database_uri: self.meta_storage_uri,
+            backend: self.meta_storage_backend,
             pool_size: self.meta_storage_pool_size as usize,
             schema: self.meta_storage_schema,
             keepalives_idle: self.meta_storage_keepalives_idle,

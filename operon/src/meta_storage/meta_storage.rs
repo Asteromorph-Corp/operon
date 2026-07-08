@@ -1,5 +1,5 @@
 use crate::meta_storage::psql::PsqlMetaStorage;
-use crate::meta_storage::{MetaConn, MetaStorageError, MetaStorageOptions};
+use crate::meta_storage::{MetaBackendOptions, MetaConn, MetaStorageError, MetaStorageOptions};
 
 /// The backend-agnostic handle over the concrete metadata store.
 #[derive(Debug, Clone)]
@@ -9,7 +9,26 @@ pub enum MetaStorage {
 
 impl MetaStorage {
     pub fn new(options: MetaStorageOptions) -> Result<Self, MetaStorageError> {
-        Ok(MetaStorage::Psql(PsqlMetaStorage::new(options)?))
+        let MetaStorageOptions {
+            backend,
+            pool_size,
+            keepalives_idle,
+            keepalives_interval,
+            schema,
+        } = options;
+
+        // The only backend right now.
+        // When further backends are added they get their own arm here,
+        // constructed from their variant's parameters.
+        match backend {
+            MetaBackendOptions::Psql(uri) => Ok(MetaStorage::Psql(PsqlMetaStorage::new(
+                &uri,
+                pool_size,
+                keepalives_idle,
+                keepalives_interval,
+                schema,
+            )?)),
+        }
     }
 
     /// Checks out a connection for a spawned worker.
