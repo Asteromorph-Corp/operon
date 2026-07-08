@@ -59,12 +59,11 @@ impl<'a> MetaTx<'a> {
     }
 }
 
-/// A backend-agnostic handle for issuing metadata queries, borrowed from either a [`MetaConn`] or
-/// a [`MetaTx`].
+/// A backend-agnostic handle for issuing metadata queries.
 ///
 /// All metadata operations are exposed here in terms of the domain types (`Ticket`, `Resolution`,
-/// `RunFootprint`, …); dispatch to the concrete backend happens per-operation. Adding a backend is
-/// a matter of adding a variant and an arm to each method.
+/// `RunFootprint`, …); translation to the concrete backend happens per-operation. Adding a backend
+/// is a matter of adding a variant and an arm to each method.
 #[derive(Debug, Clone, Copy)]
 pub enum MetaClient<'a> {
     Psql(PsqlClient<'a>),
