@@ -4,7 +4,7 @@ use secrecy::ExposeSecret;
 use crate::schema::RunFootprint;
 use crate::storage::psql::EntityQueries;
 use crate::storage::psql::client::StorageClient;
-use crate::storage::{OperonStorage, StorageError, StorageOptions};
+use crate::storage::{OperonStorage, PsqlStorageOptions, StorageError};
 use crate::utils::SchemaPrefix;
 
 /// The SQL storage that can be used with the service.
@@ -31,7 +31,7 @@ impl<T> PsqlStorage<T> {
 }
 
 impl<T: Default> PsqlStorage<T> {
-    pub fn new(options: StorageOptions) -> Result<Self, StorageError> {
+    pub fn new(options: PsqlStorageOptions) -> Result<Self, StorageError> {
         let pg_config: tokio_postgres::Config = {
             let mut config = options
                 .database_uri
