@@ -1,304 +1,146 @@
-use uuid::Uuid;
+use std::borrow::Cow;
+use std::fmt::Display;
+
+use bytes::Buf;
+use tokio_postgres::{CopyInSink, ToStatement};
 
 use crate::meta_storage::MetaStorageError;
-use crate::meta_storage::psql::{PsqlClient, PsqlConn, PsqlTx};
-use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, Resolution, RunFootprint, Ticket, TicketStatus,
-};
+use crate::utils::SchemaPrefix;
 
-/// A backend-agnostic checked-out metadata connection.
-///
-/// Wraps a concrete backend connection; obtained from
-/// [`MetaStorage::worker_conn`](crate::meta_storage::MetaStorage::worker_conn) or
-/// [`scheduler_conn`](crate::meta_storage::MetaStorage::scheduler_conn).
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum MetaConn<'a> {
-    Psql(PsqlConn<'a>),
+macro_rules! impl_meta_client {
+    (
+        $method:ident
+        $(< $($generics:tt),* >)?
+        ( $($arg:ident : $arg_ty:ty),* ) -> $ret:ty
+        $(where $($where_clause:tt)+)?
+    ) => {
+        pub async fn $method
+        $(< $($generics),* >)?
+        (&self, $($arg: $arg_ty),*)  -> Result<$ret, MetaStorageError>
+        $(where $($where_clause)+)?
+        {
+            match self {
+                MetaClient::Object(ConnectionWithSchema { client, .. }) => {
+                    client.$method($($arg),*).await.map_err(Into::into)
+                }
+                MetaClient::Transaction(TransactionWithSchema { tx, .. }) => {
+                    tx.$method($($arg),*).await.map_err(Into::into)
+                }
+            }
+        }
+    };
 }
 
-impl<'a> MetaConn<'a> {
-    /// Begins a transaction over this connection.
-    pub async fn transaction(&'a mut self) -> Result<MetaTx<'a>, MetaStorageError> {
-        match self {
-            MetaConn::Psql(conn) => Ok(MetaTx::Psql(conn.transaction().await?)),
-        }
+type ToSql = dyn tokio_postgres::types::ToSql + Sync;
+
+#[derive(Debug)]
+pub struct ConnectionWithSchema<'a> {
+    client: deadpool_postgres::Object,
+    schema: Option<Cow<'a, str>>,
+}
+
+impl<'a> ConnectionWithSchema<'a> {
+    pub fn new(client: deadpool_postgres::Object, schema: Option<impl Into<Cow<'a, str>>>) -> Self {
+        let schema = schema.map(Into::into);
+        ConnectionWithSchema { client, schema }
     }
 
-    /// Borrows this connection as a [`MetaClient`] for issuing queries.
+    pub async fn transaction(&'a mut self) -> Result<TransactionWithSchema<'a>, MetaStorageError> {
+        let tx = self.client.transaction().await?;
+        let schema = self.schema.as_deref().map(Cow::Borrowed);
+        Ok(TransactionWithSchema { tx, schema })
+    }
+
     pub fn as_client(&self) -> MetaClient<'_> {
-        match self {
-            MetaConn::Psql(conn) => MetaClient::Psql(conn.as_client()),
-        }
+        MetaClient::Object(self)
     }
 }
 
-/// A backend-agnostic metadata transaction.
 #[derive(Debug)]
-#[non_exhaustive]
-pub enum MetaTx<'a> {
-    Psql(PsqlTx<'a>),
+pub struct TransactionWithSchema<'a> {
+    tx: deadpool_postgres::Transaction<'a>,
+    schema: Option<Cow<'a, str>>,
 }
 
-impl<'a> MetaTx<'a> {
+impl<'a> TransactionWithSchema<'a> {
     pub async fn commit(self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaTx::Psql(tx) => tx.commit().await,
-        }
+        self.tx.commit().await.map_err(Into::into)
     }
 
     pub async fn rollback(self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaTx::Psql(tx) => tx.rollback().await,
-        }
+        self.tx.rollback().await.map_err(Into::into)
     }
 
-    /// Borrows this transaction as a [`MetaClient`] for issuing queries.
     pub fn as_client(&self) -> MetaClient<'_> {
-        match self {
-            MetaTx::Psql(tx) => MetaClient::Psql(tx.as_client()),
-        }
+        MetaClient::Transaction(self)
     }
 }
 
-/// A backend-agnostic handle for issuing metadata queries.
-///
-/// All metadata operations are exposed here in terms of the domain types (`Ticket`, `Resolution`,
-/// `RunFootprint`, …); translation to the concrete backend happens per-operation. Adding a backend
-/// is a matter of adding a variant and an arm to each method.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub enum MetaClient<'a> {
-    Psql(PsqlClient<'a>),
+    Object(&'a ConnectionWithSchema<'a>),
+    Transaction(&'a TransactionWithSchema<'a>),
 }
 
-impl<'a> MetaClient<'a> {
-    /// Builds ticket queries for the given job.
-    pub fn ticket<const N: usize>(&'a self, job_meta: JobMetadata<N>) -> TicketQueryBuilder<'a, N> {
-        TicketQueryBuilder {
-            client: self,
-            job_meta,
-        }
+impl MetaClient<'_> {
+    impl_meta_client!(batch_execute(query: &str) -> ());
+    impl_meta_client!(execute(query: &str, params: &[&ToSql]) -> u64);
+    impl_meta_client!(query(query: &str, params: &[&ToSql]) -> Vec<tokio_postgres::Row>);
+    impl_meta_client!(query_opt(query: &str, params: &[&ToSql]) -> Option<tokio_postgres::Row>);
+    impl_meta_client!(
+        copy_in<T, U>(query: &T) -> CopyInSink<U>
+        where T: ?Sized + ToStatement + Send + Sync,
+              U: Buf + 'static + Send + Sync
+    );
+
+    pub async fn batch_execute_stmt(&self, stmt: &impl Display) -> Result<(), MetaStorageError> {
+        self.batch_execute(&stmt.to_string()).await
     }
 
-    /// Builds resolution queries for the given dimension.
-    pub fn resolution<const N: usize>(
-        &'a self,
-        dim_meta: DimensionMetadata<N>,
-    ) -> ResolutionQueryBuilder<'a, N> {
-        ResolutionQueryBuilder {
-            client: self,
-            dim_meta,
-        }
-    }
-
-    // --- Schema initialization ---
-
-    pub async fn init_schema(&self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.init_schema().await,
-        }
-    }
-
-    pub async fn init_ticket_hash(&self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.init_ticket_hash().await,
-        }
-    }
-
-    pub async fn init_dimension_hash(&self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.init_dimension_hash().await,
-        }
-    }
-
-    pub async fn init_ticket_status_type(&self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.init_ticket_status_type().await,
-        }
-    }
-
-    pub async fn init_ticket_summary(&self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.init_ticket_summary().await,
-        }
-    }
-
-    // --- Footprint ---
-
-    pub async fn init_footprint(&self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.init_footprint().await,
-        }
-    }
-
-    pub async fn clear_footprint(&self) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.clear_footprint().await,
-        }
-    }
-
-    pub async fn get_footprint(&self) -> Result<Option<RunFootprint>, MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.get_footprint().await,
-        }
-    }
-
-    pub async fn upsert_run(&self, footprint: &RunFootprint) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => client.upsert_run(footprint).await,
-        }
-    }
-
-    pub async fn put_execution(
+    pub async fn execute_stmt(
         &self,
-        run_id: Uuid,
-        execution_id: Uuid,
-    ) -> Result<(), MetaStorageError> {
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<u64, MetaStorageError> {
+        self.execute(&stmt.to_string(), params).await
+    }
+
+    pub async fn query_stmt(
+        &self,
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<Vec<tokio_postgres::Row>, MetaStorageError> {
+        self.query(&stmt.to_string(), params).await
+    }
+
+    pub async fn query_opt_stmt(
+        &self,
+        stmt: &impl Display,
+        params: &[&ToSql],
+    ) -> Result<Option<tokio_postgres::Row>, MetaStorageError> {
+        self.query_opt(&stmt.to_string(), params).await
+    }
+
+    pub fn schema(&self) -> Option<&str> {
         match self {
-            MetaClient::Psql(client) => client.put_execution(run_id, execution_id).await,
+            MetaClient::Object(ConnectionWithSchema { schema, .. }) => schema.as_deref(),
+            MetaClient::Transaction(TransactionWithSchema { schema, .. }) => schema.as_deref(),
         }
     }
 
-    pub async fn update_execution_on_finish(
-        &self,
-        footprint: &RunFootprint,
-        execution_id: Uuid,
-    ) -> Result<(), MetaStorageError> {
-        match self {
-            MetaClient::Psql(client) => {
-                client
-                    .update_execution_on_finish(footprint, execution_id)
-                    .await
-            }
-        }
+    pub fn schema_prefix(&self) -> SchemaPrefix<'_> {
+        SchemaPrefix(self.schema())
     }
 }
 
-/// Backend-agnostic builder for ticket queries, delegating to the concrete backend per-operation.
-pub struct TicketQueryBuilder<'a, const N: usize> {
-    client: &'a MetaClient<'a>,
-    job_meta: JobMetadata<N>,
-}
-
-impl<const N: usize> TicketQueryBuilder<'_, N> {
-    pub async fn init(&self) -> Result<(), MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.ticket(self.job_meta).init().await,
-        }
-    }
-
-    pub async fn clear(&self) -> Result<(), MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.ticket(self.job_meta).clear().await,
-        }
-    }
-
-    pub async fn get_all(&self, status: TicketStatus) -> Result<Vec<Ticket<N>>, MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.ticket(self.job_meta).get_all(status).await,
-        }
-    }
-
-    pub async fn put(&self, ticket: Ticket<N>) -> Result<(), MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.ticket(self.job_meta).put(ticket).await,
-        }
-    }
-
-    pub async fn raise_deps_done<const M: usize>(
-        &self,
-        upstream_meta: JobMetadata<M>,
-        upstream_job: Job<M>,
-        aggregate_dims: &[&'static str],
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => {
-                client
-                    .ticket(self.job_meta)
-                    .raise_deps_done(upstream_meta, upstream_job, aggregate_dims)
-                    .await
-            }
-        }
-    }
-
-    pub async fn raise_deps_quota<const M: usize>(
-        &self,
-        upstream_meta: JobMetadata<M>,
-        upstream_ticket: Ticket<M>,
-        aggregate_dims: &[&'static str],
-        ub: usize,
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => {
-                client
-                    .ticket(self.job_meta)
-                    .raise_deps_quota(upstream_meta, upstream_ticket, aggregate_dims, ub)
-                    .await
-            }
-        }
-    }
-
-    pub async fn explode<const M: usize, const IDX: usize>(
-        &self,
-        res_meta: DimensionMetadata<M>,
-        res: Resolution<M>,
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => {
-                client
-                    .ticket(self.job_meta)
-                    .explode::<M, IDX>(res_meta, res)
-                    .await
-            }
-        }
-    }
-
-    pub async fn mark_done(&self, job: Job<N>) -> Result<(), MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.ticket(self.job_meta).mark_done(job).await,
-        }
-    }
-
-    pub async fn get_status(&self) -> Result<(i64, i64, i64), MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.ticket(self.job_meta).get_status().await,
-        }
+impl<'a> From<&'a ConnectionWithSchema<'a>> for MetaClient<'a> {
+    fn from(client: &'a ConnectionWithSchema<'a>) -> Self {
+        MetaClient::Object(client)
     }
 }
 
-/// Backend-agnostic builder for resolution queries, delegating to the concrete backend
-/// per-operation.
-pub struct ResolutionQueryBuilder<'a, const N: usize> {
-    client: &'a MetaClient<'a>,
-    dim_meta: DimensionMetadata<N>,
-}
-
-impl<const N: usize> ResolutionQueryBuilder<'_, N> {
-    pub async fn init(&self) -> Result<(), MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.resolution(self.dim_meta).init().await,
-        }
-    }
-
-    pub async fn clear(&self) -> Result<(), MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.resolution(self.dim_meta).clear().await,
-        }
-    }
-
-    pub async fn get(
-        &self,
-        coordinate: [usize; N],
-    ) -> Result<Option<Resolution<N>>, MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.resolution(self.dim_meta).get(coordinate).await,
-        }
-    }
-
-    pub async fn put(&self, resolution: Resolution<N>) -> Result<(), MetaStorageError> {
-        match self.client {
-            MetaClient::Psql(client) => client.resolution(self.dim_meta).put(resolution).await,
-        }
+impl<'a> From<&'a TransactionWithSchema<'a>> for MetaClient<'a> {
+    fn from(tx: &'a TransactionWithSchema<'a>) -> Self {
+        MetaClient::Transaction(tx)
     }
 }

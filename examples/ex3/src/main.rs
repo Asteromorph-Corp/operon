@@ -1,5 +1,5 @@
 use operon::error::UserError;
-use operon::options::{OperonOptions, PsqlStorageOptions};
+use operon::options::{OperonOptions, StorageOptions};
 use operon::{Operon, OperonService, define_operon};
 use rand::Rng;
 
@@ -87,7 +87,7 @@ impl StressTestService for MyService {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
 
-    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex3_data");
+    let storage_options = StorageOptions::new(&database_uri).with_schema("ex3_data");
     let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex3_meta");
 
     let service = MyService;

@@ -1,7 +1,6 @@
 use secrecy::SecretString;
 
-/// Configuration for the Postgres entity-storage backend.
-pub struct PsqlStorageOptions {
+pub struct StorageOptions {
     pub database_uri: SecretString,
     pub pool_size: usize,
     pub keepalives_idle: std::time::Duration,
@@ -9,11 +8,7 @@ pub struct PsqlStorageOptions {
     pub schema: Option<String>,
 }
 
-/// Former name of [`PsqlStorageOptions`], kept as an alias for backward compatibility.
-#[deprecated(note = "renamed to `PsqlStorageOptions`")]
-pub type StorageOptions = PsqlStorageOptions;
-
-impl PsqlStorageOptions {
+impl StorageOptions {
     pub fn new(database_uri: impl Into<String>) -> Self {
         Self {
             database_uri: SecretString::from(database_uri.into()),

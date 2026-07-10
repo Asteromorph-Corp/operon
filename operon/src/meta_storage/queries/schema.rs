@@ -1,7 +1,6 @@
-use crate::meta_storage::MetaStorageError;
-use crate::meta_storage::psql::PsqlClient;
+use crate::meta_storage::{MetaClient, MetaStorageError};
 
-impl PsqlClient<'_> {
+impl MetaClient<'_> {
     /// Initializes the metadata storage schema, if specified.
     pub async fn init_schema(&self) -> Result<(), MetaStorageError> {
         let Some(schema) = self.schema() else {
