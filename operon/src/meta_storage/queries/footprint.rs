@@ -1,15 +1,16 @@
 //! Operations for footprinting the PSQL metadata storage.
+//! Given a connection with an optional schema, this module provides operations footprint the
+//! metadata storage.
 
 use std::str::FromStr;
 
 use uuid::Uuid;
 
-use crate::meta_storage::MetaStorageError;
-use crate::meta_storage::psql::PsqlClient;
+use crate::meta_storage::{MetaClient, MetaStorageError};
 use crate::schema::{RunFootprint, RunState};
 use crate::utils::GLOBAL;
 
-impl PsqlClient<'_> {
+impl MetaClient<'_> {
     /// Initializes the footprint table.
     pub async fn init_footprint(&self) -> Result<(), MetaStorageError> {
         let schema_prefix = self.schema_prefix();

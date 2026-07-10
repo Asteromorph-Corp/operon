@@ -2,13 +2,12 @@ mod meta_storage;
 pub use meta_storage::MetaStorage;
 
 mod meta_client;
-pub use meta_client::{MetaClient, MetaConn};
+pub use meta_client::MetaClient;
 
 mod options;
-pub use options::MetaBackendOptions;
+pub use options::MetaStorageOptions;
 
 mod error;
 pub use error::MetaStorageError;
 
-mod psql;
-pub use psql::PsqlMetaStorageOptions;
+mod queries;
