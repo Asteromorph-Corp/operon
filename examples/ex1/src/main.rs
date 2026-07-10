@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use operon::error::UserError;
-use operon::options::{OperonOptions, StorageOptions};
+use operon::options::{OperonOptions, PsqlStorageOptions};
 use operon::{Operon, OperonService, define_operon};
 use serde::{Deserialize, Serialize};
 
@@ -114,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
 
     // The two settings object
-    let storage_options = StorageOptions::new(&database_uri).with_schema("ex1_data");
+    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex1_data");
     let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex1_meta");
 
     //# ——————————————————— Initializing Settings ————————————————————— #//
