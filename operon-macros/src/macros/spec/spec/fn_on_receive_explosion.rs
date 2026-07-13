@@ -14,7 +14,7 @@ use crate::utils::{
 /// #[allow(unused_variables, clippy::match_single_binding)]
 /// async fn on_receive_explosion(
 ///     &self,
-///     client: operon::__private::MetaClient<'_>,
+///     client: MSto::Client<'_>,
 ///     resolution: schema::ResolutionEnum,
 /// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
 ///     match resolution {
@@ -71,7 +71,7 @@ pub(super) fn fn_on_receive_explosion(
         #[allow(unused_variables, clippy::match_single_binding)]
         async fn on_receive_explosion(
             &self,
-            client: #operon::__private::MetaClient<'_>,
+            client: MSto::Client<'_>,
             explosion: #operon::__private::TicketExplosion<schema::#ticket_enum_ident>,
         ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError> {
             match explosion.ticket {

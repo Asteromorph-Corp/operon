@@ -247,7 +247,7 @@ fn arg_def_collected(
 ///     &self,
 ///     service: &Svc,
 ///     storage: &Sto,
-///     meta_storage: operon::__private::MetaStorage,
+///     meta_storage: MSto,
 ///     job: Self::Job,
 /// ) -> Result<Self::Resolution, operon::error::SchedulerError> {
 ///     let [i] = job.coordinate;
@@ -372,7 +372,7 @@ pub(super) fn fn_run_job(
             &self,
             service: &Svc,
             storage: &Sto,
-            meta_storage: #operon::__private::MetaStorage,
+            meta_storage: MSto,
             job: Self::Job,
         ) -> Result<Self::Resolution, #operon::error::SchedulerError> {
             let [#(#job_coord_vars),*] = job.coordinate;

@@ -12,7 +12,7 @@ use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, to_lit_str,
 /// #[allow(unused_variables, clippy::match_single_binding)]
 /// async fn on_receive_job(
 ///     &self,
-///     client: operon::__private::MetaClient<'_>,
+///     client: MSto::Client<'_>,
 ///     job: schema::JobEnum,
 /// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
 ///     match job {
@@ -68,7 +68,7 @@ pub(super) fn fn_on_receive_job(
         #[allow(unused_variables, clippy::match_single_binding)]
         async fn on_receive_job(
             &self,
-            client: #operon::__private::MetaClient<'_>,
+            client: MSto::Client<'_>,
             job: schema::#job_enum_ident,
         ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError> {
             match job {

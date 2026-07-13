@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use crate::meta_storage::MetaStorage;
+use crate::meta_storage::{MetaBackend, MetaConnApi, MetaTxApi};
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::events::{ControlEventReceiver, SchedulerStateSender};
 use crate::scheduler::states::{InitTransition, NextState, SchedulerState};
-use crate::scheduler::{SchedulerError, SchedulerHandler, SchedulerOptions};
+use crate::scheduler::{SchedulerError, SchedulerHandler};
 use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -19,12 +19,13 @@ use crate::ui::UiMode;
 /// * Initialization of the metadata storage,
 /// * initialization of the individual schedulers, and
 /// * communication between the UI and the individual schedulers.
-pub struct Scheduler<Svc, Sto>
+pub struct Scheduler<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     ctrl_rx: ControlEventReceiver,
     sched_tx: SchedulerStateSender,
     channel_size: usize,
@@ -32,24 +33,26 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<Svc, Sto> Scheduler<Svc, Sto>
+impl<Svc, Sto, MSto> Scheduler<Svc, Sto, MSto>
 where
     Sto: OperonStorage,
     Svc: OperonService,
+    MSto: MetaBackend,
 {
     /// Initialize a new scheduler and its associated storages.
     pub fn new(
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        handler: SchedulerHandler<Svc, Sto>,
+        handler: SchedulerHandler<Svc, Sto, MSto>,
         progresses: SharedProgressMap,
         ctrl_rx: ControlEventReceiver,
         sched_tx: SchedulerStateSender,
-        options: SchedulerOptions,
+        channel_size: usize,
+        ui_mode: UiMode,
+        backend: MSto::Options,
     ) -> Result<Self, SchedulerError> {
         handler.validate_pool_sizes();
-        let (channel_size, ui_mode, backend) = options.split();
-        let meta_storage = MetaStorage::new(backend)?;
+        let meta_storage = MSto::new(backend)?;
 
         let ctx = SchedulerContext {
             service,

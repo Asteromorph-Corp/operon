@@ -1,9 +1,9 @@
 #[operon::__private::async_trait::async_trait]
 #[automatically_derived]
-impl operon::__private::JobRebuilder for BetaRebuilder {
+impl<MSto: operon::__private::MetaBackend> operon::__private::JobRebuilder<MSto> for BetaRebuilder {
     async fn rebuild(
         &self,
-        client: operon::__private::MetaClient<'_>,
+        client: MSto::Client<'_>,
     ) -> Result<(), operon::error::SchedulerError> {
         let ready_tickets = client
             .ticket(self.job_meta)

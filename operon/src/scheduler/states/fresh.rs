@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::meta_storage::MetaBackend;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::events::{ControlEvent, RunEventInner};
 use crate::scheduler::states::clean::CleanTransition;
@@ -9,23 +10,25 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct FreshState<Svc, Sto>
+pub struct FreshState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     run_id: Uuid,
 }
 
-impl<Svc, Sto> FreshState<Svc, Sto>
+impl<Svc, Sto, MSto> FreshState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
         run_id: Uuid,
@@ -48,10 +51,11 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerState for FreshState<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerState for FreshState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     async fn handle_progress(
         self: Box<Self>,

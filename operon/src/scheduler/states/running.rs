@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tokio::task::JoinSet;
 use uuid::Uuid;
 
+use crate::meta_storage::{MetaBackend, MetaClientApi, MetaConnApi, MetaTxApi};
 use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::events::{ControlEvent, IndividualControlEvent};
@@ -13,12 +14,13 @@ use crate::schema::{RunFootprint, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct RunningState<Svc, Sto>
+pub struct RunningState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     run_id: Uuid,
     execution_id: Uuid,
     handles: JoinSet<()>,
@@ -28,13 +30,14 @@ where
     time_started: std::time::Instant,
 }
 
-impl<Svc, Sto> RunningState<Svc, Sto>
+impl<Svc, Sto, MSto> RunningState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
         execution_id: Uuid,
@@ -73,10 +76,11 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerState for RunningState<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerState for RunningState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     async fn handle_progress(mut self: Box<Self>) -> Result<NextState, SchedulerError> {
         if self.handles.try_join_next().is_none() || !self.handles.is_empty() {

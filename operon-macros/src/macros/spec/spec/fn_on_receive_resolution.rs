@@ -14,7 +14,7 @@ use crate::utils::{
 /// #[allow(unused_variables, clippy::match_single_binding)]
 /// async fn on_receive_resolution(
 ///     &self,
-///     client: operon::__private::MetaClient<'_>,
+///     client: MSto::Client<'_>,
 ///     peer_txs: &Self::PeerEventSenders,
 ///     resolution: schema::ResolutionEnum,
 /// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
@@ -112,7 +112,7 @@ pub(super) fn fn_on_receive_resolution(
         #[allow(unused_variables, unreachable_code, clippy::match_single_binding)]
         async fn on_receive_resolution(
             &self,
-            client: #operon::__private::MetaClient<'_>,
+            client: MSto::Client<'_>,
             peer_txs: &Self::PeerEventSenders,
             resolution: schema::#res_enum_ident,
         ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError> {

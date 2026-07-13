@@ -7,8 +7,11 @@ use secrecy::ExposeSecret;
 use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
-use crate::meta_storage::MetaStorageError;
-use crate::meta_storage::psql::{PsqlConn, PsqlMetaStorageOptions};
+use crate::meta_storage::psql::{
+    PsqlClient, PsqlConn, PsqlMetaStorageOptions, PsqlResolutionQueryBuilder,
+    PsqlTicketQueryBuilder, PsqlTx,
+};
+use crate::meta_storage::{MetaBackend, MetaStorageError};
 
 /// The Postgres implementation of the metadata backend.
 ///
@@ -31,8 +34,15 @@ pub(crate) struct AdvisoryLock {
     key: i64,
 }
 
-impl PsqlMetaStorage {
-    pub fn new(options: PsqlMetaStorageOptions) -> Result<Self, MetaStorageError> {
+impl MetaBackend for PsqlMetaStorage {
+    type Options = PsqlMetaStorageOptions;
+    type Conn<'a> = PsqlConn<'a>;
+    type Tx<'a> = PsqlTx<'a>;
+    type Client<'a> = PsqlClient<'a>;
+    type Ticket<'a, const N: usize> = PsqlTicketQueryBuilder<'a, N>;
+    type Resolution<'a, const N: usize> = PsqlResolutionQueryBuilder<'a, N>;
+
+    fn new(options: PsqlMetaStorageOptions) -> Result<Self, MetaStorageError> {
         let PsqlMetaStorageOptions {
             uri,
             pool_size,
@@ -74,20 +84,59 @@ impl PsqlMetaStorage {
         })
     }
 
-    pub async fn worker_conn(&self) -> Result<PsqlConn<'_>, MetaStorageError> {
+    async fn worker_conn(&self) -> Result<PsqlConn<'_>, MetaStorageError> {
         let client = self.worker_pool.get().await?;
         let schema = self.schema.as_deref();
 
         Ok(PsqlConn::new(client, schema))
     }
 
-    pub async fn scheduler_conn(&self) -> Result<PsqlConn<'static>, MetaStorageError> {
+    async fn scheduler_conn(&self) -> Result<PsqlConn<'static>, MetaStorageError> {
         let client = self.scheduler_pool.get().await?;
         let schema = self.schema.clone();
 
         Ok(PsqlConn::new(client, schema))
     }
 
+    async fn ensure_lock(&self) -> Result<(), MetaStorageError> {
+        self.lock().await?;
+        Ok(())
+    }
+
+    async fn check_lock(&self) -> Result<(), MetaStorageError> {
+        let lock = self.lock().await?;
+
+        // A single `bigint` advisory lock is recorded in `pg_locks` as its key's upper and
+        // lower 32 bits, in `classid`/`objid` respectively, with `objsubid` fixed to 1.
+        let classid = (lock.key >> 32) as u32;
+        let objid = lock.key as u32;
+
+        let held: bool = lock
+            .conn
+            .query_one(
+                "SELECT EXISTS (
+                    SELECT 1 FROM pg_locks
+                    WHERE locktype = 'advisory'
+                      AND granted
+                      AND pid = pg_backend_pid()
+                      AND objsubid = 1
+                      AND classid = $1
+                      AND objid = $2
+                )",
+                &[&classid, &objid],
+            )
+            .await?
+            .get(0);
+
+        if !held {
+            return Err(MetaStorageError::LockLost(lock.schema.clone()));
+        }
+
+        Ok(())
+    }
+}
+
+impl PsqlMetaStorage {
     /// Acquires a Postgres session-level advisory lock scoped to this instance's schema,
     /// guarding against a second Operon instance corrupting this run's metadata.
     ///
@@ -98,7 +147,7 @@ impl PsqlMetaStorage {
     ///
     /// `Scheduler::work` forces this once, at startup; it is lazy and idempotent, so the lock
     /// acquisition path is guaranteed to be reached exactly once per `PsqlMetaStorage` instance.
-    pub(crate) async fn ensure_lock(&self) -> Result<&AdvisoryLock, MetaStorageError> {
+    async fn lock(&self) -> Result<&AdvisoryLock, MetaStorageError> {
         self.lock
             .get_or_try_init(|| async {
                 let conn = self.lock_pool.get().await?;
@@ -128,46 +177,6 @@ impl PsqlMetaStorage {
                 Ok(AdvisoryLock { conn, schema, key })
             })
             .await
-    }
-
-    /// Re-checks that the advisory lock acquired by `ensure_lock` is still held, by looking
-    /// it up in `pg_locks` rather than trusting the connection to still be alive.
-    ///
-    /// TCP keepalives (see `PsqlMetaStorageOptions`) only catch a peer that has gone completely
-    /// unreachable; they don't catch a connection pooler or an `idle_session_timeout` on the
-    /// server closing an idle session out from under us, which silently releases the lock
-    /// without either side telling us. Since `ensure_lock`'s connection is never used again
-    /// after startup, nothing else would ever notice this on its own.
-    pub(crate) async fn check_lock(&self) -> Result<(), MetaStorageError> {
-        let lock = self.ensure_lock().await?;
-
-        // A single `bigint` advisory lock is recorded in `pg_locks` as its key's upper and
-        // lower 32 bits, in `classid`/`objid` respectively, with `objsubid` fixed to 1.
-        let classid = (lock.key >> 32) as u32;
-        let objid = lock.key as u32;
-
-        let held: bool = lock
-            .conn
-            .query_one(
-                "SELECT EXISTS (
-                    SELECT 1 FROM pg_locks
-                    WHERE locktype = 'advisory'
-                      AND granted
-                      AND pid = pg_backend_pid()
-                      AND objsubid = 1
-                      AND classid = $1
-                      AND objid = $2
-                )",
-                &[&classid, &objid],
-            )
-            .await?
-            .get(0);
-
-        if !held {
-            return Err(MetaStorageError::LockLost(lock.schema.clone()));
-        }
-
-        Ok(())
     }
 }
 

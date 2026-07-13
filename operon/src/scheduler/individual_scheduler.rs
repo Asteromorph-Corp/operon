@@ -3,7 +3,9 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
-use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
+use crate::meta_storage::{
+    MetaBackend, MetaClientApi, MetaConnApi, MetaStorageError, MetaTicketApi, MetaTxApi,
+};
 use crate::scheduler::events::{
     IndividualControlEvent, IndividualControlEventReceiver, InternalEvent, PeerEvent,
     PeerEventSenders, ServicePeerEventReceiver, ServicePeerEventSenderMap,
@@ -25,34 +27,36 @@ use crate::storage::OperonStorage;
 /// * Updating waiting tickets from `Event` messages.
 ///
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Svc, Sto, JS, const N: usize>
+pub struct IndividualScheduler<Svc, Sto, JS, MSto, const N: usize>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto>,
+    MSto: MetaBackend,
+    JS: JobSpec<Svc, Sto, MSto>,
 {
     pub spec: JS,
     pub meta: JobMetadata<N>,
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
-    pub meta_storage: MetaStorage,
+    pub meta_storage: MSto,
     pub pool: Arc<Semaphore>,
     pub progress: SharedProgress,
     pub state: TaskState,
     pub handles: JoinSet<Result<InternalEvent<Job<N>, JS::Resolution>, SchedulerError>>,
 }
 
-impl<Svc, Sto, JS, const N: usize> IndividualScheduler<Svc, Sto, JS, N>
+impl<Svc, Sto, JS, MSto, const N: usize> IndividualScheduler<Svc, Sto, JS, MSto, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = Ticket<N>>,
+    MSto: MetaBackend,
+    JS: JobSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
 {
     pub fn new(
         spec: SpecWithMetadata<Svc, Sto, JS, N>,
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        meta_storage: MetaStorage,
+        meta_storage: MSto,
         pool_size: usize,
         progress: SharedProgress,
     ) -> Self {
@@ -83,7 +87,7 @@ where
     /// Call `update_state` with an ongoing connection.
     async fn update_progress_with_client(
         &mut self,
-        client: MetaClient<'_>,
+        client: MSto::Client<'_>,
     ) -> Result<(), SchedulerError> {
         let (done, queued, waiting) = client.ticket(self.meta).get_status().await?;
         let finished = (*self.progress.write().await).update(done, queued, waiting);

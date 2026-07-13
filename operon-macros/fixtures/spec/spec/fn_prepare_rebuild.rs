@@ -2,8 +2,8 @@ async fn prepare_rebuild(
     &self,
     storage: &Sto,
     progress: operon::__private::SharedProgress,
-    client: operon::__private::MetaClient<'_>,
-) -> Result<Box<dyn operon::__private::JobRebuilder>, operon::error::SchedulerError> {
+    client: MSto::Client<'_>,
+) -> Result<Box<dyn operon::__private::JobRebuilder<MSto>>, operon::error::SchedulerError> {
     let tickets = client
         .ticket(self.job_meta())
         .get_all(operon::__private::TicketStatus::Done)

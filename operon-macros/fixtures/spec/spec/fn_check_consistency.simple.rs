@@ -1,7 +1,7 @@
 async fn check_consistency(
     &self,
     storage: &Sto,
-    client: operon::__private::MetaClient<'_>,
+    client: MSto::Client<'_>,
     mode: operon::__private::CheckMode,
 ) -> Result<bool, operon::error::SchedulerError> {
     if mode == operon::__private::CheckMode::TrustAll {

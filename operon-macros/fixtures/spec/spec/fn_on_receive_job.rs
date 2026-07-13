@@ -1,7 +1,7 @@
 #[allow(unused_variables, clippy::match_single_binding)]
 async fn on_receive_job(
     &self,
-    client: operon::__private::MetaClient<'_>,
+    client: MSto::Client<'_>,
     job: schema::JobEnum,
 ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
     match job {

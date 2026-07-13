@@ -3,12 +3,13 @@ use std::sync::Arc;
 use futures::future::try_join;
 
 use crate::logger::UiBroadcastLayer;
+use crate::meta_storage::{MetaBackend, MetaBackendOptions, PsqlMetaStorage};
 use crate::operon::{OperonError, OperonOptions};
 use crate::scheduler::{Scheduler, ValidOperon};
 use crate::schema::SharedProgressMap;
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
-use crate::ui::UiLoop;
+use crate::ui::{UiLoop, UiMode, UiOptions};
 
 /// # Operon
 ///
@@ -52,9 +53,43 @@ where
     /// any other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
     pub async fn run(self) -> Result<(), OperonError> {
-        let handler = <(Svc, Sto) as ValidOperon<Svc, Sto>>::scheduler_handler();
-        let (ui_options, scheduler_options, log_options) = self.options.split();
+        let Operon {
+            service,
+            storage,
+            options,
+        } = self;
+        let (ui_options, scheduler_options, log_options) = options.split();
+        let (channel_size, ui_mode, backend) = scheduler_options.split();
 
+        match backend {
+            MetaBackendOptions::Psql(backend) => {
+                Self::run_with::<PsqlMetaStorage>(
+                    service,
+                    storage,
+                    backend,
+                    channel_size,
+                    ui_mode,
+                    ui_options,
+                    log_options,
+                )
+                .await
+            }
+        }
+    }
+
+    /// Builds the scheduler and UI over a concrete metadata backend and drives them to completion.
+    ///
+    /// The backend-generic handler and progress map are constructed here, past the point where
+    /// [`run`](Self::run) has resolved `MSto`.
+    async fn run_with<MSto: MetaBackend>(
+        service: Arc<Svc>,
+        storage: Arc<Sto>,
+        backend: MSto::Options,
+        channel_size: usize,
+        ui_mode: UiMode,
+        ui_options: UiOptions,
+        log_options: crate::logger::LoggerOptions,
+    ) -> Result<(), OperonError> {
         // Initialize the logger
         let (log_tx, log_rx) = ::tokio::sync::broadcast::channel(log_options.buffer_size);
 
@@ -67,17 +102,21 @@ where
         // Set up the tracing subscriber
         UiBroadcastLayer::new(log_tx, log_options).setup()?;
 
+        let handler = <(Svc, Sto) as ValidOperon<Svc, Sto>>::scheduler_handler::<MSto>();
+
         let progresses = SharedProgressMap::from_jobs(&handler.job_ids());
 
         // Create the scheduler
-        let scheduler = Scheduler::<Svc, Sto>::new(
-            self.service,
-            self.storage,
+        let scheduler = Scheduler::<Svc, Sto, MSto>::new(
+            service,
+            storage,
             handler,
             progresses.clone(),
             ctrl_rx,
             sched_tx,
-            scheduler_options,
+            channel_size,
+            ui_mode,
+            backend,
         )?;
         let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 

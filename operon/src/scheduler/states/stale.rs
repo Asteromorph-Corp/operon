@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tokio::time::Instant;
 use uuid::Uuid;
 
+use crate::meta_storage::{MetaBackend, MetaConnApi};
 use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::events::{ControlEvent, RunEventInner};
@@ -16,12 +17,13 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct StaleState<Svc, Sto>
+pub struct StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     run_id: Uuid,
     kind: StaleKind,
@@ -43,13 +45,14 @@ pub enum RunMode {
     Restore,
 }
 
-impl<Svc, Sto> StaleState<Svc, Sto>
+impl<Svc, Sto, MSto> StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
         run_id: Uuid,
@@ -225,10 +228,11 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerState for StaleState<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerState for StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     async fn handle_progress(
         self: Box<Self>,

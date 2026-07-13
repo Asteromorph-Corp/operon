@@ -3,7 +3,7 @@ async fn run_job(
     &self,
     service: &Svc,
     storage: &Sto,
-    meta_storage: operon::__private::MetaStorage,
+    meta_storage: MSto,
     job: Self::Job,
 ) -> Result<Self::Resolution, operon::error::SchedulerError> {
     let [i, k] = job.coordinate;

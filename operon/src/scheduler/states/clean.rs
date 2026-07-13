@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::meta_storage::{MetaBackend, MetaClientApi, MetaConnApi, MetaTxApi};
 use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::start::StartTransition;
@@ -8,22 +9,24 @@ use crate::scheduler::states::{NextState, SchedulerTransition, TransitionState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct CleanTransition<Svc, Sto>
+pub struct CleanTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     run_id: Uuid,
 }
 
-impl<Svc, Sto> CleanTransition<Svc, Sto>
+impl<Svc, Sto, MSto> CleanTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    pub fn new(ctx: SchedulerContext<Svc, Sto>, channel_size: usize, run_id: Uuid) -> Self {
+    pub fn new(ctx: SchedulerContext<Svc, Sto, MSto>, channel_size: usize, run_id: Uuid) -> Self {
         Self {
             ctx,
             channel_size,
@@ -32,7 +35,7 @@ where
     }
 
     pub fn state(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
     ) -> TransitionState {
@@ -45,10 +48,11 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerTransition for CleanTransition<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerTransition for CleanTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     fn warn_msg(&self) -> Option<&'static str> {
         None

@@ -20,3 +20,6 @@ mod footprint;
 mod resolution;
 mod schema;
 mod ticket;
+
+pub use resolution::PsqlResolutionQueryBuilder;
+pub use ticket::PsqlTicketQueryBuilder;

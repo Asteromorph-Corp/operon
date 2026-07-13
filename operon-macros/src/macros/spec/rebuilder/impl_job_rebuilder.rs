@@ -12,10 +12,12 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 /// ```rust,ignore
 /// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
-/// impl operon::__private::JobRebuilder for BetaRebuilder {
+/// impl<MSto: operon::__private::MetaBackend> operon::__private::JobRebuilder<MSto>
+///     for BetaRebuilder
+/// {
 ///     async fn rebuild(
 ///         &self,
-///         client: operon::__private::MetaClient<'_>,
+///         client: MSto::Client<'_>,
 ///     ) -> Result<(), operon::error::SchedulerError> {
 ///         for (job, resolution) in self.data.iter().cloned() {
 ///             client
@@ -142,10 +144,12 @@ pub fn impl_job_rebuilder(
     parse_quote! {
         #[#operon::__private::async_trait::async_trait]
         #[automatically_derived]
-        impl #operon::__private::JobRebuilder for #rebuilder_ident {
+        impl<MSto: #operon::__private::MetaBackend> #operon::__private::JobRebuilder<MSto>
+            for #rebuilder_ident
+        {
             async fn rebuild(
                 &self,
-                client: #operon::__private::MetaClient<'_>,
+                client: MSto::Client<'_>,
             ) -> Result<(), #operon::error::SchedulerError> {
                 let ready_tickets = client
                     .ticket(self.job_meta)

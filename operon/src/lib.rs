@@ -42,7 +42,9 @@ pub mod __private {
     pub use futures;
     pub use tracing;
 
-    pub use crate::meta_storage::{MetaClient, MetaStorage};
+    pub use crate::meta_storage::{
+        MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi, MetaTxApi,
+    };
     pub use crate::scheduler::{
         JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
         PeerEventSenders, SchedulerHandler, SpecWithMetadata, ValidOperon,
