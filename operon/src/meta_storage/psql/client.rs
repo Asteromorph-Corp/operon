@@ -6,7 +6,7 @@ use tokio_postgres::{CopyInSink, ToStatement};
 use uuid::Uuid;
 
 use crate::meta_storage::psql::{
-    PsqlMetaStorage, PsqlResolutionQueryBuilder, PsqlTicketQueryBuilder,
+    PsqlMetaError, PsqlMetaStorage, PsqlResolutionQueryBuilder, PsqlTicketQueryBuilder,
 };
 use crate::meta_storage::{MetaClientApi, MetaConnApi, MetaStorageError, MetaTxApi};
 use crate::schema::{DimensionMetadata, JobMetadata, RunFootprint};
@@ -26,10 +26,10 @@ macro_rules! impl_psql_client {
         {
             match self {
                 PsqlClient::Object(PsqlConn { client, .. }) => {
-                    client.$method($($arg),*).await.map_err(Into::into)
+                    client.$method($($arg),*).await.map_err(|e| PsqlMetaError::from(e).into())
                 }
                 PsqlClient::Transaction(PsqlTx { tx, .. }) => {
-                    tx.$method($($arg),*).await.map_err(Into::into)
+                    tx.$method($($arg),*).await.map_err(|e| PsqlMetaError::from(e).into())
                 }
             }
         }
@@ -54,7 +54,11 @@ impl<'a> PsqlConn<'a> {
 
 impl MetaConnApi<PsqlMetaStorage> for PsqlConn<'_> {
     async fn transaction(&mut self) -> Result<PsqlTx<'_>, MetaStorageError> {
-        let tx = self.client.transaction().await?;
+        let tx = self
+            .client
+            .transaction()
+            .await
+            .map_err(PsqlMetaError::from)?;
         let schema = self.schema.as_deref().map(Cow::Borrowed);
         Ok(PsqlTx { tx, schema })
     }
@@ -73,11 +77,17 @@ pub struct PsqlTx<'a> {
 
 impl MetaTxApi<PsqlMetaStorage> for PsqlTx<'_> {
     async fn commit(self) -> Result<(), MetaStorageError> {
-        self.tx.commit().await.map_err(Into::into)
+        self.tx
+            .commit()
+            .await
+            .map_err(|e| PsqlMetaError::from(e).into())
     }
 
     async fn rollback(self) -> Result<(), MetaStorageError> {
-        self.tx.rollback().await.map_err(Into::into)
+        self.tx
+            .rollback()
+            .await
+            .map_err(|e| PsqlMetaError::from(e).into())
     }
 
     fn as_client(&self) -> PsqlClient<'_> {

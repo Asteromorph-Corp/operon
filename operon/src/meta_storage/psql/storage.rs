@@ -8,7 +8,7 @@ use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
 use crate::meta_storage::psql::{
-    PsqlClient, PsqlConn, PsqlMetaStorageOptions, PsqlResolutionQueryBuilder,
+    PsqlClient, PsqlConn, PsqlMetaError, PsqlMetaStorageOptions, PsqlResolutionQueryBuilder,
     PsqlTicketQueryBuilder, PsqlTx,
 };
 use crate::meta_storage::{MetaBackend, MetaStorageError};
@@ -66,7 +66,7 @@ impl MetaBackend for PsqlMetaStorage {
         // 2. One to five connections for synchronous (individual-)scheduler operations.
         // 3. The remaining connections for spawned workers.
         let (worker_pool, scheduler_pool, lock_pool) = match pool_size {
-            0..=1 => return Err(MetaStorageError::PoolSizeTooSmall(pool_size)),
+            0..=1 => return Err(PsqlMetaError::PoolSizeTooSmall(pool_size).into()),
             2 => {
                 let p = mk_pool(1)?;
                 (p.clone(), p, mk_pool(1)?)
@@ -85,14 +85,18 @@ impl MetaBackend for PsqlMetaStorage {
     }
 
     async fn worker_conn(&self) -> Result<PsqlConn<'_>, MetaStorageError> {
-        let client = self.worker_pool.get().await?;
+        let client = self.worker_pool.get().await.map_err(PsqlMetaError::from)?;
         let schema = self.schema.as_deref();
 
         Ok(PsqlConn::new(client, schema))
     }
 
     async fn scheduler_conn(&self) -> Result<PsqlConn<'static>, MetaStorageError> {
-        let client = self.scheduler_pool.get().await?;
+        let client = self
+            .scheduler_pool
+            .get()
+            .await
+            .map_err(PsqlMetaError::from)?;
         let schema = self.schema.clone();
 
         Ok(PsqlConn::new(client, schema))
@@ -125,7 +129,8 @@ impl MetaBackend for PsqlMetaStorage {
                 )",
                 &[&classid, &objid],
             )
-            .await?
+            .await
+            .map_err(PsqlMetaError::from)?
             .get(0);
 
         if !held {
@@ -150,13 +155,14 @@ impl PsqlMetaStorage {
     async fn lock(&self) -> Result<&AdvisoryLock, MetaStorageError> {
         self.lock
             .get_or_try_init(|| async {
-                let conn = self.lock_pool.get().await?;
+                let conn = self.lock_pool.get().await.map_err(PsqlMetaError::from)?;
                 let schema = match &self.schema {
                     Some(schema) => schema.clone(),
                     // Unprefixed queries resolve against whatever schema is first in `search_path`.
                     None => conn
                         .query_one("SELECT current_schema()", &[])
-                        .await?
+                        .await
+                        .map_err(PsqlMetaError::from)?
                         .get::<_, Option<String>>(0)
                         .ok_or(MetaStorageError::Internal(
                             "failed to find default schema; \
@@ -167,7 +173,8 @@ impl PsqlMetaStorage {
                 let key = lock_key(&schema);
                 let locked: bool = conn
                     .query_one("SELECT pg_try_advisory_lock($1)", &[&key])
-                    .await?
+                    .await
+                    .map_err(PsqlMetaError::from)?
                     .get(0);
 
                 if !locked {
@@ -197,7 +204,7 @@ fn create_pool(
     keepalives_idle: Duration,
     keepalives_interval: Duration,
     pool_size: usize,
-) -> Result<deadpool_postgres::Pool, MetaStorageError> {
+) -> Result<deadpool_postgres::Pool, PsqlMetaError> {
     // Might want to make these hardcoded config values configurable.
     let mut pg_config = tokio_postgres::Config::from_str(uri)?;
     pg_config

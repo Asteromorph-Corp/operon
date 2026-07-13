@@ -4,7 +4,7 @@ use bytes::Bytes;
 use futures::SinkExt;
 use tokio_postgres::Row;
 
-use crate::meta_storage::psql::PsqlClient;
+use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{
     DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
@@ -245,9 +245,11 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
             .await?;
         let mut sink = Box::pin(sink);
         for ticket in &new_tickets {
-            sink.feed(ticket.to_copy_string()?.into()).await?;
+            sink.feed(ticket.to_copy_string()?.into())
+                .await
+                .map_err(PsqlMetaError::from)?;
         }
-        sink.close().await?;
+        sink.close().await.map_err(PsqlMetaError::from)?;
 
         Ok(tickets)
     }

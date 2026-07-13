@@ -10,6 +10,9 @@
 mod client;
 pub use client::{PsqlClient, PsqlConn, PsqlTx};
 
+mod error;
+pub(crate) use error::PsqlMetaError;
+
 mod options;
 pub use options::PsqlMetaStorageOptions;
 

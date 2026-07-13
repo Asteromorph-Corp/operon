@@ -1,14 +1,16 @@
 use std::error::Error;
 use std::num::TryFromIntError;
 
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
-#[derive(Debug, Error)]
+/// The backend-neutral metadata error.
+///
+/// Backend-specific failures arrive through [`Backend`](Self::Backend); each backend converts its
+/// own error into it via `Into<MetaStorageError>`.
+#[derive(Debug, ThisError)]
 pub enum MetaStorageError {
-    #[error("Database error: {}{}", .0, .0.source().map_or_else(String::new, |e| format!(", cause: {e}")))]
-    DatabaseError(#[from] tokio_postgres::Error),
-    #[error("Database pool error: {0}")]
-    DatabasePoolError(#[from] deadpool_postgres::PoolError),
+    #[error("Backend error: {0}")]
+    Backend(Box<dyn Error + Send + Sync + 'static>),
     #[error("Integer conversion error: {0}")]
     IntegerConversionError(#[from] TryFromIntError),
     #[error("Invalid run state: {0}")]
@@ -27,8 +29,6 @@ pub enum MetaStorageError {
     },
     #[error("Internal error: {0}")]
     Internal(&'static str),
-    #[error("Metadata pool size {0} is not allowed")]
-    PoolSizeTooSmall(usize),
     #[error("Another Operon instance is already running against metadata schema `{0}`")]
     SchemaLocked(String),
     #[error(
@@ -52,11 +52,5 @@ impl MetaStorageError {
 
     pub fn missing_ticket_summary(job: &'static str) -> Self {
         Self::MissingTicketSummary { job }
-    }
-}
-
-impl From<deadpool_postgres::BuildError> for MetaStorageError {
-    fn from(_: deadpool_postgres::BuildError) -> Self {
-        Self::Internal("Failed to build connection pool")
     }
 }
