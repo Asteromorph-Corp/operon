@@ -68,6 +68,20 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     needs: lint
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: operon
+          POSTGRES_PASSWORD: operon
+          POSTGRES_DB: operon
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v6
 
@@ -100,4 +114,5 @@ jobs:
       - name: Run tests
         env:
           CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+          POSTGRES_URI: postgres://operon:operon@localhost:5432/operon
         run: cargo test --workspace --locked --all-features --all-targets
