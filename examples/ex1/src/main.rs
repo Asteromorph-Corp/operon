@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use operon::error::UserError;
-use operon::options::{OperonOptions, PsqlStorageOptions};
+use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
 use operon::{Operon, OperonService, define_operon};
 use serde::{Deserialize, Serialize};
 
@@ -115,7 +115,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // The two settings object
     let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex1_data");
-    let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex1_meta");
+    let operon_options = OperonOptions::from_backend(
+        PsqlMetaStorageOptions::new(&database_uri).with_schema("ex1_meta"),
+    );
 
     //# ——————————————————— Initializing Settings ————————————————————— #//
     // The service is what we defined above —
