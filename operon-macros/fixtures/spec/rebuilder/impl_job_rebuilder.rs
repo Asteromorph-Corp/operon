@@ -4,7 +4,7 @@ impl<MSto: operon::__private::MetaBackend> operon::__private::JobRebuilder<MSto>
     async fn rebuild(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), operon::error::SchedulerError> {
+    ) -> Result<(), operon::error::SchedulerError<MSto::Error>> {
         let ready_tickets = client
             .ticket(self.job_meta)
             .get_all(operon::__private::TicketStatus::Queued)

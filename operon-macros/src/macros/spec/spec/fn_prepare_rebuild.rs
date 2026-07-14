@@ -12,7 +12,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     &self,
 ///     storage: &Sto,
 ///     client: MSto::Client<'_>,
-/// ) -> Result<Box<dyn operon::__private::JobRebuilder<MSto>>, operon::error::SchedulerError> {
+/// ) -> Result<Box<dyn operon::__private::JobRebuilder<MSto>>, operon::error::SchedulerError<MSto::Error>> {
 ///     let tickets = client
 ///         .ticket(self.job_meta())
 ///         .get_all(operon::__private::TicketStatus::Done)
@@ -33,7 +33,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///                     ))
 ///                 })?;
 ///
-///             Ok::<_, operon::error::SchedulerError>((job, resolution))
+///             Ok::<_, operon::error::SchedulerError<MSto::Error>>((job, resolution))
 ///         }))
 ///         .await?;
 ///
@@ -76,7 +76,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             storage: &Sto,
             progress: #operon::__private::SharedProgress,
             client: MSto::Client<'_>,
-        ) -> Result<Box<dyn #operon::__private::JobRebuilder<MSto>>, #operon::error::SchedulerError>
+        ) -> Result<Box<dyn #operon::__private::JobRebuilder<MSto>>, #operon::error::SchedulerError<MSto::Error>>
         {
             let tickets = client
                 .ticket(self.job_meta())
@@ -91,7 +91,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
                     })?;
                     let resolution = #resolution_expr;
 
-                    Ok::<_, #operon::error::SchedulerError>((job, resolution))
+                    Ok::<_, #operon::error::SchedulerError<MSto::Error>>((job, resolution))
                 }
             ))
             .await?;

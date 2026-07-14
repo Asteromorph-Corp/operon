@@ -3,7 +3,7 @@ async fn prepare_rebuild(
     storage: &Sto,
     progress: operon::__private::SharedProgress,
     client: MSto::Client<'_>,
-) -> Result<Box<dyn operon::__private::JobRebuilder<MSto>>, operon::error::SchedulerError> {
+) -> Result<Box<dyn operon::__private::JobRebuilder<MSto>>, operon::error::SchedulerError<MSto::Error>> {
     let tickets = client
         .ticket(self.job_meta())
         .get_all(operon::__private::TicketStatus::Done)
@@ -24,7 +24,7 @@ async fn prepare_rebuild(
                     ))
                 })?;
 
-            Ok::<_, operon::error::SchedulerError>((job, resolution))
+            Ok::<_, operon::error::SchedulerError<MSto::Error>>((job, resolution))
         },
     ))
     .await?;

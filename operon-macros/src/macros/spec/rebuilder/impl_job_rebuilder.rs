@@ -18,7 +18,7 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///     async fn rebuild(
 ///         &self,
 ///         client: MSto::Client<'_>,
-///     ) -> Result<(), operon::error::SchedulerError> {
+///     ) -> Result<(), operon::error::SchedulerError<MSto::Error>> {
 ///         for (job, resolution) in self.data.iter().cloned() {
 ///             client
 ///                 .resolution(self.spawn_dim_meta)
@@ -150,7 +150,7 @@ pub fn impl_job_rebuilder(
             async fn rebuild(
                 &self,
                 client: MSto::Client<'_>,
-            ) -> Result<(), #operon::error::SchedulerError> {
+            ) -> Result<(), #operon::error::SchedulerError<MSto::Error>> {
                 let ready_tickets = client
                     .ticket(self.job_meta)
                     .get_all(#operon::__private::TicketStatus::Queued)

@@ -5,7 +5,7 @@ async fn run_job(
     storage: &Sto,
     meta_storage: MSto,
     job: Self::Job,
-) -> Result<Self::Resolution, operon::error::SchedulerError> {
+) -> Result<Self::Resolution, operon::error::SchedulerError<MSto::Error>> {
     let [i] = job.coordinate;
 
     let Some(a) = storage.get_a([i]).await? else {
