@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 async-trait = "0.1.89"
+dashmap = "6.1.0"
 log = "0.4.27"
 operon = { path = "../../operon" }
 rand = "0.9.1"

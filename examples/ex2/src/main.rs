@@ -1,7 +1,12 @@
+#![allow(unused)]
+
 use async_trait::async_trait;
+use ex2::mem_storage::DashMapCookingStorage;
 use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage};
 use operon::error::UserError;
-use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
+use operon::options::{
+    MemMetaStorageOptions, OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions,
+};
 use operon::{Operon, OperonService};
 use rand::Rng;
 
@@ -103,14 +108,16 @@ impl CookingService for ExampleService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
-    
+
     let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex2_data");
     let operon_options = OperonOptions::from_backend(
         PsqlMetaStorageOptions::new(&database_uri).with_schema("ex2_meta"),
+        // MemMetaStorageOptions::new(),
     );
 
     let service = ExampleService;
     let storage = PsqlCookingStorage::new(storage_options)?;
+    // let storage = DashMapCookingStorage::default();
     Operon::new(service, storage, operon_options).run().await?;
 
     Ok(())
