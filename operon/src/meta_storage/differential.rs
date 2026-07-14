@@ -47,6 +47,29 @@ fn job_gamma() -> JobMetadata<1> {
     }
 }
 
+/// A job over both `i` and `j`, whose upstreams pin one of the two.
+///
+/// Its upstreams pin a proper subset of its dimensions, which is the query shape a single-dimension
+/// job cannot produce.
+fn job_delta() -> JobMetadata<2> {
+    JobMetadata {
+        id: "delta",
+        dims: ["i", "j"],
+        spawn_dim: None,
+        priority: &[],
+    }
+}
+
+/// An upstream of `delta` over `j` alone.
+fn job_over_j() -> JobMetadata<1> {
+    JobMetadata {
+        id: "over_j",
+        dims: ["j"],
+        spawn_dim: None,
+        priority: &[],
+    }
+}
+
 /// The dimension `alpha` spawns.
 fn dim_i() -> DimensionMetadata<0> {
     DimensionMetadata { id: "i", deps: [] }
@@ -124,6 +147,7 @@ async fn exercise<MSto: MetaBackend>(backend: &MSto) -> Vec<Step> {
     client.ticket(job_alpha()).init().await.expect("alpha init");
     client.ticket(job_beta()).init().await.expect("beta init");
     client.ticket(job_gamma()).init().await.expect("gamma init");
+    client.ticket(job_delta()).init().await.expect("delta init");
     client.init_footprint().await.expect("init_footprint");
 
     // Start from a known state, so a reused database matches a fresh store.
@@ -143,6 +167,11 @@ async fn exercise<MSto: MetaBackend>(backend: &MSto) -> Vec<Step> {
         .clear()
         .await
         .expect("gamma clear");
+    client
+        .ticket(job_delta())
+        .clear()
+        .await
+        .expect("delta clear");
     client.clear_footprint().await.expect("clear_footprint");
 
     // A zero-quota ticket is ready on arrival; beta's default waits on one dependency.
@@ -358,6 +387,70 @@ async fn exercise<MSto: MetaBackend>(backend: &MSto) -> Vec<Step> {
             &client
                 .ticket(job_gamma())
                 .get_all(TicketStatus::Waiting)
+                .await
+                .expect("get_all"),
+        )),
+    ));
+
+    // Delta's upstreams each pin one of its two dimensions, leaving the other free.
+    for i in 0..2 {
+        for j in 0..2 {
+            client
+                .ticket(job_delta())
+                .put(
+                    Ticket::new(2)
+                        .with_coordinate::<0>(i)
+                        .with_coordinate::<1>(j),
+                )
+                .await
+                .expect("delta put");
+        }
+    }
+    let over_i = client
+        .ticket(job_delta())
+        .raise_deps_done::<1>(job_gamma(), Job { coordinate: [0] }, &[])
+        .await
+        .expect("delta raise_deps_done over i");
+    log.push((
+        "delta raise_deps_done returned (pinned to i = 0, j free)",
+        Observed::Tickets(views(&over_i)),
+    ));
+    log.push((
+        "delta waiting after raise_deps_done over i",
+        Observed::Tickets(views(
+            &client
+                .ticket(job_delta())
+                .get_all(TicketStatus::Waiting)
+                .await
+                .expect("get_all"),
+        )),
+    ));
+
+    let over_j = client
+        .ticket(job_delta())
+        .raise_deps_done::<1>(job_over_j(), Job { coordinate: [0] }, &[])
+        .await
+        .expect("delta raise_deps_done over j");
+    log.push((
+        "delta raise_deps_done returned (pinned to j = 0, i free)",
+        Observed::Tickets(views(&over_j)),
+    ));
+    log.push((
+        "delta status after both pinned raises",
+        Observed::Status(
+            client
+                .ticket(job_delta())
+                .get_status()
+                .await
+                .expect("status"),
+        ),
+    ));
+    log.push((
+        "delta queued after both pinned raises",
+        Observed::Tickets(views(
+            &client
+                .ticket(job_delta())
+                .get_all(TicketStatus::Queued)
                 .await
                 .expect("get_all"),
         )),
