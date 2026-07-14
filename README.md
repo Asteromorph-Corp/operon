@@ -291,13 +291,13 @@ We provide a struct `Psql{PipelineName}Storage` that already implements this tra
 ```rust
 // In examples/ex1/src/main.rs (slightly modified):
 
-use operon::StorageOptions;
+use operon::PsqlStorageOptions;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // ...
     let storage = PsqlSplitterStorage::new(
-        StorageOptions::new("postgres://username:password@hostname:port/dbname")
+        PsqlStorageOptions::new("postgres://username:password@hostname:port/dbname")
             .with_schema("data"),
     )?;
     // ...
@@ -317,7 +317,7 @@ Once you have all the pieces in place, you can run the Operon engine by construc
 ```rust
 // In examples/ex1/src/main.rs (slightly modified):
 
-use operon::{Operon, OperonOptions, OperonStorage, StorageOptions};
+use operon::{Operon, OperonOptions, OperonStorage, PsqlStorageOptions};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -325,7 +325,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //# ——————————————————— Initializing Settings ————————————————————— #//
     let database_uri = "postgres://username:password@hostname:port/dbname";
     
-    let storage_options = StorageOptions::new(&database_uri).with_schema("ex1_data");
+    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex1_data");
     let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex1_meta");
     
     let service = MySplitterService;
