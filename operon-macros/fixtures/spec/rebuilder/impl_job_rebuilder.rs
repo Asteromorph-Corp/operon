@@ -5,6 +5,8 @@ impl operon::__private::JobRebuilder for BetaRebuilder {
         &self,
         client: operon::__private::MetaClient<'_>,
     ) -> Result<(), operon::error::SchedulerError> {
+        use operon::__private::futures::{StreamExt, TryStreamExt};
+
         let ready_tickets = client
             .ticket(self.job_meta)
             .get_all(operon::__private::TicketStatus::Queued)
@@ -28,7 +30,7 @@ impl operon::__private::JobRebuilder for BetaRebuilder {
             .map(|(job, _)| job)
             .collect::<Vec<_>>();
 
-        operon::__private::futures::future::try_join_all(ready_data.into_iter().map(
+        operon::__private::futures::stream::iter(ready_data.into_iter().map(
             |(job, resolution)| async move {
                 client
                     .resolution(self.spawn_dim_meta)
@@ -61,6 +63,8 @@ impl operon::__private::JobRebuilder for BetaRebuilder {
                 Ok::<_, operon::error::SchedulerError>(())
             },
         ))
+        .buffer_unordered(operon::__private::REBUILD_CONCURRENCY)
+        .try_collect::<Vec<_>>()
         .await?;
 
         if !invalid_tickets.is_empty() {

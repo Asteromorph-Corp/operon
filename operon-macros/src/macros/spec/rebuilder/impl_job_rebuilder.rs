@@ -17,6 +17,7 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///         &self,
 ///         client: operon::__private::MetaClient<'_>,
 ///     ) -> Result<(), operon::error::SchedulerError> {
+///         use operon::__private::futures::{StreamExt, TryStreamExt};
 ///         let ready_tickets = client
 ///             .ticket(self.job_meta)
 ///             .get_all(operon::__private::TicketStatus::Queued)
@@ -40,7 +41,7 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///             .map(|(job, _)| job)
 ///             .collect::<Vec<_>>();
 ///
-///         operon::__private::futures::future::try_join_all(ready_data.into_iter().map(
+///         operon::__private::futures::stream::iter(ready_data.into_iter().map(
 ///             |(job, resolution)| async move {
 ///                 client
 ///                     .resolution(self.spawn_dim_meta)
@@ -72,12 +73,15 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///                     .raise_deps_done(self.job_meta, job, &["j"])
 ///                     .await?;
 ///
-///                 let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
+///                 let (done, queued, waiting) =
+///                     client.ticket(self.job_meta).get_status().await?;
 ///                 (*self.progress.write().await).update(done, queued, waiting);
 ///
 ///                 Ok::<_, operon::error::SchedulerError>(())
 ///             },
 ///         ))
+///         .buffer_unordered(operon::__private::REBUILD_CONCURRENCY)
+///         .try_collect::<Vec<_>>()
 ///         .await?;
 ///
 ///         // ... warn about `invalid_tickets` ...
@@ -190,6 +194,8 @@ pub fn impl_job_rebuilder(
                 &self,
                 client: #operon::__private::MetaClient<'_>,
             ) -> Result<(), #operon::error::SchedulerError> {
+                use #operon::__private::futures::{StreamExt, TryStreamExt};
+
                 let ready_tickets = client
                     .ticket(self.job_meta)
                     .get_all(#operon::__private::TicketStatus::Queued)
@@ -213,7 +219,7 @@ pub fn impl_job_rebuilder(
                     .map(|(job, _)| job)
                     .collect::<Vec<_>>();
 
-                #operon::__private::futures::future::try_join_all(ready_data.into_iter().map(
+                #operon::__private::futures::stream::iter(ready_data.into_iter().map(
                     |(job, #resolution_pat)| async move {
                         #maybe_put_resolution
                         client.ticket(self.job_meta).mark_done(job).await?;
@@ -227,6 +233,8 @@ pub fn impl_job_rebuilder(
                         Ok::<_, #operon::error::SchedulerError>(())
                     }
                 ))
+                .buffer_unordered(#operon::__private::REBUILD_CONCURRENCY)
+                .try_collect::<Vec<_>>()
                 .await?;
 
                 if !invalid_tickets.is_empty() {

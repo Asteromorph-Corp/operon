@@ -12,4 +12,4 @@ mod job_spec;
 pub use job_spec::{JobSpec, SpecWithMetadata};
 
 mod job_rebuilder;
-pub use job_rebuilder::JobRebuilder;
+pub use job_rebuilder::{JobRebuilder, REBUILD_CONCURRENCY};
