@@ -2,9 +2,9 @@
 //!
 //! The concrete metadata store lives behind the [`MetaBackend`] trait and its associated API
 //! traits.
-//! A backend is selected at runtime via [`MetaBackendOptions`](super::MetaBackendOptions) and
-//! monomorphized at compile time: [`Operon::run`](crate::Operon::run) matches the options enum once
-//! and dispatches into a generic inner parameterized by a concrete `MSto: MetaBackend`.
+//! A program either pins a concrete backend as [`Operon`](crate::Operon)'s `MSto` parameter, or
+//! defaults to [`AnyBackend`](super::AnyBackend), which selects the backend at runtime from
+//! [`MetaBackendOptions`](super::MetaBackendOptions) and match-dispatches each operation.
 
 use uuid::Uuid;
 

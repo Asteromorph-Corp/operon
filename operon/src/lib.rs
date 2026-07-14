@@ -10,6 +10,7 @@ mod storage;
 mod ui;
 mod utils;
 
+pub use meta_storage::AnyBackend;
 pub use operon::Operon;
 pub use operon_macros::define_operon;
 pub use schema::{Direction, Entity};
@@ -17,7 +18,7 @@ pub use service::OperonService;
 pub use storage::OperonStorage;
 
 pub mod error {
-    pub use crate::meta_storage::{MetaStorageError, PsqlMetaError};
+    pub use crate::meta_storage::{AnyBackendError, MetaStorageError, PsqlMetaError};
     pub use crate::operon::{OperonError, UserError};
     pub use crate::scheduler::SchedulerError;
     pub use crate::storage::{DimState, StorageError};

@@ -55,4 +55,21 @@ impl<MErr> MetaStorageError<MErr> {
     pub fn missing_ticket_summary(job: &'static str) -> Self {
         Self::MissingTicketSummary { job }
     }
+
+    /// Remaps the backend error, passing the domain variants through unchanged.
+    pub(crate) fn map_backend<U>(self, f: impl FnOnce(MErr) -> U) -> MetaStorageError<U> {
+        match self {
+            Self::IntegerConversionError(e) => MetaStorageError::IntegerConversionError(e),
+            Self::InvalidRunState(s) => MetaStorageError::InvalidRunState(s),
+            Self::InvalidExplosion { job, dim } => MetaStorageError::InvalidExplosion { job, dim },
+            Self::MissingTicketSummary { job } => MetaStorageError::MissingTicketSummary { job },
+            Self::MissingResolution { dim, deps } => {
+                MetaStorageError::MissingResolution { dim, deps }
+            }
+            Self::Internal(s) => MetaStorageError::Internal(s),
+            Self::SchemaLocked(s) => MetaStorageError::SchemaLocked(s),
+            Self::LockLost(s) => MetaStorageError::LockLost(s),
+            Self::Backend(e) => MetaStorageError::Backend(f(e)),
+        }
+    }
 }

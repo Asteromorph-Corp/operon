@@ -1,3 +1,6 @@
+mod any;
+pub use any::{AnyBackend, AnyBackendError};
+
 mod backend;
 pub use backend::{
     MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi, MetaTxApi,
@@ -11,4 +14,4 @@ pub(crate) use error::MetaResult;
 pub use error::MetaStorageError;
 
 mod psql;
-pub use psql::{PsqlMetaError, PsqlMetaStorage, PsqlMetaStorageOptions};
+pub use psql::{PsqlMetaError, PsqlMetaStorageOptions};
