@@ -10,8 +10,8 @@ use crate::schema::{DimensionMetadata, JobMetadata, RunFootprint};
 
 /// A handle on the in-memory store.
 ///
-/// The store is process-local, so a "connection" is just a shared handle to it. It owns its handle
-/// rather than borrowing the backend, so it can be handed out for `'static`.
+/// The store is process-local, so a "connection" is just a shared handle to it. It owns its handle,
+/// so it can be handed out for `'static`.
 pub struct MemConn {
     store: Arc<MemStore>,
 }
@@ -25,8 +25,7 @@ impl MemConn {
 impl MetaConnApi<MemMetaStorage> for MemConn {
     /// Opens a transaction.
     ///
-    /// The in-memory store is non-transactional: writes land immediately and are never rolled
-    /// back.
+    /// Writes through it land as they are issued.
     async fn transaction(&mut self) -> MemResult<MemTx<'_>> {
         Ok(MemTx { store: &self.store })
     }
@@ -75,8 +74,7 @@ impl MetaClientApi<MemMetaStorage> for MemClient<'_> {
 
     // --- Schema initialization ---
     //
-    // The in-memory store has no schema: tables are registered on first use by the ticket and
-    // resolution builders, and statuses and summaries are held natively.
+    // Tables are registered on first use by the ticket and resolution builders.
 
     async fn init_schema(&self) -> MemResult<()> {
         Ok(())

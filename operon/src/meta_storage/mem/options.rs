@@ -1,7 +1,6 @@
 /// Options for the in-memory metadata backend.
 ///
-/// The store is volatile and has no connection or schema to configure, so it currently takes no
-/// parameters.
+/// The store is volatile and has no connection or schema to configure, so it takes no parameters.
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
 pub struct MemMetaStorageOptions {}

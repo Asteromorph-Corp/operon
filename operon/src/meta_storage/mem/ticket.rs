@@ -8,8 +8,6 @@ use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
 
 /// A ticket's primary key: its coordinate, with unresolved dimensions left as `None`.
-///
-/// Stored natively rather than through the Postgres `-1` sentinel.
 pub(super) type TicketKey<const N: usize> = [Option<usize>; N];
 
 /// Derives a ticket's key from its coordinate.
@@ -26,9 +24,8 @@ pub(super) struct TicketTable<const N: usize> {
 /// A ticket table's rows, alongside the per-status counters they are summarized by and the
 /// secondary indexes they are queried through.
 ///
-/// One lock spans all three: it makes a slice op's scan and write-back atomic, matching the single
-/// `UPDATE ... WHERE ... RETURNING` its Postgres counterpart issues, and it keeps a reader from
-/// observing the counters or an index midway through an update.
+/// One lock spans all three: it makes a slice op's scan and write-back atomic, and it keeps a
+/// reader from observing the counters or an index midway through an update.
 #[derive(Default)]
 struct TicketRows<const N: usize> {
     map: HashMap<TicketKey<N>, Ticket<N>>,
@@ -71,8 +68,8 @@ impl<const N: usize> TicketRows<N> {
     /// The keys whose coordinate matches every pin, building the index for that pin set on first
     /// use.
     ///
-    /// A pin set covering every dimension names one coordinate outright, so it is served from the
-    /// rows and never indexed.
+    /// A pin set covering every dimension names one coordinate outright, so it is served straight
+    /// from the rows.
     fn matching(&mut self, mask: PinMask, pinned: &TicketKey<N>) -> Vec<TicketKey<N>> {
         if mask == full_pins::<N>() {
             return Vec::from_iter(self.map.contains_key(pinned).then_some(*pinned));

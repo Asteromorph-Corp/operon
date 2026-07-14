@@ -17,7 +17,7 @@ use crate::meta_storage::mem::{
 ///
 /// The store is volatile and non-transactional: it has nothing to lock against a second Operon
 /// instance, and a failure part-way through a write leaves the partial write in place. It suits
-/// work that is rebuilt from scratch on failure rather than resumed.
+/// work that is rebuilt from scratch on failure.
 #[derive(Clone, Default)]
 pub struct MemMetaStorage {
     store: Arc<MemStore>,
