@@ -13,5 +13,8 @@ mod error;
 pub(crate) use error::MetaResult;
 pub use error::MetaStorageError;
 
+mod mem;
+pub use mem::MemMetaStorageOptions;
+
 mod psql;
 pub use psql::{PsqlMetaError, PsqlMetaStorageOptions};

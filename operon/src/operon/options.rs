@@ -88,7 +88,8 @@ impl OperonOptions {
         self.map_psql(|psql| psql.with_keepalives_interval(duration))
     }
 
-    /// Applies a builder step to the configured backend's [`PsqlMetaStorageOptions`].
+    /// Applies a builder step to the configured backend's [`PsqlMetaStorageOptions`], leaving any
+    /// other backend untouched.
     fn map_psql(
         mut self,
         f: impl FnOnce(PsqlMetaStorageOptions) -> PsqlMetaStorageOptions,
@@ -97,6 +98,7 @@ impl OperonOptions {
             MetaBackendOptions::Psql(psql) => {
                 self.meta_storage_backend = MetaBackendOptions::Psql(f(psql));
             }
+            MetaBackendOptions::Mem(_) => {}
         }
         self
     }

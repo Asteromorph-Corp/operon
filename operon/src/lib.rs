@@ -26,7 +26,9 @@ pub mod error {
 }
 
 pub mod options {
-    pub use crate::meta_storage::{MetaBackendOptions, PsqlMetaStorageOptions};
+    pub use crate::meta_storage::{
+        MemMetaStorageOptions, MetaBackendOptions, PsqlMetaStorageOptions,
+    };
     pub use crate::operon::OperonOptions;
     #[allow(deprecated)]
     pub use crate::storage::{PsqlStorageOptions, StorageOptions};

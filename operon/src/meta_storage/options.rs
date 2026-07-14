@@ -1,3 +1,4 @@
+use crate::meta_storage::mem::MemMetaStorageOptions;
 use crate::meta_storage::psql::PsqlMetaStorageOptions;
 
 /// Selects and parameterizes the metadata storage backend.
@@ -22,6 +23,8 @@ use crate::meta_storage::psql::PsqlMetaStorageOptions;
 pub enum MetaBackendOptions {
     /// The Postgres backend and its configuration.
     Psql(PsqlMetaStorageOptions),
+    /// The in-memory backend and its configuration.
+    Mem(MemMetaStorageOptions),
 }
 
 impl MetaBackendOptions {
@@ -32,10 +35,23 @@ impl MetaBackendOptions {
     pub fn psql(uri: impl Into<String>) -> Self {
         MetaBackendOptions::Psql(PsqlMetaStorageOptions::new(uri))
     }
+
+    /// Selects the in-memory backend.
+    ///
+    /// The metadata lives in process and is lost when it exits.
+    pub fn mem() -> Self {
+        MetaBackendOptions::Mem(MemMetaStorageOptions::new())
+    }
 }
 
 impl From<PsqlMetaStorageOptions> for MetaBackendOptions {
     fn from(options: PsqlMetaStorageOptions) -> Self {
         MetaBackendOptions::Psql(options)
+    }
+}
+
+impl From<MemMetaStorageOptions> for MetaBackendOptions {
+    fn from(options: MemMetaStorageOptions) -> Self {
+        MetaBackendOptions::Mem(options)
     }
 }
