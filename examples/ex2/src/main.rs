@@ -106,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     
     let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex2_data");
     let operon_options = OperonOptions::from_backend(
-        PsqlMetaStorageOptions::psql(&database_uri).with_schema("ex2_meta"),
+        PsqlMetaStorageOptions::new(&database_uri).with_schema("ex2_meta"),
     );
 
     let service = ExampleService;
