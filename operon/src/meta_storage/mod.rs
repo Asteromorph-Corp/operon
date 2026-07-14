@@ -1,6 +1,9 @@
 mod any;
 pub use any::{AnyBackend, AnyBackendError};
 
+#[cfg(test)]
+mod differential;
+
 mod backend;
 pub use backend::{
     MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi, MetaTxApi,
