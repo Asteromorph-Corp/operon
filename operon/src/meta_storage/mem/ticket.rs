@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 
 use crate::meta_storage::mem::error::{MemResult, POISONED};
@@ -23,12 +23,16 @@ pub(super) struct TicketTable<const N: usize> {
     rows: RwLock<TicketRows<N>>,
 }
 
-/// A ticket table's rows, alongside the per-status counters they are summarized by.
+/// A ticket table's rows, alongside the per-status counters they are summarized by and the
+/// secondary indexes they are queried through.
 ///
-/// The counters live under the same lock as the rows so they cannot drift from them.
+/// One lock spans all three: it makes a slice op's scan and write-back atomic, matching the single
+/// `UPDATE ... WHERE ... RETURNING` its Postgres counterpart issues, and it keeps a reader from
+/// observing the counters or an index midway through an update.
 #[derive(Default)]
 struct TicketRows<const N: usize> {
     map: HashMap<TicketKey<N>, Ticket<N>>,
+    indexes: HashMap<PinMask, PinIndex<N>>,
     done: i64,
     queued: i64,
     waiting: i64,
@@ -44,16 +48,81 @@ impl<const N: usize> TicketRows<N> {
         }
     }
 
+    /// Adds a key to every index built so far.
+    fn index(&mut self, key: TicketKey<N>) {
+        for (&mask, index) in &mut self.indexes {
+            index.entry(project(mask, &key)).or_default().insert(key);
+        }
+    }
+
+    /// Drops a key from every index built so far.
+    fn unindex(&mut self, key: &TicketKey<N>) {
+        for (&mask, index) in &mut self.indexes {
+            let Entry::Occupied(mut bucket) = index.entry(project(mask, key)) else {
+                continue;
+            };
+            bucket.get_mut().remove(key);
+            if bucket.get().is_empty() {
+                bucket.remove();
+            }
+        }
+    }
+
+    /// The keys whose coordinate matches every pin, building the index for that pin set on first
+    /// use.
+    ///
+    /// A pin set covering every dimension names one coordinate outright, so it is served from the
+    /// rows and never indexed.
+    fn matching(&mut self, mask: PinMask, pinned: &TicketKey<N>) -> Vec<TicketKey<N>> {
+        if mask == full_pins::<N>() {
+            return Vec::from_iter(self.map.contains_key(pinned).then_some(*pinned));
+        }
+
+        if !self.indexes.contains_key(&mask) {
+            let mut index = PinIndex::<N>::default();
+            for key in self.map.keys() {
+                index.entry(project(mask, key)).or_default().insert(*key);
+            }
+            self.indexes.insert(mask, index);
+        }
+
+        self.indexes[&mask]
+            .get(pinned)
+            .map(|bucket| bucket.iter().copied().collect())
+            .unwrap_or_default()
+    }
+
+    /// The waiting tickets whose coordinate matches every pin, alongside their keys.
+    fn matching_waiting(
+        &mut self,
+        mask: PinMask,
+        pinned: &TicketKey<N>,
+    ) -> Vec<(TicketKey<N>, Ticket<N>)> {
+        self.matching(mask, pinned)
+            .into_iter()
+            .filter_map(|key| self.map.get(&key).map(|ticket| (key, *ticket)))
+            .filter(|(_, ticket)| ticket.status == TicketStatus::Waiting)
+            .collect()
+    }
+
     /// Inserts a ticket, leaving an existing one at the same key untouched.
     fn insert_new(&mut self, ticket: Ticket<N>) {
-        if let Entry::Vacant(entry) = self.map.entry(key_of(&ticket)) {
-            entry.insert(ticket);
-            self.count(ticket.status, 1);
-        }
+        let key = key_of(&ticket);
+        match self.map.entry(key) {
+            Entry::Vacant(entry) => entry.insert(ticket),
+            Entry::Occupied(_) => return,
+        };
+        self.count(ticket.status, 1);
+        self.index(key);
     }
 
     /// Replaces the ticket at `key`, keeping the counters in step.
     fn replace(&mut self, key: TicketKey<N>, old_status: TicketStatus, ticket: Ticket<N>) {
+        debug_assert_eq!(
+            key,
+            key_of(&ticket),
+            "a replacement keeps the key it indexes"
+        );
         self.map.insert(key, ticket);
         self.count(old_status, -1);
         self.count(ticket.status, 1);
@@ -63,11 +132,13 @@ impl<const N: usize> TicketRows<N> {
     fn remove(&mut self, key: &TicketKey<N>) -> Option<Ticket<N>> {
         let ticket = self.map.remove(key)?;
         self.count(ticket.status, -1);
+        self.unindex(key);
         Some(ticket)
     }
 
     fn clear(&mut self) {
         self.map.clear();
+        self.indexes.clear();
         self.done = 0;
         self.queued = 0;
         self.waiting = 0;
@@ -78,10 +149,47 @@ impl<const N: usize> TicketRows<N> {
 /// ticket's coordinate must hold there.
 type Pin = (usize, usize);
 
-/// Whether a ticket's coordinate matches every pin.
-fn matches<const N: usize>(ticket: &Ticket<N>, pins: &[Pin]) -> bool {
-    pins.iter()
-        .all(|&(idx, value)| ticket.coordinate[idx].0 == Some(value))
+/// The set of dimensions a query pins, as a bitmask over a job's `dims`.
+///
+/// Every op pins a subset that is fixed by the DAG, so a job sees only a handful of masks.
+type PinMask = u32;
+
+/// The pin set covering all `N` of a job's dimensions.
+const fn full_pins<const N: usize>() -> PinMask {
+    if N >= PinMask::BITS as usize {
+        PinMask::MAX
+    } else {
+        (1 << N) - 1
+    }
+}
+
+/// A secondary index over one pin set, mapping a projected coordinate to the keys holding it.
+type PinIndex<const N: usize> = HashMap<TicketKey<N>, HashSet<TicketKey<N>>>;
+
+/// Projects a coordinate onto a pin set, nulling every dimension the set leaves free.
+///
+/// Two coordinates share a projection exactly when they agree on every pinned dimension, so a
+/// projection is the bucket key both a stored ticket and a query resolve to.
+fn project<const N: usize>(mask: PinMask, key: &TicketKey<N>) -> TicketKey<N> {
+    const { assert!(N <= PinMask::BITS as usize) }
+    let mut pinned = [None; N];
+    for (idx, slot) in pinned.iter_mut().enumerate() {
+        if mask & (1 << idx) != 0 {
+            *slot = key[idx];
+        }
+    }
+    pinned
+}
+
+/// Builds the mask and projected coordinate that look a pin set up in its index.
+fn query_of<const N: usize>(pins: &[Pin]) -> (PinMask, TicketKey<N>) {
+    let mut mask = 0;
+    let mut pinned = [None; N];
+    for &(idx, value) in pins {
+        mask |= 1 << idx;
+        pinned[idx] = Some(value);
+    }
+    (mask, pinned)
 }
 
 /// Helper struct for querying the in-memory tickets of a job.
@@ -186,12 +294,8 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let mut rows = table.rows.write().expect(POISONED);
 
-        let stale = rows
-            .map
-            .iter()
-            .filter(|(_, ticket)| ticket.status == TicketStatus::Waiting && matches(ticket, &pins))
-            .map(|(key, ticket)| (*key, *ticket))
-            .collect::<Vec<_>>();
+        let (mask, pinned) = query_of::<N>(&pins);
+        let stale = rows.matching_waiting(mask, &pinned);
 
         let mut promoted = Vec::new();
         for (key, ticket) in stale {
@@ -238,12 +342,8 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let mut rows = table.rows.write().expect(POISONED);
 
-        let stale = rows
-            .map
-            .iter()
-            .filter(|(_, ticket)| ticket.status == TicketStatus::Waiting && matches(ticket, &pins))
-            .map(|(key, ticket)| (*key, *ticket))
-            .collect::<Vec<_>>();
+        let (mask, pinned) = query_of::<N>(&pins);
+        let stale = rows.matching_waiting(mask, &pinned);
 
         let mut promoted = Vec::new();
         for (key, ticket) in stale {
@@ -290,12 +390,8 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let mut rows = table.rows.write().expect(POISONED);
 
-        let popped_keys = rows
-            .map
-            .iter()
-            .filter(|(_, ticket)| matches(ticket, &pins))
-            .map(|(key, _)| *key)
-            .collect::<Vec<_>>();
+        let (mask, pinned) = query_of::<N>(&pins);
+        let popped_keys = rows.matching(mask, &pinned);
 
         let tickets = popped_keys
             .iter()
@@ -378,6 +474,26 @@ mod tests {
         }
     }
 
+    /// A job over two dimensions, whose upstreams pin one dimension each.
+    fn job_gamma() -> JobMetadata<2> {
+        JobMetadata {
+            id: "gamma",
+            dims: ["i", "j"],
+            spawn_dim: None,
+            priority: &[],
+        }
+    }
+
+    /// An upstream job over `j` alone.
+    fn job_over_j() -> JobMetadata<1> {
+        JobMetadata {
+            id: "over_j",
+            dims: ["j"],
+            spawn_dim: None,
+            priority: &[],
+        }
+    }
+
     /// Builds an initialized store, returning it alongside a connection to borrow clients from.
     async fn store() -> (MemMetaStorage, MemConn) {
         let backend = MemMetaStorage::default();
@@ -410,7 +526,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn put_leaves_an_existing_coordinate_untouched() {
+    async fn put_leaves_existing_coordinate_untouched() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -429,7 +545,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn raise_deps_done_promotes_only_the_pinned_coordinate() {
+    async fn raise_deps_done_promotes_only_pinned_coordinate() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -455,7 +571,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn raise_deps_done_holds_a_ticket_short_of_its_quota() {
+    async fn raise_deps_done_holds_ticket_short_of_its_quota() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -476,7 +592,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn raise_deps_quota_reopens_a_ready_ticket() {
+    async fn raise_deps_quota_reopens_ready_ticket() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -498,7 +614,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn explode_expands_a_ticket_along_its_spawn_dimension() {
+    async fn explode_expands_ticket_along_its_spawn_dimension() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -529,7 +645,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn explode_rejects_an_already_resolved_dimension() {
+    async fn explode_rejects_already_resolved_dimension() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -557,7 +673,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn mark_done_moves_a_ticket_to_done() {
+    async fn mark_done_moves_ticket_to_done() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -573,7 +689,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn clear_resets_the_rows_and_their_counters() {
+    async fn clear_resets_rows_and_counters() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -596,7 +712,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_status_reports_a_missing_table() {
+    async fn get_status_reports_missing_table() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(job_beta());
@@ -605,6 +721,138 @@ mod tests {
             tickets.get_status().await,
             Err(MetaStorageError::MissingTicketSummary { .. })
         ));
+    }
+
+    #[tokio::test]
+    async fn put_reaches_index_built_before_it() {
+        let (_backend, conn) = store().await;
+        let client = conn.as_client();
+        let tickets = client.ticket(job_beta());
+        tickets.init().await.unwrap();
+
+        tickets
+            .put(Ticket::new(1).with_coordinate::<0>(0))
+            .await
+            .unwrap();
+        tickets
+            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .await
+            .unwrap();
+
+        tickets
+            .put(Ticket::new(1).with_coordinate::<0>(1))
+            .await
+            .unwrap();
+        let promoted = tickets
+            .raise_deps_done(job_alpha(), Job { coordinate: [1] }, &[])
+            .await
+            .unwrap();
+
+        assert_eq!(promoted.len(), 1);
+        assert_eq!(promoted[0].coordinate[0].0, Some(1));
+    }
+
+    #[tokio::test]
+    async fn explosion_reaches_index_built_before_it() {
+        let (_backend, conn) = store().await;
+        let client = conn.as_client();
+        let tickets = client.ticket(job_beta());
+        tickets.init().await.unwrap();
+
+        tickets.put(Ticket::new(1)).await.unwrap();
+        // Builds the index over `i` while the only ticket is still unexploded.
+        tickets
+            .raise_deps_done(job_alpha(), Job { coordinate: [1] }, &[])
+            .await
+            .unwrap();
+
+        tickets
+            .explode::<0, 0>(
+                DimensionMetadata { id: "i", deps: [] },
+                Resolution {
+                    coordinate: [],
+                    ub: 3,
+                },
+            )
+            .await
+            .unwrap();
+
+        let promoted = tickets
+            .raise_deps_done(job_alpha(), Job { coordinate: [1] }, &[])
+            .await
+            .unwrap();
+
+        assert_eq!(promoted.len(), 1);
+        assert_eq!(promoted[0].coordinate[0].0, Some(1));
+        assert_eq!(tickets.get_status().await.unwrap(), (0, 1, 2));
+    }
+
+    #[tokio::test]
+    async fn clear_drops_index_built_before_it() {
+        let (_backend, conn) = store().await;
+        let client = conn.as_client();
+        let tickets = client.ticket(job_beta());
+        tickets.init().await.unwrap();
+
+        tickets
+            .put(Ticket::new(1).with_coordinate::<0>(0))
+            .await
+            .unwrap();
+        tickets
+            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .await
+            .unwrap();
+        tickets.clear().await.unwrap();
+
+        tickets
+            .put(Ticket::new(1).with_coordinate::<0>(0))
+            .await
+            .unwrap();
+        let promoted = tickets
+            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .await
+            .unwrap();
+
+        assert_eq!(promoted.len(), 1);
+        assert_eq!(tickets.get_status().await.unwrap(), (0, 1, 0));
+    }
+
+    #[tokio::test]
+    async fn upstreams_pinning_different_dimensions_keep_separate_indexes() {
+        let (_backend, conn) = store().await;
+        let client = conn.as_client();
+        let tickets = client.ticket(job_gamma());
+        tickets.init().await.unwrap();
+
+        for i in 0..2 {
+            for j in 0..2 {
+                tickets
+                    .put(
+                        Ticket::new(2)
+                            .with_coordinate::<0>(i)
+                            .with_coordinate::<1>(j),
+                    )
+                    .await
+                    .unwrap();
+            }
+        }
+
+        // Pins `i` alone: reaches (0,0) and (0,1), neither of which meets its quota of 2.
+        let promoted = tickets
+            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .await
+            .unwrap();
+        assert!(promoted.is_empty());
+
+        // Pins `j` alone: reaches (0,0) and (1,0), so only (0,0) reaches its quota.
+        let promoted = tickets
+            .raise_deps_done(job_over_j(), Job { coordinate: [0] }, &[])
+            .await
+            .unwrap();
+
+        assert_eq!(promoted.len(), 1);
+        assert_eq!(promoted[0].coordinate.map(|c| c.0), [Some(0), Some(0)]);
+        assert_eq!(tickets.get_status().await.unwrap(), (0, 1, 3));
     }
 
     #[tokio::test]
