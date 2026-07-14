@@ -1,7 +1,8 @@
 use std::num::TryFromIntError;
 
-use crate::meta_storage::psql::PsqlClient;
-use crate::meta_storage::{MetaResolutionApi, MetaStorageError};
+use crate::meta_storage::MetaResolutionApi;
+use crate::meta_storage::psql::error::PsqlResult;
+use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
 use crate::schema::{DimensionMetadata, Resolution};
 use crate::utils::{SchemaPrefix, SqlParams, replace_if_updated};
 
@@ -33,8 +34,10 @@ impl<'a> PsqlClient<'a> {
 }
 
 impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> {
+    type Error = PsqlMetaError;
+
     /// Initializes the resolution table.
-    async fn init(&self) -> Result<(), MetaStorageError> {
+    async fn init(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
 
         let stmt = replace_if_updated(
@@ -49,7 +52,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
     }
 
     /// Clears the resolution table.
-    async fn clear(&self) -> Result<(), MetaStorageError> {
+    async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearResolutionQuery(schema_prefix, self.dim_meta);
         self.client.execute_stmt(&stmt, &[]).await?;
@@ -57,7 +60,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
     }
 
     /// Gets the resolution for the given primary key.
-    async fn get(&self, coordinate: [usize; N]) -> Result<Option<Resolution<N>>, MetaStorageError> {
+    async fn get(&self, coordinate: [usize; N]) -> PsqlResult<Option<Resolution<N>>> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetResolutionQuery(schema_prefix, self.dim_meta);
         let params = SqlParams::from_usize(coordinate)?;
@@ -69,7 +72,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
     }
 
     /// Puts the resolution into the table.
-    async fn put(&self, resolution: Resolution<N>) -> Result<(), MetaStorageError> {
+    async fn put(&self, resolution: Resolution<N>) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
         let params = resolution.as_sql_params()?;

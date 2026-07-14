@@ -45,7 +45,7 @@ where
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
-    ) -> TransitionState {
+    ) -> TransitionState<MSto::Error> {
         TransitionState::new(Self::new(ctx, ui_mode, channel_size))
     }
 
@@ -59,7 +59,7 @@ where
     }
 
     /// Fetch the metadata of a previous run if it exists.
-    async fn get_run_metadata(&self) -> Result<Option<RunMetadata>, SchedulerError> {
+    async fn get_run_metadata(&self) -> Result<Option<RunMetadata>, SchedulerError<MSto::Error>> {
         let meta_conn = self.ctx.meta_storage.scheduler_conn().await?;
 
         // Get footprints from both storages.
@@ -89,7 +89,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerTransition for InitTransition<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerTransition<MSto::Error> for InitTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -99,19 +99,19 @@ where
         None
     }
 
-    async fn execute(self) -> Result<NextState, SchedulerError> {
+    async fn execute(self) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
         let RunMetadata { run_id, state } = self.get_run_metadata().await?.unwrap_or_default();
 
         // if self.ui_mode == UiMode::Headless {
-        //     return Ok(NextState::from(self.into_fresh(run_id)));
+        //     return Ok(NextState::next(self.into_fresh(run_id)));
         // }
 
         let next = match state {
-            RunState::Fresh => NextState::from(self.into_fresh(run_id)),
-            RunState::Completed => NextState::from(self.into_stale(run_id, StaleKind::Complete)),
-            RunState::Paused => NextState::from(self.into_stale(run_id, StaleKind::GracefulStop)),
+            RunState::Fresh => NextState::next(self.into_fresh(run_id)),
+            RunState::Completed => NextState::next(self.into_stale(run_id, StaleKind::Complete)),
+            RunState::Paused => NextState::next(self.into_stale(run_id, StaleKind::GracefulStop)),
             RunState::Running | RunState::Aborted => {
-                NextState::from(self.into_stale(run_id, StaleKind::Abort))
+                NextState::next(self.into_stale(run_id, StaleKind::Abort))
             }
         };
 

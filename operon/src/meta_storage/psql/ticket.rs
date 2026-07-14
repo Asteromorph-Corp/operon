@@ -4,6 +4,7 @@ use bytes::Bytes;
 use futures::SinkExt;
 use tokio_postgres::Row;
 
+use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{
@@ -77,8 +78,10 @@ impl<'a> PsqlClient<'a> {
 }
 
 impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
+    type Error = PsqlMetaError;
+
     /// Initializes the ticket table.
-    async fn init(&self) -> Result<(), MetaStorageError> {
+    async fn init(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
 
         let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
@@ -101,7 +104,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     }
 
     /// Clears the ticket table.
-    async fn clear(&self) -> Result<(), MetaStorageError> {
+    async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearTicketQuery(schema_prefix, self.job_meta);
         self.client.execute_stmt(&stmt, &[]).await?;
@@ -109,7 +112,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     }
 
     /// Gets all tickets with a given status.
-    async fn get_all(&self, status: TicketStatus) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    async fn get_all(&self, status: TicketStatus) -> PsqlResult<Vec<Ticket<N>>> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetAllTicketQuery(schema_prefix, self.job_meta);
         let rows = self.client.query_stmt(&stmt, &[&status]).await?;
@@ -121,7 +124,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     }
 
     /// Puts a ticket into the table.
-    async fn put(&self, ticket: Ticket<N>) -> Result<(), MetaStorageError> {
+    async fn put(&self, ticket: Ticket<N>) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutTicketQuery(schema_prefix, self.job_meta);
         let params = ticket.as_sql_params()?;
@@ -137,7 +140,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         upstream_meta: JobMetadata<M>,
         upstream_job: Job<M>,
         aggregate_dims: &[&'static str],
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    ) -> PsqlResult<Vec<Ticket<N>>> {
         let schema = self.client.schema_prefix();
         let stmt = RaiseDepsDoneQuery(schema, self.job_meta, upstream_meta, aggregate_dims);
 
@@ -166,7 +169,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         upstream_ticket: Ticket<M>,
         aggregate_dims: &[&'static str],
         ub: usize,
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    ) -> PsqlResult<Vec<Ticket<N>>> {
         let schema = self.client.schema_prefix();
 
         let (cols, values): (Vec<_>, Vec<_>) = upstream_meta
@@ -199,7 +202,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         &self,
         res_meta: DimensionMetadata<M>,
         res: Resolution<M>,
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    ) -> PsqlResult<Vec<Ticket<N>>> {
         const { assert!(IDX < N) }
         if self.job_meta.dims[IDX] != res_meta.id {
             tracing::warn!("Invalid resolution received for explosion.");
@@ -255,7 +258,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     }
 
     /// Marks the ticket corresponding to a given job as done.
-    async fn mark_done(&self, job: Job<N>) -> Result<(), MetaStorageError> {
+    async fn mark_done(&self, job: Job<N>) -> PsqlResult<()> {
         let schema = self.client.schema_prefix();
         let stmt = MarkDoneQuery(schema, self.job_meta);
         let params = SqlParams::from_usize(job.coordinate)?;
@@ -263,7 +266,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(())
     }
 
-    async fn get_status(&self) -> Result<(i64, i64, i64), MetaStorageError> {
+    async fn get_status(&self) -> PsqlResult<(i64, i64, i64)> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetStatusQuery(schema_prefix);
 

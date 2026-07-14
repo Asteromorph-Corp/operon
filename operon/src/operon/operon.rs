@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures::future::try_join;
 
 use crate::logger::UiBroadcastLayer;
-use crate::meta_storage::{MetaBackend, MetaBackendOptions, PsqlMetaStorage};
+use crate::meta_storage::{MetaBackend, MetaBackendOptions, PsqlMetaError, PsqlMetaStorage};
 use crate::operon::{OperonError, OperonOptions};
 use crate::scheduler::{Scheduler, ValidOperon};
 use crate::schema::SharedProgressMap;
@@ -52,7 +52,7 @@ where
     /// context. Running this will take over the terminal, so it is strongly discouraged to make
     /// any other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
-    pub async fn run(self) -> Result<(), OperonError> {
+    pub async fn run(self) -> Result<(), OperonError<PsqlMetaError>> {
         let Operon {
             service,
             storage,
@@ -89,7 +89,7 @@ where
         ui_mode: UiMode,
         ui_options: UiOptions,
         log_options: crate::logger::LoggerOptions,
-    ) -> Result<(), OperonError> {
+    ) -> Result<(), OperonError<MSto::Error>> {
         // Initialize the logger
         let (log_tx, log_rx) = ::tokio::sync::broadcast::channel(log_options.buffer_size);
 
@@ -126,7 +126,7 @@ where
         try_join(
             async {
                 ui_loop.run().await?;
-                Ok::<_, OperonError>(())
+                Ok::<_, OperonError<MSto::Error>>(())
             },
             async {
                 // A panic (`JoinError`) is fatal (kills the UI);

@@ -45,13 +45,13 @@ where
         }
     }
 
-    fn into_running(self) -> TransitionState {
+    fn into_running(self) -> TransitionState<MSto::Error> {
         CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerState for FreshState<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerState<MSto::Error> for FreshState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -59,20 +59,20 @@ where
 {
     async fn handle_progress(
         self: Box<Self>,
-    ) -> Result<NextState, crate::scheduler::SchedulerError> {
+    ) -> Result<NextState<MSto::Error>, crate::scheduler::SchedulerError<MSto::Error>> {
         Ok(NextState::Next(self))
     }
 
     async fn handle_control_event(
         self: Box<Self>,
         evt: ControlEvent,
-    ) -> Result<NextState, crate::scheduler::SchedulerError> {
+    ) -> Result<NextState<MSto::Error>, crate::scheduler::SchedulerError<MSto::Error>> {
         match evt {
             ControlEvent::Check { .. } => tracing::warn!("Cannot check on a fresh run"),
             ControlEvent::Run(RunEventInner::Rebuild { .. }) => {
                 tracing::error!("Cannot rebuild on a fresh run.")
             }
-            ControlEvent::Run(..) => return Ok(NextState::from(self.into_running())),
+            ControlEvent::Run(..) => return Ok(NextState::next(self.into_running())),
             ControlEvent::Pause { .. } => {
                 tracing::warn!("Cannot pause before the run has started.")
             }

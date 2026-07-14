@@ -76,13 +76,15 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerState for RunningState<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerState<MSto::Error> for RunningState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    async fn handle_progress(mut self: Box<Self>) -> Result<NextState, SchedulerError> {
+    async fn handle_progress(
+        mut self: Box<Self>,
+    ) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
         if self.handles.try_join_next().is_none() || !self.handles.is_empty() {
             return Ok(NextState::Next(self));
         }
@@ -121,7 +123,7 @@ where
     async fn handle_control_event(
         mut self: Box<Self>,
         evt: ControlEvent,
-    ) -> Result<NextState, SchedulerError> {
+    ) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
         // TODO: make `RunningState` aware of individual scheduler states and decide whether to
         // propagate events.
 

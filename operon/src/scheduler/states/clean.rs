@@ -38,17 +38,17 @@ where
         ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
-    ) -> TransitionState {
+    ) -> TransitionState<MSto::Error> {
         TransitionState::new(Self::new(ctx, channel_size, run_id))
     }
 
-    fn into_start(self) -> TransitionState {
+    fn into_start(self) -> TransitionState<MSto::Error> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, true)
     }
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerTransition for CleanTransition<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerTransition<MSto::Error> for CleanTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -58,7 +58,7 @@ where
         None
     }
 
-    async fn execute(self) -> Result<NextState, SchedulerError> {
+    async fn execute(self) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
         let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
 
@@ -70,6 +70,6 @@ where
 
         tx.commit().await?;
 
-        Ok(NextState::from(self.into_start()))
+        Ok(NextState::next(self.into_start()))
     }
 }

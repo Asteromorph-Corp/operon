@@ -47,7 +47,7 @@ where
         channel_size: usize,
         run_id: Uuid,
         clean: bool,
-    ) -> TransitionState {
+    ) -> TransitionState<MSto::Error> {
         TransitionState::new(Self::new(ctx, channel_size, run_id, clean))
     }
 
@@ -63,7 +63,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerTransition for StartTransition<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerTransition<MSto::Error> for StartTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -73,7 +73,7 @@ where
         None
     }
 
-    async fn execute(self) -> Result<NextState, SchedulerError> {
+    async fn execute(self) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
         let footprint = RunFootprint::new(self.run_id, RunState::Running);
         let execution_id = Uuid::new_v4();
 
@@ -84,6 +84,6 @@ where
             .put_execution(footprint.metadata.run_id, execution_id)
             .await?;
 
-        Ok(NextState::from(self.into_running(execution_id)))
+        Ok(NextState::next(self.into_running(execution_id)))
     }
 }

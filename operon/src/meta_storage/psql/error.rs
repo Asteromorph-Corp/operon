@@ -4,8 +4,10 @@ use thiserror::Error as ThisError;
 
 use crate::meta_storage::MetaStorageError;
 
-/// Postgres-specific metadata errors, kept out of the backend-neutral [`MetaStorageError`] so its
-/// `tokio_postgres` / `deadpool_postgres` dependencies stay behind this module.
+/// A metadata result over the Postgres backend's error.
+pub(super) type PsqlResult<T> = Result<T, MetaStorageError<PsqlMetaError>>;
+
+/// Postgres-specific metadata errors.
 #[derive(Debug, ThisError)]
 pub enum PsqlMetaError {
     #[error("Database error: {}{}", .0, .0.source().map_or_else(String::new, |e| format!(", cause: {e}")))]
@@ -14,18 +16,12 @@ pub enum PsqlMetaError {
     DatabasePool(#[from] deadpool_postgres::PoolError),
     #[error("Metadata pool size {0} is not allowed")]
     PoolSizeTooSmall(usize),
-    #[error("Failed to build connection pool")]
-    PoolBuild,
+    #[error("Failed to build connection pool: {0}")]
+    PoolBuild(#[from] deadpool_postgres::BuildError),
 }
 
-impl From<deadpool_postgres::BuildError> for PsqlMetaError {
-    fn from(_: deadpool_postgres::BuildError) -> Self {
-        Self::PoolBuild
-    }
-}
-
-impl From<PsqlMetaError> for MetaStorageError {
+impl From<PsqlMetaError> for MetaStorageError<PsqlMetaError> {
     fn from(err: PsqlMetaError) -> Self {
-        MetaStorageError::Backend(Box::new(err))
+        MetaStorageError::Backend(err)
     }
 }

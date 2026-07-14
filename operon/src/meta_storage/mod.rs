@@ -7,7 +7,8 @@ mod options;
 pub use options::MetaBackendOptions;
 
 mod error;
+pub(crate) use error::MetaResult;
 pub use error::MetaStorageError;
 
 mod psql;
-pub use psql::{PsqlMetaStorage, PsqlMetaStorageOptions};
+pub use psql::{PsqlMetaError, PsqlMetaStorage, PsqlMetaStorageOptions};

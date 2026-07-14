@@ -49,17 +49,17 @@ where
         channel_size: usize,
         run_id: Uuid,
         skip: HashSet<String>,
-    ) -> TransitionState {
+    ) -> TransitionState<MSto::Error> {
         TransitionState::new(Self::new(ctx, channel_size, run_id, skip))
     }
 
-    fn into_start(self) -> TransitionState {
+    fn into_start(self) -> TransitionState<MSto::Error> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerTransition for RebuildTransition<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerTransition<MSto::Error> for RebuildTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -69,7 +69,7 @@ where
         Some("Rebuild in progress, commands will be handled after rebuild completes.")
     }
 
-    async fn execute(self) -> Result<NextState, SchedulerError> {
+    async fn execute(self) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
         let start = Instant::now();
 
         let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
@@ -105,6 +105,6 @@ where
             start.elapsed()
         );
 
-        Ok(NextState::from(self.into_start()))
+        Ok(NextState::next(self.into_start()))
     }
 }

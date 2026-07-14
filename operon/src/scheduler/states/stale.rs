@@ -87,19 +87,22 @@ where
         }
     }
 
-    fn into_clean(self) -> TransitionState {
+    fn into_clean(self) -> TransitionState<MSto::Error> {
         CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 
-    fn into_rebuild(self, skip: HashSet<String>) -> TransitionState {
+    fn into_rebuild(self, skip: HashSet<String>) -> TransitionState<MSto::Error> {
         RebuildTransition::state(self.ctx, self.channel_size, self.run_id, skip)
     }
 
-    fn into_restore(self) -> TransitionState {
+    fn into_restore(self) -> TransitionState<MSto::Error> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 
-    async fn run_consistency_check(&mut self, mode: CheckMode) -> Result<(), SchedulerError> {
+    async fn run_consistency_check(
+        &mut self,
+        mode: CheckMode,
+    ) -> Result<(), SchedulerError<MSto::Error>> {
         let check_start = Instant::now();
         let inconsistent_jobs = self
             .ctx
@@ -228,7 +231,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerState for StaleState<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerState<MSto::Error> for StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -236,14 +239,14 @@ where
 {
     async fn handle_progress(
         self: Box<Self>,
-    ) -> Result<NextState, crate::scheduler::SchedulerError> {
+    ) -> Result<NextState<MSto::Error>, crate::scheduler::SchedulerError<MSto::Error>> {
         Ok(NextState::Next(self))
     }
 
     async fn handle_control_event(
         mut self: Box<Self>,
         evt: ControlEvent,
-    ) -> Result<NextState, crate::scheduler::SchedulerError> {
+    ) -> Result<NextState<MSto::Error>, crate::scheduler::SchedulerError<MSto::Error>> {
         match evt {
             ControlEvent::Check { .. } if self.inconsistent_jobs.is_some() => {
                 tracing::warn!("Already run a check.")
@@ -253,11 +256,11 @@ where
                 self.run_consistency_check(mode).await?
             }
             ControlEvent::Run(run_inner) => match self.choose_run_mode(run_inner) {
-                Some(RunMode::Clean) => return Ok(NextState::from(self.into_clean())),
+                Some(RunMode::Clean) => return Ok(NextState::next(self.into_clean())),
                 Some(RunMode::Rebuild { skip }) => {
-                    return Ok(NextState::from(self.into_rebuild(skip)));
+                    return Ok(NextState::next(self.into_rebuild(skip)));
                 }
-                Some(RunMode::Restore) => return Ok(NextState::from(self.into_restore())),
+                Some(RunMode::Restore) => return Ok(NextState::next(self.into_restore())),
                 None => {}
             },
             ControlEvent::Pause { .. } => {

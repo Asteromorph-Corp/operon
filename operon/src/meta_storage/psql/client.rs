@@ -5,10 +5,11 @@ use bytes::Buf;
 use tokio_postgres::{CopyInSink, ToStatement};
 use uuid::Uuid;
 
+use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{
     PsqlMetaError, PsqlMetaStorage, PsqlResolutionQueryBuilder, PsqlTicketQueryBuilder,
 };
-use crate::meta_storage::{MetaClientApi, MetaConnApi, MetaStorageError, MetaTxApi};
+use crate::meta_storage::{MetaClientApi, MetaConnApi, MetaTxApi};
 use crate::schema::{DimensionMetadata, JobMetadata, RunFootprint};
 use crate::utils::SchemaPrefix;
 
@@ -21,7 +22,7 @@ macro_rules! impl_psql_client {
     ) => {
         pub async fn $method
         $(< $($generics),* >)?
-        (&self, $($arg: $arg_ty),*)  -> Result<$ret, MetaStorageError>
+        (&self, $($arg: $arg_ty),*)  -> PsqlResult<$ret>
         $(where $($where_clause)+)?
         {
             match self {
@@ -53,7 +54,7 @@ impl<'a> PsqlConn<'a> {
 }
 
 impl MetaConnApi<PsqlMetaStorage> for PsqlConn<'_> {
-    async fn transaction(&mut self) -> Result<PsqlTx<'_>, MetaStorageError> {
+    async fn transaction(&mut self) -> PsqlResult<PsqlTx<'_>> {
         let tx = self
             .client
             .transaction()
@@ -76,14 +77,14 @@ pub struct PsqlTx<'a> {
 }
 
 impl MetaTxApi<PsqlMetaStorage> for PsqlTx<'_> {
-    async fn commit(self) -> Result<(), MetaStorageError> {
+    async fn commit(self) -> PsqlResult<()> {
         self.tx
             .commit()
             .await
             .map_err(|e| PsqlMetaError::from(e).into())
     }
 
-    async fn rollback(self) -> Result<(), MetaStorageError> {
+    async fn rollback(self) -> PsqlResult<()> {
         self.tx
             .rollback()
             .await
@@ -113,11 +114,7 @@ impl PsqlClient<'_> {
               U: Buf + 'static + Send + Sync
     );
 
-    pub async fn execute_stmt(
-        &self,
-        stmt: &impl Display,
-        params: &[&ToSql],
-    ) -> Result<u64, MetaStorageError> {
+    pub async fn execute_stmt(&self, stmt: &impl Display, params: &[&ToSql]) -> PsqlResult<u64> {
         self.execute(&stmt.to_string(), params).await
     }
 
@@ -125,7 +122,7 @@ impl PsqlClient<'_> {
         &self,
         stmt: &impl Display,
         params: &[&ToSql],
-    ) -> Result<Vec<tokio_postgres::Row>, MetaStorageError> {
+    ) -> PsqlResult<Vec<tokio_postgres::Row>> {
         self.query(&stmt.to_string(), params).await
     }
 
@@ -133,7 +130,7 @@ impl PsqlClient<'_> {
         &self,
         stmt: &impl Display,
         params: &[&ToSql],
-    ) -> Result<Option<tokio_postgres::Row>, MetaStorageError> {
+    ) -> PsqlResult<Option<tokio_postgres::Row>> {
         self.query_opt(&stmt.to_string(), params).await
     }
 
@@ -161,47 +158,43 @@ impl MetaClientApi<PsqlMetaStorage> for PsqlClient<'_> {
         PsqlClient::resolution(self, dim_meta)
     }
 
-    async fn init_schema(&self) -> Result<(), MetaStorageError> {
+    async fn init_schema(&self) -> PsqlResult<()> {
         PsqlClient::init_schema(self).await
     }
 
-    async fn init_ticket_hash(&self) -> Result<(), MetaStorageError> {
+    async fn init_ticket_hash(&self) -> PsqlResult<()> {
         PsqlClient::init_ticket_hash(self).await
     }
 
-    async fn init_dimension_hash(&self) -> Result<(), MetaStorageError> {
+    async fn init_dimension_hash(&self) -> PsqlResult<()> {
         PsqlClient::init_dimension_hash(self).await
     }
 
-    async fn init_ticket_status_type(&self) -> Result<(), MetaStorageError> {
+    async fn init_ticket_status_type(&self) -> PsqlResult<()> {
         PsqlClient::init_ticket_status_type(self).await
     }
 
-    async fn init_ticket_summary(&self) -> Result<(), MetaStorageError> {
+    async fn init_ticket_summary(&self) -> PsqlResult<()> {
         PsqlClient::init_ticket_summary(self).await
     }
 
-    async fn init_footprint(&self) -> Result<(), MetaStorageError> {
+    async fn init_footprint(&self) -> PsqlResult<()> {
         PsqlClient::init_footprint(self).await
     }
 
-    async fn clear_footprint(&self) -> Result<(), MetaStorageError> {
+    async fn clear_footprint(&self) -> PsqlResult<()> {
         PsqlClient::clear_footprint(self).await
     }
 
-    async fn get_footprint(&self) -> Result<Option<RunFootprint>, MetaStorageError> {
+    async fn get_footprint(&self) -> PsqlResult<Option<RunFootprint>> {
         PsqlClient::get_footprint(self).await
     }
 
-    async fn upsert_run(&self, footprint: &RunFootprint) -> Result<(), MetaStorageError> {
+    async fn upsert_run(&self, footprint: &RunFootprint) -> PsqlResult<()> {
         PsqlClient::upsert_run(self, footprint).await
     }
 
-    async fn put_execution(
-        &self,
-        run_id: Uuid,
-        execution_id: Uuid,
-    ) -> Result<(), MetaStorageError> {
+    async fn put_execution(&self, run_id: Uuid, execution_id: Uuid) -> PsqlResult<()> {
         PsqlClient::put_execution(self, run_id, execution_id).await
     }
 
@@ -209,7 +202,7 @@ impl MetaClientApi<PsqlMetaStorage> for PsqlClient<'_> {
         &self,
         footprint: &RunFootprint,
         execution_id: Uuid,
-    ) -> Result<(), MetaStorageError> {
+    ) -> PsqlResult<()> {
         PsqlClient::update_execution_on_finish(self, footprint, execution_id).await
     }
 }

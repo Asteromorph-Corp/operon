@@ -7,6 +7,7 @@ use secrecy::ExposeSecret;
 use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
+use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{
     PsqlClient, PsqlConn, PsqlMetaError, PsqlMetaStorageOptions, PsqlResolutionQueryBuilder,
     PsqlTicketQueryBuilder, PsqlTx,
@@ -36,13 +37,14 @@ pub(crate) struct AdvisoryLock {
 
 impl MetaBackend for PsqlMetaStorage {
     type Options = PsqlMetaStorageOptions;
+    type Error = PsqlMetaError;
     type Conn<'a> = PsqlConn<'a>;
     type Tx<'a> = PsqlTx<'a>;
     type Client<'a> = PsqlClient<'a>;
     type Ticket<'a, const N: usize> = PsqlTicketQueryBuilder<'a, N>;
     type Resolution<'a, const N: usize> = PsqlResolutionQueryBuilder<'a, N>;
 
-    fn new(options: PsqlMetaStorageOptions) -> Result<Self, MetaStorageError> {
+    fn new(options: PsqlMetaStorageOptions) -> PsqlResult<Self> {
         let PsqlMetaStorageOptions {
             uri,
             pool_size,
@@ -84,14 +86,14 @@ impl MetaBackend for PsqlMetaStorage {
         })
     }
 
-    async fn worker_conn(&self) -> Result<PsqlConn<'_>, MetaStorageError> {
+    async fn worker_conn(&self) -> PsqlResult<PsqlConn<'_>> {
         let client = self.worker_pool.get().await.map_err(PsqlMetaError::from)?;
         let schema = self.schema.as_deref();
 
         Ok(PsqlConn::new(client, schema))
     }
 
-    async fn scheduler_conn(&self) -> Result<PsqlConn<'static>, MetaStorageError> {
+    async fn scheduler_conn(&self) -> PsqlResult<PsqlConn<'static>> {
         let client = self
             .scheduler_pool
             .get()
@@ -102,12 +104,12 @@ impl MetaBackend for PsqlMetaStorage {
         Ok(PsqlConn::new(client, schema))
     }
 
-    async fn ensure_lock(&self) -> Result<(), MetaStorageError> {
+    async fn ensure_lock(&self) -> PsqlResult<()> {
         self.lock().await?;
         Ok(())
     }
 
-    async fn check_lock(&self) -> Result<(), MetaStorageError> {
+    async fn check_lock(&self) -> PsqlResult<()> {
         let lock = self.lock().await?;
 
         // A single `bigint` advisory lock is recorded in `pg_locks` as its key's upper and
@@ -152,7 +154,7 @@ impl PsqlMetaStorage {
     ///
     /// `Scheduler::work` forces this once, at startup; it is lazy and idempotent, so the lock
     /// acquisition path is guaranteed to be reached exactly once per `PsqlMetaStorage` instance.
-    async fn lock(&self) -> Result<&AdvisoryLock, MetaStorageError> {
+    async fn lock(&self) -> PsqlResult<&AdvisoryLock> {
         self.lock
             .get_or_try_init(|| async {
                 let conn = self.lock_pool.get().await.map_err(PsqlMetaError::from)?;

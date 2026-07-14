@@ -5,18 +5,13 @@ use crate::scheduler::SchedulerError;
 use crate::storage::StorageError;
 use crate::ui::UiError;
 
-// #[derive(Debug, Error)]
-// pub enum UserError {
-//     #[error("Other error: {0}")]
-//     Other(String),
-// }
-
-/// Error type returned by Operon.
+/// Error type returned by Operon, generic over the metadata backend's error type `MErr`
+/// ([`MetaBackend::Error`](crate::meta_storage::MetaBackend::Error)).
 #[derive(Debug, Error)]
-pub enum OperonError {
+pub enum OperonError<MErr> {
     /// Error in the scheduler
     #[error("Scheduler error: {0}")]
-    Scheduler(SchedulerError),
+    Scheduler(SchedulerError<MErr>),
     /// Error in a user function
     #[error("User function error: {0}")]
     User(UserError),
@@ -25,7 +20,7 @@ pub enum OperonError {
     Storage(#[from] StorageError),
     /// Error in the metadata storage
     #[error("Metadata storage error: {0}")]
-    MetaStorage(#[from] MetaStorageError),
+    MetaStorage(#[from] MetaStorageError<MErr>),
     /// Error in the terminal UI
     #[error("Terminal UI error: {0}")]
     UI(#[from] UiError),
@@ -36,8 +31,8 @@ pub enum OperonError {
 
 pub type UserError = Box<dyn std::error::Error + Send + Sync>;
 
-impl From<SchedulerError> for OperonError {
-    fn from(e: SchedulerError) -> Self {
+impl<MErr> From<SchedulerError<MErr>> for OperonError<MErr> {
+    fn from(e: SchedulerError<MErr>) -> Self {
         match e {
             SchedulerError::Storage(e) => OperonError::Storage(e),
             SchedulerError::MetaStorage(e) => OperonError::MetaStorage(e),

@@ -62,7 +62,7 @@ where
         storage: &Sto,
         client: MSto::Client<'_>,
         mode: CheckMode,
-    ) -> Result<bool, SchedulerError>;
+    ) -> Result<bool, SchedulerError<MSto::Error>>;
 
     /// Prepare the job rebuilder for the given storage and metadata client by fetching the
     /// necessary data.
@@ -71,7 +71,7 @@ where
         storage: &Sto,
         progress: SharedProgress,
         client: MSto::Client<'_>,
-    ) -> Result<Box<dyn JobRebuilder<MSto>>, SchedulerError>;
+    ) -> Result<Box<dyn JobRebuilder<MSto>>, SchedulerError<MSto::Error>>;
 
     /// Call the user function and stores the result in the storage.
     ///
@@ -82,31 +82,31 @@ where
         storage: &Sto,
         meta: MSto,
         job: Self::Job,
-    ) -> Result<Self::Resolution, SchedulerError>;
+    ) -> Result<Self::Resolution, SchedulerError<MSto::Error>>;
 
     async fn send_on_finish(
         &self,
         peer_txs: &Self::PeerEventSenders,
         job: Self::Job,
         resolution: Self::Resolution,
-    ) -> Result<(), SchedulerError>;
+    ) -> Result<(), SchedulerError<MSto::Error>>;
 
     async fn on_receive_job(
         &self,
         client: MSto::Client<'_>,
         job: Svc::JobEnum,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<MSto::Error>>;
 
     async fn on_receive_resolution(
         &self,
         client: MSto::Client<'_>,
         peer_txs: &Self::PeerEventSenders,
         resolution: Svc::ResolutionEnum,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<MSto::Error>>;
 
     async fn on_receive_explosion(
         &self,
         client: MSto::Client<'_>,
         explosion: TicketExplosion<Svc::TicketEnum>,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<MSto::Error>>;
 }
