@@ -1,34 +1,99 @@
 name: Rust
 
 on:
+  workflow_dispatch:
+  # Commented out to prevent the CI running in `grimoire`. Uncomment for your own crate.
   push:
     branches: ["main", "next"]
   pull_request:
     branches: ["main", "next"]
-  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -Dwarnings
+
+  # All workspace members:
+  CARGO_PACKAGE_ARGS: "--workspace"
+
+  # Or selected packages only:
+  # CARGO_PACKAGE_ARGS: "--package my-core --package my-cli"
+
+  # Or all except helper crates:
+  # CARGO_PACKAGE_ARGS: "--workspace --exclude xtask"
 
 jobs:
-  lint:
-    name: Lint
+  fmt:
+    name: fmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      # Optional, uncomment if disk space pressure is observed.
+      # - name: Free disk space
+      #   uses: jlumbroso/free-disk-space@v1.3.1
+      #   with:
+      #     android: true
+      #     dotnet: true
+      #     haskell: true
+      #     large-packages: true
+      #     docker-images: true
+      #     swap-storage: true
+      #     tool-cache: false
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      - uses: actions/checkout@v7
 
       - name: Install nightly rustfmt
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
 
-      - name: Configure Cargo auth
+      - name: Configure cargo auth
+        env:
+          KELLNR_REGISTRY_URL: ${{ secrets.KELLNR_REGISTRY_URL }}
+        run: |
+          mkdir -p ~/.cargo
+          cat > ~/.cargo/config.toml <<EOF
+          [registries.kellnr]
+          index = "sparse+https://${KELLNR_REGISTRY_URL}/api/v1/crates/"
+          credential-provider = ["cargo:token"]
+          EOF
+
+      - name: Check formatting
+        run: cargo +nightly fmt --all -- --check
+
+  doc:
+    name: doc / ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: fmt
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            args: ""
+          # Optional, uncomment if your crate has default features.
+          # - name: no-default-features
+          #   args: "--no-default-features"
+          # Optional, uncomment if your crate has optional features.
+          # - name: all-features
+          #   args: "--all-features"
+
+    steps:
+      # Optional, uncomment if disk space pressure is observed.
+      # - name: Free disk space
+      #   uses: jlumbroso/free-disk-space@v1.3.1
+      #   with:
+      #     android: true
+      #     dotnet: true
+      #     haskell: true
+      #     large-packages: true
+      #     docker-images: true
+      #     swap-storage: true
+      #     tool-cache: false
+
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure cargo auth
         env:
           KELLNR_REGISTRY_URL: ${{ secrets.KELLNR_REGISTRY_URL }}
         run: |
@@ -40,41 +105,57 @@ jobs:
           EOF
 
       - name: Cache cargo registry
-        uses: actions/cache@v5
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Check formatting
-        run: cargo +nightly fmt --all -- --check
-
-      - name: Run cargo clippy
-        env:
-          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
-        run: cargo +stable clippy --workspace --locked --all-features --all-targets -- -D warnings
+          shared-key: doc-${{ matrix.name }}
 
       - name: Check documentation
         env:
           RUSTDOCFLAGS: "-D warnings"
           CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
-        run: cargo +stable doc --workspace --locked --no-deps --document-private-items
+        run: cargo doc $CARGO_PACKAGE_ARGS --locked --no-deps --document-private-items ${{ matrix.args }}
 
   test:
-    name: Test
+    name: test / ${{ matrix.name }}
     runs-on: ubuntu-latest
-    needs: lint
+    needs: fmt
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            args: ""
+          # Optional, uncomment if your crate has default features.
+          # - name: no-default-features
+          #   args: "--no-default-features"
+          # Optional, uncomment if your crate has optional features.
+          # - name: all-features
+          #   args: "--all-features"
+          # Any other feature combinations you want to test.
+          # - name: core-serde
+          #   args: "--no-default-features --features my-core/serde"
+
     steps:
-      - uses: actions/checkout@v6
+      # Optional, uncomment if disk space pressure is observed.
+      # - name: Free disk space
+      #   uses: jlumbroso/free-disk-space@v1.3.1
+      #   with:
+      #     android: true
+      #     dotnet: true
+      #     haskell: true
+      #     large-packages: true
+      #     docker-images: true
+      #     swap-storage: true
+      #     tool-cache: false
+
+      - uses: actions/checkout@v7
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
-      - name: Configure Cargo auth
+      - name: Configure cargo auth
         env:
           KELLNR_REGISTRY_URL: ${{ secrets.KELLNR_REGISTRY_URL }}
         run: |
@@ -85,19 +166,176 @@ jobs:
           credential-provider = ["cargo:token"]
           EOF
 
-      - name: Cache test dependencies
-        uses: actions/cache@v5
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-test-
-            ${{ runner.os }}-cargo-
+          shared-key: test-${{ matrix.name }}
+
+      - name: Run cargo clippy
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo clippy $CARGO_PACKAGE_ARGS --locked --all-targets ${{ matrix.args }} -- -D warnings
 
       - name: Run tests
         env:
           CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
-        run: cargo test --workspace --locked --all-features --all-targets
+        run: cargo test $CARGO_PACKAGE_ARGS --locked --all-targets ${{ matrix.args }}
+
+      - name: Run doc tests
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo test $CARGO_PACKAGE_ARGS --locked --doc ${{ matrix.args }}
+
+  get-msrv:
+    name: Get MSRV
+    runs-on: ubuntu-latest
+    outputs:
+      msrv: ${{ steps.msrv.outputs.value }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Get MSRV
+        id: msrv
+        uses: SebRollen/toml-action@v1.2.0
+        with:
+          file: Cargo.toml
+          field: workspace.package.rust-version
+
+  msrv:
+    name: MSRV / ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: [fmt, get-msrv]
+    if: needs.get-msrv.outputs.msrv != ''
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            args: ""
+          # Optional, uncomment if your crate has default features.
+          # - name: no-default-features
+          #   args: "--no-default-features"
+          # Optional, uncomment if your crate has optional features.
+          # - name: all-features
+          #   args: "--all-features"
+
+    steps:
+      # Optional, uncomment if disk space pressure is observed.
+      # - name: Free disk space
+      #   uses: jlumbroso/free-disk-space@v1.3.1
+      #   with:
+      #     android: true
+      #     dotnet: true
+      #     haskell: true
+      #     large-packages: true
+      #     docker-images: true
+      #     swap-storage: true
+      #     tool-cache: false
+
+      - uses: actions/checkout@v7
+
+      - name: Install MSRV Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ needs.get-msrv.outputs.msrv }}
+
+      - name: Configure cargo auth
+        env:
+          KELLNR_REGISTRY_URL: ${{ secrets.KELLNR_REGISTRY_URL }}
+        run: |
+          mkdir -p ~/.cargo
+          cat > ~/.cargo/config.toml <<EOF
+          [registries.kellnr]
+          index = "sparse+https://${KELLNR_REGISTRY_URL}/api/v1/crates/"
+          credential-provider = ["cargo:token"]
+          EOF
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: msrv-${{ matrix.name }}
+
+      # No cargo clippy, because older versions of clippy have different lints and may fail the build for reasons unrelated to the crate.
+
+      - name: Run tests
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo test $CARGO_PACKAGE_ARGS --locked --all-targets ${{ matrix.args }}
+
+  minimal-versions:
+    name: Minimal versions / ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: fmt
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            args: ""
+          # Optional, uncomment if your crate has default features.
+          # - name: no-default-features
+          #   args: "--no-default-features"
+          # Optional, uncomment if your crate has optional features.
+          # - name: all-features
+          #   args: "--all-features"
+
+    steps:
+      # Optional, uncomment if disk space pressure is observed.
+      # - name: Free disk space
+      #   uses: jlumbroso/free-disk-space@v1.3.1
+      #   with:
+      #     android: true
+      #     dotnet: true
+      #     haskell: true
+      #     large-packages: true
+      #     docker-images: true
+      #     swap-storage: true
+      #     tool-cache: false
+
+      - uses: actions/checkout@v7
+
+      - name: Install nightly Rust
+        # Needed only to resolve a minimal-versions lockfile.
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Configure cargo auth
+        env:
+          KELLNR_REGISTRY_URL: ${{ secrets.KELLNR_REGISTRY_URL }}
+        run: |
+          mkdir -p ~/.cargo
+          cat > ~/.cargo/config.toml <<EOF
+          [registries.kellnr]
+          index = "sparse+https://${KELLNR_REGISTRY_URL}/api/v1/crates/"
+          credential-provider = ["cargo:token"]
+          EOF
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: minimal-versions-${{ matrix.name }}
+
+      - name: Resolve direct minimal-versions lockfile
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo +nightly generate-lockfile -Z direct-minimal-versions
+
+      - name: Run cargo clippy
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo clippy $CARGO_PACKAGE_ARGS --locked --all-targets ${{ matrix.args }} -- -D warnings
+
+      - name: Run tests
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo test $CARGO_PACKAGE_ARGS --locked --all-targets ${{ matrix.args }}
+
+      - name: Run doc tests
+        env:
+          CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+        run: cargo test $CARGO_PACKAGE_ARGS --locked --doc ${{ matrix.args }}
