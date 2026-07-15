@@ -1,7 +1,3 @@
-#[allow(
-    unused,
-    reason = "an alternative storage, swapped in by hand to time against Postgres"
-)]
 pub mod mem_storage;
 
 use operon::define_operon;

@@ -1,14 +1,37 @@
-#![allow(unused)]
-
 use async_trait::async_trait;
+use clap::{Parser, Subcommand};
 use ex2::mem_storage::DashMapCookingStorage;
 use ex2::{A, B, C, CookingService, D, E, F, PsqlCookingStorage};
 use operon::error::UserError;
 use operon::options::{
-    MemMetaStorageOptions, OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions,
+    MemMetaStorageOptions, OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions, UiMode,
 };
 use operon::{Operon, OperonService};
 use rand::Rng;
+
+/// Runs the `cooking` pipeline on a storage backend chosen at startup.
+#[derive(Parser)]
+#[command(about, long_about = None)]
+struct Cli {
+    /// Log to stdout instead of taking over the terminal with the interactive UI.
+    #[arg(short = 'H', long)]
+    headless: bool,
+
+    #[command(subcommand)]
+    backend: Option<Backend>,
+}
+
+#[derive(Subcommand)]
+enum Backend {
+    /// Keep entities and metadata in memory. Nothing survives the run.
+    Mem,
+    /// Keep entities and metadata in PostgreSQL, under the `ex2_data` and `ex2_meta` schemas.
+    Psql {
+        /// Connection URI of the database. Read from `$POSTGRES_URI` when not given.
+        #[arg(env = "POSTGRES_URI", hide_env_values = true)]
+        uri: String,
+    },
+}
 
 // Example service implementation
 #[derive(OperonService)]
@@ -107,18 +130,34 @@ impl CookingService for ExampleService {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let database_uri = std::env::var("POSTGRES_URI")?;
-
-    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex2_data");
-    let operon_options = OperonOptions::from_backend(
-        PsqlMetaStorageOptions::new(&database_uri).with_schema("ex2_meta"),
-        // MemMetaStorageOptions::new(),
-    );
-
+    let cli = Cli::parse();
+    let ui_mode = if cli.headless {
+        UiMode::Headless
+    } else {
+        UiMode::Interactive
+    };
     let service = ExampleService;
-    let storage = PsqlCookingStorage::new(storage_options)?;
-    // let storage = DashMapCookingStorage::default();
-    Operon::new(service, storage, operon_options).run().await?;
+    let backend = cli.backend.unwrap_or(Backend::Psql {
+        uri: std::env::var("POSTGRES_URI")?,
+    });
+
+    match backend {
+        Backend::Mem => {
+            let operon_options =
+                OperonOptions::from_backend(MemMetaStorageOptions::new()).with_ui_mode(ui_mode);
+            let storage = DashMapCookingStorage::default();
+            Operon::new(service, storage, operon_options).run().await?;
+        }
+        Backend::Psql { uri } => {
+            let operon_options = OperonOptions::from_backend(
+                PsqlMetaStorageOptions::new(&uri).with_schema("ex2_meta"),
+            )
+            .with_ui_mode(ui_mode);
+            let storage_options = PsqlStorageOptions::new(&uri).with_schema("ex2_data");
+            let storage = PsqlCookingStorage::new(storage_options)?;
+            Operon::new(service, storage, operon_options).run().await?;
+        }
+    }
 
     Ok(())
 }

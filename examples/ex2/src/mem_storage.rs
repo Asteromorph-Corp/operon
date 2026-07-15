@@ -1,11 +1,7 @@
 //! An in-memory entity storage for this pipeline, to time against `PsqlCookingStorage`.
 //!
-//! To run the pipeline on it, build one in `main` in place of the Postgres storage:
-//!
-//!      let storage = DashMapCookingStorage::default();
-//!
-//! Pair it with `OperonOptions::from_backend(MetaBackendOptions::mem())` to take Postgres out of
-//! the run entirely; keep the Postgres meta options to time the entity storage on its own.
+//! The `mem` subcommand runs the pipeline on this storage, paired with the in-memory metadata
+//! backend to take Postgres out of the run entirely.
 
 use async_trait::async_trait;
 use dashmap::DashMap;
