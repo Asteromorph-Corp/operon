@@ -48,3 +48,5 @@ nix = { version = "0.29", features = ["fs"] }
 indoc = "2"
 pretty_assertions = "1"
 rstest = "0.26"
+log = "0.4.29"
+rand = "0.9.1"
