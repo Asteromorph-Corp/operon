@@ -63,9 +63,9 @@ If you want to try out Operon, you can clone the repository and run the provided
 
 ```bash
 git clone https://github.com/Asteromorph-Corp/operon
-cd operon/operon/examples/ex1.rs
+cd operon
 # Make sure the URI points to a running PostgreSQL database.
-POSTGRES_URI=<your_postgres_uri> cargo run --release
+POSTGRES_URI=<your_postgres_uri> cargo run --release --example ex1
 ```
 
 We recommend reading the source code of [ex1](operon/examples/ex1.rs) to get a hang of how everything works.
