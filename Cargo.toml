@@ -1,6 +1,5 @@
 [workspace]
 members = ["operon", "operon-macros"]
-exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
