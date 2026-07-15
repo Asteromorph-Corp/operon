@@ -9,7 +9,8 @@ use operon::options::{
 use operon::{Operon, OperonService};
 use rand::Rng;
 
-/// Runs the `cooking` pipeline on a storage backend chosen at startup.
+/// Runs the `cooking` pipeline on a storage backend chosen at startup;
+/// defaults to `psql` if no backend is specified.
 #[derive(Parser)]
 #[command(about, long_about = None)]
 struct Cli {
@@ -23,7 +24,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Backend {
-    /// Keep entities and metadata in memory. Nothing survives the run.
+    /// Keep entities and metadata in memory; nothing survives the run.
     Mem,
     /// Keep entities and metadata in PostgreSQL, under the `ex2_data` and `ex2_meta` schemas.
     Psql {
