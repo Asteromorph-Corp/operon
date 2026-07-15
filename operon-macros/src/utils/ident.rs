@@ -9,7 +9,7 @@ static CRATE_NAME: Lazy<Result<FoundCrate, proc_macro_crate::Error>> =
 pub fn operon_ident() -> syn::Ident {
     match CRATE_NAME.as_ref() {
         Ok(FoundCrate::Name(name)) => format_ident!("{name}"),
-        Ok(FoundCrate::Itself) => format_ident!("crate"),
+        Ok(FoundCrate::Itself) => format_ident!("operon"),
         Err(_) => format_ident!("operon"),
     }
 }

@@ -3,7 +3,8 @@ pub(crate) use scheduler::Scheduler;
 
 mod spec;
 pub use spec::{
-    JobHandler, JobRebuilder, JobSpec, SchedulerHandler, SpecWithMetadata, ValidOperon,
+    JobHandler, JobRebuilder, JobSpec, REBUILD_CONCURRENCY, SchedulerHandler, SpecWithMetadata,
+    ValidOperon,
 };
 
 mod events;

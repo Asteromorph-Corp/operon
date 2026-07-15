@@ -1,10 +1,9 @@
 [workspace]
 members = ["operon", "operon-macros"]
-exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 rust-version = "1.91"
 publish = ["kellnr"]
@@ -17,4 +16,4 @@ repository = "https://github.com/Asteromorph-Corp/operon"
 readme = "README.md"
 
 [workspace.dependencies]
-operon-macros = { version = "0.4.1", registry = "kellnr", path = "operon-macros" }
+operon-macros = { version = "0.4.2", registry = "kellnr", path = "operon-macros" }

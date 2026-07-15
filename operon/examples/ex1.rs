@@ -1,21 +1,24 @@
-// # Operon Example 1: Splitter
-//
-// This example code serves as a basic introduction to Operon.
-// Here, we demonstrate a simple use case of Operon,
-// where we split a string into words and then into characters.
-//
-// To run this example as-is, you will need an URI to a working PostgreSQL database,
-// and use the following shell command in this example's root directory (`operon/examples/ex1`):
-// `POSTGRES_URI=<database_uri> cargo run --release`
-//
-// This example is meant to be run as a binary,
-// and was tested with Rust 1.91.1 and PostgreSQL 16+.
+//! # Operon Example 1: Splitter
+//!
+//! This example code serves as a basic introduction to Operon.
+//! Here, we demonstrate a simple use case of Operon,
+//! where we split a string into words and then into characters.
+//!
+//! To run this example as-is, you will need an URI to a working PostgreSQL database,
+//! and use the following shell command:
+//!
+//! ```bash
+//! POSTGRES_URI=<database_uri> cargo run --release --example ex1
+//! ```
+//!
+//! This example is meant to be run as a binary,
+//! and was tested with Rust 1.91.1 and PostgreSQL 16+.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use operon::error::UserError;
-use operon::options::{OperonOptions, StorageOptions};
+use operon::options::{OperonOptions, PsqlStorageOptions};
 use operon::{Operon, OperonService, define_operon};
 use serde::{Deserialize, Serialize};
 
@@ -114,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
 
     // The two settings object
-    let storage_options = StorageOptions::new(&database_uri).with_schema("ex1_data");
+    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex1_data");
     let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex1_meta");
 
     //# ——————————————————— Initializing Settings ————————————————————— #//

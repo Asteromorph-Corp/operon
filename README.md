@@ -38,13 +38,13 @@ Powered by a PostgreSQL-based transactional backend, Operon specializes in orche
 
 ![Demo 1](docs/assets/demo1.gif)
 
-▲ Animation of running [ex2](examples/ex2) with Operon. _(log level `Info`)_
+▲ Animation of running [ex2](operon/examples/ex2.rs) with Operon. _(log level `Info`)_
 
 ![Demo 2](docs/assets/demo2.gif)
 
 ▲ Animation of recovering from a poisoned run of ex2.
 
-You can find more examples in the [examples](examples/) directory of this repository.
+You can find more examples in the [examples](operon/examples/) directory of this repository.
 
 ## Prerequisites
 
@@ -63,12 +63,12 @@ If you want to try out Operon, you can clone the repository and run the provided
 
 ```bash
 git clone https://github.com/Asteromorph-Corp/operon
-cd operon/examples/ex1
+cd operon
 # Make sure the URI points to a running PostgreSQL database.
-POSTGRES_URI=<your_postgres_uri> cargo run --release
+POSTGRES_URI=<your_postgres_uri> cargo run --release --example ex1
 ```
 
-We recommend reading the source code of [ex1](examples/ex1/src/main.rs) to get a hang of how everything works.
+We recommend reading the source code of [ex1](operon/examples/ex1.rs) to get a hang of how everything works.
 
 ## Key Features
 
@@ -119,7 +119,7 @@ Add Operon to your project's dependencies by including the following in your `Ca
 
 ```toml
 [dependencies]
-operon = { version = "0.4.1", registry = "kellnr" }
+operon = { version = "0.4.2", registry = "kellnr" }
 ```
 
 Alternatively, clone this repository:
@@ -144,7 +144,7 @@ For persistent database use, it is also recommended that the type implements `se
 An example of entity declarations is as follows:
 
 ```rust
-// In examples/ex1/src/main.rs:
+// In operon/examples/ex1.rs:
 
 use serde::{Serialize, Deserialize};
 
@@ -193,7 +193,7 @@ For example, if you have an `Intermediate` entity that has two dimensions, `inpu
 The following is an example of a pipeline definition using the `define_operon!` macro:
 
 ```rust
-// In examples/ex1/src/main.rs:
+// In operon/examples/ex1.rs:
 
 operon::define_operon! {
     splitter = {
@@ -243,7 +243,7 @@ This is done by providing an `impl` for the `{PipelineName}Service` trait that w
 Continuing with the previous example, you would implement the `splitter` pipeline as follows:
 
 ```rust
-// In examples/ex1/src/main.rs (slightly modified):
+// In operon/examples/ex1.rs (slightly modified):
 
 use async_trait::async_trait;
 use operon::OperonService;
@@ -289,15 +289,15 @@ The Operon engine assumes all entities are accessible through a storage interfac
 We provide a struct `Psql{PipelineName}Storage` that already implements this trait using PostgreSQL, which can be constructed as follows:
 
 ```rust
-// In examples/ex1/src/main.rs (slightly modified):
+// In operon/examples/ex1.rs (slightly modified):
 
-use operon::StorageOptions;
+use operon::PsqlStorageOptions;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // ...
     let storage = PsqlSplitterStorage::new(
-        StorageOptions::new("postgres://username:password@hostname:port/dbname")
+        PsqlStorageOptions::new("postgres://username:password@hostname:port/dbname")
             .with_schema("data"),
     )?;
     // ...
@@ -315,9 +315,9 @@ However, note that the engine will not provide recoverability if the storage is 
 Once you have all the pieces in place, you can run the Operon engine by constructing an `Operon` instance and calling the `.run()` method.
 
 ```rust
-// In examples/ex1/src/main.rs (slightly modified):
+// In operon/examples/ex1.rs (slightly modified):
 
-use operon::{Operon, OperonOptions, OperonStorage, StorageOptions};
+use operon::{Operon, OperonOptions, OperonStorage, PsqlStorageOptions};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -325,7 +325,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //# ——————————————————— Initializing Settings ————————————————————— #//
     let database_uri = "postgres://username:password@hostname:port/dbname";
     
-    let storage_options = StorageOptions::new(&database_uri).with_schema("ex1_data");
+    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex1_data");
     let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex1_meta");
     
     let service = MySplitterService;

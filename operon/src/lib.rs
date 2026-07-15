@@ -25,8 +25,10 @@ pub mod error {
 }
 
 pub mod options {
+    pub use crate::meta_storage::{MetaBackendOptions, PsqlMetaStorageOptions};
     pub use crate::operon::OperonOptions;
-    pub use crate::storage::StorageOptions;
+    #[allow(deprecated)]
+    pub use crate::storage::{PsqlStorageOptions, StorageOptions};
     pub use crate::ui::UiMode;
 
     /// A logging level, type alias for `tracing::Level`
@@ -43,7 +45,7 @@ pub mod __private {
     pub use crate::meta_storage::{MetaClient, MetaStorage};
     pub use crate::scheduler::{
         JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
-        PeerEventSenders, SchedulerHandler, SpecWithMetadata, ValidOperon,
+        PeerEventSenders, REBUILD_CONCURRENCY, SchedulerHandler, SpecWithMetadata, ValidOperon,
     };
     pub use crate::schema::*;
     pub use crate::storage::psql::{EntityQueries, PsqlStorage};

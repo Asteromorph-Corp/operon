@@ -5,6 +5,8 @@ impl operon::__private::JobRebuilder for BetaRebuilder {
         &self,
         client: operon::__private::MetaClient<'_>,
     ) -> Result<(), operon::error::SchedulerError> {
+        use operon::__private::futures::{StreamExt, TryStreamExt};
+
         let ready_tickets = client
             .ticket(self.job_meta)
             .get_all(operon::__private::TicketStatus::Queued)
@@ -17,41 +19,53 @@ impl operon::__private::JobRebuilder for BetaRebuilder {
                 )),
             })
             .collect::<Result<std::collections::HashSet<_>, _>>()?;
-        let mut invalid_tickets = Vec::new();
 
-        for (job, resolution) in self.data.iter().cloned() {
-            if !ready_tickets.contains(&job.coordinate) {
-                invalid_tickets.push(job);
-                continue;
-            }
-            client
-                .resolution(self.spawn_dim_meta)
-                .put(resolution)
-                .await?;
-            client.ticket(self.job_meta).mark_done(job).await?;
+        let (ready_data, invalid_data): (Vec<_>, Vec<_>) = self
+            .data
+            .iter()
+            .cloned()
+            .partition(|(job, _)| ready_tickets.contains(&job.coordinate));
+        let invalid_tickets = invalid_data
+            .into_iter()
+            .map(|(job, _)| job)
+            .collect::<Vec<_>>();
 
-            let affected = client
-                .ticket(metadata::job_delta_meta())
-                .explode::<_, 1usize>(self.spawn_dim_meta, resolution)
-                .await?;
-            for ticket in affected {
+        operon::__private::futures::stream::iter(ready_data.into_iter().map(
+            |(job, resolution)| async move {
+                client
+                    .resolution(self.spawn_dim_meta)
+                    .put(resolution)
+                    .await?;
+                client.ticket(self.job_meta).mark_done(job).await?;
+
+                let affected = client
+                    .ticket(metadata::job_delta_meta())
+                    .explode::<_, 1usize>(self.spawn_dim_meta, resolution)
+                    .await?;
+                for ticket in affected {
+                    client
+                        .ticket(metadata::job_epsilon_meta())
+                        .raise_deps_quota(metadata::job_delta_meta(), ticket, &["j"], resolution.ub)
+                        .await?;
+                }
+                client
+                    .ticket(metadata::job_delta_meta())
+                    .raise_deps_done(self.job_meta, job, &[])
+                    .await?;
                 client
                     .ticket(metadata::job_epsilon_meta())
-                    .raise_deps_quota(metadata::job_delta_meta(), ticket, &["j"], resolution.ub)
+                    .raise_deps_done(self.job_meta, job, &["j"])
                     .await?;
-            }
-            client
-                .ticket(metadata::job_delta_meta())
-                .raise_deps_done(self.job_meta, job, &[])
-                .await?;
-            client
-                .ticket(metadata::job_epsilon_meta())
-                .raise_deps_done(self.job_meta, job, &["j"])
-                .await?;
 
-            let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
-            (*self.progress.write().await).update(done, queued, waiting);
-        }
+                let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
+                (*self.progress.write().await).update(done, queued, waiting);
+
+                Ok::<_, operon::error::SchedulerError>(())
+            },
+        ))
+        .buffer_unordered(operon::__private::REBUILD_CONCURRENCY)
+        .try_collect::<Vec<_>>()
+        .await?;
 
         if !invalid_tickets.is_empty() {
             let count = invalid_tickets.len();
