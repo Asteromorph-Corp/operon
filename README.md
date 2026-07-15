@@ -119,7 +119,7 @@ Add Operon to your project's dependencies by including the following in your `Ca
 
 ```toml
 [dependencies]
-operon = { version = "0.4.1", registry = "kellnr" }
+operon = { version = "0.4.2", registry = "kellnr" }
 ```
 
 Alternatively, clone this repository:
