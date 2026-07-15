@@ -6,7 +6,7 @@
 //!
 //! To run this example as-is, you will need an URI to a working PostgreSQL database,
 //! and use the following shell command:
-//! 
+//!
 //! ```bash
 //! POSTGRES_URI=<database_uri> cargo run --release --example ex1
 //! ```
