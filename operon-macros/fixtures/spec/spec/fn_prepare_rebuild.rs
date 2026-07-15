@@ -4,11 +4,13 @@ async fn prepare_rebuild(
     progress: operon::__private::SharedProgress,
     client: operon::__private::MetaClient<'_>,
 ) -> Result<Box<dyn operon::__private::JobRebuilder>, operon::error::SchedulerError> {
+    use operon::__private::futures::{StreamExt, TryStreamExt};
+
     let tickets = client
         .ticket(self.job_meta())
         .get_all(operon::__private::TicketStatus::Done)
         .await?;
-    let data = operon::__private::futures::future::try_join_all(tickets.into_iter().map(
+    let data = operon::__private::futures::stream::iter(tickets.into_iter().map(
         |ticket| async move {
             let job = ticket.resolve().ok_or_else(|| {
                 operon::error::SchedulerError::Other("Failed to resolve a beta ticket".into())
@@ -27,6 +29,8 @@ async fn prepare_rebuild(
             Ok::<_, operon::error::SchedulerError>((job, resolution))
         },
     ))
+    .buffered(operon::__private::REBUILD_CONCURRENCY)
+    .try_collect::<Vec<_>>()
     .await?;
 
     Ok(Box::new(BetaRebuilder {
