@@ -14,7 +14,7 @@
 // Each job demonstrates a different logging facade to show how they all appear in the UI.
 //
 // To run:
-//   POSTGRES_URI=<database_uri> cargo run --release
+//   POSTGRES_URI=<database_uri> cargo run --release --example ex4
 
 use std::sync::Arc;
 

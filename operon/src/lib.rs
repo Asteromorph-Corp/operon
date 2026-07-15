@@ -50,7 +50,7 @@ pub mod __private {
     };
     pub use crate::scheduler::{
         JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
-        PeerEventSenders, SchedulerHandler, SpecWithMetadata, ValidOperon,
+        PeerEventSenders, REBUILD_CONCURRENCY, SchedulerHandler, SpecWithMetadata, ValidOperon,
     };
     pub use crate::schema::*;
     pub use crate::storage::psql::{EntityQueries, PsqlStorage};

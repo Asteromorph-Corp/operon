@@ -12,13 +12,16 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     &self,
 ///     storage: &Sto,
 ///     client: MSto::Client<'_>,
+///     progress: operon::__private::SharedProgress,
 /// ) -> Result<Box<dyn operon::__private::JobRebuilder<MSto>>, operon::error::SchedulerError<MSto::Error>> {
+///     use operon::__private::futures::{StreamExt, TryStreamExt};
+///
 ///     let tickets = client
 ///         .ticket(self.job_meta())
 ///         .get_all(operon::__private::TicketStatus::Done)
 ///         .await?;
-///     let data =
-///         operon::__private::futures::future::try_join_all(tickets.into_iter().map(|ticket| async move {
+///     let data = operon::__private::futures::stream::iter(tickets.into_iter().map(
+///         |ticket| async move {
 ///             let job = ticket.resolve().ok_or_else(|| {
 ///                 operon::error::SchedulerError::Other("Failed to resolve a beta ticket".into())
 ///             })?;
@@ -34,13 +37,17 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///                 })?;
 ///
 ///             Ok::<_, operon::error::SchedulerError<MSto::Error>>((job, resolution))
-///         }))
-///         .await?;
+///         },
+///     ))
+///     .buffered(operon::__private::REBUILD_CONCURRENCY)
+///     .try_collect::<Vec<_>>()
+///     .await?;
 ///
 ///     Ok(Box::new(BetaRebuilder {
 ///         job_meta: self.job_meta(),
 ///         spawn_dim_meta: self.spawn_dim_meta(),
 ///         data,
+///         progress,
 ///     }))
 /// }
 /// ```
@@ -78,11 +85,13 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             client: MSto::Client<'_>,
         ) -> Result<Box<dyn #operon::__private::JobRebuilder<MSto>>, #operon::error::SchedulerError<MSto::Error>>
         {
+            use #operon::__private::futures::{StreamExt, TryStreamExt};
+
             let tickets = client
                 .ticket(self.job_meta())
                 .get_all(#operon::__private::TicketStatus::Done)
                 .await?;
-            let data = #operon::__private::futures::future::try_join_all(tickets.into_iter().map(
+            let data = #operon::__private::futures::stream::iter(tickets.into_iter().map(
                 |ticket| async move {
                     let job = ticket.resolve().ok_or_else(|| {
                         #operon::error::SchedulerError::Other(
@@ -94,6 +103,8 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
                     Ok::<_, #operon::error::SchedulerError<MSto::Error>>((job, resolution))
                 }
             ))
+            .buffered(#operon::__private::REBUILD_CONCURRENCY)
+            .try_collect::<Vec<_>>()
             .await?;
 
             Ok(Box::new(#rebuilder_ident {
