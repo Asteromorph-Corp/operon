@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::error::Error;
 
 use async_trait::async_trait;
 use tokio::task::JoinHandle;
@@ -16,35 +17,38 @@ mod start;
 
 pub(super) use init::InitTransition;
 
-pub(super) enum NextState<MErr> {
-    Next(Box<dyn SchedulerState<MErr>>),
+pub(super) enum NextState<E> {
+    Next(Box<dyn SchedulerState<Error = E>>),
     Exit { exit_ui: bool },
 }
 
 #[async_trait]
-pub(super) trait SchedulerState<MErr>: Send + Sync {
-    async fn handle_progress(self: Box<Self>) -> Result<NextState<MErr>, SchedulerError<MErr>>;
+pub(super) trait SchedulerState: Send + Sync {
+    type Error: Error + Send + Sync + 'static;
+
+    async fn handle_progress(self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error>;
 
     async fn handle_control_event(
         self: Box<Self>,
         evt: ControlEvent,
-    ) -> Result<NextState<MErr>, SchedulerError<MErr>>;
+    ) -> Result<NextState<Self::Error>, Self::Error>;
 }
 
 #[async_trait]
-pub(super) trait SchedulerTransition<MErr>: Send + Sync + 'static {
+pub(super) trait SchedulerTransition: Send + Sync + 'static {
+    type Error: Error + Send + Sync + 'static;
     fn warn_msg(&self) -> Option<&'static str>;
-    async fn execute(self) -> Result<NextState<MErr>, SchedulerError<MErr>>;
+    async fn execute(self) -> Result<NextState<Self::Error>, Self::Error>;
 }
 
 pub(super) struct TransitionState<MErr> {
     warn_msg: Option<&'static str>,
-    handle: JoinHandle<Result<NextState<MErr>, SchedulerError<MErr>>>,
+    handle: JoinHandle<Result<NextState<SchedulerError<MErr>>, SchedulerError<MErr>>>,
     events: VecDeque<ControlEvent>,
 }
 
-impl<MErr: Send + 'static> TransitionState<MErr> {
-    pub fn new<T: SchedulerTransition<MErr>>(transition: T) -> Self {
+impl<MErr: Error + Send + Sync + 'static> TransitionState<MErr> {
+    pub fn new<T: SchedulerTransition<Error = SchedulerError<MErr>>>(transition: T) -> Self {
         let warn_msg = transition.warn_msg();
         let handle = tokio::task::spawn(async move { transition.execute().await });
         Self {
@@ -56,8 +60,10 @@ impl<MErr: Send + 'static> TransitionState<MErr> {
 }
 
 #[async_trait]
-impl<MErr: Send + Sync + 'static> SchedulerState<MErr> for TransitionState<MErr> {
-    async fn handle_progress(mut self: Box<Self>) -> Result<NextState<MErr>, SchedulerError<MErr>> {
+impl<MErr: Error + Send + Sync + 'static> SchedulerState for TransitionState<MErr> {
+    type Error = SchedulerError<MErr>;
+
+    async fn handle_progress(mut self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         if self.handle.is_finished() {
             let mut next = self.handle.await.map_err(SchedulerError::from).flatten()?;
             while let Some(evt) = self.events.pop_front() {
@@ -76,7 +82,7 @@ impl<MErr: Send + Sync + 'static> SchedulerState<MErr> for TransitionState<MErr>
     async fn handle_control_event(
         mut self: Box<Self>,
         evt: ControlEvent,
-    ) -> Result<NextState<MErr>, SchedulerError<MErr>> {
+    ) -> Result<NextState<Self::Error>, Self::Error> {
         if let Some(msg) = self.warn_msg {
             tracing::warn!("{msg}")
         }
@@ -86,9 +92,9 @@ impl<MErr: Send + Sync + 'static> SchedulerState<MErr> for TransitionState<MErr>
     }
 }
 
-impl<MErr> NextState<MErr> {
+impl<MErr> NextState<SchedulerError<MErr>> {
     /// Boxes a concrete state into the next state.
-    pub(super) fn next(state: impl SchedulerState<MErr> + 'static) -> Self {
+    pub(super) fn next(state: impl SchedulerState<Error = SchedulerError<MErr>> + 'static) -> Self {
         NextState::Next(Box::new(state))
     }
 }

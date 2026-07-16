@@ -78,11 +78,9 @@ where
         self.init_meta_storage().await?;
 
         let heartbeat_handle = self.ctx.meta_storage.clone();
-        let mut state: Box<dyn SchedulerState<MSto::Error>> = Box::new(InitTransition::state(
-            self.ctx,
-            self.ui_mode,
-            self.channel_size,
-        ));
+        let mut state: Box<dyn SchedulerState<Error = SchedulerError<MSto::Error>>> = Box::new(
+            InitTransition::state(self.ctx, self.ui_mode, self.channel_size),
+        );
 
         // Main work tick
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));

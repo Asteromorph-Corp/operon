@@ -59,17 +59,19 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerTransition<MSto::Error> for RebuildTransition<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerTransition for RebuildTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
+    type Error = SchedulerError<MSto::Error>;
+
     fn warn_msg(&self) -> Option<&'static str> {
         Some("Rebuild in progress, commands will be handled after rebuild completes.")
     }
 
-    async fn execute(self) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
+    async fn execute(self) -> Result<NextState<Self::Error>, Self::Error> {
         let start = Instant::now();
 
         let mut conn = self.ctx.meta_storage.scheduler_conn().await?;

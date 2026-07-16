@@ -63,17 +63,19 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerTransition<MSto::Error> for StartTransition<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerTransition for StartTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
+    type Error = SchedulerError<MSto::Error>;
+
     fn warn_msg(&self) -> Option<&'static str> {
         None
     }
 
-    async fn execute(self) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
+    async fn execute(self) -> Result<NextState<Self::Error>, Self::Error> {
         let footprint = RunFootprint::new(self.run_id, RunState::Running);
         let execution_id = Uuid::new_v4();
 

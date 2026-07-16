@@ -89,17 +89,19 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerTransition<MSto::Error> for InitTransition<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerTransition for InitTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
+    type Error = SchedulerError<MSto::Error>;
+
     fn warn_msg(&self) -> Option<&'static str> {
         None
     }
 
-    async fn execute(self) -> Result<NextState<MSto::Error>, SchedulerError<MSto::Error>> {
+    async fn execute(self) -> Result<NextState<Self::Error>, Self::Error> {
         let RunMetadata { run_id, state } = self.get_run_metadata().await?.unwrap_or_default();
 
         // if self.ui_mode == UiMode::Headless {

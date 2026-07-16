@@ -231,22 +231,22 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, MSto> SchedulerState<MSto::Error> for StaleState<Svc, Sto, MSto>
+impl<Svc, Sto, MSto> SchedulerState for StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    async fn handle_progress(
-        self: Box<Self>,
-    ) -> Result<NextState<MSto::Error>, crate::scheduler::SchedulerError<MSto::Error>> {
+    type Error = SchedulerError<MSto::Error>;
+
+    async fn handle_progress(self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         Ok(NextState::Next(self))
     }
 
     async fn handle_control_event(
         mut self: Box<Self>,
         evt: ControlEvent,
-    ) -> Result<NextState<MSto::Error>, crate::scheduler::SchedulerError<MSto::Error>> {
+    ) -> Result<NextState<Self::Error>, Self::Error> {
         match evt {
             ControlEvent::Check { .. } if self.inconsistent_jobs.is_some() => {
                 tracing::warn!("Already run a check.")
