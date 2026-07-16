@@ -1,12 +1,11 @@
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use crate::meta_storage::MetaBackend;
 use crate::meta_storage::mem::error::MemResult;
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::mem::{
-    MemClient, MemConn, MemMetaStorageOptions, MemResolutionQueryBuilder, MemTicketQueryBuilder,
-    MemTx,
+    MemClient, MemConn, MemMetaError, MemMetaStorageOptions, MemResolutionQueryBuilder,
+    MemTicketQueryBuilder, MemTx,
 };
 
 /// The in-memory implementation of the metadata backend.
@@ -31,7 +30,7 @@ impl std::fmt::Debug for MemMetaStorage {
 
 impl MetaBackend for MemMetaStorage {
     type Options = MemMetaStorageOptions;
-    type Error = Infallible;
+    type Error = MemMetaError;
     type Conn<'a> = MemConn;
     type Tx<'a> = MemTx<'a>;
     type Client<'a> = MemClient<'a>;

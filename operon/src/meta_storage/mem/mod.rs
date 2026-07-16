@@ -7,6 +7,7 @@ mod client;
 pub use client::{MemClient, MemConn, MemTx};
 
 mod error;
+pub use error::MemMetaError;
 
 mod options;
 pub use options::MemMetaStorageOptions;

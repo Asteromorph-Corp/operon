@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 
-use crate::meta_storage::mem::error::{MemResult, POISONED};
+use crate::meta_storage::mem::error::{MemMetaError, MemResult, poisoned};
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
@@ -234,18 +234,17 @@ impl<const N: usize> MemTicketQueryBuilder<'_, N> {
 }
 
 impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
-    type Error = std::convert::Infallible;
+    type Error = MemMetaError;
 
     /// Initializes the ticket table.
     async fn init(&self) -> MemResult<()> {
-        self.store.init_ticket_table::<N>(self.job_meta.id);
-        Ok(())
+        self.store.init_ticket_table::<N>(self.job_meta.id)
     }
 
     /// Clears the ticket table.
     async fn clear(&self) -> MemResult<()> {
         if let Some(table) = self.table()? {
-            table.rows.write().expect(POISONED).clear();
+            table.rows.write().map_err(poisoned)?.clear();
         }
         Ok(())
     }
@@ -255,7 +254,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let Some(table) = self.table()? else {
             return Ok(Vec::new());
         };
-        let rows = table.rows.read().expect(POISONED);
+        let rows = table.rows.read().map_err(poisoned)?;
         Ok(rows
             .map
             .values()
@@ -267,7 +266,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
     /// Puts a ticket into the table, leaving an existing one at the same coordinate untouched.
     async fn put(&self, ticket: Ticket<N>) -> MemResult<()> {
         let table = self.require_table()?;
-        table.rows.write().expect(POISONED).insert_new(ticket);
+        table.rows.write().map_err(poisoned)?.insert_new(ticket);
         Ok(())
     }
 
@@ -289,7 +288,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .collect::<MemResult<Vec<Pin>>>()?;
 
         let table = self.require_table()?;
-        let mut rows = table.rows.write().expect(POISONED);
+        let mut rows = table.rows.write().map_err(poisoned)?;
 
         let (mask, pinned) = query_of::<N>(&pins);
         let stale = rows.matching_waiting(mask, &pinned);
@@ -337,7 +336,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .collect::<MemResult<Vec<Pin>>>()?;
 
         let table = self.require_table()?;
-        let mut rows = table.rows.write().expect(POISONED);
+        let mut rows = table.rows.write().map_err(poisoned)?;
 
         let (mask, pinned) = query_of::<N>(&pins);
         let stale = rows.matching_waiting(mask, &pinned);
@@ -385,7 +384,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .collect::<MemResult<Vec<Pin>>>()?;
 
         let table = self.require_table()?;
-        let mut rows = table.rows.write().expect(POISONED);
+        let mut rows = table.rows.write().map_err(poisoned)?;
 
         let (mask, pinned) = query_of::<N>(&pins);
         let popped_keys = rows.matching(mask, &pinned);
@@ -417,7 +416,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
     /// Marks the ticket corresponding to a given job as done.
     async fn mark_done(&self, job: Job<N>) -> MemResult<()> {
         let table = self.require_table()?;
-        let mut rows = table.rows.write().expect(POISONED);
+        let mut rows = table.rows.write().map_err(poisoned)?;
 
         let key = job.coordinate.map(Some);
         let Some(ticket) = rows.map.get(&key).copied() else {
@@ -438,7 +437,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let Some(table) = self.table()? else {
             return Err(MetaStorageError::missing_ticket_summary(self.job_meta.id));
         };
-        let rows = table.rows.read().expect(POISONED);
+        let rows = table.rows.read().map_err(poisoned)?;
         Ok((rows.done, rows.queued, rows.waiting))
     }
 }
@@ -865,5 +864,34 @@ mod tests {
         tickets.init().await.unwrap();
 
         assert_eq!(tickets.get_status().await.unwrap(), (0, 0, 1));
+    }
+
+    /// Every operation on a table whose lock a panic has poisoned reports it as a backend error.
+    #[tokio::test]
+    async fn a_poisoned_table_errors_rather_than_panicking() {
+        let store = MemStore::default();
+        let tickets = store.ticket(job_beta());
+        tickets.init().await.unwrap();
+
+        let table = store.ticket_table::<1>("beta").unwrap().expect("table");
+        let panicked = std::thread::spawn(move || {
+            let _guard = table.rows.write().expect("uncontended");
+            panic!("a store operation unwinds while holding the lock");
+        })
+        .join();
+        assert!(panicked.is_err());
+
+        assert!(matches!(
+            tickets.get_status().await,
+            Err(MetaStorageError::Backend(MemMetaError::Poisoned))
+        ));
+        assert!(matches!(
+            tickets.put(Ticket::new(0)).await,
+            Err(MetaStorageError::Backend(MemMetaError::Poisoned))
+        ));
+        assert!(matches!(
+            tickets.get_all(TicketStatus::Queued).await,
+            Err(MetaStorageError::Backend(MemMetaError::Poisoned))
+        ));
     }
 }

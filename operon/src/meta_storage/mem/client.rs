@@ -103,22 +103,19 @@ impl MetaClientApi<MemMetaStorage> for MemClient<'_> {
     }
 
     async fn clear_footprint(&self) -> MemResult<()> {
-        self.0.clear_footprint();
-        Ok(())
+        self.0.clear_footprint()
     }
 
     async fn get_footprint(&self) -> MemResult<Option<RunFootprint>> {
-        Ok(self.0.get_footprint())
+        self.0.get_footprint()
     }
 
     async fn upsert_run(&self, footprint: &RunFootprint) -> MemResult<()> {
-        self.0.upsert_run(footprint);
-        Ok(())
+        self.0.upsert_run(footprint)
     }
 
     async fn put_execution(&self, run_id: Uuid, execution_id: Uuid) -> MemResult<()> {
-        self.0.put_execution(run_id, execution_id);
-        Ok(())
+        self.0.put_execution(run_id, execution_id)
     }
 
     async fn update_execution_on_finish(
@@ -126,7 +123,6 @@ impl MetaClientApi<MemMetaStorage> for MemClient<'_> {
         footprint: &RunFootprint,
         execution_id: Uuid,
     ) -> MemResult<()> {
-        self.0.update_execution_on_finish(footprint, execution_id);
-        Ok(())
+        self.0.update_execution_on_finish(footprint, execution_id)
     }
 }

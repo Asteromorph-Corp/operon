@@ -1,13 +1,26 @@
-use std::convert::Infallible;
+use std::sync::PoisonError;
 
-use crate::meta_storage::MetaResult;
+use thiserror::Error as ThisError;
+
+use crate::meta_storage::{MetaResult, MetaStorageError};
 
 /// A metadata result over the in-memory backend's error.
-///
-/// The in-memory backend has no transport layer, so every failure it can raise is a
-/// backend-neutral domain error; `Infallible` leaves
-/// [`MetaStorageError::Backend`](crate::meta_storage::MetaStorageError::Backend) unconstructable.
-pub(super) type MemResult<T> = MetaResult<T, Infallible>;
+pub(super) type MemResult<T> = MetaResult<T, MemMetaError>;
 
-/// The message used when a store lock is poisoned by a panic in another thread.
-pub(super) const POISONED: &str = "in-memory metadata store lock poisoned";
+/// In-memory-specific metadata errors.
+#[derive(Debug, ThisError)]
+pub enum MemMetaError {
+    #[error("In-memory metadata store lock poisoned")]
+    Poisoned,
+}
+
+impl From<MemMetaError> for MetaStorageError<MemMetaError> {
+    fn from(err: MemMetaError) -> Self {
+        MetaStorageError::Backend(err)
+    }
+}
+
+/// Maps a poisoned store lock onto the backend's error.
+pub(super) fn poisoned<T>(_: PoisonError<T>) -> MetaStorageError<MemMetaError> {
+    MemMetaError::Poisoned.into()
+}

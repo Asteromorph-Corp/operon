@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 use std::sync::RwLock;
 
 use crate::meta_storage::MetaResolutionApi;
-use crate::meta_storage::mem::error::{MemResult, POISONED};
+use crate::meta_storage::mem::error::{MemMetaError, MemResult, poisoned};
 use crate::meta_storage::mem::store::MemStore;
 use crate::schema::{DimensionMetadata, Resolution};
 
@@ -33,18 +33,17 @@ impl MemStore {
 }
 
 impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
-    type Error = std::convert::Infallible;
+    type Error = MemMetaError;
 
     /// Initializes the resolution table.
     async fn init(&self) -> MemResult<()> {
-        self.store.init_resolution_table::<N>(self.dim_meta.id);
-        Ok(())
+        self.store.init_resolution_table::<N>(self.dim_meta.id)
     }
 
     /// Clears the resolution table.
     async fn clear(&self) -> MemResult<()> {
         if let Some(table) = self.store.resolution_table::<N>(self.dim_meta.id)? {
-            table.rows.write().expect(POISONED).clear();
+            table.rows.write().map_err(poisoned)?.clear();
         }
         Ok(())
     }
@@ -54,7 +53,7 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
         let Some(table) = self.store.resolution_table::<N>(self.dim_meta.id)? else {
             return Ok(None);
         };
-        let rows = table.rows.read().expect(POISONED);
+        let rows = table.rows.read().map_err(poisoned)?;
         Ok(rows
             .get(&coordinate)
             .map(|&ub| Resolution { coordinate, ub }))
@@ -66,7 +65,7 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
         let Some(table) = self.store.resolution_table::<N>(self.dim_meta.id)? else {
             return Ok(());
         };
-        let mut rows = table.rows.write().expect(POISONED);
+        let mut rows = table.rows.write().map_err(poisoned)?;
         if let Entry::Vacant(entry) = rows.entry(resolution.coordinate) {
             entry.insert(resolution.ub);
         }

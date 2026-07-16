@@ -5,12 +5,11 @@
 //! It is the default `MSto` for [`Operon`](crate::Operon), and is used to select between available
 //! backends at runtime.
 
-use std::convert::Infallible;
-
 use uuid::Uuid;
 
 use crate::meta_storage::mem::{
-    MemClient, MemConn, MemMetaStorage, MemResolutionQueryBuilder, MemTicketQueryBuilder, MemTx,
+    MemClient, MemConn, MemMetaError, MemMetaStorage, MemResolutionQueryBuilder,
+    MemTicketQueryBuilder, MemTx,
 };
 use crate::meta_storage::psql::{
     PsqlClient, PsqlConn, PsqlMetaError, PsqlMetaStorage, PsqlResolutionQueryBuilder,
@@ -65,7 +64,7 @@ pub enum AnyBackendError {
     #[error(transparent)]
     Psql(PsqlMetaError),
     #[error(transparent)]
-    Mem(Infallible),
+    Mem(MemMetaError),
 }
 
 /// Lifts a Postgres backend error into the runtime-selected backend's error.
@@ -74,7 +73,7 @@ fn lift_psql(err: MetaStorageError<PsqlMetaError>) -> MetaStorageError<AnyBacken
 }
 
 /// Lifts an in-memory backend error into the runtime-selected backend's error.
-fn lift_mem(err: MetaStorageError<Infallible>) -> MetaStorageError<AnyBackendError> {
+fn lift_mem(err: MetaStorageError<MemMetaError>) -> MetaStorageError<AnyBackendError> {
     err.map_backend(AnyBackendError::Mem)
 }
 

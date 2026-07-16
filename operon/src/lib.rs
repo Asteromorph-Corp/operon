@@ -18,7 +18,7 @@ pub use service::OperonService;
 pub use storage::OperonStorage;
 
 pub mod error {
-    pub use crate::meta_storage::{AnyBackendError, MetaStorageError, PsqlMetaError};
+    pub use crate::meta_storage::{AnyBackendError, MemMetaError, MetaStorageError, PsqlMetaError};
     pub use crate::operon::{OperonError, UserError};
     pub use crate::scheduler::SchedulerError;
     pub use crate::storage::{DimState, StorageError};
