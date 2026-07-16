@@ -1,9 +1,6 @@
 mod any;
 pub use any::{AnyBackend, AnyBackendError};
 
-#[cfg(test)]
-mod differential;
-
 mod backend;
 pub use backend::{
     MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi, MetaTxApi,
@@ -21,3 +18,6 @@ pub use mem::{MemMetaError, MemMetaStorageOptions};
 
 mod psql;
 pub use psql::{PsqlMetaError, PsqlMetaStorageOptions};
+
+#[cfg(test)]
+mod tests;
