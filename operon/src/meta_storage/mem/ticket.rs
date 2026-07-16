@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 
-use crate::meta_storage::mem::error::{MemMetaError, MemResult, poisoned};
+use crate::meta_storage::mem::error::{MemMetaError, MemResult};
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{
@@ -265,7 +265,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
     /// Clears the ticket table.
     async fn clear(&self) -> MemResult<()> {
         if let Some(table) = self.table()? {
-            table.rows.write().map_err(poisoned)?.clear();
+            table.rows.write()?.clear();
         }
         Ok(())
     }
@@ -275,7 +275,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let Some(table) = self.table()? else {
             return Ok(Vec::new());
         };
-        let rows = table.rows.read().map_err(poisoned)?;
+        let rows = table.rows.read()?;
         Ok(rows
             .map
             .iter()
@@ -288,7 +288,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
     async fn put(&self, ticket: Ticket<N>) -> MemResult<()> {
         let table = self.require_table()?;
         let (key, row) = Self::split(&ticket);
-        table.rows.write().map_err(poisoned)?.insert_new(key, row);
+        table.rows.write()?.insert_new(key, row);
         Ok(())
     }
 
@@ -311,7 +311,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
 
         const { assert!(N <= PinMask::BITS as usize) }
         let table = self.require_table()?;
-        let mut rows = table.rows.write().map_err(poisoned)?;
+        let mut rows = table.rows.write()?;
 
         let (mask, pinned) = query_of(&pins, N);
         let stale = rows.matching_waiting(mask, &pinned);
@@ -363,7 +363,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
 
         const { assert!(N <= PinMask::BITS as usize) }
         let table = self.require_table()?;
-        let mut rows = table.rows.write().map_err(poisoned)?;
+        let mut rows = table.rows.write()?;
 
         let (mask, pinned) = query_of(&pins, N);
         let stale = rows.matching_waiting(mask, &pinned);
@@ -416,7 +416,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .collect::<MemResult<Vec<Pin>>>()?;
 
         let table = self.require_table()?;
-        let mut rows = table.rows.write().map_err(poisoned)?;
+        let mut rows = table.rows.write()?;
 
         let (mask, pinned) = query_of(&pins, N);
         let popped_keys = rows.matching(mask, &pinned);
@@ -454,7 +454,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
     /// Marks the ticket corresponding to a given job as done.
     async fn mark_done(&self, job: Job<N>) -> MemResult<()> {
         let table = self.require_table()?;
-        let mut rows = table.rows.write().map_err(poisoned)?;
+        let mut rows = table.rows.write()?;
 
         let key: TicketKey = job
             .coordinate
@@ -477,7 +477,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let Some(table) = self.table()? else {
             return Err(MetaStorageError::missing_ticket_summary(self.job_meta.id));
         };
-        let rows = table.rows.read().map_err(poisoned)?;
+        let rows = table.rows.read()?;
         Ok((rows.done, rows.queued, rows.waiting))
     }
 }

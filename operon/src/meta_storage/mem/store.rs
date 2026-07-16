@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use uuid::Uuid;
 
-use crate::meta_storage::mem::error::{MemResult, poisoned};
+use crate::meta_storage::mem::error::MemResult;
 use crate::meta_storage::mem::resolution::ResolutionTable;
 use crate::meta_storage::mem::ticket::TicketTable;
 use crate::schema::RunFootprint;
@@ -38,8 +38,7 @@ impl MemStore {
     /// Registers a job's ticket table, keeping an existing one.
     pub(super) fn init_ticket_table(&self, job_id: &'static str) -> MemResult<()> {
         self.tickets
-            .write()
-            .map_err(poisoned)?
+            .write()?
             .entry(job_id)
             .or_insert_with(|| Arc::new(TicketTable::default()));
         Ok(())
@@ -47,14 +46,13 @@ impl MemStore {
 
     /// Returns a job's ticket table, if it has been registered.
     pub(super) fn ticket_table(&self, job_id: &'static str) -> MemResult<Option<Arc<TicketTable>>> {
-        Ok(self.tickets.read().map_err(poisoned)?.get(job_id).cloned())
+        Ok(self.tickets.read()?.get(job_id).cloned())
     }
 
     /// Registers a dimension's resolution table, keeping an existing one.
     pub(super) fn init_resolution_table(&self, dim_id: &'static str) -> MemResult<()> {
         self.resolutions
-            .write()
-            .map_err(poisoned)?
+            .write()?
             .entry(dim_id)
             .or_insert_with(|| Arc::new(ResolutionTable::default()));
         Ok(())
@@ -65,31 +63,26 @@ impl MemStore {
         &self,
         dim_id: &'static str,
     ) -> MemResult<Option<Arc<ResolutionTable>>> {
-        Ok(self
-            .resolutions
-            .read()
-            .map_err(poisoned)?
-            .get(dim_id)
-            .cloned())
+        Ok(self.resolutions.read()?.get(dim_id).cloned())
     }
 
     pub(super) fn clear_footprint(&self) -> MemResult<()> {
-        *self.footprint.write().map_err(poisoned)? = None;
-        self.executions.write().map_err(poisoned)?.clear();
+        *self.footprint.write()? = None;
+        self.executions.write()?.clear();
         Ok(())
     }
 
     pub(super) fn get_footprint(&self) -> MemResult<Option<RunFootprint>> {
-        Ok(self.footprint.read().map_err(poisoned)?.clone())
+        Ok(self.footprint.read()?.clone())
     }
 
     pub(super) fn upsert_run(&self, footprint: &RunFootprint) -> MemResult<()> {
-        *self.footprint.write().map_err(poisoned)? = Some(footprint.clone());
+        *self.footprint.write()? = Some(footprint.clone());
         Ok(())
     }
 
     pub(super) fn put_execution(&self, run_id: Uuid, execution_id: Uuid) -> MemResult<()> {
-        self.executions.write().map_err(poisoned)?.insert(
+        self.executions.write()?.insert(
             execution_id,
             Execution {
                 run_id,
@@ -105,7 +98,7 @@ impl MemStore {
         footprint: &RunFootprint,
         execution_id: Uuid,
     ) -> MemResult<()> {
-        let mut executions = self.executions.write().map_err(poisoned)?;
+        let mut executions = self.executions.write()?;
         let Some(execution) = executions.get_mut(&execution_id) else {
             return Ok(());
         };

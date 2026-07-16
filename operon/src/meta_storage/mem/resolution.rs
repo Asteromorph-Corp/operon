@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 use std::sync::RwLock;
 
 use crate::meta_storage::MetaResolutionApi;
-use crate::meta_storage::mem::error::{MemMetaError, MemResult, poisoned};
+use crate::meta_storage::mem::error::{MemMetaError, MemResult};
 use crate::meta_storage::mem::store::MemStore;
 use crate::schema::{DimensionMetadata, Resolution};
 
@@ -43,7 +43,7 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
     /// Clears the resolution table.
     async fn clear(&self) -> MemResult<()> {
         if let Some(table) = self.store.resolution_table(self.dim_meta.id)? {
-            table.rows.write().map_err(poisoned)?.clear();
+            table.rows.write()?.clear();
         }
         Ok(())
     }
@@ -53,7 +53,7 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
         let Some(table) = self.store.resolution_table(self.dim_meta.id)? else {
             return Ok(None);
         };
-        let rows = table.rows.read().map_err(poisoned)?;
+        let rows = table.rows.read()?;
         Ok(rows
             .get(&coordinate[..])
             .map(|&ub| Resolution { coordinate, ub }))
@@ -65,7 +65,7 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
         let Some(table) = self.store.resolution_table(self.dim_meta.id)? else {
             return Ok(());
         };
-        let mut rows = table.rows.write().map_err(poisoned)?;
+        let mut rows = table.rows.write()?;
         if let Entry::Vacant(entry) = rows.entry(resolution.coordinate.into()) {
             entry.insert(resolution.ub);
         }

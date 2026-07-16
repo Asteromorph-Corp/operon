@@ -20,7 +20,8 @@ impl From<MemMetaError> for MetaStorageError<MemMetaError> {
     }
 }
 
-/// Maps a poisoned store lock onto the backend's error.
-pub(super) fn poisoned<T>(_: PoisonError<T>) -> MetaStorageError<MemMetaError> {
-    MemMetaError::Poisoned.into()
+impl<T> From<PoisonError<T>> for MetaStorageError<MemMetaError> {
+    fn from(_: PoisonError<T>) -> Self {
+        MemMetaError::Poisoned.into()
+    }
 }
