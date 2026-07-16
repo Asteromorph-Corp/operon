@@ -1,9 +1,9 @@
 //! The runtime-selected metadata backend.
 //!
 //! [`AnyBackend`] is a [`MetaBackend`] whose concrete backend is chosen at runtime from
-//! [`MetaBackendOptions`]. It is the default `MSto` for [`Operon`](crate::Operon): a program that
-//! doesn't pin a backend at compile time runs against `AnyBackend`, which match-dispatches every
-//! operation to the selected backend through hand-written wrapper enums.
+//! [`MetaBackendOptions`].
+//! It is the default `MSto` for [`Operon`](crate::Operon), and is used to select between available
+//! backends at runtime.
 
 use std::convert::Infallible;
 
@@ -23,6 +23,32 @@ use crate::meta_storage::{
 use crate::schema::{
     DimensionMetadata, Job, JobMetadata, Resolution, RunFootprint, Ticket, TicketStatus,
 };
+
+/// Maps an operation over the backend variant and lifts the error.
+macro_rules! map_lift_backend {
+    ($self:expr, | $inner:ident | $call:expr) => {
+        match $self {
+            Self::Psql($inner) => $call.map_err(lift_psql),
+            Self::Mem($inner) => $call.map_err(lift_mem),
+        }
+    };
+    ($self:expr, | $inner:ident | $call:expr => $wrap:ident) => {
+        match $self {
+            Self::Psql($inner) => $call.map($wrap::Psql).map_err(lift_psql),
+            Self::Mem($inner) => $call.map($wrap::Mem).map_err(lift_mem),
+        }
+    };
+}
+
+/// Maps an operation over the backend variant.
+macro_rules! map_backend {
+    ($self:expr, | $inner:ident | $call:expr => $wrap:ident) => {
+        match $self {
+            Self::Psql($inner) => $wrap::Psql($call),
+            Self::Mem($inner) => $wrap::Mem($call),
+        }
+    };
+}
 
 /// A metadata backend selected at runtime from [`MetaBackendOptions`].
 #[derive(Debug, Clone)]
@@ -73,47 +99,19 @@ impl MetaBackend for AnyBackend {
     }
 
     async fn worker_conn(&self) -> MetaResult<AnyConn<'_>, AnyBackendError> {
-        match self {
-            AnyBackend::Psql(backend) => backend
-                .worker_conn()
-                .await
-                .map(AnyConn::Psql)
-                .map_err(lift_psql),
-            AnyBackend::Mem(backend) => backend
-                .worker_conn()
-                .await
-                .map(AnyConn::Mem)
-                .map_err(lift_mem),
-        }
+        map_lift_backend!(self, |backend| backend.worker_conn().await => AnyConn)
     }
 
     async fn scheduler_conn(&self) -> MetaResult<AnyConn<'static>, AnyBackendError> {
-        match self {
-            AnyBackend::Psql(backend) => backend
-                .scheduler_conn()
-                .await
-                .map(AnyConn::Psql)
-                .map_err(lift_psql),
-            AnyBackend::Mem(backend) => backend
-                .scheduler_conn()
-                .await
-                .map(AnyConn::Mem)
-                .map_err(lift_mem),
-        }
+        map_lift_backend!(self, |backend| backend.scheduler_conn().await => AnyConn)
     }
 
     async fn ensure_lock(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyBackend::Psql(backend) => backend.ensure_lock().await.map_err(lift_psql),
-            AnyBackend::Mem(backend) => backend.ensure_lock().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |backend| backend.ensure_lock().await)
     }
 
     async fn check_lock(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyBackend::Psql(backend) => backend.check_lock().await.map_err(lift_psql),
-            AnyBackend::Mem(backend) => backend.check_lock().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |backend| backend.check_lock().await)
     }
 }
 
@@ -126,17 +124,11 @@ pub enum AnyConn<'a> {
 
 impl MetaConnApi<AnyBackend> for AnyConn<'_> {
     async fn transaction(&mut self) -> MetaResult<AnyTx<'_>, AnyBackendError> {
-        match self {
-            AnyConn::Psql(conn) => conn.transaction().await.map(AnyTx::Psql).map_err(lift_psql),
-            AnyConn::Mem(conn) => conn.transaction().await.map(AnyTx::Mem).map_err(lift_mem),
-        }
+        map_lift_backend!(self, |conn| conn.transaction().await => AnyTx)
     }
 
     fn as_client(&self) -> AnyClient<'_> {
-        match self {
-            AnyConn::Psql(conn) => AnyClient::Psql(conn.as_client()),
-            AnyConn::Mem(conn) => AnyClient::Mem(conn.as_client()),
-        }
+        map_backend!(self, |conn| conn.as_client() => AnyClient)
     }
 }
 
@@ -148,24 +140,15 @@ pub enum AnyTx<'a> {
 
 impl MetaTxApi<AnyBackend> for AnyTx<'_> {
     async fn commit(self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyTx::Psql(tx) => tx.commit().await.map_err(lift_psql),
-            AnyTx::Mem(tx) => tx.commit().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |tx| tx.commit().await)
     }
 
     async fn rollback(self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyTx::Psql(tx) => tx.rollback().await.map_err(lift_psql),
-            AnyTx::Mem(tx) => tx.rollback().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |tx| tx.rollback().await)
     }
 
     fn as_client(&self) -> AnyClient<'_> {
-        match self {
-            AnyTx::Psql(tx) => AnyClient::Psql(tx.as_client()),
-            AnyTx::Mem(tx) => AnyClient::Mem(tx.as_client()),
-        }
+        map_backend!(self, |tx| tx.as_client() => AnyClient)
     }
 }
 
@@ -178,80 +161,47 @@ pub enum AnyClient<'a> {
 
 impl MetaClientApi<AnyBackend> for AnyClient<'_> {
     fn ticket<const N: usize>(&self, job_meta: JobMetadata<N>) -> AnyTicket<'_, N> {
-        match self {
-            AnyClient::Psql(client) => AnyTicket::Psql(client.ticket(job_meta)),
-            AnyClient::Mem(client) => AnyTicket::Mem(client.ticket(job_meta)),
-        }
+        map_backend!(self, |client| client.ticket(job_meta) => AnyTicket)
     }
 
     fn resolution<const N: usize>(&self, dim_meta: DimensionMetadata<N>) -> AnyResolution<'_, N> {
-        match self {
-            AnyClient::Psql(client) => AnyResolution::Psql(client.resolution(dim_meta)),
-            AnyClient::Mem(client) => AnyResolution::Mem(client.resolution(dim_meta)),
-        }
+        map_backend!(self, |client| client.resolution(dim_meta) => AnyResolution)
     }
 
     async fn init_schema(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.init_schema().await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.init_schema().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.init_schema().await)
     }
 
     async fn init_ticket_hash(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.init_ticket_hash().await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.init_ticket_hash().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.init_ticket_hash().await)
     }
 
     async fn init_dimension_hash(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.init_dimension_hash().await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.init_dimension_hash().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.init_dimension_hash().await)
     }
 
     async fn init_ticket_status_type(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.init_ticket_status_type().await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.init_ticket_status_type().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.init_ticket_status_type().await)
     }
 
     async fn init_ticket_summary(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.init_ticket_summary().await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.init_ticket_summary().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.init_ticket_summary().await)
     }
 
     async fn init_footprint(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.init_footprint().await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.init_footprint().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.init_footprint().await)
     }
 
     async fn clear_footprint(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.clear_footprint().await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.clear_footprint().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.clear_footprint().await)
     }
 
     async fn get_footprint(&self) -> MetaResult<Option<RunFootprint>, AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.get_footprint().await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.get_footprint().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.get_footprint().await)
     }
 
     async fn upsert_run(&self, footprint: &RunFootprint) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client.upsert_run(footprint).await.map_err(lift_psql),
-            AnyClient::Mem(client) => client.upsert_run(footprint).await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| client.upsert_run(footprint).await)
     }
 
     async fn put_execution(
@@ -259,16 +209,9 @@ impl MetaClientApi<AnyBackend> for AnyClient<'_> {
         run_id: Uuid,
         execution_id: Uuid,
     ) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client
-                .put_execution(run_id, execution_id)
-                .await
-                .map_err(lift_psql),
-            AnyClient::Mem(client) => client
-                .put_execution(run_id, execution_id)
-                .await
-                .map_err(lift_mem),
-        }
+        map_lift_backend!(self, |client| {
+            client.put_execution(run_id, execution_id).await
+        })
     }
 
     async fn update_execution_on_finish(
@@ -276,16 +219,11 @@ impl MetaClientApi<AnyBackend> for AnyClient<'_> {
         footprint: &RunFootprint,
         execution_id: Uuid,
     ) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyClient::Psql(client) => client
+        map_lift_backend!(self, |client| {
+            client
                 .update_execution_on_finish(footprint, execution_id)
                 .await
-                .map_err(lift_psql),
-            AnyClient::Mem(client) => client
-                .update_execution_on_finish(footprint, execution_id)
-                .await
-                .map_err(lift_mem),
-        }
+        })
     }
 }
 
@@ -299,31 +237,19 @@ impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
     type Error = AnyBackendError;
 
     async fn init(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyTicket::Psql(ticket) => ticket.init().await.map_err(lift_psql),
-            AnyTicket::Mem(ticket) => ticket.init().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |ticket| ticket.init().await)
     }
 
     async fn clear(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyTicket::Psql(ticket) => ticket.clear().await.map_err(lift_psql),
-            AnyTicket::Mem(ticket) => ticket.clear().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |ticket| ticket.clear().await)
     }
 
     async fn get_all(&self, status: TicketStatus) -> MetaResult<Vec<Ticket<N>>, AnyBackendError> {
-        match self {
-            AnyTicket::Psql(ticket) => ticket.get_all(status).await.map_err(lift_psql),
-            AnyTicket::Mem(ticket) => ticket.get_all(status).await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |ticket| ticket.get_all(status).await)
     }
 
     async fn put(&self, ticket: Ticket<N>) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyTicket::Psql(builder) => builder.put(ticket).await.map_err(lift_psql),
-            AnyTicket::Mem(builder) => builder.put(ticket).await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |builder| builder.put(ticket).await)
     }
 
     async fn raise_deps_done<const M: usize>(
@@ -332,16 +258,11 @@ impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
         upstream_job: Job<M>,
         aggregate_dims: &[&'static str],
     ) -> MetaResult<Vec<Ticket<N>>, AnyBackendError> {
-        match self {
-            AnyTicket::Psql(ticket) => ticket
+        map_lift_backend!(self, |ticket| {
+            ticket
                 .raise_deps_done(upstream_meta, upstream_job, aggregate_dims)
                 .await
-                .map_err(lift_psql),
-            AnyTicket::Mem(ticket) => ticket
-                .raise_deps_done(upstream_meta, upstream_job, aggregate_dims)
-                .await
-                .map_err(lift_mem),
-        }
+        })
     }
 
     async fn raise_deps_quota<const M: usize>(
@@ -351,16 +272,11 @@ impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
         aggregate_dims: &[&'static str],
         ub: usize,
     ) -> MetaResult<Vec<Ticket<N>>, AnyBackendError> {
-        match self {
-            AnyTicket::Psql(ticket) => ticket
+        map_lift_backend!(self, |ticket| {
+            ticket
                 .raise_deps_quota(upstream_meta, upstream_ticket, aggregate_dims, ub)
                 .await
-                .map_err(lift_psql),
-            AnyTicket::Mem(ticket) => ticket
-                .raise_deps_quota(upstream_meta, upstream_ticket, aggregate_dims, ub)
-                .await
-                .map_err(lift_mem),
-        }
+        })
     }
 
     async fn explode<const M: usize, const IDX: usize>(
@@ -368,30 +284,15 @@ impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
         res_meta: DimensionMetadata<M>,
         res: Resolution<M>,
     ) -> MetaResult<Vec<Ticket<N>>, AnyBackendError> {
-        match self {
-            AnyTicket::Psql(ticket) => ticket
-                .explode::<M, IDX>(res_meta, res)
-                .await
-                .map_err(lift_psql),
-            AnyTicket::Mem(ticket) => ticket
-                .explode::<M, IDX>(res_meta, res)
-                .await
-                .map_err(lift_mem),
-        }
+        map_lift_backend!(self, |ticket| ticket.explode::<M, IDX>(res_meta, res).await)
     }
 
     async fn mark_done(&self, job: Job<N>) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyTicket::Psql(ticket) => ticket.mark_done(job).await.map_err(lift_psql),
-            AnyTicket::Mem(ticket) => ticket.mark_done(job).await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |ticket| ticket.mark_done(job).await)
     }
 
     async fn get_status(&self) -> MetaResult<(i64, i64, i64), AnyBackendError> {
-        match self {
-            AnyTicket::Psql(ticket) => ticket.get_status().await.map_err(lift_psql),
-            AnyTicket::Mem(ticket) => ticket.get_status().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |ticket| ticket.get_status().await)
     }
 }
 
@@ -405,33 +306,21 @@ impl<const N: usize> MetaResolutionApi<N> for AnyResolution<'_, N> {
     type Error = AnyBackendError;
 
     async fn init(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyResolution::Psql(resolution) => resolution.init().await.map_err(lift_psql),
-            AnyResolution::Mem(resolution) => resolution.init().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |resolution| resolution.init().await)
     }
 
     async fn clear(&self) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyResolution::Psql(resolution) => resolution.clear().await.map_err(lift_psql),
-            AnyResolution::Mem(resolution) => resolution.clear().await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |resolution| resolution.clear().await)
     }
 
     async fn get(
         &self,
         coordinate: [usize; N],
     ) -> MetaResult<Option<Resolution<N>>, AnyBackendError> {
-        match self {
-            AnyResolution::Psql(resolution) => resolution.get(coordinate).await.map_err(lift_psql),
-            AnyResolution::Mem(resolution) => resolution.get(coordinate).await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |resolution| resolution.get(coordinate).await)
     }
 
     async fn put(&self, resolution: Resolution<N>) -> MetaResult<(), AnyBackendError> {
-        match self {
-            AnyResolution::Psql(builder) => builder.put(resolution).await.map_err(lift_psql),
-            AnyResolution::Mem(builder) => builder.put(resolution).await.map_err(lift_mem),
-        }
+        map_lift_backend!(self, |builder| builder.put(resolution).await)
     }
 }
