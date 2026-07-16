@@ -87,15 +87,15 @@ where
         }
     }
 
-    fn into_clean(self) -> TransitionState<MSto::Error> {
+    fn into_clean(self) -> TransitionState<SchedulerError<MSto::Error>> {
         CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 
-    fn into_rebuild(self, skip: HashSet<String>) -> TransitionState<MSto::Error> {
+    fn into_rebuild(self, skip: HashSet<String>) -> TransitionState<SchedulerError<MSto::Error>> {
         RebuildTransition::state(self.ctx, self.channel_size, self.run_id, skip)
     }
 
-    fn into_restore(self) -> TransitionState<MSto::Error> {
+    fn into_restore(self) -> TransitionState<SchedulerError<MSto::Error>> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 

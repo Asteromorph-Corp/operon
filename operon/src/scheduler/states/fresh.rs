@@ -46,7 +46,7 @@ where
         }
     }
 
-    fn into_running(self) -> TransitionState<MSto::Error> {
+    fn into_running(self) -> TransitionState<SchedulerError<MSto::Error>> {
         CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 }

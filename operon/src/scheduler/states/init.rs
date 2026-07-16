@@ -45,7 +45,7 @@ where
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
-    ) -> TransitionState<MSto::Error> {
+    ) -> TransitionState<SchedulerError<MSto::Error>> {
         TransitionState::new(Self::new(ctx, ui_mode, channel_size))
     }
 

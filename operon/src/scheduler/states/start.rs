@@ -47,7 +47,7 @@ where
         channel_size: usize,
         run_id: Uuid,
         clean: bool,
-    ) -> TransitionState<MSto::Error> {
+    ) -> TransitionState<SchedulerError<MSto::Error>> {
         TransitionState::new(Self::new(ctx, channel_size, run_id, clean))
     }
 

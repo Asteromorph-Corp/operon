@@ -49,11 +49,11 @@ where
         channel_size: usize,
         run_id: Uuid,
         skip: HashSet<String>,
-    ) -> TransitionState<MSto::Error> {
+    ) -> TransitionState<SchedulerError<MSto::Error>> {
         TransitionState::new(Self::new(ctx, channel_size, run_id, skip))
     }
 
-    fn into_start(self) -> TransitionState<MSto::Error> {
+    fn into_start(self) -> TransitionState<SchedulerError<MSto::Error>> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 }
