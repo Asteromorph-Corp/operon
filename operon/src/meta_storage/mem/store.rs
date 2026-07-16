@@ -1,10 +1,8 @@
-use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use uuid::Uuid;
 
-use crate::meta_storage::MetaStorageError;
 use crate::meta_storage::mem::error::{MemResult, poisoned};
 use crate::meta_storage::mem::resolution::ResolutionTable;
 use crate::meta_storage::mem::ticket::TicketTable;
@@ -12,10 +10,8 @@ use crate::schema::RunFootprint;
 
 /// The in-memory metadata store.
 ///
-/// Ticket and resolution tables are keyed by job/dimension id in a type map: their arity `N` is a
-/// const parameter, so a store holding tables of differing arity erases each to `dyn Any` on the
-/// way in and downcasts it back at the [`MemClient`](super::MemClient) boundary, where `N` is
-/// known again.
+/// Ticket and resolution tables are keyed by job/dimension id. Their coordinates carry their arity
+/// at runtime, so one store holds tables spanning jobs of differing arity without a type parameter.
 ///
 /// # Concurrency
 ///
@@ -25,8 +21,8 @@ use crate::schema::RunFootprint;
 /// task, so it takes the lock uncontended.
 #[derive(Default)]
 pub(super) struct MemStore {
-    tickets: RwLock<HashMap<&'static str, Arc<dyn Any + Send + Sync>>>,
-    resolutions: RwLock<HashMap<&'static str, Arc<dyn Any + Send + Sync>>>,
+    tickets: RwLock<HashMap<&'static str, Arc<TicketTable>>>,
+    resolutions: RwLock<HashMap<&'static str, Arc<ResolutionTable>>>,
     footprint: RwLock<Option<RunFootprint>>,
     executions: RwLock<HashMap<Uuid, Execution>>,
 }
@@ -40,60 +36,41 @@ struct Execution {
 
 impl MemStore {
     /// Registers a job's ticket table, keeping an existing one.
-    pub(super) fn init_ticket_table<const N: usize>(&self, job_id: &'static str) -> MemResult<()> {
+    pub(super) fn init_ticket_table(&self, job_id: &'static str) -> MemResult<()> {
         self.tickets
             .write()
             .map_err(poisoned)?
             .entry(job_id)
-            .or_insert_with(|| Arc::new(TicketTable::<N>::default()));
+            .or_insert_with(|| Arc::new(TicketTable::default()));
         Ok(())
     }
 
     /// Returns a job's ticket table, if it has been registered.
-    pub(super) fn ticket_table<const N: usize>(
-        &self,
-        job_id: &'static str,
-    ) -> MemResult<Option<Arc<TicketTable<N>>>> {
-        let tables = self.tickets.read().map_err(poisoned)?;
-        let Some(table) = tables.get(job_id) else {
-            return Ok(None);
-        };
-        table
-            .clone()
-            .downcast::<TicketTable<N>>()
-            .map(Some)
-            .map_err(|_| MetaStorageError::Internal("ticket table registered with another arity"))
+    pub(super) fn ticket_table(&self, job_id: &'static str) -> MemResult<Option<Arc<TicketTable>>> {
+        Ok(self.tickets.read().map_err(poisoned)?.get(job_id).cloned())
     }
 
     /// Registers a dimension's resolution table, keeping an existing one.
-    pub(super) fn init_resolution_table<const N: usize>(
-        &self,
-        dim_id: &'static str,
-    ) -> MemResult<()> {
+    pub(super) fn init_resolution_table(&self, dim_id: &'static str) -> MemResult<()> {
         self.resolutions
             .write()
             .map_err(poisoned)?
             .entry(dim_id)
-            .or_insert_with(|| Arc::new(ResolutionTable::<N>::default()));
+            .or_insert_with(|| Arc::new(ResolutionTable::default()));
         Ok(())
     }
 
     /// Returns a dimension's resolution table, if it has been registered.
-    pub(super) fn resolution_table<const N: usize>(
+    pub(super) fn resolution_table(
         &self,
         dim_id: &'static str,
-    ) -> MemResult<Option<Arc<ResolutionTable<N>>>> {
-        let tables = self.resolutions.read().map_err(poisoned)?;
-        let Some(table) = tables.get(dim_id) else {
-            return Ok(None);
-        };
-        table
-            .clone()
-            .downcast::<ResolutionTable<N>>()
-            .map(Some)
-            .map_err(|_| {
-                MetaStorageError::Internal("resolution table registered with another arity")
-            })
+    ) -> MemResult<Option<Arc<ResolutionTable>>> {
+        Ok(self
+            .resolutions
+            .read()
+            .map_err(poisoned)?
+            .get(dim_id)
+            .cloned())
     }
 
     pub(super) fn clear_footprint(&self) -> MemResult<()> {

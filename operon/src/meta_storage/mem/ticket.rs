@@ -5,20 +5,25 @@ use std::sync::RwLock;
 use crate::meta_storage::mem::error::{MemMetaError, MemResult, poisoned};
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
-use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
+use crate::schema::{
+    DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
+};
 
 /// A ticket's primary key: its coordinate, with unresolved dimensions left as `None`.
-pub(super) type TicketKey<const N: usize> = [Option<usize>; N];
+type TicketKey = Box<[OptionCoordinate]>;
 
-/// Derives a ticket's key from its coordinate.
-fn key_of<const N: usize>(ticket: &Ticket<N>) -> TicketKey<N> {
-    ticket.coordinate.map(|coord| coord.0)
+/// A stored ticket's state, keyed in the table by its coordinate.
+#[derive(Clone, Copy)]
+struct TicketRow {
+    deps_done: usize,
+    deps_quota: usize,
+    status: TicketStatus,
 }
 
 /// One job's ticket table.
 #[derive(Default)]
-pub(super) struct TicketTable<const N: usize> {
-    rows: RwLock<TicketRows<N>>,
+pub(super) struct TicketTable {
+    rows: RwLock<TicketRows>,
 }
 
 /// A ticket table's rows, alongside the per-status counters they are summarized by and the
@@ -27,15 +32,15 @@ pub(super) struct TicketTable<const N: usize> {
 /// One lock spans all three: it makes a slice op's scan and write-back atomic, and it keeps a
 /// reader from observing the counters or an index midway through an update.
 #[derive(Default)]
-struct TicketRows<const N: usize> {
-    map: HashMap<TicketKey<N>, Ticket<N>>,
-    indexes: HashMap<PinMask, PinIndex<N>>,
+struct TicketRows {
+    map: HashMap<TicketKey, TicketRow>,
+    indexes: HashMap<PinMask, PinIndex>,
     done: i64,
     queued: i64,
     waiting: i64,
 }
 
-impl<const N: usize> TicketRows<N> {
+impl TicketRows {
     /// Adjusts the counter for `status` by `delta`.
     fn count(&mut self, status: TicketStatus, delta: i64) {
         match status {
@@ -46,14 +51,17 @@ impl<const N: usize> TicketRows<N> {
     }
 
     /// Adds a key to every index built so far.
-    fn index(&mut self, key: TicketKey<N>) {
+    fn index(&mut self, key: &TicketKey) {
         for (&mask, index) in &mut self.indexes {
-            index.entry(project(mask, &key)).or_default().insert(key);
+            index
+                .entry(project(mask, key))
+                .or_default()
+                .insert(key.clone());
         }
     }
 
     /// Drops a key from every index built so far.
-    fn unindex(&mut self, key: &TicketKey<N>) {
+    fn unindex(&mut self, key: &TicketKey) {
         for (&mask, index) in &mut self.indexes {
             let Entry::Occupied(mut bucket) = index.entry(project(mask, key)) else {
                 continue;
@@ -70,22 +78,25 @@ impl<const N: usize> TicketRows<N> {
     ///
     /// A pin set covering every dimension names one coordinate outright, so it is served straight
     /// from the rows.
-    fn matching(&mut self, mask: PinMask, pinned: &TicketKey<N>) -> Vec<TicketKey<N>> {
-        if mask == full_pins::<N>() {
-            return Vec::from_iter(self.map.contains_key(pinned).then_some(*pinned));
+    fn matching(&mut self, mask: PinMask, pinned: &TicketKey) -> Vec<TicketKey> {
+        if mask == full_pins(pinned.len()) {
+            return Vec::from_iter(self.map.contains_key(pinned).then(|| pinned.clone()));
         }
 
         if !self.indexes.contains_key(&mask) {
-            let mut index = PinIndex::<N>::default();
+            let mut index = PinIndex::default();
             for key in self.map.keys() {
-                index.entry(project(mask, key)).or_default().insert(*key);
+                index
+                    .entry(project(mask, key))
+                    .or_default()
+                    .insert(key.clone());
             }
             self.indexes.insert(mask, index);
         }
 
         self.indexes[&mask]
             .get(pinned)
-            .map(|bucket| bucket.iter().copied().collect())
+            .map(|bucket| bucket.iter().cloned().collect())
             .unwrap_or_default()
     }
 
@@ -93,44 +104,38 @@ impl<const N: usize> TicketRows<N> {
     fn matching_waiting(
         &mut self,
         mask: PinMask,
-        pinned: &TicketKey<N>,
-    ) -> Vec<(TicketKey<N>, Ticket<N>)> {
+        pinned: &TicketKey,
+    ) -> Vec<(TicketKey, TicketRow)> {
         self.matching(mask, pinned)
             .into_iter()
-            .filter_map(|key| self.map.get(&key).map(|ticket| (key, *ticket)))
-            .filter(|(_, ticket)| ticket.status == TicketStatus::Waiting)
+            .filter_map(|key| self.map.get(&key).map(|row| (key, *row)))
+            .filter(|(_, row)| row.status == TicketStatus::Waiting)
             .collect()
     }
 
     /// Inserts a ticket, leaving an existing one at the same key untouched.
-    fn insert_new(&mut self, ticket: Ticket<N>) {
-        let key = key_of(&ticket);
-        match self.map.entry(key) {
-            Entry::Vacant(entry) => entry.insert(ticket),
-            Entry::Occupied(_) => return,
-        };
-        self.count(ticket.status, 1);
-        self.index(key);
+    fn insert_new(&mut self, key: TicketKey, row: TicketRow) {
+        if self.map.contains_key(&key) {
+            return;
+        }
+        self.count(row.status, 1);
+        self.index(&key);
+        self.map.insert(key, row);
     }
 
-    /// Replaces the ticket at `key`, keeping the counters in step.
-    fn replace(&mut self, key: TicketKey<N>, old_status: TicketStatus, ticket: Ticket<N>) {
-        debug_assert_eq!(
-            key,
-            key_of(&ticket),
-            "a replacement keeps the key it indexes"
-        );
-        self.map.insert(key, ticket);
+    /// Replaces the row at `key`, keeping the counters in step.
+    fn replace(&mut self, key: &TicketKey, old_status: TicketStatus, row: TicketRow) {
+        self.map.insert(key.clone(), row);
         self.count(old_status, -1);
-        self.count(ticket.status, 1);
+        self.count(row.status, 1);
     }
 
-    /// Removes the ticket at `key`, keeping the counters in step.
-    fn remove(&mut self, key: &TicketKey<N>) -> Option<Ticket<N>> {
-        let ticket = self.map.remove(key)?;
-        self.count(ticket.status, -1);
+    /// Removes the row at `key`, keeping the counters in step.
+    fn remove(&mut self, key: &TicketKey) -> Option<TicketRow> {
+        let row = self.map.remove(key)?;
+        self.count(row.status, -1);
         self.unindex(key);
-        Some(ticket)
+        Some(row)
     }
 
     fn clear(&mut self) {
@@ -151,42 +156,41 @@ type Pin = (usize, usize);
 /// Every op pins a subset that is fixed by the DAG, so a job sees only a handful of masks.
 type PinMask = u32;
 
-/// The pin set covering all `N` of a job's dimensions.
-const fn full_pins<const N: usize>() -> PinMask {
-    if N >= PinMask::BITS as usize {
+/// The pin set covering all `arity` of a job's dimensions.
+fn full_pins(arity: usize) -> PinMask {
+    if arity >= PinMask::BITS as usize {
         PinMask::MAX
     } else {
-        (1 << N) - 1
+        (1 << arity) - 1
     }
 }
 
 /// A secondary index over one pin set, mapping a projected coordinate to the keys holding it.
-type PinIndex<const N: usize> = HashMap<TicketKey<N>, HashSet<TicketKey<N>>>;
+type PinIndex = HashMap<TicketKey, HashSet<TicketKey>>;
 
 /// Projects a coordinate onto a pin set, nulling every dimension the set leaves free.
 ///
 /// Two coordinates share a projection exactly when they agree on every pinned dimension, so a
 /// projection is the bucket key both a stored ticket and a query resolve to.
-fn project<const N: usize>(mask: PinMask, key: &TicketKey<N>) -> TicketKey<N> {
-    const { assert!(N <= PinMask::BITS as usize) }
-    let mut pinned = [None; N];
+fn project(mask: PinMask, key: &[OptionCoordinate]) -> TicketKey {
+    let mut pinned = vec![OptionCoordinate::none(); key.len()];
     for (idx, slot) in pinned.iter_mut().enumerate() {
         if mask & (1 << idx) != 0 {
             *slot = key[idx];
         }
     }
-    pinned
+    pinned.into()
 }
 
 /// Builds the mask and projected coordinate that look a pin set up in its index.
-fn query_of<const N: usize>(pins: &[Pin]) -> (PinMask, TicketKey<N>) {
+fn query_of(pins: &[Pin], arity: usize) -> (PinMask, TicketKey) {
     let mut mask = 0;
-    let mut pinned = [None; N];
+    let mut pinned = vec![OptionCoordinate::none(); arity];
     for &(idx, value) in pins {
         mask |= 1 << idx;
-        pinned[idx] = Some(value);
+        pinned[idx] = OptionCoordinate::some(value);
     }
-    (mask, pinned)
+    (mask, pinned.into())
 }
 
 /// Helper struct for querying the in-memory tickets of a job.
@@ -221,15 +225,32 @@ impl<const N: usize> MemTicketQueryBuilder<'_, N> {
     }
 
     /// The table this job's tickets live in, if it has been initialized.
-    fn table(&self) -> MemResult<Option<std::sync::Arc<TicketTable<N>>>> {
-        self.store.ticket_table::<N>(self.job_meta.id)
+    fn table(&self) -> MemResult<Option<std::sync::Arc<TicketTable>>> {
+        self.store.ticket_table(self.job_meta.id)
     }
 
     /// The table this job's tickets live in, erroring if it has not been initialized.
-    fn require_table(&self) -> MemResult<std::sync::Arc<TicketTable<N>>> {
+    fn require_table(&self) -> MemResult<std::sync::Arc<TicketTable>> {
         self.table()?.ok_or(MetaStorageError::Internal(
             "ticket table was not initialized",
         ))
+    }
+
+    /// Reconstructs a typed ticket from a stored key and row.
+    fn ticket_of(key: &TicketKey, row: &TicketRow) -> Ticket<N> {
+        let coordinate = std::array::from_fn(|i| key[i]);
+        Ticket::from_parts(coordinate, row.deps_done, row.deps_quota, row.status)
+    }
+
+    /// Splits a typed ticket into the key and row it is stored as.
+    fn split(ticket: &Ticket<N>) -> (TicketKey, TicketRow) {
+        let key = Box::from(&ticket.coordinate[..]);
+        let row = TicketRow {
+            deps_done: ticket.deps_done(),
+            deps_quota: ticket.deps_quota(),
+            status: ticket.status,
+        };
+        (key, row)
     }
 }
 
@@ -238,7 +259,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
 
     /// Initializes the ticket table.
     async fn init(&self) -> MemResult<()> {
-        self.store.init_ticket_table::<N>(self.job_meta.id)
+        self.store.init_ticket_table(self.job_meta.id)
     }
 
     /// Clears the ticket table.
@@ -257,16 +278,17 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let rows = table.rows.read().map_err(poisoned)?;
         Ok(rows
             .map
-            .values()
-            .filter(|ticket| ticket.status == status)
-            .copied()
+            .iter()
+            .filter(|(_, row)| row.status == status)
+            .map(|(key, row)| Self::ticket_of(key, row))
             .collect())
     }
 
     /// Puts a ticket into the table, leaving an existing one at the same coordinate untouched.
     async fn put(&self, ticket: Ticket<N>) -> MemResult<()> {
         let table = self.require_table()?;
-        table.rows.write().map_err(poisoned)?.insert_new(ticket);
+        let (key, row) = Self::split(&ticket);
+        table.rows.write().map_err(poisoned)?.insert_new(key, row);
         Ok(())
     }
 
@@ -287,25 +309,29 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .map(|(dim, coord)| self.dim_index(dim).map(|idx| (idx, coord)))
             .collect::<MemResult<Vec<Pin>>>()?;
 
+        const { assert!(N <= PinMask::BITS as usize) }
         let table = self.require_table()?;
         let mut rows = table.rows.write().map_err(poisoned)?;
 
-        let (mask, pinned) = query_of::<N>(&pins);
+        let (mask, pinned) = query_of(&pins, N);
         let stale = rows.matching_waiting(mask, &pinned);
 
         let mut promoted = Vec::new();
-        for (key, ticket) in stale {
-            let deps_done = ticket.deps_done() + 1;
-            let status = if deps_done >= ticket.deps_quota() {
+        for (key, row) in stale {
+            let deps_done = row.deps_done + 1;
+            let status = if deps_done >= row.deps_quota {
                 TicketStatus::Queued
             } else {
                 TicketStatus::Waiting
             };
-            let raised =
-                Ticket::from_parts(ticket.coordinate, deps_done, ticket.deps_quota(), status);
-            rows.replace(key, ticket.status, raised);
+            let raised = TicketRow {
+                deps_done,
+                deps_quota: row.deps_quota,
+                status,
+            };
+            rows.replace(&key, row.status, raised);
             if status == TicketStatus::Queued {
-                promoted.push(raised);
+                promoted.push(Self::ticket_of(&key, &raised));
             }
         }
 
@@ -335,26 +361,31 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .map(|(dim, coord)| self.dim_index(dim).map(|idx| (idx, coord)))
             .collect::<MemResult<Vec<Pin>>>()?;
 
+        const { assert!(N <= PinMask::BITS as usize) }
         let table = self.require_table()?;
         let mut rows = table.rows.write().map_err(poisoned)?;
 
-        let (mask, pinned) = query_of::<N>(&pins);
+        let (mask, pinned) = query_of(&pins, N);
         let stale = rows.matching_waiting(mask, &pinned);
 
         let mut promoted = Vec::new();
-        for (key, ticket) in stale {
+        for (key, row) in stale {
             // Mirrors the backing `deps_quota + $ub - 1` arithmetic, which is signed.
-            let quota = i64::try_from(ticket.deps_quota())? + i64::try_from(ub)? - 1;
-            let status = if i64::try_from(ticket.deps_done())? >= quota {
+            let quota = i64::try_from(row.deps_quota)? + i64::try_from(ub)? - 1;
+            let status = if i64::try_from(row.deps_done)? >= quota {
                 TicketStatus::Queued
             } else {
                 TicketStatus::Waiting
             };
             let quota = usize::try_from(quota)?;
-            let raised = Ticket::from_parts(ticket.coordinate, ticket.deps_done(), quota, status);
-            rows.replace(key, ticket.status, raised);
+            let raised = TicketRow {
+                deps_done: row.deps_done,
+                deps_quota: quota,
+                status,
+            };
+            rows.replace(&key, row.status, raised);
             if status == TicketStatus::Queued {
-                promoted.push(raised);
+                promoted.push(Self::ticket_of(&key, &raised));
             }
         }
 
@@ -370,6 +401,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         res: Resolution<M>,
     ) -> MemResult<Vec<Ticket<N>>> {
         const { assert!(IDX < N) }
+        const { assert!(N <= PinMask::BITS as usize) }
         if self.job_meta.dims[IDX] != res_meta.id {
             tracing::warn!("Invalid resolution received for explosion.");
             return Ok(vec![]);
@@ -386,12 +418,16 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let mut rows = table.rows.write().map_err(poisoned)?;
 
-        let (mask, pinned) = query_of::<N>(&pins);
+        let (mask, pinned) = query_of(&pins, N);
         let popped_keys = rows.matching(mask, &pinned);
 
-        let tickets = popped_keys
+        let popped = popped_keys
+            .into_iter()
+            .filter_map(|key| rows.remove(&key).map(|row| (key, row)))
+            .collect::<Vec<_>>();
+        let tickets = popped
             .iter()
-            .filter_map(|key| rows.remove(key))
+            .map(|(key, row)| Self::ticket_of(key, row))
             .collect::<Vec<_>>();
 
         if tickets
@@ -406,7 +442,9 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
 
         for ticket in &tickets {
             for coord in 0..res.ub {
-                rows.insert_new(ticket.with_coordinate::<IDX>(coord).update_status());
+                let exploded = ticket.with_coordinate::<IDX>(coord).update_status();
+                let (key, row) = Self::split(&exploded);
+                rows.insert_new(key, row);
             }
         }
 
@@ -418,17 +456,19 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let mut rows = table.rows.write().map_err(poisoned)?;
 
-        let key = job.coordinate.map(Some);
-        let Some(ticket) = rows.map.get(&key).copied() else {
+        let key: TicketKey = job
+            .coordinate
+            .iter()
+            .map(|&c| OptionCoordinate::some(c))
+            .collect();
+        let Some(row) = rows.map.get(&key).copied() else {
             return Ok(());
         };
-        let done = Ticket::from_parts(
-            ticket.coordinate,
-            ticket.deps_done(),
-            ticket.deps_quota(),
-            TicketStatus::Done,
-        );
-        rows.replace(key, ticket.status, done);
+        let done = TicketRow {
+            status: TicketStatus::Done,
+            ..row
+        };
+        rows.replace(&key, row.status, done);
 
         Ok(())
     }
@@ -873,7 +913,7 @@ mod tests {
         let tickets = store.ticket(job_beta());
         tickets.init().await.unwrap();
 
-        let table = store.ticket_table::<1>("beta").unwrap().expect("table");
+        let table = store.ticket_table("beta").unwrap().expect("table");
         let panicked = std::thread::spawn(move || {
             let _guard = table.rows.write().expect("uncontended");
             panic!("a store operation unwinds while holding the lock");
