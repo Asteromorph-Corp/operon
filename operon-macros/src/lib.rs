@@ -30,7 +30,8 @@ pub fn define_operon(input: TokenStream) -> TokenStream {
 ///
 /// # Attributes
 ///
-/// - `#[operon(error = "MyError")]`: the service's error type `Self::Error` (default `::operon::error::UserError`)
+/// - `#[operon(error = "MyError")]`: the service's error type `Self::Error` (default
+///   `::operon::error::UserError`)
 /// - `#[operon(defined_at = "path")]`: path to where `define_operon!` was invoked (default `self`)
 /// - `#[operon(crate = "path")]`: path to the `operon` crate (default `::operon`)
 #[proc_macro_derive(OperonService, attributes(operon))]

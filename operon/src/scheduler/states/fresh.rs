@@ -46,7 +46,7 @@ where
         }
     }
 
-    fn into_running(self) -> TransitionState<SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+    fn into_running(self) -> TransitionState<SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 }
@@ -58,7 +58,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    type Error = SchedulerError<MSto::Error, Sto::Error, Svc::Error>;
+    type Error = SchedulerError<Svc::Error, Sto::Error, MSto::Error>;
 
     async fn handle_progress(self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         Ok(NextState::Next(self))

@@ -62,7 +62,7 @@ where
         storage: &Sto,
         client: MSto::Client<'_>,
         mode: CheckMode,
-    ) -> Result<bool, SchedulerError<MSto::Error, Sto::Error, Svc::Error>>;
+    ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Prepare the job rebuilder for the given storage and metadata client by fetching the
     /// necessary data.
@@ -73,7 +73,7 @@ where
         client: MSto::Client<'_>,
     ) -> Result<
         Box<dyn JobRebuilder<Svc, Sto, MSto>>,
-        SchedulerError<MSto::Error, Sto::Error, Svc::Error>,
+        SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
     >;
 
     /// Call the user function and stores the result in the storage.
@@ -85,31 +85,31 @@ where
         storage: &Sto,
         meta: MSto,
         job: Self::Job,
-    ) -> Result<Self::Resolution, SchedulerError<MSto::Error, Sto::Error, Svc::Error>>;
+    ) -> Result<Self::Resolution, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     async fn send_on_finish(
         &self,
         peer_txs: &Self::PeerEventSenders,
         job: Self::Job,
         resolution: Self::Resolution,
-    ) -> Result<(), SchedulerError<MSto::Error, Sto::Error, Svc::Error>>;
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     async fn on_receive_job(
         &self,
         client: MSto::Client<'_>,
         job: Svc::JobEnum,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError<MSto::Error, Sto::Error, Svc::Error>>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     async fn on_receive_resolution(
         &self,
         client: MSto::Client<'_>,
         peer_txs: &Self::PeerEventSenders,
         resolution: Svc::ResolutionEnum,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError<MSto::Error, Sto::Error, Svc::Error>>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     async fn on_receive_explosion(
         &self,
         client: MSto::Client<'_>,
         explosion: TicketExplosion<Svc::TicketEnum>,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError<MSto::Error, Sto::Error, Svc::Error>>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 }

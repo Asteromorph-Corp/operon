@@ -27,11 +27,11 @@ use crate::storage::OperonStorage;
 /// * Updating waiting tickets from `Event` messages.
 ///
 /// The result a spawned worker task reports back to its individual scheduler.
-type WorkerResult<J, R, MErr, SErr, UErr> =
-    Result<InternalEvent<J, R, MErr, SErr, UErr>, SchedulerError<MErr, SErr, UErr>>;
+type WorkerResult<J, R, UErr, SErr, MErr> =
+    Result<InternalEvent<J, R, UErr, SErr, MErr>, SchedulerError<UErr, SErr, MErr>>;
 
 /// The set of worker tasks an individual scheduler is currently awaiting.
-type WorkerHandles<J, R, MErr, SErr, UErr> = JoinSet<WorkerResult<J, R, MErr, SErr, UErr>>;
+type WorkerHandles<J, R, UErr, SErr, MErr> = JoinSet<WorkerResult<J, R, UErr, SErr, MErr>>;
 
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
 pub struct IndividualScheduler<Svc, Sto, JS, MSto, const N: usize>
@@ -49,7 +49,7 @@ where
     pub pool: Arc<Semaphore>,
     pub progress: SharedProgress,
     pub state: TaskState,
-    pub handles: WorkerHandles<Job<N>, JS::Resolution, MSto::Error, Sto::Error, Svc::Error>,
+    pub handles: WorkerHandles<Job<N>, JS::Resolution, Svc::Error, Sto::Error, MSto::Error>,
 }
 
 impl<Svc, Sto, JS, MSto, const N: usize> IndividualScheduler<Svc, Sto, JS, MSto, N>
@@ -87,7 +87,7 @@ where
 
     async fn update_progress(
         &mut self,
-    ) -> Result<(), SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let conn = self.meta_storage.scheduler_conn().await?;
         self.update_progress_with_client(conn.as_client()).await?;
         Ok(())
@@ -97,7 +97,7 @@ where
     async fn update_progress_with_client(
         &mut self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let (done, queued, waiting) = client.ticket(self.meta).get_status().await?;
         let finished = (*self.progress.write().await).update(done, queued, waiting);
         if finished && self.state != TaskState::Finished {
@@ -122,7 +122,7 @@ where
         &mut self,
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
         peer_txs: &JS::PeerEventSenders,
-    ) -> Result<Vec<Job<N>>, SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+    ) -> Result<Vec<Job<N>>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let mut conn = self.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
         let ready_tickets = match event {
@@ -242,7 +242,7 @@ where
         peer_txs: &JS::PeerEventSenders,
         mut peer_rx: ServicePeerEventReceiver<Svc>,
         mut ctrl_rx: IndividualControlEventReceiver,
-    ) -> Result<(), SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let pool = self.pool.clone();
 
         let initial_jobs = initial_tickets

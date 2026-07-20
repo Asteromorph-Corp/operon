@@ -66,7 +66,7 @@ where
     /// context. Running this will take over the terminal, so it is strongly discouraged to make
     /// any other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
-    pub async fn run(self) -> Result<(), OperonError<MSto::Error, Sto::Error, Svc::Error>> {
+    pub async fn run(self) -> Result<(), OperonError<Svc::Error, Sto::Error, MSto::Error>> {
         let Operon {
             service,
             storage,
@@ -112,7 +112,7 @@ where
         try_join(
             async {
                 ui_loop.run().await?;
-                Ok::<_, OperonError<MSto::Error, Sto::Error, Svc::Error>>(())
+                Ok::<_, OperonError<Svc::Error, Sto::Error, MSto::Error>>(())
             },
             async {
                 // A panic (`JoinError`) is fatal (kills the UI);

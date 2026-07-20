@@ -60,13 +60,13 @@ impl<E: Error + Send + Sync + 'static> TransitionState<E> {
 }
 
 #[async_trait]
-impl<MErr, SErr, UErr> SchedulerState for TransitionState<SchedulerError<MErr, SErr, UErr>>
+impl<UErr, SErr, MErr> SchedulerState for TransitionState<SchedulerError<UErr, SErr, MErr>>
 where
-    MErr: Error + Send + Sync + 'static,
-    SErr: Error + Send + Sync + 'static,
     UErr: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
+    SErr: Error + Send + Sync + 'static,
+    MErr: Error + Send + Sync + 'static,
 {
-    type Error = SchedulerError<MErr, SErr, UErr>;
+    type Error = SchedulerError<UErr, SErr, MErr>;
 
     async fn handle_progress(mut self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         if self.handle.is_finished() {
@@ -97,15 +97,15 @@ where
     }
 }
 
-impl<MErr, SErr, UErr> NextState<SchedulerError<MErr, SErr, UErr>>
+impl<UErr, SErr, MErr> NextState<SchedulerError<UErr, SErr, MErr>>
 where
-    MErr: Error + Send + Sync + 'static,
-    SErr: Error + Send + Sync + 'static,
     UErr: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
+    SErr: Error + Send + Sync + 'static,
+    MErr: Error + Send + Sync + 'static,
 {
     /// Boxes a concrete state into the next state.
     pub(super) fn next(
-        state: impl SchedulerState<Error = SchedulerError<MErr, SErr, UErr>> + 'static,
+        state: impl SchedulerState<Error = SchedulerError<UErr, SErr, MErr>> + 'static,
     ) -> Self {
         NextState::Next(Box::new(state))
     }

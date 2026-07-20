@@ -16,5 +16,5 @@ pub trait JobRebuilder<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend
     async fn rebuild(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error, Sto::Error, Svc::Error>>;
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 }

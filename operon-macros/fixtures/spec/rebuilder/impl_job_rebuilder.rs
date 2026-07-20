@@ -4,7 +4,7 @@ impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__pri
     async fn rebuild(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+    ) -> Result<(), operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         use operon::__private::futures::{StreamExt, TryStreamExt};
 
         let ready_tickets = client
@@ -60,7 +60,7 @@ impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__pri
                 let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
                 (*self.progress.write().await).update(done, queued, waiting);
 
-                Ok::<_, operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>>(())
+                Ok::<_, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>(())
             },
         ))
         .buffer_unordered(operon::__private::REBUILD_CONCURRENCY)

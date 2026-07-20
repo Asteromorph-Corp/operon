@@ -4,7 +4,7 @@ async fn on_receive_resolution(
     client: MSto::Client<'_>,
     peer_txs: &Self::PeerEventSenders,
     resolution: schema::ResolutionEnum,
-) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
     match resolution {
         schema::ResolutionEnum::I(res) => {
             let affected = client

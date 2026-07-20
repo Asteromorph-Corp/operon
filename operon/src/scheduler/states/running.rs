@@ -82,7 +82,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    type Error = SchedulerError<MSto::Error, Sto::Error, Svc::Error>;
+    type Error = SchedulerError<Svc::Error, Sto::Error, MSto::Error>;
 
     async fn handle_progress(mut self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         if self.handles.try_join_next().is_none() || !self.handles.is_empty() {

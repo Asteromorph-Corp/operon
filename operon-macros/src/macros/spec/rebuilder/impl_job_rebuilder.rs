@@ -18,7 +18,7 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///     async fn rebuild(
 ///         &self,
 ///         client: MSto::Client<'_>,
-///     ) -> Result<(), operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+///     ) -> Result<(), operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///         use operon::__private::futures::{StreamExt, TryStreamExt};
 ///         let ready_tickets = client
 ///             .ticket(self.job_meta)
@@ -200,7 +200,7 @@ pub fn impl_job_rebuilder(
             async fn rebuild(
                 &self,
                 client: MSto::Client<'_>,
-            ) -> Result<(), #operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
+            ) -> Result<(), #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
                 use #operon::__private::futures::{StreamExt, TryStreamExt};
 
                 let ready_tickets = client
@@ -237,7 +237,7 @@ pub fn impl_job_rebuilder(
                         let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
                         (*self.progress.write().await).update(done, queued, waiting);
 
-                        Ok::<_, #operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>>(())
+                        Ok::<_, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>(())
                     }
                 ))
                 .buffer_unordered(#operon::__private::REBUILD_CONCURRENCY)
