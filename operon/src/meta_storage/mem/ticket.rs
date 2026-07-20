@@ -52,9 +52,9 @@ impl TicketRows {
 
     /// Adds a key to every index built so far.
     fn index(&mut self, key: &TicketKey) {
-        for (&mask, index) in &mut self.indexes {
+        for (mask, index) in &mut self.indexes {
             index
-                .entry(project(mask, key))
+                .entry(mask.apply(key))
                 .or_default()
                 .insert(key.clone());
         }
@@ -62,8 +62,8 @@ impl TicketRows {
 
     /// Drops a key from every index built so far.
     fn unindex(&mut self, key: &TicketKey) {
-        for (&mask, index) in &mut self.indexes {
-            let Entry::Occupied(mut bucket) = index.entry(project(mask, key)) else {
+        for (mask, index) in &mut self.indexes {
+            let Entry::Occupied(mut bucket) = index.entry(mask.apply(key)) else {
                 continue;
             };
             bucket.get_mut().remove(key);
@@ -78,23 +78,23 @@ impl TicketRows {
     ///
     /// A pin set covering every dimension names one coordinate outright, so it is served straight
     /// from the rows.
-    fn matching(&mut self, mask: PinMask, pinned: &TicketKey) -> Vec<TicketKey> {
-        if mask == full_pins(pinned.len()) {
+    fn matching(&mut self, mask: &PinMask, pinned: &TicketKey) -> Vec<TicketKey> {
+        if mask.is_full() {
             return Vec::from_iter(self.map.contains_key(pinned).then(|| pinned.clone()));
         }
 
-        if !self.indexes.contains_key(&mask) {
+        if !self.indexes.contains_key(mask) {
             let mut index = PinIndex::default();
             for key in self.map.keys() {
                 index
-                    .entry(project(mask, key))
+                    .entry(mask.apply(key))
                     .or_default()
                     .insert(key.clone());
             }
-            self.indexes.insert(mask, index);
+            self.indexes.insert(mask.clone(), index);
         }
 
-        self.indexes[&mask]
+        self.indexes[mask]
             .get(pinned)
             .map(|bucket| bucket.iter().cloned().collect())
             .unwrap_or_default()
@@ -103,7 +103,7 @@ impl TicketRows {
     /// The waiting tickets whose coordinate matches every pin, alongside their keys.
     fn matching_waiting(
         &mut self,
-        mask: PinMask,
+        mask: &PinMask,
         pinned: &TicketKey,
     ) -> Vec<(TicketKey, TicketRow)> {
         self.matching(mask, pinned)
@@ -147,51 +147,72 @@ impl TicketRows {
     }
 }
 
-/// A dimension pinned to a concrete value: the index into a job's `dims`, and the value the
-/// ticket's coordinate must hold there.
-type Pin = (usize, usize);
+/// One of a job's dimensions, as a query sees it: pinned to a concrete value, or free to vary.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+enum PinSlot {
+    Free,
+    Pinned,
+}
 
-/// The set of dimensions a query pins, as a bitmask over a job's `dims`.
+/// The set of a job's dimensions that a query pins, one slot per dimension.
 ///
-/// Every op pins a subset that is fixed by the DAG, so a job sees only a handful of masks.
-type PinMask = u32;
+/// Every op pins a subset that the DAG fixes in advance, so a job sees only a handful of masks.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct PinMask(Box<[PinSlot]>);
 
-/// The pin set covering all `arity` of a job's dimensions.
-fn full_pins(arity: usize) -> PinMask {
-    if arity >= PinMask::BITS as usize {
-        PinMask::MAX
-    } else {
-        (1 << arity) - 1
+impl PinMask {
+    /// Builds the pin set a query fixes and the coordinate it pins to, from the upstream dimensions
+    /// and the values they carry.
+    ///
+    /// A dimension is pinned when it belongs to this job, is not aggregated, and carries a resolved
+    /// value; every other dimension stays free.
+    fn project<const N: usize>(
+        job_meta: JobMetadata<N>,
+        pins: impl IntoIterator<Item = (&'static str, OptionCoordinate)>,
+        aggregate_dims: &[&'static str],
+    ) -> (Self, TicketKey) {
+        let mut slots = vec![PinSlot::Free; N];
+        let mut pinned = vec![OptionCoordinate::none(); N];
+        for (dim, coord) in pins {
+            if aggregate_dims.contains(&dim) {
+                continue;
+            }
+            let Some(value) = coord.0 else {
+                continue;
+            };
+            let Some(idx) = job_meta.dims.iter().position(|d| *d == dim) else {
+                continue;
+            };
+            slots[idx] = PinSlot::Pinned;
+            pinned[idx] = OptionCoordinate::some(value);
+        }
+        (Self(slots.into()), pinned.into())
+    }
+
+    /// Projects a coordinate onto this pin set, nulling every dimension the set leaves free.
+    ///
+    /// Two coordinates share a projection exactly when they agree on every pinned dimension, so a
+    /// projection is the bucket key both a stored ticket and a query resolve to.
+    fn apply(&self, key: &[OptionCoordinate]) -> TicketKey {
+        self.0
+            .iter()
+            .zip(key)
+            .map(|(slot, &coord)| match slot {
+                PinSlot::Pinned => coord,
+                PinSlot::Free => OptionCoordinate::none(),
+            })
+            .collect()
+    }
+
+    /// Whether the set pins every dimension, which names one coordinate outright.
+    fn is_full(&self) -> bool {
+        self.0.iter().all(|slot| *slot == PinSlot::Pinned)
     }
 }
 
 /// A secondary index over one pin set, mapping a projected coordinate to the keys holding it.
 type PinIndex = HashMap<TicketKey, HashSet<TicketKey>>;
-
-/// Projects a coordinate onto a pin set, nulling every dimension the set leaves free.
-///
-/// Two coordinates share a projection exactly when they agree on every pinned dimension, so a
-/// projection is the bucket key both a stored ticket and a query resolve to.
-fn project(mask: PinMask, key: &[OptionCoordinate]) -> TicketKey {
-    let mut pinned = vec![OptionCoordinate::none(); key.len()];
-    for (idx, slot) in pinned.iter_mut().enumerate() {
-        if mask & (1 << idx) != 0 {
-            *slot = key[idx];
-        }
-    }
-    pinned.into()
-}
-
-/// Builds the mask and projected coordinate that look a pin set up in its index.
-fn query_of(pins: &[Pin], arity: usize) -> (PinMask, TicketKey) {
-    let mut mask = 0;
-    let mut pinned = vec![OptionCoordinate::none(); arity];
-    for &(idx, value) in pins {
-        mask |= 1 << idx;
-        pinned[idx] = OptionCoordinate::some(value);
-    }
-    (mask, pinned.into())
-}
 
 /// Helper struct for querying the in-memory tickets of a job.
 pub struct MemTicketQueryBuilder<'a, const N: usize> {
@@ -213,17 +234,6 @@ impl MemStore {
 }
 
 impl<const N: usize> MemTicketQueryBuilder<'_, N> {
-    /// Resolves the index of `dim` within this job's dimensions.
-    fn dim_index(&self, dim: &str) -> MemResult<usize> {
-        self.job_meta
-            .dims
-            .iter()
-            .position(|d| *d == dim)
-            .ok_or(MetaStorageError::Internal(
-                "upstream dimension is not a dimension of this job",
-            ))
-    }
-
     /// The table this job's tickets live in, if it has been initialized.
     fn table(&self) -> MemResult<Option<std::sync::Arc<TicketTable>>> {
         self.store.ticket_table(self.job_meta.id)
@@ -305,16 +315,13 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .dims
             .iter()
             .zip(upstream_job.coordinate)
-            .filter(|(dim, _)| self.job_meta.dims.contains(dim) && !aggregate_dims.contains(dim))
-            .map(|(dim, coord)| self.dim_index(dim).map(|idx| (idx, coord)))
-            .collect::<MemResult<Vec<Pin>>>()?;
+            .map(|(dim, coord)| (*dim, OptionCoordinate::some(coord)));
 
-        const { assert!(N <= PinMask::BITS as usize) }
         let table = self.require_table()?;
         let mut rows = table.rows.write()?;
 
-        let (mask, pinned) = query_of(&pins, N);
-        let stale = rows.matching_waiting(mask, &pinned);
+        let (mask, pinned) = PinMask::project(self.job_meta, pins, aggregate_dims);
+        let stale = rows.matching_waiting(&mask, &pinned);
 
         let mut promoted = Vec::new();
         for (key, row) in stale {
@@ -351,22 +358,14 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let pins = upstream_meta
             .dims
             .iter()
-            .zip(upstream_ticket.coordinate)
-            .filter_map(|(&dim, coord)| {
-                if aggregate_dims.contains(&dim) {
-                    return None;
-                }
-                Some((dim, coord.0?))
-            })
-            .map(|(dim, coord)| self.dim_index(dim).map(|idx| (idx, coord)))
-            .collect::<MemResult<Vec<Pin>>>()?;
+            .copied()
+            .zip(upstream_ticket.coordinate);
 
-        const { assert!(N <= PinMask::BITS as usize) }
         let table = self.require_table()?;
         let mut rows = table.rows.write()?;
 
-        let (mask, pinned) = query_of(&pins, N);
-        let stale = rows.matching_waiting(mask, &pinned);
+        let (mask, pinned) = PinMask::project(self.job_meta, pins, aggregate_dims);
+        let stale = rows.matching_waiting(&mask, &pinned);
 
         let mut promoted = Vec::new();
         for (key, row) in stale {
@@ -401,7 +400,6 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         res: Resolution<M>,
     ) -> MemResult<Vec<Ticket<N>>> {
         const { assert!(IDX < N) }
-        const { assert!(N <= PinMask::BITS as usize) }
         if self.job_meta.dims[IDX] != res_meta.id {
             tracing::warn!("Invalid resolution received for explosion.");
             return Ok(vec![]);
@@ -411,15 +409,13 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .deps
             .iter()
             .zip(res.coordinate)
-            .filter(|(dim, _)| self.job_meta.dims.contains(dim))
-            .map(|(dim, coord)| self.dim_index(dim).map(|idx| (idx, coord)))
-            .collect::<MemResult<Vec<Pin>>>()?;
+            .map(|(dim, coord)| (*dim, OptionCoordinate::some(coord)));
 
         let table = self.require_table()?;
         let mut rows = table.rows.write()?;
 
-        let (mask, pinned) = query_of(&pins, N);
-        let popped_keys = rows.matching(mask, &pinned);
+        let (mask, pinned) = PinMask::project(self.job_meta, pins, &[]);
+        let popped_keys = rows.matching(&mask, &pinned);
 
         let popped = popped_keys
             .into_iter()
