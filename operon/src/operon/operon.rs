@@ -92,8 +92,7 @@ where
 
         let progresses = SharedProgressMap::from_jobs(&handler.job_ids());
 
-        // Create the scheduler, resolving the backend from the options. A construction failure is
-        // the one backend error `run` surfaces (the rest are handled in-band); see #79.
+        // TODO (#79): push this into the scheduler thread and let the UI consume this error.
         let scheduler = Scheduler::<Svc, Sto, MSto>::new(
             service,
             storage,

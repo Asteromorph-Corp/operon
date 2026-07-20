@@ -5,7 +5,7 @@ use crate::schema::{JobEnum, ResolutionEnum, TicketEnum};
 pub trait OperonService: Send + Sync + 'static {
     /// The error a service method may return.
     /// Carried by [`SchedulerError::UserError`](crate::error::SchedulerError::UserError), which the
-    /// scheduler handles in-band rather than returning to the caller.
+    /// UI consumes rather than returning to the caller.
     /// Defaults to [`UserError`](crate::operon::UserError) (alias of `Box<dyn std::error::Error +
     /// Send + Sync>`).
     ///
