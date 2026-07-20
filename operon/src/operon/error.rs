@@ -6,16 +6,17 @@ use crate::storage::StorageError;
 use crate::ui::UiError;
 
 /// Error type returned by Operon, generic over the metadata backend's error type `MErr`
-/// ([`MetaBackend::Error`](crate::meta_storage::MetaBackend::Error)) and the entity storage's error
-/// type `SErr` ([`OperonStorage::Error`](crate::storage::OperonStorage::Error)).
+/// ([`MetaBackend::Error`](crate::meta_storage::MetaBackend::Error)), the entity storage's error
+/// type `SErr` ([`OperonStorage::Error`](crate::storage::OperonStorage::Error)), and the service's
+/// error type `UErr` ([`OperonService::Error`](crate::service::OperonService::Error)).
 #[derive(Debug, Error)]
-pub enum OperonError<MErr, SErr> {
+pub enum OperonError<MErr, SErr, UErr> {
     /// Error in the scheduler
     #[error("Scheduler error: {0}")]
-    Scheduler(SchedulerError<MErr, SErr>),
+    Scheduler(SchedulerError<MErr, SErr, UErr>),
     /// Error in a user function
     #[error("User function error: {0}")]
-    User(UserError),
+    User(UErr),
     /// Error in a storage operation
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError<SErr>),
@@ -30,10 +31,11 @@ pub enum OperonError<MErr, SErr> {
     SchedulerJoinError(#[from] tokio::task::JoinError),
 }
 
+/// The default error type for user functions.
 pub type UserError = Box<dyn std::error::Error + Send + Sync>;
 
-impl<MErr, SErr> From<SchedulerError<MErr, SErr>> for OperonError<MErr, SErr> {
-    fn from(e: SchedulerError<MErr, SErr>) -> Self {
+impl<MErr, SErr, UErr> From<SchedulerError<MErr, SErr, UErr>> for OperonError<MErr, SErr, UErr> {
+    fn from(e: SchedulerError<MErr, SErr, UErr>) -> Self {
         match e {
             SchedulerError::Storage(e) => OperonError::Storage(e),
             SchedulerError::MetaStorage(e) => OperonError::MetaStorage(e),

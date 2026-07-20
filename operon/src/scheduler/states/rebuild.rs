@@ -49,11 +49,11 @@ where
         channel_size: usize,
         run_id: Uuid,
         skip: HashSet<String>,
-    ) -> TransitionState<SchedulerError<MSto::Error, Sto::Error>> {
+    ) -> TransitionState<SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
         TransitionState::new(Self::new(ctx, channel_size, run_id, skip))
     }
 
-    fn into_start(self) -> TransitionState<SchedulerError<MSto::Error, Sto::Error>> {
+    fn into_start(self) -> TransitionState<SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 }
@@ -65,7 +65,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    type Error = SchedulerError<MSto::Error, Sto::Error>;
+    type Error = SchedulerError<MSto::Error, Sto::Error, Svc::Error>;
 
     fn warn_msg(&self) -> Option<&'static str> {
         Some("Rebuild in progress, commands will be handled after rebuild completes.")

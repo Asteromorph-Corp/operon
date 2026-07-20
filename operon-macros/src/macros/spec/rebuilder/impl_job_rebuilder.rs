@@ -12,13 +12,13 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 /// ```rust,ignore
 /// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
-/// impl<Sto: operon::OperonStorage, MSto: operon::__private::MetaBackend>
-///     operon::__private::JobRebuilder<Sto, MSto> for BetaRebuilder
+/// impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__private::MetaBackend>
+///     operon::__private::JobRebuilder<Svc, Sto, MSto> for BetaRebuilder
 /// {
 ///     async fn rebuild(
 ///         &self,
 ///         client: MSto::Client<'_>,
-///     ) -> Result<(), operon::error::SchedulerError<MSto::Error, Sto::Error>> {
+///     ) -> Result<(), operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
 ///         use operon::__private::futures::{StreamExt, TryStreamExt};
 ///         let ready_tickets = client
 ///             .ticket(self.job_meta)
@@ -191,13 +191,16 @@ pub fn impl_job_rebuilder(
     parse_quote! {
         #[#operon::__private::async_trait::async_trait]
         #[automatically_derived]
-        impl<Sto: #operon::OperonStorage, MSto: #operon::__private::MetaBackend>
-            #operon::__private::JobRebuilder<Sto, MSto> for #rebuilder_ident
+        impl<
+            Svc: #operon::OperonService,
+            Sto: #operon::OperonStorage,
+            MSto: #operon::__private::MetaBackend,
+        > #operon::__private::JobRebuilder<Svc, Sto, MSto> for #rebuilder_ident
         {
             async fn rebuild(
                 &self,
                 client: MSto::Client<'_>,
-            ) -> Result<(), #operon::error::SchedulerError<MSto::Error, Sto::Error>> {
+            ) -> Result<(), #operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
                 use #operon::__private::futures::{StreamExt, TryStreamExt};
 
                 let ready_tickets = client
@@ -234,7 +237,7 @@ pub fn impl_job_rebuilder(
                         let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
                         (*self.progress.write().await).update(done, queued, waiting);
 
-                        Ok::<_, #operon::error::SchedulerError<MSto::Error, Sto::Error>>(())
+                        Ok::<_, #operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>>(())
                     }
                 ))
                 .buffer_unordered(#operon::__private::REBUILD_CONCURRENCY)

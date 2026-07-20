@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use operon::error::{StorageResult, UserError};
+use operon::error::StorageResult;
 use operon::options::{MetaBackendOptions, OperonOptions, UiMode};
 use operon::{Entity, Operon, OperonService, OperonStorage, define_operon};
 
@@ -32,18 +32,18 @@ struct WordCounter;
 
 #[async_trait]
 impl FanoutService for WordCounter {
-    async fn alpha(&self) -> Result<Vec<A>, UserError> {
+    async fn alpha(&self) -> Result<Vec<A>, Self::Error> {
         Ok(vec![
             "the quick brown fox".to_owned(),
             "jumps over the lazy dog".to_owned(),
         ])
     }
 
-    async fn beta(&self, document: A) -> Result<Vec<B>, UserError> {
+    async fn beta(&self, document: A) -> Result<Vec<B>, Self::Error> {
         Ok(document.split_whitespace().map(str::to_owned).collect())
     }
 
-    async fn gamma(&self, document: A) -> Result<Vec<C>, UserError> {
+    async fn gamma(&self, document: A) -> Result<Vec<C>, Self::Error> {
         let mut characters = document
             .chars()
             .filter(|character| !character.is_whitespace())
@@ -54,7 +54,7 @@ impl FanoutService for WordCounter {
         Ok(characters)
     }
 
-    async fn delta(&self, word: B, character: C) -> Result<D, UserError> {
+    async fn delta(&self, word: B, character: C) -> Result<D, Self::Error> {
         Ok(word.matches(&character).count())
     }
 }

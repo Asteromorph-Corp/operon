@@ -5,9 +5,9 @@ use crate::scheduler::SchedulerError;
 /// These are used for communication between individual schedulers and their
 /// child worker coroutines.
 #[derive(Debug)]
-pub enum InternalEvent<J, R, MErr, SErr> {
+pub enum InternalEvent<J, R, MErr, SErr, UErr> {
     /// A job successfully finished.
     JobSuccess(J, R),
     /// A job failed.
-    JobFailure(J, SchedulerError<MErr, SErr>),
+    JobFailure(J, SchedulerError<MErr, SErr, UErr>),
 }

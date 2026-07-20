@@ -3,7 +3,7 @@ async fn on_receive_explosion(
     &self,
     client: MSto::Client<'_>,
     explosion: operon::__private::TicketExplosion<schema::TicketEnum>,
-) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<MSto::Error, Sto::Error>> {
+) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
     match explosion.ticket {
         schema::TicketEnum::Beta(ticket) => {
             let mut out = Vec::new();

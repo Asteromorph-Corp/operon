@@ -1,4 +1,3 @@
-use operon::error::UserError;
 use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
 use operon::{Operon, OperonService, define_operon};
 use rand::Rng;
@@ -30,17 +29,17 @@ struct MyService;
 
 #[async_trait::async_trait]
 impl StressTestService for MyService {
-    async fn alpha(&self) -> Result<Vec<A>, UserError> {
+    async fn alpha(&self) -> Result<Vec<A>, Self::Error> {
         let mut rng = rand::rng();
         let size = rng.random_range(1..5);
         Ok((0..size).map(|_| ()).collect())
     }
-    async fn beta(&self, _a_i: Vec<A>, _a: A) -> Result<Vec<B>, UserError> {
+    async fn beta(&self, _a_i: Vec<A>, _a: A) -> Result<Vec<B>, Self::Error> {
         let mut rng = rand::rng();
         let size = rng.random_range(1..5);
         Ok((0..size).map(|_| ()).collect())
     }
-    async fn gamma(&self, _a: A) -> Result<Vec<C>, UserError> {
+    async fn gamma(&self, _a: A) -> Result<Vec<C>, Self::Error> {
         let mut rng = rand::rng();
         let size = rng.random_range(1..5);
         Ok((0..size).map(|_| ()).collect())
@@ -52,17 +51,17 @@ impl StressTestService for MyService {
         _b_j: Vec<B>,
         _b: B,
         _c: C,
-    ) -> Result<Vec<D>, UserError> {
+    ) -> Result<Vec<D>, Self::Error> {
         let mut rng = rand::rng();
         let size = rng.random_range(1..5);
         Ok((0..size).map(|_| ()).collect())
     }
-    async fn epsilon(&self, _d_ijkl: Vec<Vec<Vec<Vec<D>>>>) -> Result<Vec<E>, UserError> {
+    async fn epsilon(&self, _d_ijkl: Vec<Vec<Vec<Vec<D>>>>) -> Result<Vec<E>, Self::Error> {
         let mut rng = rand::rng();
         let size = rng.random_range(1..5);
         Ok((0..size).map(|_| ()).collect())
     }
-    async fn zeta(&self, _e: E, _d_jl: Vec<Vec<D>>, _d: D) -> Result<Vec<F>, UserError> {
+    async fn zeta(&self, _e: E, _d_jl: Vec<Vec<D>>, _d: D) -> Result<Vec<F>, Self::Error> {
         let mut rng = rand::rng();
         let size = rng.random_range(1..5);
         Ok((0..size).map(|_| ()).collect())
@@ -75,10 +74,19 @@ impl StressTestService for MyService {
         _e: E,
         _d_l: Vec<D>,
         _d: D,
-    ) -> Result<G, UserError> {
+    ) -> Result<G, Self::Error> {
         Ok(())
     }
-    async fn theta(&self, _g: G, _f: F, _e: E, _d: D, _c: C, _b: B, _a: A) -> Result<H, UserError> {
+    async fn theta(
+        &self,
+        _g: G,
+        _f: F,
+        _e: E,
+        _d: D,
+        _c: C,
+        _b: B,
+        _a: A,
+    ) -> Result<H, Self::Error> {
         Ok(())
     }
 }

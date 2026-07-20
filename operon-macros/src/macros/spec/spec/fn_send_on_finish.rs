@@ -14,7 +14,7 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///     peer_txs: &Self::PeerEventSenders,
 ///     job: Self::Job,
 ///     resolution: Self::Resolution,
-/// ) -> Result<(), operon::error::SchedulerError<MSto::Error, Sto::Error>> {
+/// ) -> Result<(), operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
 ///     match peer_txs
 ///         .to_delta
 ///         .send(operon::__private::PeerEvent::Resolution(
@@ -123,7 +123,7 @@ pub(super) fn fn_send_on_finish(
             peer_txs: &Self::PeerEventSenders,
             job: Self::Job,
             resolution: Self::Resolution,
-        ) -> Result<(), #operon::error::SchedulerError<MSto::Error, Sto::Error>> {
+        ) -> Result<(), #operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
             #(#send_resolutions)*
             #(#send_jobs)*
             Ok(())

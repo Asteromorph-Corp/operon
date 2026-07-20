@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use dashmap::DashMap;
-use operon::error::{StorageResult, UserError};
+use operon::error::StorageResult;
 use operon::options::{
     MemMetaStorageOptions, OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions, UiMode,
 };
@@ -56,11 +56,11 @@ struct ExampleService;
 
 #[async_trait]
 impl CookingService for ExampleService {
-    async fn alpha(&self) -> Result<Vec<A>, UserError> {
+    async fn alpha(&self) -> Result<Vec<A>, Self::Error> {
         Ok((0..100).map(|i| A(format!("A ({i})"))).collect())
     }
 
-    async fn beta(&self, a: A) -> Result<Vec<B>, UserError> {
+    async fn beta(&self, a: A) -> Result<Vec<B>, Self::Error> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -75,7 +75,7 @@ impl CookingService for ExampleService {
         Ok(result)
     }
 
-    async fn gamma(&self, a: A) -> Result<Vec<C>, UserError> {
+    async fn gamma(&self, a: A) -> Result<Vec<C>, Self::Error> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -91,7 +91,7 @@ impl CookingService for ExampleService {
         Ok(result)
     }
 
-    async fn delta(&self, a: A, b: B, c: C) -> Result<D, UserError> {
+    async fn delta(&self, a: A, b: B, c: C) -> Result<D, Self::Error> {
         // // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -108,7 +108,7 @@ impl CookingService for ExampleService {
         Ok(d)
     }
 
-    async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, UserError> {
+    async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, Self::Error> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -121,7 +121,7 @@ impl CookingService for ExampleService {
         Ok(e)
     }
 
-    async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, UserError> {
+    async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, Self::Error> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {

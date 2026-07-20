@@ -6,62 +6,62 @@ pub trait CookingService:
     >
 {
     /// ```rust,ignore
-    /// async fn alpha() -> Result<Vec<A>, operon::error::UserError>
+    /// async fn alpha() -> Result<Vec<A>, Self::Error>
     /// ```
     /// Corresponds to the task:
     /// ```rust,ignore
     /// A<i> = alpha()
     /// ```
     #[allow(clippy::too_many_arguments)]
-    async fn alpha(&self) -> Result<Vec<A>, operon::error::UserError>;
+    async fn alpha(&self) -> Result<Vec<A>, Self::Error>;
 
     /// ```rust,ignore
-    /// async fn beta(a: A) -> Result<Vec<B>, operon::error::UserError>
+    /// async fn beta(a: A) -> Result<Vec<B>, Self::Error>
     /// ```
     /// Corresponds to the task:
     ///```rust,ignore
     /// B<j> = beta(A) for i
     /// ```
     #[allow(clippy::too_many_arguments)]
-    async fn beta(&self, a: A) -> Result<Vec<B>, operon::error::UserError>;
+    async fn beta(&self, a: A) -> Result<Vec<B>, Self::Error>;
 
     /// ```rust,ignore
-    /// async fn gamma(a: A) -> Result<Vec<C>, operon::error::UserError>
+    /// async fn gamma(a: A) -> Result<Vec<C>, Self::Error>
     /// ```
     /// Corresponds to the task:
     /// ```rust,ignore
     /// C<k> = gamma(A) for i
     /// ```
     #[allow(clippy::too_many_arguments)]
-    async fn gamma(&self, a: A) -> Result<Vec<C>, operon::error::UserError>;
+    async fn gamma(&self, a: A) -> Result<Vec<C>, Self::Error>;
 
     /// ```rust,ignore
-    /// async fn delta(a: A, b: B, c: C) -> Result<D, operon::error::UserError>
+    /// async fn delta(a: A, b: B, c: C) -> Result<D, Self::Error>
     /// ```
     /// Corresponds to the task:
     /// ```rust,ignore
     /// D = delta(A, B, C) for i, j, k
     /// ```
     #[allow(clippy::too_many_arguments)]
-    async fn delta(&self, a: A, b: B, c: C) -> Result<D, operon::error::UserError>;
+    async fn delta(&self, a: A, b: B, c: C) -> Result<D, Self::Error>;
 
     /// ```rust,ignore
-    /// async fn epsilon(b_j: Vec<B>, d_j: Vec<D>) -> Result<E, operon::error::UserError>
+    /// async fn epsilon(b_j: Vec<B>, d_j: Vec<D>) -> Result<E, Self::Error>
     /// ```
     /// Corresponds to the task:
     /// ```rust,ignore
     /// E = epsilon(B<j>, D<j>) for i, k
     /// ```
     #[allow(clippy::too_many_arguments)]
-    async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, operon::error::UserError>;
+    async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, Self::Error>;
 
     /// ```rust,ignore
-    /// async fn zeta(c_k: Vec<C>, e_k: Vec<E>) -> Result<F, operon::error::UserError>
+    /// async fn zeta(c_k: Vec<C>, e_k: Vec<E>) -> Result<F, Self::Error>
     /// ```
     /// Corresponds to the task:
     /// ```rust,ignore
     /// F = zeta(C<k>, E<k>) for i
     /// ```
     #[allow(clippy::too_many_arguments)]
-    async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, operon::error::UserError>;
+    async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, Self::Error>;
 }

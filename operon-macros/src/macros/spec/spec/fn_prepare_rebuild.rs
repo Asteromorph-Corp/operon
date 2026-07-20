@@ -13,7 +13,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     storage: &Sto,
 ///     client: MSto::Client<'_>,
 ///     progress: operon::__private::SharedProgress,
-/// ) -> Result<Box<dyn operon::__private::JobRebuilder<Sto, MSto>>, operon::error::SchedulerError<MSto::Error, Sto::Error>> {
+/// ) -> Result<Box<dyn operon::__private::JobRebuilder<Svc, Sto, MSto>>, operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>> {
 ///     use operon::__private::futures::{StreamExt, TryStreamExt};
 ///
 ///     let tickets = client
@@ -36,7 +36,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///                     ))
 ///                 })?;
 ///
-///             Ok::<_, operon::error::SchedulerError<MSto::Error, Sto::Error>>((job, resolution))
+///             Ok::<_, operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>>((job, resolution))
 ///         },
 ///     ))
 ///     .buffered(operon::__private::REBUILD_CONCURRENCY)
@@ -83,7 +83,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             storage: &Sto,
             progress: #operon::__private::SharedProgress,
             client: MSto::Client<'_>,
-        ) -> Result<Box<dyn #operon::__private::JobRebuilder<Sto, MSto>>, #operon::error::SchedulerError<MSto::Error, Sto::Error>>
+        ) -> Result<Box<dyn #operon::__private::JobRebuilder<Svc, Sto, MSto>>, #operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>>
         {
             use #operon::__private::futures::{StreamExt, TryStreamExt};
 
@@ -100,7 +100,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
                     })?;
                     let resolution = #resolution_expr;
 
-                    Ok::<_, #operon::error::SchedulerError<MSto::Error, Sto::Error>>((job, resolution))
+                    Ok::<_, #operon::error::SchedulerError<MSto::Error, Sto::Error, Svc::Error>>((job, resolution))
                 }
             ))
             .buffered(#operon::__private::REBUILD_CONCURRENCY)

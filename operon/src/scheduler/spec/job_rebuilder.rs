@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::meta_storage::MetaBackend;
 use crate::scheduler::SchedulerError;
+use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
 // TODO: Temporary hard-coded value, may be added to the `OperonOptions` in the future.
@@ -9,9 +10,11 @@ use crate::storage::OperonStorage;
 pub const REBUILD_CONCURRENCY: usize = 64;
 
 #[async_trait]
-pub trait JobRebuilder<Sto: OperonStorage, MSto: MetaBackend>: Send + Sync + 'static {
+pub trait JobRebuilder<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend>:
+    Send + Sync + 'static
+{
     async fn rebuild(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error, Sto::Error>>;
+    ) -> Result<(), SchedulerError<MSto::Error, Sto::Error, Svc::Error>>;
 }

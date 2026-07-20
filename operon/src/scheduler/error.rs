@@ -2,17 +2,17 @@ use thiserror::Error;
 use tokio::sync::AcquireError;
 use tokio::task::JoinError;
 
-use crate::error::UserError;
 use crate::meta_storage::MetaStorageError;
 use crate::storage::StorageError;
 
 /// The scheduler's error, generic over the metadata backend's error type `MErr`
-/// ([`MetaBackend::Error`](crate::meta_storage::MetaBackend::Error)) and the entity storage's error
-/// type `SErr` ([`OperonStorage::Error`](crate::storage::OperonStorage::Error)).
+/// ([`MetaBackend::Error`](crate::meta_storage::MetaBackend::Error)), the entity storage's error
+/// type `SErr` ([`OperonStorage::Error`](crate::storage::OperonStorage::Error)), and the service's
+/// error type `UErr` ([`OperonService::Error`](crate::service::OperonService::Error)).
 #[derive(Debug, Error)]
-pub enum SchedulerError<MErr, SErr> {
+pub enum SchedulerError<MErr, SErr, UErr> {
     #[error("Error in user provided function: {0}")]
-    UserError(#[from] UserError),
+    UserError(UErr),
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError<SErr>),
     #[error("Metadata storage error: {0}")]
@@ -33,7 +33,7 @@ pub enum SchedulerError<MErr, SErr> {
     Other(String),
 }
 
-impl<MErr, SErr> SchedulerError<MErr, SErr> {
+impl<MErr, SErr, UErr> SchedulerError<MErr, SErr, UErr> {
     pub(crate) fn missing_progress(id: impl Into<String>) -> Self {
         Self::MissingProgressEntry(id.into())
     }
@@ -43,13 +43,15 @@ impl<MErr, SErr> SchedulerError<MErr, SErr> {
     }
 }
 
-impl<MErr, SErr> From<AcquireError> for SchedulerError<MErr, SErr> {
+impl<MErr, SErr, UErr> From<AcquireError> for SchedulerError<MErr, SErr, UErr> {
     fn from(_: AcquireError) -> Self {
         SchedulerError::SemaphoreAcquireFailed
     }
 }
 
-impl<MErr, SErr> From<tokio::sync::watch::error::RecvError> for SchedulerError<MErr, SErr> {
+impl<MErr, SErr, UErr> From<tokio::sync::watch::error::RecvError>
+    for SchedulerError<MErr, SErr, UErr>
+{
     fn from(_: tokio::sync::watch::error::RecvError) -> Self {
         SchedulerError::ControlEventReceiveFailed
     }
