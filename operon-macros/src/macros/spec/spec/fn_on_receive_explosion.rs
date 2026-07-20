@@ -16,7 +16,7 @@ use crate::utils::{
 ///     &self,
 ///     client: MSto::Client<'_>,
 ///     resolution: schema::ResolutionEnum,
-/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<MSto::Error>> {
+/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<MSto::Error, Sto::Error>> {
 ///     match resolution {
 ///         schema::ResolutionEnum::J(res) => Ok(client
 ///             .ticket(self.job_meta())
@@ -73,7 +73,7 @@ pub(super) fn fn_on_receive_explosion(
             &self,
             client: MSto::Client<'_>,
             explosion: #operon::__private::TicketExplosion<schema::#ticket_enum_ident>,
-        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError<MSto::Error>> {
+        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError<MSto::Error, Sto::Error>> {
             match explosion.ticket {
                 #(#arms)*
                 _ => Err(#operon::error::SchedulerError::InvalidPeerEventReceived("explosion", #job_id)),

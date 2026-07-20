@@ -1,4 +1,4 @@
-async fn get_all_b_j(&self, [i]: [usize; 1usize]) -> Result<Vec<B>, operon::error::StorageError> {
+async fn get_all_b_j(&self, [i]: [usize; 1usize]) -> operon::error::StorageResult<Vec<B>, Self::Error> {
     let entities = self
         .conn()
         .await?
@@ -14,7 +14,7 @@ async fn get_all_b_j(&self, [i]: [usize; 1usize]) -> Result<Vec<B>, operon::erro
     Ok(result)
 }
 
-async fn get_all_c_k(&self, [i]: [usize; 1usize]) -> Result<Vec<C>, operon::error::StorageError> {
+async fn get_all_c_k(&self, [i]: [usize; 1usize]) -> operon::error::StorageResult<Vec<C>, Self::Error> {
     let entities = self
         .conn()
         .await?
@@ -33,7 +33,7 @@ async fn get_all_c_k(&self, [i]: [usize; 1usize]) -> Result<Vec<C>, operon::erro
 async fn get_all_d_j(
     &self,
     [i, k]: [usize; 2usize],
-) -> Result<Vec<D>, operon::error::StorageError> {
+) -> operon::error::StorageResult<Vec<D>, Self::Error> {
     let entities = self
         .conn()
         .await?
@@ -49,7 +49,7 @@ async fn get_all_d_j(
     Ok(result)
 }
 
-async fn get_all_e_k(&self, [i]: [usize; 1usize]) -> Result<Vec<E>, operon::error::StorageError> {
+async fn get_all_e_k(&self, [i]: [usize; 1usize]) -> operon::error::StorageResult<Vec<E>, Self::Error> {
     let entities = self
         .conn()
         .await?

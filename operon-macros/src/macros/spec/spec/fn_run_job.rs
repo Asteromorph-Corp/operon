@@ -227,7 +227,7 @@ fn arg_def_collected(
                 .take(*ub)
                 .enumerate()
                 .map(|(#dim, elem)| { #acc })
-                .collect::<Result<Vec<_>, #operon::error::SchedulerError<MSto::Error>>>()
+                .collect::<Result<Vec<_>, #operon::error::SchedulerError<MSto::Error, Sto::Error>>>()
         }
     });
 
@@ -249,7 +249,7 @@ fn arg_def_collected(
 ///     storage: &Sto,
 ///     meta_storage: MSto,
 ///     job: Self::Job,
-/// ) -> Result<Self::Resolution, operon::error::SchedulerError<MSto::Error>> {
+/// ) -> Result<Self::Resolution, operon::error::SchedulerError<MSto::Error, Sto::Error>> {
 ///     let [i] = job.coordinate;
 ///
 ///     let Some(a) = storage.get_a([i]).await? else {
@@ -374,7 +374,7 @@ pub(super) fn fn_run_job(
             storage: &Sto,
             meta_storage: MSto,
             job: Self::Job,
-        ) -> Result<Self::Resolution, #operon::error::SchedulerError<MSto::Error>> {
+        ) -> Result<Self::Resolution, #operon::error::SchedulerError<MSto::Error, Sto::Error>> {
             let [#(#job_coord_vars),*] = job.coordinate;
 
             #maybe_define_resolutions;

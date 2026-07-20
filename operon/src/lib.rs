@@ -21,7 +21,8 @@ pub mod error {
     pub use crate::meta_storage::{AnyBackendError, MemMetaError, MetaStorageError, PsqlMetaError};
     pub use crate::operon::{OperonError, UserError};
     pub use crate::scheduler::SchedulerError;
-    pub use crate::storage::{DimState, StorageError};
+    pub use crate::storage::psql::PsqlStorageError;
+    pub use crate::storage::{DimState, StorageError, StorageResult};
     pub use crate::ui::UiError;
 }
 

@@ -2,12 +2,13 @@ use std::str::FromStr;
 
 use crate::schema::{RunFootprint, RunMetadata, RunState};
 use crate::storage::StorageError;
+use crate::storage::psql::PsqlStorageResult;
 use crate::storage::psql::client::StorageClient;
 use crate::utils::GLOBAL;
 
 impl StorageClient<'_> {
     /// Initializes the footprint table.
-    pub async fn init_footprint(&self) -> Result<(), StorageError> {
+    pub async fn init_footprint(&self) -> PsqlStorageResult<()> {
         let schema_prefix = self.schema_prefix();
 
         let stmt = format!(
@@ -25,7 +26,7 @@ impl StorageClient<'_> {
     }
 
     /// Clears the footprint table.
-    pub async fn clear_footprint(&self) -> Result<(), StorageError> {
+    pub async fn clear_footprint(&self) -> PsqlStorageResult<()> {
         let schema_prefix = self.schema_prefix();
         let stmt = format!("TRUNCATE TABLE {schema_prefix}_footprint");
         self.execute(&stmt, &[]).await?;
@@ -33,7 +34,7 @@ impl StorageClient<'_> {
     }
 
     /// Gets a footprint value by key.
-    pub async fn get_footprint(&self) -> Result<Option<RunFootprint>, StorageError> {
+    pub async fn get_footprint(&self) -> PsqlStorageResult<Option<RunFootprint>> {
         let schema_prefix = self.schema_prefix();
 
         let stmt = format!(
@@ -55,7 +56,7 @@ impl StorageClient<'_> {
     }
 
     /// Sets a footprint key-value pair.
-    pub async fn put_footprint(&self, footprint: &RunFootprint) -> Result<(), StorageError> {
+    pub async fn put_footprint(&self, footprint: &RunFootprint) -> PsqlStorageResult<()> {
         let schema_prefix = self.schema_prefix();
         let run_id = &footprint.metadata.run_id;
         let updated_at = &footprint.at;

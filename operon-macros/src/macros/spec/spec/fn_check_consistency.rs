@@ -13,7 +13,7 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///     storage: &Sto,
 ///     client: MSto::Client<'_>,
 ///     mode: operon::__private::CheckMode,
-/// ) -> Result<bool, operon::error::SchedulerError<MSto::Error>> {
+/// ) -> Result<bool, operon::error::SchedulerError<MSto::Error, Sto::Error>> {
 ///     if mode == operon::__private::CheckMode::TrustAll {
 ///         return Ok(true);
 ///     }
@@ -136,7 +136,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             storage: &Sto,
             client: MSto::Client<'_>,
             mode: #operon::__private::CheckMode,
-        ) -> Result<bool, #operon::error::SchedulerError<MSto::Error>> {
+        ) -> Result<bool, #operon::error::SchedulerError<MSto::Error, Sto::Error>> {
             if mode == #operon::__private::CheckMode::TrustAll {
                 return Ok(true);
             }

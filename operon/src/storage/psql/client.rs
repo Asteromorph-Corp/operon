@@ -5,7 +5,7 @@ use bytes::Buf;
 use deadpool_postgres::Transaction;
 use tokio_postgres::{CopyInSink, ToStatement};
 
-use crate::storage::StorageError;
+use crate::storage::psql::PsqlStorageResult;
 use crate::utils::SchemaPrefix;
 
 macro_rules! impl_storage_client {
@@ -17,7 +17,7 @@ macro_rules! impl_storage_client {
     ) => {
         pub async fn $method
         $(< $($generics),* >)?
-        (&self, $($arg: $arg_ty),*)  -> Result<$ret, StorageError>
+        (&self, $($arg: $arg_ty),*)  -> PsqlStorageResult<$ret>
         $(where $($where_clause)+)?
         {
             self.client.$method($($arg),*).await.map_err(Into::into)
@@ -49,7 +49,7 @@ impl<'a> StorageClient<'a> {
               U: Buf + 'static + Send + Sync
     );
 
-    pub async fn batch_execute_stmt(&self, stmt: &impl Display) -> Result<(), StorageError> {
+    pub async fn batch_execute_stmt(&self, stmt: &impl Display) -> PsqlStorageResult<()> {
         self.batch_execute(&stmt.to_string()).await
     }
 
@@ -57,7 +57,7 @@ impl<'a> StorageClient<'a> {
         &self,
         stmt: &impl Display,
         params: &[&ToSql],
-    ) -> Result<u64, StorageError> {
+    ) -> PsqlStorageResult<u64> {
         self.execute(&stmt.to_string(), params).await
     }
 
@@ -65,7 +65,7 @@ impl<'a> StorageClient<'a> {
         &self,
         stmt: &impl Display,
         params: &[&ToSql],
-    ) -> Result<Vec<tokio_postgres::Row>, StorageError> {
+    ) -> PsqlStorageResult<Vec<tokio_postgres::Row>> {
         self.query(&stmt.to_string(), params).await
     }
 
@@ -73,7 +73,7 @@ impl<'a> StorageClient<'a> {
         &self,
         stmt: &impl Display,
         params: &[&ToSql],
-    ) -> Result<Option<tokio_postgres::Row>, StorageError> {
+    ) -> PsqlStorageResult<Option<tokio_postgres::Row>> {
         self.query_opt(&stmt.to_string(), params).await
     }
 
@@ -85,7 +85,7 @@ impl<'a> StorageClient<'a> {
         SchemaPrefix(self.schema())
     }
 
-    pub async fn transaction(&mut self) -> Result<Transaction<'_>, StorageError> {
+    pub async fn transaction(&mut self) -> PsqlStorageResult<Transaction<'_>> {
         let tx = self.client.transaction().await?;
         Ok(tx)
     }

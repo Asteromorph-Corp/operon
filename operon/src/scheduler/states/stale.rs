@@ -87,22 +87,25 @@ where
         }
     }
 
-    fn into_clean(self) -> TransitionState<SchedulerError<MSto::Error>> {
+    fn into_clean(self) -> TransitionState<SchedulerError<MSto::Error, Sto::Error>> {
         CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 
-    fn into_rebuild(self, skip: HashSet<String>) -> TransitionState<SchedulerError<MSto::Error>> {
+    fn into_rebuild(
+        self,
+        skip: HashSet<String>,
+    ) -> TransitionState<SchedulerError<MSto::Error, Sto::Error>> {
         RebuildTransition::state(self.ctx, self.channel_size, self.run_id, skip)
     }
 
-    fn into_restore(self) -> TransitionState<SchedulerError<MSto::Error>> {
+    fn into_restore(self) -> TransitionState<SchedulerError<MSto::Error, Sto::Error>> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 
     async fn run_consistency_check(
         &mut self,
         mode: CheckMode,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<MSto::Error, Sto::Error>> {
         let check_start = Instant::now();
         let inconsistent_jobs = self
             .ctx
@@ -237,7 +240,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    type Error = SchedulerError<MSto::Error>;
+    type Error = SchedulerError<MSto::Error, Sto::Error>;
 
     async fn handle_progress(self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         Ok(NextState::Next(self))

@@ -60,8 +60,12 @@ impl<E: Error + Send + Sync + 'static> TransitionState<E> {
 }
 
 #[async_trait]
-impl<MErr: Error + Send + Sync + 'static> SchedulerState for TransitionState<SchedulerError<MErr>> {
-    type Error = SchedulerError<MErr>;
+impl<MErr, SErr> SchedulerState for TransitionState<SchedulerError<MErr, SErr>>
+where
+    MErr: Error + Send + Sync + 'static,
+    SErr: Error + Send + Sync + 'static,
+{
+    type Error = SchedulerError<MErr, SErr>;
 
     async fn handle_progress(mut self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         if self.handle.is_finished() {
@@ -92,9 +96,15 @@ impl<MErr: Error + Send + Sync + 'static> SchedulerState for TransitionState<Sch
     }
 }
 
-impl<MErr: Error + Send + Sync + 'static> NextState<SchedulerError<MErr>> {
+impl<MErr, SErr> NextState<SchedulerError<MErr, SErr>>
+where
+    MErr: Error + Send + Sync + 'static,
+    SErr: Error + Send + Sync + 'static,
+{
     /// Boxes a concrete state into the next state.
-    pub(super) fn next(state: impl SchedulerState<Error = SchedulerError<MErr>> + 'static) -> Self {
+    pub(super) fn next(
+        state: impl SchedulerState<Error = SchedulerError<MErr, SErr>> + 'static,
+    ) -> Self {
         NextState::Next(Box::new(state))
     }
 }

@@ -45,7 +45,7 @@ where
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
-    ) -> TransitionState<SchedulerError<MSto::Error>> {
+    ) -> TransitionState<SchedulerError<MSto::Error, Sto::Error>> {
         TransitionState::new(Self::new(ctx, ui_mode, channel_size))
     }
 
@@ -59,7 +59,9 @@ where
     }
 
     /// Fetch the metadata of a previous run if it exists.
-    async fn get_run_metadata(&self) -> Result<Option<RunMetadata>, SchedulerError<MSto::Error>> {
+    async fn get_run_metadata(
+        &self,
+    ) -> Result<Option<RunMetadata>, SchedulerError<MSto::Error, Sto::Error>> {
         let meta_conn = self.ctx.meta_storage.scheduler_conn().await?;
 
         // Get footprints from both storages.
@@ -95,7 +97,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    type Error = SchedulerError<MSto::Error>;
+    type Error = SchedulerError<MSto::Error, Sto::Error>;
 
     fn warn_msg(&self) -> Option<&'static str> {
         None

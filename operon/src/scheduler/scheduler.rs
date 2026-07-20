@@ -50,7 +50,7 @@ where
         channel_size: usize,
         ui_mode: UiMode,
         backend: MSto::Options,
-    ) -> Result<Self, SchedulerError<MSto::Error>> {
+    ) -> Result<Self, SchedulerError<MSto::Error, Sto::Error>> {
         handler.validate_pool_sizes();
         let meta_storage = MSto::new(backend)?;
 
@@ -72,15 +72,18 @@ where
     }
 
     /// Main entry point for the scheduler.
-    pub async fn work(mut self) -> Result<(), SchedulerError<MSto::Error>> {
+    pub async fn work(mut self) -> Result<(), SchedulerError<MSto::Error, Sto::Error>> {
         self.ctx.meta_storage.ensure_lock().await?;
         self.ctx.storage.init().await?;
         self.init_meta_storage().await?;
 
         let heartbeat_handle = self.ctx.meta_storage.clone();
-        let mut state: Box<dyn SchedulerState<Error = SchedulerError<MSto::Error>>> = Box::new(
-            InitTransition::state(self.ctx, self.ui_mode, self.channel_size),
-        );
+        let mut state: Box<dyn SchedulerState<Error = SchedulerError<MSto::Error, Sto::Error>>> =
+            Box::new(InitTransition::state(
+                self.ctx,
+                self.ui_mode,
+                self.channel_size,
+            ));
 
         // Main work tick
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
@@ -118,7 +121,7 @@ where
     }
 
     /// An helper function to call `self.spec.init_meta_storage` with a transaction.
-    async fn init_meta_storage(&self) -> Result<(), SchedulerError<MSto::Error>> {
+    async fn init_meta_storage(&self) -> Result<(), SchedulerError<MSto::Error, Sto::Error>> {
         let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
         self.ctx.handler.init_meta_storage(tx.as_client()).await?;

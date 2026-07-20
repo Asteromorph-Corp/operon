@@ -3,7 +3,7 @@ async fn prepare_rebuild(
     storage: &Sto,
     progress: operon::__private::SharedProgress,
     client: MSto::Client<'_>,
-) -> Result<Box<dyn operon::__private::JobRebuilder<MSto>>, operon::error::SchedulerError<MSto::Error>> {
+) -> Result<Box<dyn operon::__private::JobRebuilder<Sto, MSto>>, operon::error::SchedulerError<MSto::Error, Sto::Error>> {
     use operon::__private::futures::{StreamExt, TryStreamExt};
 
     let tickets = client
@@ -26,7 +26,7 @@ async fn prepare_rebuild(
                     ))
                 })?;
 
-            Ok::<_, operon::error::SchedulerError<MSto::Error>>((job, resolution))
+            Ok::<_, operon::error::SchedulerError<MSto::Error, Sto::Error>>((job, resolution))
         },
     ))
     .buffered(operon::__private::REBUILD_CONCURRENCY)

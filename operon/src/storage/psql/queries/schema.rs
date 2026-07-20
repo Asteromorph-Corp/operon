@@ -1,9 +1,9 @@
-use crate::storage::StorageError;
+use crate::storage::psql::PsqlStorageResult;
 use crate::storage::psql::client::StorageClient;
 
 impl<'a> StorageClient<'a> {
     /// Initializes the data storage schema, if specified.
-    pub async fn init_schema(&self) -> Result<(), StorageError> {
+    pub async fn init_schema(&self) -> PsqlStorageResult<()> {
         let Some(schema) = self.schema() else {
             return Ok(());
         };
@@ -13,7 +13,7 @@ impl<'a> StorageClient<'a> {
     }
 
     /// Initializes the entity hash table.
-    pub async fn init_entity_hash(&self) -> Result<(), StorageError> {
+    pub async fn init_entity_hash(&self) -> PsqlStorageResult<()> {
         let schema = self.schema_prefix();
 
         let create_table = format!(
