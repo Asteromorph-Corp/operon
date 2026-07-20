@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::meta_storage::{MetaBackend, MetaClientApi, MetaConnApi};
 use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::fresh::FreshState;
@@ -11,22 +12,28 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct InitTransition<Svc, Sto>
+pub struct InitTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     ui_mode: UiMode,
 }
 
-impl<Svc, Sto> InitTransition<Svc, Sto>
+impl<Svc, Sto, MSto> InitTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    pub fn new(ctx: SchedulerContext<Svc, Sto>, ui_mode: UiMode, channel_size: usize) -> Self {
+    pub fn new(
+        ctx: SchedulerContext<Svc, Sto, MSto>,
+        ui_mode: UiMode,
+        channel_size: usize,
+    ) -> Self {
         Self {
             ctx,
             channel_size,
@@ -35,24 +42,24 @@ where
     }
 
     pub fn state(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
-    ) -> TransitionState {
+    ) -> TransitionState<SchedulerError<MSto::Error>> {
         TransitionState::new(Self::new(ctx, ui_mode, channel_size))
     }
 
     // TODO: rename states
-    fn into_fresh(self, run_id: Uuid) -> FreshState<Svc, Sto> {
+    fn into_fresh(self, run_id: Uuid) -> FreshState<Svc, Sto, MSto> {
         FreshState::new(self.ctx, self.ui_mode, self.channel_size, run_id)
     }
 
-    fn into_stale(self, run_id: Uuid, kind: StaleKind) -> StaleState<Svc, Sto> {
+    fn into_stale(self, run_id: Uuid, kind: StaleKind) -> StaleState<Svc, Sto, MSto> {
         StaleState::new(self.ctx, self.ui_mode, self.channel_size, run_id, kind)
     }
 
     /// Fetch the metadata of a previous run if it exists.
-    async fn get_run_metadata(&self) -> Result<Option<RunMetadata>, SchedulerError> {
+    async fn get_run_metadata(&self) -> Result<Option<RunMetadata>, SchedulerError<MSto::Error>> {
         let meta_conn = self.ctx.meta_storage.scheduler_conn().await?;
 
         // Get footprints from both storages.
@@ -82,28 +89,31 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerTransition for InitTransition<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerTransition for InitTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
+    type Error = SchedulerError<MSto::Error>;
+
     fn warn_msg(&self) -> Option<&'static str> {
         None
     }
 
-    async fn execute(self) -> Result<NextState, SchedulerError> {
+    async fn execute(self) -> Result<NextState<Self::Error>, Self::Error> {
         let RunMetadata { run_id, state } = self.get_run_metadata().await?.unwrap_or_default();
 
         // if self.ui_mode == UiMode::Headless {
-        //     return Ok(NextState::from(self.into_fresh(run_id)));
+        //     return Ok(NextState::next(self.into_fresh(run_id)));
         // }
 
         let next = match state {
-            RunState::Fresh => NextState::from(self.into_fresh(run_id)),
-            RunState::Completed => NextState::from(self.into_stale(run_id, StaleKind::Complete)),
-            RunState::Paused => NextState::from(self.into_stale(run_id, StaleKind::GracefulStop)),
+            RunState::Fresh => NextState::next(self.into_fresh(run_id)),
+            RunState::Completed => NextState::next(self.into_stale(run_id, StaleKind::Complete)),
+            RunState::Paused => NextState::next(self.into_stale(run_id, StaleKind::GracefulStop)),
             RunState::Running | RunState::Aborted => {
-                NextState::from(self.into_stale(run_id, StaleKind::Abort))
+                NextState::next(self.into_stale(run_id, StaleKind::Abort))
             }
         };
 

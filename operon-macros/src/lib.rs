@@ -47,8 +47,9 @@ pub fn derive_operon_service(input: TokenStream) -> TokenStream {
         impl<Sto: #definition::__misc::StorageTrait> operon::__private::ValidOperon<#service, Sto>
             for (#service, Sto)
         {
-            fn scheduler_handler() -> operon::__private::SchedulerHandler<#service, Sto> {
-                #definition::__misc::scheduler_handler()
+            fn scheduler_handler<MSto: operon::__private::MetaBackend>()
+            -> operon::__private::SchedulerHandler<#service, Sto, MSto> {
+                #definition::__misc::scheduler_handler::<#service, Sto, MSto>()
             }
         }
     }

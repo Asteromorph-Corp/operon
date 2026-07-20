@@ -3,7 +3,7 @@ async fn send_on_finish(
     peer_txs: &Self::PeerEventSenders,
     job: Self::Job,
     resolution: Self::Resolution,
-) -> Result<(), operon::error::SchedulerError> {
+) -> Result<(), operon::error::SchedulerError<MSto::Error>> {
     match peer_txs
         .to_delta
         .send(operon::__private::PeerEvent::Resolution(

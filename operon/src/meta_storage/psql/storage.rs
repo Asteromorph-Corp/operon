@@ -7,8 +7,12 @@ use secrecy::ExposeSecret;
 use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
-use crate::meta_storage::MetaStorageError;
-use crate::meta_storage::psql::{PsqlConn, PsqlMetaStorageOptions};
+use crate::meta_storage::psql::error::PsqlResult;
+use crate::meta_storage::psql::{
+    PsqlClient, PsqlConn, PsqlMetaError, PsqlMetaStorageOptions, PsqlResolutionQueryBuilder,
+    PsqlTicketQueryBuilder, PsqlTx,
+};
+use crate::meta_storage::{MetaBackend, MetaStorageError};
 
 /// The Postgres implementation of the metadata backend.
 ///
@@ -31,8 +35,16 @@ pub(crate) struct AdvisoryLock {
     key: i64,
 }
 
-impl PsqlMetaStorage {
-    pub fn new(options: PsqlMetaStorageOptions) -> Result<Self, MetaStorageError> {
+impl MetaBackend for PsqlMetaStorage {
+    type Options = PsqlMetaStorageOptions;
+    type Error = PsqlMetaError;
+    type Conn<'a> = PsqlConn<'a>;
+    type Tx<'a> = PsqlTx<'a>;
+    type Client<'a> = PsqlClient<'a>;
+    type Ticket<'a, const N: usize> = PsqlTicketQueryBuilder<'a, N>;
+    type Resolution<'a, const N: usize> = PsqlResolutionQueryBuilder<'a, N>;
+
+    fn new(options: PsqlMetaStorageOptions) -> PsqlResult<Self> {
         let PsqlMetaStorageOptions {
             uri,
             pool_size,
@@ -56,7 +68,7 @@ impl PsqlMetaStorage {
         // 2. One to five connections for synchronous (individual-)scheduler operations.
         // 3. The remaining connections for spawned workers.
         let (worker_pool, scheduler_pool, lock_pool) = match pool_size {
-            0..=1 => return Err(MetaStorageError::PoolSizeTooSmall(pool_size)),
+            0..=1 => return Err(PsqlMetaError::PoolSizeTooSmall(pool_size).into()),
             2 => {
                 let p = mk_pool(1)?;
                 (p.clone(), p, mk_pool(1)?)
@@ -74,72 +86,31 @@ impl PsqlMetaStorage {
         })
     }
 
-    pub async fn worker_conn(&self) -> Result<PsqlConn<'_>, MetaStorageError> {
-        let client = self.worker_pool.get().await?;
+    async fn worker_conn(&self) -> PsqlResult<PsqlConn<'_>> {
+        let client = self.worker_pool.get().await.map_err(PsqlMetaError::from)?;
         let schema = self.schema.as_deref();
 
         Ok(PsqlConn::new(client, schema))
     }
 
-    pub async fn scheduler_conn(&self) -> Result<PsqlConn<'static>, MetaStorageError> {
-        let client = self.scheduler_pool.get().await?;
+    async fn scheduler_conn(&self) -> PsqlResult<PsqlConn<'static>> {
+        let client = self
+            .scheduler_pool
+            .get()
+            .await
+            .map_err(PsqlMetaError::from)?;
         let schema = self.schema.clone();
 
         Ok(PsqlConn::new(client, schema))
     }
 
-    /// Acquires a Postgres session-level advisory lock scoped to this instance's schema,
-    /// guarding against a second Operon instance corrupting this run's metadata.
-    ///
-    /// The lock is tied to the connection that acquires it, held for the lifetime of the
-    /// last `Arc` reference to this `PsqlMetaStorage` instance.\
-    /// Crash safety is provided by Postgres, which releases the lock when the connection closes.
-    /// Since that release can also happen silently (see `check_lock`), it isn't the sole guard.
-    ///
-    /// `Scheduler::work` forces this once, at startup; it is lazy and idempotent, so the lock
-    /// acquisition path is guaranteed to be reached exactly once per `PsqlMetaStorage` instance.
-    pub(crate) async fn ensure_lock(&self) -> Result<&AdvisoryLock, MetaStorageError> {
-        self.lock
-            .get_or_try_init(|| async {
-                let conn = self.lock_pool.get().await?;
-                let schema = match &self.schema {
-                    Some(schema) => schema.clone(),
-                    // Unprefixed queries resolve against whatever schema is first in `search_path`.
-                    None => conn
-                        .query_one("SELECT current_schema()", &[])
-                        .await?
-                        .get::<_, Option<String>>(0)
-                        .ok_or(MetaStorageError::Internal(
-                            "failed to find default schema; \
-                            try setting `meta_storage_schema` explicitly in `OperonOptions`",
-                        ))?,
-                };
-
-                let key = lock_key(&schema);
-                let locked: bool = conn
-                    .query_one("SELECT pg_try_advisory_lock($1)", &[&key])
-                    .await?
-                    .get(0);
-
-                if !locked {
-                    return Err(MetaStorageError::SchemaLocked(schema));
-                }
-
-                Ok(AdvisoryLock { conn, schema, key })
-            })
-            .await
+    async fn ensure_lock(&self) -> PsqlResult<()> {
+        self.lock().await?;
+        Ok(())
     }
 
-    /// Re-checks that the advisory lock acquired by `ensure_lock` is still held, by looking
-    /// it up in `pg_locks` rather than trusting the connection to still be alive.
-    ///
-    /// TCP keepalives (see `PsqlMetaStorageOptions`) only catch a peer that has gone completely
-    /// unreachable; they don't catch a connection pooler or an `idle_session_timeout` on the
-    /// server closing an idle session out from under us, which silently releases the lock
-    /// without either side telling us. Since `ensure_lock`'s connection is never used again
-    /// after startup, nothing else would ever notice this on its own.
-    pub(crate) async fn check_lock(&self) -> Result<(), MetaStorageError> {
-        let lock = self.ensure_lock().await?;
+    async fn check_lock(&self) -> PsqlResult<()> {
+        let lock = self.lock().await?;
 
         // A single `bigint` advisory lock is recorded in `pg_locks` as its key's upper and
         // lower 32 bits, in `classid`/`objid` respectively, with `objsubid` fixed to 1.
@@ -160,7 +131,8 @@ impl PsqlMetaStorage {
                 )",
                 &[&classid, &objid],
             )
-            .await?
+            .await
+            .map_err(PsqlMetaError::from)?
             .get(0);
 
         if !held {
@@ -168,6 +140,52 @@ impl PsqlMetaStorage {
         }
 
         Ok(())
+    }
+}
+
+impl PsqlMetaStorage {
+    /// Acquires a Postgres session-level advisory lock scoped to this instance's schema,
+    /// guarding against a second Operon instance corrupting this run's metadata.
+    ///
+    /// The lock is tied to the connection that acquires it, held for the lifetime of the
+    /// last `Arc` reference to this `PsqlMetaStorage` instance.\
+    /// Crash safety is provided by Postgres, which releases the lock when the connection closes.
+    /// Since that release can also happen silently (see `check_lock`), it isn't the sole guard.
+    ///
+    /// `Scheduler::work` forces this once, at startup; it is lazy and idempotent, so the lock
+    /// acquisition path is guaranteed to be reached exactly once per `PsqlMetaStorage` instance.
+    async fn lock(&self) -> PsqlResult<&AdvisoryLock> {
+        self.lock
+            .get_or_try_init(|| async {
+                let conn = self.lock_pool.get().await.map_err(PsqlMetaError::from)?;
+                let schema = match &self.schema {
+                    Some(schema) => schema.clone(),
+                    // Unprefixed queries resolve against whatever schema is first in `search_path`.
+                    None => conn
+                        .query_one("SELECT current_schema()", &[])
+                        .await
+                        .map_err(PsqlMetaError::from)?
+                        .get::<_, Option<String>>(0)
+                        .ok_or(MetaStorageError::Internal(
+                            "failed to find default schema; \
+                            try setting `meta_storage_schema` explicitly in `OperonOptions`",
+                        ))?,
+                };
+
+                let key = lock_key(&schema);
+                let locked: bool = conn
+                    .query_one("SELECT pg_try_advisory_lock($1)", &[&key])
+                    .await
+                    .map_err(PsqlMetaError::from)?
+                    .get(0);
+
+                if !locked {
+                    return Err(MetaStorageError::SchemaLocked(schema));
+                }
+
+                Ok(AdvisoryLock { conn, schema, key })
+            })
+            .await
     }
 }
 
@@ -188,7 +206,7 @@ fn create_pool(
     keepalives_idle: Duration,
     keepalives_interval: Duration,
     pool_size: usize,
-) -> Result<deadpool_postgres::Pool, MetaStorageError> {
+) -> Result<deadpool_postgres::Pool, PsqlMetaError> {
     // Might want to make these hardcoded config values configurable.
     let mut pg_config = tokio_postgres::Config::from_str(uri)?;
     pg_config

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::meta_storage::{MetaBackend, MetaClientApi, MetaConnApi};
 use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::running::RunningState;
@@ -9,24 +10,26 @@ use crate::schema::{RunFootprint, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct StartTransition<Svc, Sto>
+pub struct StartTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     run_id: Uuid,
     clean: bool,
 }
 
-impl<Svc, Sto> StartTransition<Svc, Sto>
+impl<Svc, Sto, MSto> StartTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
         clean: bool,
@@ -40,15 +43,15 @@ where
     }
 
     pub fn state(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
         clean: bool,
-    ) -> TransitionState {
+    ) -> TransitionState<SchedulerError<MSto::Error>> {
         TransitionState::new(Self::new(ctx, channel_size, run_id, clean))
     }
 
-    fn into_running(self, execution_id: Uuid) -> RunningState<Svc, Sto> {
+    fn into_running(self, execution_id: Uuid) -> RunningState<Svc, Sto, MSto> {
         RunningState::new(
             self.ctx,
             self.channel_size,
@@ -60,16 +63,19 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerTransition for StartTransition<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerTransition for StartTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
+    type Error = SchedulerError<MSto::Error>;
+
     fn warn_msg(&self) -> Option<&'static str> {
         None
     }
 
-    async fn execute(self) -> Result<NextState, SchedulerError> {
+    async fn execute(self) -> Result<NextState<Self::Error>, Self::Error> {
         let footprint = RunFootprint::new(self.run_id, RunState::Running);
         let execution_id = Uuid::new_v4();
 
@@ -80,6 +86,6 @@ where
             .put_execution(footprint.metadata.run_id, execution_id)
             .await?;
 
-        Ok(NextState::from(self.into_running(execution_id)))
+        Ok(NextState::next(self.into_running(execution_id)))
     }
 }

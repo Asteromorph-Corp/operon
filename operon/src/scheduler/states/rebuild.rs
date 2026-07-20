@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tokio::time::Instant;
 use uuid::Uuid;
 
+use crate::meta_storage::{MetaBackend, MetaConnApi, MetaTxApi};
 use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::start::StartTransition;
@@ -11,24 +12,26 @@ use crate::scheduler::states::{NextState, SchedulerTransition, TransitionState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct RebuildTransition<Svc, Sto>
+pub struct RebuildTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     run_id: Uuid,
     skip: HashSet<String>,
 }
 
-impl<Svc, Sto> RebuildTransition<Svc, Sto>
+impl<Svc, Sto, MSto> RebuildTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
         skip: HashSet<String>,
@@ -42,30 +45,33 @@ where
     }
 
     pub fn state(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
         skip: HashSet<String>,
-    ) -> TransitionState {
+    ) -> TransitionState<SchedulerError<MSto::Error>> {
         TransitionState::new(Self::new(ctx, channel_size, run_id, skip))
     }
 
-    fn into_start(self) -> TransitionState {
+    fn into_start(self) -> TransitionState<SchedulerError<MSto::Error>> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerTransition for RebuildTransition<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerTransition for RebuildTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
+    type Error = SchedulerError<MSto::Error>;
+
     fn warn_msg(&self) -> Option<&'static str> {
         Some("Rebuild in progress, commands will be handled after rebuild completes.")
     }
 
-    async fn execute(self) -> Result<NextState, SchedulerError> {
+    async fn execute(self) -> Result<NextState<Self::Error>, Self::Error> {
         let start = Instant::now();
 
         let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
@@ -101,6 +107,6 @@ where
             start.elapsed()
         );
 
-        Ok(NextState::from(self.into_start()))
+        Ok(NextState::next(self.into_start()))
     }
 }

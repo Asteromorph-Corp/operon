@@ -9,6 +9,7 @@ use crate::dependency_analysis::{
 use crate::macros::spec::peer_txs::{impl_peer_txs, peer_txs_definition};
 use crate::macros::spec::rebuilder::{impl_job_rebuilder, job_rebuilder_definition};
 use crate::macros::spec::spec::{impl_job_spec, impl_spec_utils, job_spec_definition};
+use crate::utils::operon_ident;
 
 /// Generates the `mod spec` module containing the primary spec and job specs.
 pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
@@ -64,9 +65,17 @@ pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
         }
     });
 
+    let operon = operon_ident();
+
     parse_quote! {
         mod spec {
             use super::*;
+
+            // Bring the metadata backend API traits into scope for the generated method calls.
+            #[allow(unused_imports)]
+            use #operon::__private::{
+                MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi, MetaTxApi,
+            };
 
             #(#job_specs)*
         }

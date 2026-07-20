@@ -10,6 +10,7 @@ mod storage;
 mod ui;
 mod utils;
 
+pub use meta_storage::AnyBackend;
 pub use operon::Operon;
 pub use operon_macros::define_operon;
 pub use schema::{Direction, Entity};
@@ -17,7 +18,7 @@ pub use service::OperonService;
 pub use storage::OperonStorage;
 
 pub mod error {
-    pub use crate::meta_storage::MetaStorageError;
+    pub use crate::meta_storage::{AnyBackendError, MemMetaError, MetaStorageError, PsqlMetaError};
     pub use crate::operon::{OperonError, UserError};
     pub use crate::scheduler::SchedulerError;
     pub use crate::storage::{DimState, StorageError};
@@ -25,7 +26,9 @@ pub mod error {
 }
 
 pub mod options {
-    pub use crate::meta_storage::{MetaBackendOptions, PsqlMetaStorageOptions};
+    pub use crate::meta_storage::{
+        MemMetaStorageOptions, MetaBackendOptions, PsqlMetaStorageOptions,
+    };
     pub use crate::operon::OperonOptions;
     #[allow(deprecated)]
     pub use crate::storage::{PsqlStorageOptions, StorageOptions};
@@ -42,7 +45,9 @@ pub mod __private {
     pub use futures;
     pub use tracing;
 
-    pub use crate::meta_storage::{MetaClient, MetaStorage};
+    pub use crate::meta_storage::{
+        MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi, MetaTxApi,
+    };
     pub use crate::scheduler::{
         JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
         PeerEventSenders, REBUILD_CONCURRENCY, SchedulerHandler, SpecWithMetadata, ValidOperon,

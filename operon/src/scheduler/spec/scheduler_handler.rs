@@ -5,7 +5,7 @@ use futures::{StreamExt, TryStreamExt};
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
-use crate::meta_storage::{MetaClient, MetaStorage};
+use crate::meta_storage::{MetaBackend, MetaClientApi};
 use crate::scheduler::events::{
     IndividualControlEventSender, PeerEvent, PeerEventSenderMap, ServicePeerEventReceiver,
     ServicePeerEventSenderMap,
@@ -15,29 +15,31 @@ use crate::schema::{CheckMode, Progress, SharedProgressMap};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct SchedulerHandler<Svc: OperonService, Sto: OperonStorage> {
-    pub job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>,
+pub struct SchedulerHandler<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> {
+    pub job_handlers: Vec<Box<dyn JobHandler<Svc, Sto, MSto>>>,
 }
 
 /// Helper struct for `Scheduler::prepare_channel`
 ///
 /// An association of `JobManager` and event receiver channel
-pub(crate) struct HandlerWithRx<'a, Svc, Sto>
+pub(crate) struct HandlerWithRx<'a, Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    pub handler: &'a dyn JobHandler<Svc, Sto>,
+    pub handler: &'a dyn JobHandler<Svc, Sto, MSto>,
     pub peer_rx: ServicePeerEventReceiver<Svc>,
 }
 
 /// Helper struct for `Scheduler::prepare_channel`
-pub(crate) struct HandlersWithChannels<'a, Svc, Sto>
+pub(crate) struct HandlersWithChannels<'a, Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    pub handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto>>,
+    pub handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto, MSto>>,
     pub peer_txs: PeerEventSenderMap<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
 }
 
@@ -49,8 +51,8 @@ pub(crate) struct ControlChannel {
     pub tx: IndividualControlEventSender,
 }
 
-impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
-    pub fn new(job_handlers: Vec<Box<dyn JobHandler<Svc, Sto>>>) -> Self {
+impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler<Svc, Sto, MSto> {
+    pub fn new(job_handlers: Vec<Box<dyn JobHandler<Svc, Sto, MSto>>>) -> Self {
         Self { job_handlers }
     }
 
@@ -73,7 +75,7 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     pub(crate) fn prepare_channels(
         &self,
         channel_size: usize,
-    ) -> HandlersWithChannels<'_, Svc, Sto> {
+    ) -> HandlersWithChannels<'_, Svc, Sto, MSto> {
         let len = self.job_handlers.len();
 
         let mut schedules_with_rx = Vec::with_capacity(len);
@@ -92,8 +94,8 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
 
     pub(crate) async fn init_meta_storage(
         &self,
-        client: MetaClient<'_>,
-    ) -> Result<(), SchedulerError> {
+        client: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<MSto::Error>> {
         client.init_schema().await?;
         client.init_dimension_hash().await?;
         client.init_ticket_hash().await?;
@@ -118,9 +120,9 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     pub(crate) async fn check_consistency(
         &self,
         storage: &Sto,
-        client: MetaClient<'_>,
+        client: MSto::Client<'_>,
         mode: CheckMode,
-    ) -> Result<Vec<&'static str>, SchedulerError> {
+    ) -> Result<Vec<&'static str>, SchedulerError<MSto::Error>> {
         let mut inconsistent_jobs = Vec::new();
         for schedule in &self.job_handlers {
             if !schedule.check_consistency(storage, client, mode).await? {
@@ -141,15 +143,18 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
 
     pub(crate) async fn clear_resolution(
         &self,
-        client: MetaClient<'_>,
-    ) -> Result<(), SchedulerError> {
+        client: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<MSto::Error>> {
         for spec in &self.job_handlers {
             spec.clear_resolution(client).await?;
         }
         Ok(())
     }
 
-    pub(crate) async fn clear_tickets(&self, client: MetaClient<'_>) -> Result<(), SchedulerError> {
+    pub(crate) async fn clear_tickets(
+        &self,
+        client: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<MSto::Error>> {
         for schedule in &self.job_handlers {
             schedule.clear_tickets(client).await?;
         }
@@ -158,8 +163,8 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
 
     pub(crate) async fn put_default_tickets(
         &self,
-        client: MetaClient<'_>,
-    ) -> Result<(), SchedulerError> {
+        client: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<MSto::Error>> {
         for schedule in &self.job_handlers {
             schedule.put_default_tickets(client).await?;
         }
@@ -169,8 +174,8 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     pub(crate) async fn update_ui(
         &self,
         progresses: &SharedProgressMap,
-        client: MetaClient<'_>,
-    ) -> Result<(), SchedulerError> {
+        client: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<MSto::Error>> {
         for schedule in &self.job_handlers {
             let (done, queued, waiting) = schedule.get_status(client).await?;
             let Some(progress) = progresses.0.get(schedule.job_id()) else {
@@ -185,9 +190,9 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
         &self,
         storage: &Sto,
         progresses: &SharedProgressMap,
-        client: MetaClient<'_>,
+        client: MSto::Client<'_>,
         skip: &HashSet<String>,
-    ) -> Result<Vec<Box<dyn JobRebuilder>>, SchedulerError> {
+    ) -> Result<Vec<Box<dyn JobRebuilder<MSto>>>, SchedulerError<MSto::Error>> {
         futures::stream::iter(self.job_handlers.iter().filter(|handler| {
             std::iter::once(handler.job_id())
                 .chain(handler.all_upstream_jobs())
@@ -206,13 +211,14 @@ impl<Svc: OperonService, Sto: OperonStorage> SchedulerHandler<Svc, Sto> {
     }
 }
 
-impl<'a, Svc, Sto> HandlersWithChannels<'a, Svc, Sto>
+impl<'a, Svc, Sto, MSto> HandlersWithChannels<'a, Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto>>,
+        handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto, MSto>>,
         peer_txs: ServicePeerEventSenderMap<Svc>,
     ) -> Self {
         Self {
@@ -225,7 +231,7 @@ where
         self,
         service: &Arc<Svc>,
         storage: &Arc<Sto>,
-        meta_storage: &MetaStorage,
+        meta_storage: &MSto,
         progresses: &SharedProgressMap,
         clean: bool,
     ) -> (JoinSet<()>, Vec<ControlChannel>) {
@@ -260,13 +266,14 @@ where
     }
 }
 
-impl<'a, Svc, Sto> HandlerWithRx<'a, Svc, Sto>
+impl<'a, Svc, Sto, MSto> HandlerWithRx<'a, Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        handler: &'a dyn JobHandler<Svc, Sto>,
+        handler: &'a dyn JobHandler<Svc, Sto, MSto>,
         peer_rx: ServicePeerEventReceiver<Svc>,
     ) -> Self {
         Self { handler, peer_rx }

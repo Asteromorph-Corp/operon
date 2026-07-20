@@ -11,9 +11,9 @@ use crate::utils::{operon_ident, rebuilder_ident};
 /// async fn prepare_rebuild(
 ///     &self,
 ///     storage: &Sto,
+///     client: MSto::Client<'_>,
 ///     progress: operon::__private::SharedProgress,
-///     client: operon::__private::MetaClient<'_>,
-/// ) -> Result<Box<dyn operon::__private::JobRebuilder>, operon::error::SchedulerError> {
+/// ) -> Result<Box<dyn operon::__private::JobRebuilder<MSto>>, operon::error::SchedulerError<MSto::Error>> {
 ///     use operon::__private::futures::{StreamExt, TryStreamExt};
 ///
 ///     let tickets = client
@@ -36,7 +36,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///                     ))
 ///                 })?;
 ///
-///             Ok::<_, operon::error::SchedulerError>((job, resolution))
+///             Ok::<_, operon::error::SchedulerError<MSto::Error>>((job, resolution))
 ///         },
 ///     ))
 ///     .buffered(operon::__private::REBUILD_CONCURRENCY)
@@ -82,8 +82,8 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             &self,
             storage: &Sto,
             progress: #operon::__private::SharedProgress,
-            client: #operon::__private::MetaClient<'_>,
-        ) -> Result<Box<dyn #operon::__private::JobRebuilder>, #operon::error::SchedulerError>
+            client: MSto::Client<'_>,
+        ) -> Result<Box<dyn #operon::__private::JobRebuilder<MSto>>, #operon::error::SchedulerError<MSto::Error>>
         {
             use #operon::__private::futures::{StreamExt, TryStreamExt};
 
@@ -100,7 +100,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
                     })?;
                     let resolution = #resolution_expr;
 
-                    Ok::<_, #operon::error::SchedulerError>((job, resolution))
+                    Ok::<_, #operon::error::SchedulerError<MSto::Error>>((job, resolution))
                 }
             ))
             .buffered(#operon::__private::REBUILD_CONCURRENCY)

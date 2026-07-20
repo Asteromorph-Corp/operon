@@ -118,6 +118,20 @@ jobs:
   test:
     name: test / ${{ matrix.name }}
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: operon
+          POSTGRES_PASSWORD: operon
+          POSTGRES_DB: operon
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     needs: fmt
     strategy:
       fail-fast: false
@@ -179,6 +193,7 @@ jobs:
       - name: Run tests
         env:
           CARGO_REGISTRIES_KELLNR_TOKEN: ${{ secrets.KELLNR_READONLY_TOKEN }}
+          POSTGRES_URI: postgres://operon:operon@localhost:5432/operon
         run: cargo test $CARGO_PACKAGE_ARGS --locked --all-targets ${{ matrix.args }}
 
       - name: Run doc tests

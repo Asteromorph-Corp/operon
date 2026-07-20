@@ -53,7 +53,9 @@ pub fn impl_job_spec(
     parse_quote! {
         #[#operon::__private::async_trait::async_trait]
         #[automatically_derived]
-        impl<Svc: #svc_ident, Sto: #sto_ident> #operon::__private::JobSpec<Svc, Sto> for #spec_ident {
+        impl<Svc: #svc_ident, Sto: #sto_ident, MSto: #operon::__private::MetaBackend>
+            #operon::__private::JobSpec<Svc, Sto, MSto> for #spec_ident
+        {
             type Job = #operon::__private::Job<#n>;
             type Resolution = #resolution;
             type Ticket = #operon::__private::Ticket<#n>;

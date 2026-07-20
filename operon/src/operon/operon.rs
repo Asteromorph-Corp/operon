@@ -1,8 +1,10 @@
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use futures::future::try_join;
 
 use crate::logger::UiBroadcastLayer;
+use crate::meta_storage::{AnyBackend, MetaBackend, MetaBackendOptions};
 use crate::operon::{OperonError, OperonOptions};
 use crate::scheduler::{Scheduler, ValidOperon};
 use crate::schema::SharedProgressMap;
@@ -15,7 +17,10 @@ use crate::ui::UiLoop;
 /// The interface for the Operon library.
 ///
 /// Provided a data storage and a service, calling `run` will start executing the jobs.
-pub struct Operon<Svc, Sto>
+///
+/// `MSto` selects the metadata backend. It defaults to [`AnyBackend`], which is chosen at runtime
+/// from the [`OperonOptions`]; pin a concrete backend to select it at compile time instead.
+pub struct Operon<Svc, Sto, MSto = AnyBackend>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -24,9 +29,10 @@ where
     service: Arc<Svc>,
     storage: Arc<Sto>,
     options: OperonOptions,
+    _backend: PhantomData<MSto>,
 }
 
-impl<Svc, Sto> Operon<Svc, Sto>
+impl<Svc, Sto> Operon<Svc, Sto, AnyBackend>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -42,18 +48,33 @@ where
             service: service.into(),
             storage: storage.into(),
             options,
+            _backend: PhantomData,
         }
     }
+}
 
+impl<Svc, Sto, MSto> Operon<Svc, Sto, MSto>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    (Svc, Sto): ValidOperon<Svc, Sto>,
+    MSto: MetaBackend<Options = MetaBackendOptions>,
+{
     /// Run the Operon instance with the given primary upper bound.
     ///
     /// This function is intended to be called ONCE in the main thread in a binary executable
     /// context. Running this will take over the terminal, so it is strongly discouraged to make
     /// any other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
-    pub async fn run(self) -> Result<(), OperonError> {
-        let handler = <(Svc, Sto) as ValidOperon<Svc, Sto>>::scheduler_handler();
-        let (ui_options, scheduler_options, log_options) = self.options.split();
+    pub async fn run(self) -> Result<(), OperonError<MSto::Error>> {
+        let Operon {
+            service,
+            storage,
+            options,
+            ..
+        } = self;
+        let (ui_options, scheduler_options, log_options) = options.split();
+        let (channel_size, ui_mode, backend) = scheduler_options.split();
 
         // Initialize the logger
         let (log_tx, log_rx) = ::tokio::sync::broadcast::channel(log_options.buffer_size);
@@ -67,17 +88,21 @@ where
         // Set up the tracing subscriber
         UiBroadcastLayer::new(log_tx, log_options).setup()?;
 
+        let handler = <(Svc, Sto) as ValidOperon<Svc, Sto>>::scheduler_handler::<MSto>();
+
         let progresses = SharedProgressMap::from_jobs(&handler.job_ids());
 
-        // Create the scheduler
-        let scheduler = Scheduler::<Svc, Sto>::new(
-            self.service,
-            self.storage,
+        // Create the scheduler, resolving the backend from the options.
+        let scheduler = Scheduler::<Svc, Sto, MSto>::new(
+            service,
+            storage,
             handler,
             progresses.clone(),
             ctrl_rx,
             sched_tx,
-            scheduler_options,
+            channel_size,
+            ui_mode,
+            backend,
         )?;
         let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 
@@ -87,7 +112,7 @@ where
         try_join(
             async {
                 ui_loop.run().await?;
-                Ok::<_, OperonError>(())
+                Ok::<_, OperonError<MSto::Error>>(())
             },
             async {
                 // A panic (`JoinError`) is fatal (kills the UI);

@@ -1,7 +1,11 @@
 use async_trait::async_trait;
-use operon::error::UserError;
-use operon::options::{OperonOptions, PsqlStorageOptions};
-use operon::{Operon, OperonService, define_operon};
+use clap::{Parser, Subcommand};
+use dashmap::DashMap;
+use operon::error::{StorageError, UserError};
+use operon::options::{
+    MemMetaStorageOptions, OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions, UiMode,
+};
+use operon::{Entity, Operon, OperonService, OperonStorage, define_operon};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -138,16 +142,153 @@ impl CookingService for ExampleService {
     }
 }
 
+/// An entity storage holding one `DashMap` per entity, keyed by the entity's coordinate.
+///
+/// `define_operon!` generates the `CookingStorage` trait, which asks for a `get`/`put` pair per
+/// entity; the batched accessors it also declares come with default implementations built on those.
+/// That trait plus [`OperonStorage`] is everything a storage backend has to provide.
+#[derive(Default)]
+pub struct DashMapCookingStorage {
+    a: DashMap<[usize; 1], A>,
+    b: DashMap<[usize; 2], B>,
+    c: DashMap<[usize; 2], C>,
+    d: DashMap<[usize; 3], D>,
+    e: DashMap<[usize; 2], E>,
+    f: DashMap<[usize; 1], F>,
+}
+
+#[async_trait]
+impl OperonStorage for DashMapCookingStorage {
+    async fn init(&self) -> Result<(), StorageError> {
+        Ok(())
+    }
+
+    async fn clear(&self) -> Result<(), StorageError> {
+        self.a.clear();
+        self.b.clear();
+        self.c.clear();
+        self.d.clear();
+        self.e.clear();
+        self.f.clear();
+        Ok(())
+    }
+
+    // The footprint operations stay at their defaults: they exist to resume a previous run, which
+    // this storage cannot outlive.
+}
+
+#[async_trait]
+impl CookingStorage for DashMapCookingStorage {
+    async fn get_a(&self, coordinate: [usize; 1]) -> Result<Option<A>, StorageError> {
+        Ok(self.a.get(&coordinate).map(|entry| entry.clone()))
+    }
+
+    async fn put_a(&self, entity: Entity<1, A>) -> Result<(), StorageError> {
+        self.a.insert(entity.coordinate, entity.value);
+        Ok(())
+    }
+
+    async fn get_b(&self, coordinate: [usize; 2]) -> Result<Option<B>, StorageError> {
+        Ok(self.b.get(&coordinate).map(|entry| entry.clone()))
+    }
+
+    async fn put_b(&self, entity: Entity<2, B>) -> Result<(), StorageError> {
+        self.b.insert(entity.coordinate, entity.value);
+        Ok(())
+    }
+
+    async fn get_c(&self, coordinate: [usize; 2]) -> Result<Option<C>, StorageError> {
+        Ok(self.c.get(&coordinate).map(|entry| entry.clone()))
+    }
+
+    async fn put_c(&self, entity: Entity<2, C>) -> Result<(), StorageError> {
+        self.c.insert(entity.coordinate, entity.value);
+        Ok(())
+    }
+
+    async fn get_d(&self, coordinate: [usize; 3]) -> Result<Option<D>, StorageError> {
+        Ok(self.d.get(&coordinate).map(|entry| entry.clone()))
+    }
+
+    async fn put_d(&self, entity: Entity<3, D>) -> Result<(), StorageError> {
+        self.d.insert(entity.coordinate, entity.value);
+        Ok(())
+    }
+
+    async fn get_e(&self, coordinate: [usize; 2]) -> Result<Option<E>, StorageError> {
+        Ok(self.e.get(&coordinate).map(|entry| entry.clone()))
+    }
+
+    async fn put_e(&self, entity: Entity<2, E>) -> Result<(), StorageError> {
+        self.e.insert(entity.coordinate, entity.value);
+        Ok(())
+    }
+
+    async fn get_f(&self, coordinate: [usize; 1]) -> Result<Option<F>, StorageError> {
+        Ok(self.f.get(&coordinate).map(|entry| entry.clone()))
+    }
+
+    async fn put_f(&self, entity: Entity<1, F>) -> Result<(), StorageError> {
+        self.f.insert(entity.coordinate, entity.value);
+        Ok(())
+    }
+}
+
+/// Runs the `cooking` pipeline on a storage backend chosen at startup;
+/// defaults to `psql` if no backend is specified.
+#[derive(Parser)]
+#[command(about, long_about = None)]
+struct Cli {
+    /// Log to stdout instead of taking over the terminal with the interactive UI.
+    #[arg(short = 'H', long)]
+    headless: bool,
+
+    #[command(subcommand)]
+    backend: Option<Backend>,
+}
+
+#[derive(Subcommand)]
+enum Backend {
+    /// Keep entities and metadata in memory; nothing survives the run.
+    Mem,
+    /// Keep entities and metadata in PostgreSQL, under the `ex2_data` and `ex2_meta` schemas.
+    Psql {
+        /// Connection URI of the database. Read from `$POSTGRES_URI` when not given.
+        #[arg(env = "POSTGRES_URI", hide_env_values = true)]
+        uri: String,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let database_uri = std::env::var("POSTGRES_URI")?;
-
-    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex2_data");
-    let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex2_meta");
-
+    let cli = Cli::parse();
+    let ui_mode = if cli.headless {
+        UiMode::Headless
+    } else {
+        UiMode::Interactive
+    };
     let service = ExampleService;
-    let storage = PsqlCookingStorage::new(storage_options)?;
-    Operon::new(service, storage, operon_options).run().await?;
+    let backend = cli.backend.unwrap_or(Backend::Psql {
+        uri: std::env::var("POSTGRES_URI")?,
+    });
+
+    match backend {
+        Backend::Mem => {
+            let operon_options =
+                OperonOptions::from_backend(MemMetaStorageOptions::new()).with_ui_mode(ui_mode);
+            let storage = DashMapCookingStorage::default();
+            Operon::new(service, storage, operon_options).run().await?;
+        }
+        Backend::Psql { uri } => {
+            let operon_options = OperonOptions::from_backend(
+                PsqlMetaStorageOptions::new(&uri).with_schema("ex2_meta"),
+            )
+            .with_ui_mode(ui_mode);
+            let storage_options = PsqlStorageOptions::new(&uri).with_schema("ex2_data");
+            let storage = PsqlCookingStorage::new(storage_options)?;
+            Operon::new(service, storage, operon_options).run().await?;
+        }
+    }
 
     Ok(())
 }

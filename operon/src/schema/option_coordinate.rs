@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct OptionCoordinate(pub Option<usize>);
 

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::meta_storage::MetaClient;
+use crate::meta_storage::MetaBackend;
 use crate::scheduler::SchedulerError;
 
 // TODO: Temporary hard-coded value, may be added to the `OperonOptions` in the future.
@@ -8,6 +8,6 @@ use crate::scheduler::SchedulerError;
 pub const REBUILD_CONCURRENCY: usize = 64;
 
 #[async_trait]
-pub trait JobRebuilder: Send + Sync + 'static {
-    async fn rebuild(&self, client: MetaClient<'_>) -> Result<(), SchedulerError>; // `Scheduler::run` 6179~
+pub trait JobRebuilder<MSto: MetaBackend>: Send + Sync + 'static {
+    async fn rebuild(&self, client: MSto::Client<'_>) -> Result<(), SchedulerError<MSto::Error>>;
 }

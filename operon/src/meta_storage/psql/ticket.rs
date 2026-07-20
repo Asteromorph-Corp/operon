@@ -4,8 +4,9 @@ use bytes::Bytes;
 use futures::SinkExt;
 use tokio_postgres::Row;
 
-use crate::meta_storage::MetaStorageError;
-use crate::meta_storage::psql::PsqlClient;
+use crate::meta_storage::psql::error::PsqlResult;
+use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
+use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{
     DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
 };
@@ -76,9 +77,11 @@ impl<'a> PsqlClient<'a> {
     }
 }
 
-impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
+impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
+    type Error = PsqlMetaError;
+
     /// Initializes the ticket table.
-    pub async fn init(&self) -> Result<(), MetaStorageError> {
+    async fn init(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
 
         let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
@@ -101,7 +104,7 @@ impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
     }
 
     /// Clears the ticket table.
-    pub async fn clear(&self) -> Result<(), MetaStorageError> {
+    async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearTicketQuery(schema_prefix, self.job_meta);
         self.client.execute_stmt(&stmt, &[]).await?;
@@ -109,7 +112,7 @@ impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
     }
 
     /// Gets all tickets with a given status.
-    pub async fn get_all(&self, status: TicketStatus) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    async fn get_all(&self, status: TicketStatus) -> PsqlResult<Vec<Ticket<N>>> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetAllTicketQuery(schema_prefix, self.job_meta);
         let rows = self.client.query_stmt(&stmt, &[&status]).await?;
@@ -121,7 +124,7 @@ impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
     }
 
     /// Puts a ticket into the table.
-    pub async fn put(&self, ticket: Ticket<N>) -> Result<(), MetaStorageError> {
+    async fn put(&self, ticket: Ticket<N>) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutTicketQuery(schema_prefix, self.job_meta);
         let params = ticket.as_sql_params()?;
@@ -132,12 +135,12 @@ impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
     /// Raises the `deps_done` count of eligible tickets by 1.
     ///
     /// Returns tickets that are newly `"queued"`.
-    pub async fn raise_deps_done<const M: usize>(
+    async fn raise_deps_done<const M: usize>(
         &self,
         upstream_meta: JobMetadata<M>,
         upstream_job: Job<M>,
         aggregate_dims: &[&'static str],
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    ) -> PsqlResult<Vec<Ticket<N>>> {
         let schema = self.client.schema_prefix();
         let stmt = RaiseDepsDoneQuery(schema, self.job_meta, upstream_meta, aggregate_dims);
 
@@ -160,13 +163,13 @@ impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
     /// Raises the `deps_quota` count of eligible tickets by resolution's `ub` minus 1.
     ///
     /// Returns tickets that are newly `"queued"`.
-    pub async fn raise_deps_quota<const M: usize>(
+    async fn raise_deps_quota<const M: usize>(
         &self,
         upstream_meta: JobMetadata<M>,
         upstream_ticket: Ticket<M>,
         aggregate_dims: &[&'static str],
         ub: usize,
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    ) -> PsqlResult<Vec<Ticket<N>>> {
         let schema = self.client.schema_prefix();
 
         let (cols, values): (Vec<_>, Vec<_>) = upstream_meta
@@ -195,11 +198,11 @@ impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
     /// Explodes the ticket along a dimension at a given coordinate.
     ///
     /// Returns tickets affected.
-    pub async fn explode<const M: usize, const IDX: usize>(
+    async fn explode<const M: usize, const IDX: usize>(
         &self,
         res_meta: DimensionMetadata<M>,
         res: Resolution<M>,
-    ) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    ) -> PsqlResult<Vec<Ticket<N>>> {
         const { assert!(IDX < N) }
         if self.job_meta.dims[IDX] != res_meta.id {
             tracing::warn!("Invalid resolution received for explosion.");
@@ -245,15 +248,17 @@ impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
             .await?;
         let mut sink = Box::pin(sink);
         for ticket in &new_tickets {
-            sink.feed(ticket.to_copy_string()?.into()).await?;
+            sink.feed(ticket.to_copy_string()?.into())
+                .await
+                .map_err(PsqlMetaError::from)?;
         }
-        sink.close().await?;
+        sink.close().await.map_err(PsqlMetaError::from)?;
 
         Ok(tickets)
     }
 
     /// Marks the ticket corresponding to a given job as done.
-    pub async fn mark_done(&self, job: Job<N>) -> Result<(), MetaStorageError> {
+    async fn mark_done(&self, job: Job<N>) -> PsqlResult<()> {
         let schema = self.client.schema_prefix();
         let stmt = MarkDoneQuery(schema, self.job_meta);
         let params = SqlParams::from_usize(job.coordinate)?;
@@ -261,7 +266,7 @@ impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
         Ok(())
     }
 
-    pub async fn get_status(&self) -> Result<(i64, i64, i64), MetaStorageError> {
+    async fn get_status(&self) -> PsqlResult<(i64, i64, i64)> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetStatusQuery(schema_prefix);
 

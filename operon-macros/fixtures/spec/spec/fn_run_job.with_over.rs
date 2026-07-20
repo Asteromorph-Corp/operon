@@ -3,9 +3,9 @@ async fn run_job(
     &self,
     service: &Svc,
     storage: &Sto,
-    meta_storage: operon::__private::MetaStorage,
+    meta_storage: MSto,
     job: Self::Job,
-) -> Result<Self::Resolution, operon::error::SchedulerError> {
+) -> Result<Self::Resolution, operon::error::SchedulerError<MSto::Error>> {
     let [i, k] = job.coordinate;
 
     let (resolution_j) = {
@@ -54,7 +54,7 @@ async fn run_job(
             .take(*ub)
             .enumerate()
             .map(|(j, elem)| Ok(elem))
-            .collect::<Result<Vec<_>, operon::error::SchedulerError>>()
+            .collect::<Result<Vec<_>, operon::error::SchedulerError<MSto::Error>>>()
     }?;
     let d_j = {
         let elem = storage.get_all_d_j([i, k]).await?;
@@ -79,7 +79,7 @@ async fn run_job(
             .take(*ub)
             .enumerate()
             .map(|(j, elem)| Ok(elem))
-            .collect::<Result<Vec<_>, operon::error::SchedulerError>>()
+            .collect::<Result<Vec<_>, operon::error::SchedulerError<MSto::Error>>>()
     }?;
 
     let e = service

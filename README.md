@@ -317,7 +317,7 @@ Once you have all the pieces in place, you can run the Operon engine by construc
 ```rust
 // In operon/examples/ex1.rs (slightly modified):
 
-use operon::{Operon, OperonOptions, OperonStorage, PsqlStorageOptions};
+use operon::{Operon, OperonOptions, OperonStorage, PsqlMetaStorageOptions, PsqlStorageOptions};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -326,7 +326,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_uri = "postgres://username:password@hostname:port/dbname";
     
     let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex1_data");
-    let operon_options = OperonOptions::new(&database_uri).with_meta_storage_schema("ex1_meta");
+    let operon_options = OperonOptions::from_backend(
+        PsqlMetaStorageOptions::new(&database_uri).with_schema("ex1_meta"),
+    );
     
     let service = MySplitterService;
     let storage = PsqlSplitterStorage::new(storage_options)?;

@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tokio::time::Instant;
 use uuid::Uuid;
 
+use crate::meta_storage::{MetaBackend, MetaConnApi};
 use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::events::{ControlEvent, RunEventInner};
@@ -16,12 +17,13 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct StaleState<Svc, Sto>
+pub struct StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     run_id: Uuid,
     kind: StaleKind,
@@ -43,13 +45,14 @@ pub enum RunMode {
     Restore,
 }
 
-impl<Svc, Sto> StaleState<Svc, Sto>
+impl<Svc, Sto, MSto> StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
         run_id: Uuid,
@@ -84,19 +87,22 @@ where
         }
     }
 
-    fn into_clean(self) -> TransitionState {
+    fn into_clean(self) -> TransitionState<SchedulerError<MSto::Error>> {
         CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 
-    fn into_rebuild(self, skip: HashSet<String>) -> TransitionState {
+    fn into_rebuild(self, skip: HashSet<String>) -> TransitionState<SchedulerError<MSto::Error>> {
         RebuildTransition::state(self.ctx, self.channel_size, self.run_id, skip)
     }
 
-    fn into_restore(self) -> TransitionState {
+    fn into_restore(self) -> TransitionState<SchedulerError<MSto::Error>> {
         StartTransition::state(self.ctx, self.channel_size, self.run_id, false)
     }
 
-    async fn run_consistency_check(&mut self, mode: CheckMode) -> Result<(), SchedulerError> {
+    async fn run_consistency_check(
+        &mut self,
+        mode: CheckMode,
+    ) -> Result<(), SchedulerError<MSto::Error>> {
         let check_start = Instant::now();
         let inconsistent_jobs = self
             .ctx
@@ -225,21 +231,22 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerState for StaleState<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerState for StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    async fn handle_progress(
-        self: Box<Self>,
-    ) -> Result<NextState, crate::scheduler::SchedulerError> {
+    type Error = SchedulerError<MSto::Error>;
+
+    async fn handle_progress(self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         Ok(NextState::Next(self))
     }
 
     async fn handle_control_event(
         mut self: Box<Self>,
         evt: ControlEvent,
-    ) -> Result<NextState, crate::scheduler::SchedulerError> {
+    ) -> Result<NextState<Self::Error>, Self::Error> {
         match evt {
             ControlEvent::Check { .. } if self.inconsistent_jobs.is_some() => {
                 tracing::warn!("Already run a check.")
@@ -249,11 +256,11 @@ where
                 self.run_consistency_check(mode).await?
             }
             ControlEvent::Run(run_inner) => match self.choose_run_mode(run_inner) {
-                Some(RunMode::Clean) => return Ok(NextState::from(self.into_clean())),
+                Some(RunMode::Clean) => return Ok(NextState::next(self.into_clean())),
                 Some(RunMode::Rebuild { skip }) => {
-                    return Ok(NextState::from(self.into_rebuild(skip)));
+                    return Ok(NextState::next(self.into_rebuild(skip)));
                 }
-                Some(RunMode::Restore) => return Ok(NextState::from(self.into_restore())),
+                Some(RunMode::Restore) => return Ok(NextState::next(self.into_restore())),
                 None => {}
             },
             ControlEvent::Pause { .. } => {

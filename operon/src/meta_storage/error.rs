@@ -1,14 +1,16 @@
-use std::error::Error;
 use std::num::TryFromIntError;
 
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
-#[derive(Debug, Error)]
-pub enum MetaStorageError {
-    #[error("Database error: {}{}", .0, .0.source().map_or_else(String::new, |e| format!(", cause: {e}")))]
-    DatabaseError(#[from] tokio_postgres::Error),
-    #[error("Database pool error: {0}")]
-    DatabasePoolError(#[from] deadpool_postgres::PoolError),
+/// A metadata result over a backend error `MErr`.
+pub(crate) type MetaResult<T, MErr> = Result<T, MetaStorageError<MErr>>;
+
+/// A metadata storage error.
+///
+/// Collects the backend-neutral domain errors any backend can raise, alongside the backend's own
+/// error type `MErr` carried by [`Backend`](Self::Backend).
+#[derive(Debug, ThisError)]
+pub enum MetaStorageError<MErr> {
     #[error("Integer conversion error: {0}")]
     IntegerConversionError(#[from] TryFromIntError),
     #[error("Invalid run state: {0}")]
@@ -27,8 +29,6 @@ pub enum MetaStorageError {
     },
     #[error("Internal error: {0}")]
     Internal(&'static str),
-    #[error("Metadata pool size {0} is not allowed")]
-    PoolSizeTooSmall(usize),
     #[error("Another Operon instance is already running against metadata schema `{0}`")]
     SchemaLocked(String),
     #[error(
@@ -36,6 +36,8 @@ pub enum MetaStorageError {
          otherwise released); stopping to avoid running unguarded"
     )]
     LockLost(String),
+    #[error(transparent)]
+    Backend(MErr),
 }
 
 fn fmt_deps(deps: &[(&'static str, usize)]) -> String {
@@ -45,7 +47,7 @@ fn fmt_deps(deps: &[(&'static str, usize)]) -> String {
         .join(", ")
 }
 
-impl MetaStorageError {
+impl<MErr> MetaStorageError<MErr> {
     pub fn invalid_explosion(job: &'static str, dim: &'static str) -> Self {
         Self::InvalidExplosion { job, dim }
     }
@@ -53,10 +55,21 @@ impl MetaStorageError {
     pub fn missing_ticket_summary(job: &'static str) -> Self {
         Self::MissingTicketSummary { job }
     }
-}
 
-impl From<deadpool_postgres::BuildError> for MetaStorageError {
-    fn from(_: deadpool_postgres::BuildError) -> Self {
-        Self::Internal("Failed to build connection pool")
+    /// Remaps the backend error, passing the domain variants through unchanged.
+    pub(crate) fn map_backend<U>(self, f: impl FnOnce(MErr) -> U) -> MetaStorageError<U> {
+        match self {
+            Self::IntegerConversionError(e) => MetaStorageError::IntegerConversionError(e),
+            Self::InvalidRunState(s) => MetaStorageError::InvalidRunState(s),
+            Self::InvalidExplosion { job, dim } => MetaStorageError::InvalidExplosion { job, dim },
+            Self::MissingTicketSummary { job } => MetaStorageError::MissingTicketSummary { job },
+            Self::MissingResolution { dim, deps } => {
+                MetaStorageError::MissingResolution { dim, deps }
+            }
+            Self::Internal(s) => MetaStorageError::Internal(s),
+            Self::SchemaLocked(s) => MetaStorageError::SchemaLocked(s),
+            Self::LockLost(s) => MetaStorageError::LockLost(s),
+            Self::Backend(e) => MetaStorageError::Backend(f(e)),
+        }
     }
 }
