@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
-use operon::{Operon, OperonService, define_operon};
+use operon::{Operon, OperonService, PsqlMetaStorage, define_operon};
 use serde::{Deserialize, Serialize};
 
 //# —————————————————————— A. Entity Definitions —————————————————————— #//
@@ -117,11 +117,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // or use some other method like `.env`-`dotenvy` to load it.
     let database_uri = std::env::var("POSTGRES_URI")?;
 
-    // The two settings object
-    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex1_data");
-    let operon_options = OperonOptions::from_backend(
-        PsqlMetaStorageOptions::new(&database_uri).with_schema("ex1_meta"),
-    );
+    // The run settings.
+    let operon_options = OperonOptions::new();
 
     //# ——————————————————— Initializing Settings ————————————————————— #//
     // The service is what we defined above —
@@ -132,7 +129,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Here, we use `PsqlSplitterStorage` for the storage.
     // This is an automatically generated storage implementation
     // based on a PostgreSQL database.
-    let storage = Arc::new(PsqlSplitterStorage::new(storage_options)?);
+    let storage = Arc::new(
+        PsqlStorageOptions::new(&database_uri)
+            .with_schema("ex1_data")
+            .build::<PsqlSplitterStorage>()?,
+    );
+
+    // The metadata backend, built and handed to Operon.
+    let meta = PsqlMetaStorageOptions::new(&database_uri)
+        .with_schema("ex1_meta")
+        .build()?;
 
     //# ———————————————————————— Running Operon ——————————————————————— #//
     // Now we finally run Operon.
@@ -141,8 +147,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We cloned the `storage` Arc because we intend to access the storage
     // after the Operon instance has finished running,
     // but this is entirely optional.
-    let operon_instance: Operon<MySplitterService, PsqlSplitterStorage> =
-        Operon::new(service, storage.clone(), operon_options);
+    let operon_instance: Operon<MySplitterService, PsqlSplitterStorage, PsqlMetaStorage> =
+        Operon::new(service, storage.clone(), meta).with_options(operon_options);
 
     // This will start the Operon UI in the terminal,
     // where we can control the execution of the pipeline.

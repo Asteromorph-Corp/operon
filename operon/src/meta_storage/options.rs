@@ -1,5 +1,6 @@
 use crate::meta_storage::mem::MemMetaStorageOptions;
 use crate::meta_storage::psql::PsqlMetaStorageOptions;
+use crate::meta_storage::{AnyBackend, AnyBackendError, MetaBackend, MetaStorageError};
 
 /// Selects and parameterizes the metadata storage backend.
 ///
@@ -7,16 +8,16 @@ use crate::meta_storage::psql::PsqlMetaStorageOptions;
 /// variant owns its backend's full parameter set (e.g. [`Psql`](MetaBackendOptions::Psql) carries a
 /// [`PsqlMetaStorageOptions`]), so backend-specific knobs never leak into backend-agnostic options.
 ///
+/// Build the selected backend into an [`AnyBackend`](crate::AnyBackend) with
+/// [`build`](Self::build), then hand it to [`Operon::new`](crate::Operon::new).
+/// To pin a backend at compile time, build its concrete options directly (e.g.
+/// [`PsqlMetaStorageOptions::build`]).
+///
 /// # Stability
 ///
 /// This enum is `#[non_exhaustive]`: adding a backend variant must stay a non-breaking change.
 /// Reach it through the provided constructors (e.g. [`psql`]) or a [`From`] conversion rather than
 /// naming variants directly.
-///
-/// The *convenience* entry points that assume Postgres — notably
-/// [`OperonOptions::from_psql_uri`](crate::options::OperonOptions::from_psql_uri) — are **not**
-/// covered by this guarantee. Code that wants to stay backend-agnostic should go through this enum
-/// via [`OperonOptions::from_backend`](crate::options::OperonOptions::from_backend).
 ///
 /// [`psql`]: MetaBackendOptions::psql
 #[non_exhaustive]
@@ -41,6 +42,15 @@ impl MetaBackendOptions {
     /// The metadata lives in process and is lost when it exits.
     pub fn mem() -> Self {
         MetaBackendOptions::Mem(MemMetaStorageOptions::new())
+    }
+
+    /// Builds the metadata backend selected by these options into an [`AnyBackend`].
+    ///
+    /// The concrete backend is resolved at runtime from the chosen variant.
+    /// To pin a backend at compile time, build its concrete options instead
+    /// (e.g. [`PsqlMetaStorageOptions::build`]).
+    pub fn build(self) -> Result<AnyBackend, MetaStorageError<AnyBackendError>> {
+        <AnyBackend as MetaBackend>::new(self)
     }
 }
 

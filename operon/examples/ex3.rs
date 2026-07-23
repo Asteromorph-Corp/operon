@@ -95,14 +95,17 @@ impl StressTestService for MyService {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
 
-    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex3_data");
-    let operon_options = OperonOptions::from_backend(
-        PsqlMetaStorageOptions::new(&database_uri).with_schema("ex3_meta"),
-    );
-
     let service = MyService;
-    let storage = PsqlStressTestStorage::new(storage_options)?;
-    Operon::new(service, storage, operon_options).run().await?;
+    let storage = PsqlStorageOptions::new(&database_uri)
+        .with_schema("ex3_data")
+        .build::<PsqlStressTestStorage>()?;
+    let meta = PsqlMetaStorageOptions::new(&database_uri)
+        .with_schema("ex3_meta")
+        .build()?;
+    Operon::new(service, storage, meta)
+        .with_options(OperonOptions::new())
+        .run()
+        .await?;
 
     Ok(())
 }

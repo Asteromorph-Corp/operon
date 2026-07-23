@@ -1,5 +1,8 @@
 use secrecy::SecretString;
 
+use crate::storage::StorageError;
+use crate::storage::psql::{FromPsqlStorageOptions, PsqlStorageError};
+
 /// Configuration for the Postgres entity-storage backend.
 pub struct PsqlStorageOptions {
     pub database_uri: SecretString,
@@ -50,5 +53,20 @@ impl PsqlStorageOptions {
 
         self.schema = Some(schema);
         self
+    }
+
+    /// Builds the Postgres entity storage for a pipeline from these options.
+    ///
+    /// Turbofish or name the generated storage type to select the pipeline:
+    ///
+    /// ```rust,ignore
+    /// let psql_storage_options = PsqlStorageOptions::new("postgresql://user:pass@localhost/db")
+    ///     .with_schema("my_data_schema")
+    ///     .with_pool_size(32);
+    /// let storage = psql_storage_options.build::<PsqlCookingStorage>()?;
+    /// let storage: PsqlCookingStorage = psql_storage_options.build()?;
+    /// ```
+    pub fn build<S: FromPsqlStorageOptions>(self) -> Result<S, StorageError<PsqlStorageError>> {
+        S::from_options(self)
     }
 }

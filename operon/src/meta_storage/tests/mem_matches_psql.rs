@@ -482,7 +482,7 @@ async fn exercise<MSto: MetaBackend>(backend: &MSto) -> Vec<Step> {
 fn psql_backend() -> Option<PsqlMetaStorage> {
     let uri = std::env::var("POSTGRES_URI").ok()?;
     let options = PsqlMetaStorageOptions::new(uri).with_schema(SCHEMA);
-    Some(PsqlMetaStorage::new(options).expect("build the Postgres backend"))
+    Some(options.build().expect("build the Postgres backend"))
 }
 
 #[tokio::test]

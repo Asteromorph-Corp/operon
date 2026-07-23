@@ -28,6 +28,13 @@ impl std::fmt::Debug for MemMetaStorage {
     }
 }
 
+impl MemMetaStorage {
+    pub(super) fn build_infallible(options: MemMetaStorageOptions) -> Self {
+        _ = options;
+        Self::default()
+    }
+}
+
 impl MetaBackend for MemMetaStorage {
     type Options = MemMetaStorageOptions;
     type Error = MemMetaError;
@@ -37,8 +44,8 @@ impl MetaBackend for MemMetaStorage {
     type Ticket<'a, const N: usize> = MemTicketQueryBuilder<'a, N>;
     type Resolution<'a, const N: usize> = MemResolutionQueryBuilder<'a, N>;
 
-    fn new(_options: MemMetaStorageOptions) -> MemResult<Self> {
-        Ok(Self::default())
+    fn new(options: MemMetaStorageOptions) -> MemResult<Self> {
+        Ok(Self::build_infallible(options))
     }
 
     async fn worker_conn(&self) -> MemResult<MemConn> {

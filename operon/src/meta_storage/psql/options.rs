@@ -2,6 +2,9 @@ use std::time::Duration;
 
 use secrecy::SecretString;
 
+use crate::meta_storage::psql::{PsqlMetaError, PsqlMetaStorage};
+use crate::meta_storage::{MetaBackend, MetaStorageError};
+
 /// Configuration for the Postgres metadata backend.
 ///
 /// Carries every knob specific to Postgres: the connection URI, the connection-pool size, the
@@ -61,5 +64,10 @@ impl PsqlMetaStorageOptions {
     pub fn with_keepalives_interval(mut self, duration: Duration) -> Self {
         self.keepalives_interval = duration;
         self
+    }
+
+    /// Builds the Postgres metadata backend from these options.
+    pub fn build(self) -> Result<PsqlMetaStorage, MetaStorageError<PsqlMetaError>> {
+        PsqlMetaStorage::new(self)
     }
 }

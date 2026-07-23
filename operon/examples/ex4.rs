@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
-use operon::{Operon, OperonService, define_operon};
+use operon::{Operon, OperonService, PsqlMetaStorage, define_operon};
 use serde::{Deserialize, Serialize};
 
 // ———————————————— Entity Definitions ———————————————— //
@@ -148,17 +148,20 @@ impl SensorsService for SensorService {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_uri = std::env::var("POSTGRES_URI")?;
 
-    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex4_data");
-    let operon_options = OperonOptions::from_backend(
-        PsqlMetaStorageOptions::new(&database_uri).with_schema("ex4_meta"),
-    )
-    .with_log_dump("./dump");
+    let operon_options = OperonOptions::new().with_log_dump("./dump");
 
     let service = Arc::new(SensorService);
-    let storage = Arc::new(PsqlSensorsStorage::new(storage_options)?);
+    let storage = Arc::new(
+        PsqlStorageOptions::new(&database_uri)
+            .with_schema("ex4_data")
+            .build::<PsqlSensorsStorage>()?,
+    );
+    let meta = PsqlMetaStorageOptions::new(&database_uri)
+        .with_schema("ex4_meta")
+        .build()?;
 
-    let operon_instance: Operon<SensorService, PsqlSensorsStorage> =
-        Operon::new(service, storage.clone(), operon_options);
+    let operon_instance: Operon<SensorService, PsqlSensorsStorage, PsqlMetaStorage> =
+        Operon::new(service, storage.clone(), meta).with_options(operon_options);
 
     operon_instance.run().await?;
 

@@ -278,19 +278,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     match backend {
         Backend::Mem => {
-            let operon_options =
-                OperonOptions::from_backend(MemMetaStorageOptions::new()).with_ui_mode(ui_mode);
+            let operon_options = OperonOptions::new().with_ui_mode(ui_mode);
+            let meta = MemMetaStorageOptions::new().build();
             let storage = DashMapCookingStorage::default();
-            Operon::new(service, storage, operon_options).run().await?;
+            Operon::new(service, storage, meta)
+                .with_options(operon_options)
+                .run()
+                .await?;
         }
         Backend::Psql { uri } => {
-            let operon_options = OperonOptions::from_backend(
-                PsqlMetaStorageOptions::new(&uri).with_schema("ex2_meta"),
-            )
-            .with_ui_mode(ui_mode);
-            let storage_options = PsqlStorageOptions::new(&uri).with_schema("ex2_data");
-            let storage = PsqlCookingStorage::new(storage_options)?;
-            Operon::new(service, storage, operon_options).run().await?;
+            let operon_options = OperonOptions::new().with_ui_mode(ui_mode);
+            let meta = PsqlMetaStorageOptions::new(&uri)
+                .with_schema("ex2_meta")
+                .build()?;
+            let storage = PsqlStorageOptions::new(&uri)
+                .with_schema("ex2_data")
+                .build::<PsqlCookingStorage>()?;
+            Operon::new(service, storage, meta)
+                .with_options(operon_options)
+                .run()
+                .await?;
         }
     }
 

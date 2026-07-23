@@ -30,8 +30,22 @@ impl<T> PsqlStorage<T> {
     }
 }
 
+/// Constructs a concrete [`PsqlStorage`] alias from [`PsqlStorageOptions`].
+///
+/// This lets [`PsqlStorageOptions::build`](crate::options::PsqlStorageOptions::build) be
+/// turbofished on the generated storage alias, e.g. `build::<PsqlCookingStorage>()`.
+pub trait FromPsqlStorageOptions: Sized {
+    fn from_options(options: PsqlStorageOptions) -> PsqlStorageResult<Self>;
+}
+
+impl<T: Default> FromPsqlStorageOptions for PsqlStorage<T> {
+    fn from_options(options: PsqlStorageOptions) -> PsqlStorageResult<Self> {
+        PsqlStorage::<T>::new(options)
+    }
+}
+
 impl<T: Default> PsqlStorage<T> {
-    pub fn new(options: PsqlStorageOptions) -> PsqlStorageResult<Self> {
+    pub(crate) fn new(options: PsqlStorageOptions) -> PsqlStorageResult<Self> {
         let pg_config: tokio_postgres::Config = {
             let mut config = options
                 .database_uri

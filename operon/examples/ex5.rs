@@ -10,8 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use operon::error::StorageResult;
-use operon::options::{MetaBackendOptions, OperonOptions, UiMode};
-use operon::{Entity, Operon, OperonService, OperonStorage, define_operon};
+use operon::options::{MemMetaStorageOptions, OperonOptions, UiMode};
+use operon::{Entity, MemMetaStorage, Operon, OperonService, OperonStorage, define_operon};
 
 type A = String;
 type B = String;
@@ -135,12 +135,12 @@ impl FanoutStorage for DashMapStorage {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Headless mode starts the run immediately and exits once it finishes, so this example needs
     // neither a database nor a terminal to drive it.
-    let operon_options =
-        OperonOptions::from_backend(MetaBackendOptions::mem()).with_ui_mode(UiMode::Headless);
+    let operon_options = OperonOptions::new().with_ui_mode(UiMode::Headless);
 
+    let meta = MemMetaStorageOptions::new().build();
     let storage = Arc::new(DashMapStorage::default());
-    let operon: Operon<WordCounter, DashMapStorage> =
-        Operon::new(WordCounter, storage.clone(), operon_options);
+    let operon: Operon<WordCounter, DashMapStorage, MemMetaStorage> =
+        Operon::new(WordCounter, storage.clone(), meta).with_options(operon_options);
 
     operon.run().await?;
 
