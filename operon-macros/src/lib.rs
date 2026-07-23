@@ -7,7 +7,7 @@ mod utils;
 mod test_utils;
 
 use proc_macro::TokenStream;
-use proc_macro_error::ResultExt;
+use proc_macro_error::{ResultExt, proc_macro_error};
 use quote::{ToTokens, quote};
 use syn::{DeriveInput, parse_macro_input, parse_quote};
 
@@ -17,6 +17,7 @@ use crate::utils::{extract_attr, get_operon_attrs, operon_ident};
 // TODO: use text fixtures instead of constructing the configs in code.
 
 #[proc_macro]
+#[proc_macro_error]
 pub fn define_operon(input: TokenStream) -> TokenStream {
     let all_configs: crate::configs::AllConfig = match syn::parse(input) {
         Ok(config) => config,
@@ -35,6 +36,7 @@ pub fn define_operon(input: TokenStream) -> TokenStream {
 /// - `#[operon(defined_at = "path")]`: path to where `define_operon!` was invoked (default `self`)
 /// - `#[operon(crate = "path")]`: path to the `operon` crate (default `::operon`)
 #[proc_macro_derive(OperonService, attributes(operon))]
+#[proc_macro_error]
 pub fn derive_operon_service(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let attrs = extract_attr(&input.attrs, get_operon_attrs).unwrap_or_abort();
