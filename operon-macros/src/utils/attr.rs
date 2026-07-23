@@ -42,8 +42,7 @@ pub fn get_operon_attrs(attr: &syn::Attribute) -> Result<Option<OperonAttrs>, Di
         }
         if meta.path.is_ident("error") {
             let value = meta.value()?;
-            let lit: syn::LitStr = value.parse()?;
-            let ty = parse_str::<syn::Type>(&lit.value())?;
+            let ty: syn::Type = value.parse()?;
             error_type = Some(ty)
         }
 
