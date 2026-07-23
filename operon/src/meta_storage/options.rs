@@ -1,6 +1,6 @@
 use crate::meta_storage::mem::MemMetaStorageOptions;
 use crate::meta_storage::psql::PsqlMetaStorageOptions;
-use crate::meta_storage::{AnyBackend, AnyBackendError, MetaBackend, MetaStorageError};
+use crate::meta_storage::{AnyBackend, AnyBackendError, MetaStorageError};
 
 /// Selects and parameterizes the metadata storage backend.
 ///
@@ -50,7 +50,10 @@ impl MetaBackendOptions {
     /// To pin a backend at compile time, build its concrete options instead
     /// (e.g. [`PsqlMetaStorageOptions::build`]).
     pub fn build(self) -> Result<AnyBackend, MetaStorageError<AnyBackendError>> {
-        <AnyBackend as MetaBackend>::new(self)
+        match self {
+            MetaBackendOptions::Psql(options) => Ok(AnyBackend::Psql(options.build()?)),
+            MetaBackendOptions::Mem(options) => Ok(AnyBackend::Mem(options.build())),
+        }
     }
 }
 

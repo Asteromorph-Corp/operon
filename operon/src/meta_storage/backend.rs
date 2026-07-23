@@ -20,9 +20,6 @@ use crate::schema::{
 /// The handle is stored by value and cloned across `tokio::spawn`, hence the `Clone + Send + Sync +
 /// 'static` bounds.
 pub trait MetaBackend: Clone + std::fmt::Debug + Send + Sync + Sized + 'static {
-    /// The backend-specific options this backend is constructed from.
-    type Options;
-
     /// This backend's own error type, surfaced through
     /// [`MetaStorageError::Backend`](crate::meta_storage::MetaStorageError::Backend).
     type Error: std::error::Error + Send + Sync + 'static;
@@ -52,9 +49,6 @@ pub trait MetaBackend: Clone + std::fmt::Debug + Send + Sync + Sized + 'static {
     type Resolution<'a, const N: usize>: MetaResolutionApi<N, Error = Self::Error> + Send
     where
         Self: 'a;
-
-    /// Builds the backend from its options.
-    fn new(options: Self::Options) -> MetaResult<Self, Self::Error>;
 
     /// Checks out a connection for a spawned worker.
     fn worker_conn(&self) -> impl Future<Output = MetaResult<Self::Conn<'_>, Self::Error>> + Send;

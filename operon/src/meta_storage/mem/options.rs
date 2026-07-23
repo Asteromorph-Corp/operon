@@ -14,9 +14,6 @@ impl MemMetaStorageOptions {
 
     /// Builds the in-memory metadata backend from these options.
     pub fn build(self) -> MemMetaStorage {
-        // Uses an internal `build_infallible` instead of `MetaBackend::new` to avoid a `Result`
-        // that `MetaBackend` requires; if this ever becomes fallible, call
-        // `MemMetaStorage::new(self)` instead.
-        MemMetaStorage::build_infallible(self)
+        MemMetaStorage::default()
     }
 }
