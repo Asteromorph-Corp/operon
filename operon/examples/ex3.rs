@@ -102,9 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let meta = PsqlMetaStorageOptions::new(&database_uri)
         .with_schema("ex3_meta")
         .build()?;
-    Operon::new(service, storage, meta)
-        .run()
-        .await?;
+    Operon::new(service, storage, meta).run().await?;
 
     Ok(())
 }
