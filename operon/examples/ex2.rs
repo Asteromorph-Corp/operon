@@ -266,19 +266,18 @@ enum Backend {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cli = Cli::parse();
-    let ui_mode = if cli.headless {
-        UiMode::Headless
-    } else {
-        UiMode::Interactive
-    };
     let service = ExampleService;
     let backend = cli.backend.unwrap_or(Backend::Psql {
         uri: std::env::var("POSTGRES_URI")?,
     });
+    let operon_options = OperonOptions::new().with_ui_mode(if cli.headless {
+        UiMode::Headless
+    } else {
+        UiMode::Interactive
+    });
 
     match backend {
         Backend::Mem => {
-            let operon_options = OperonOptions::new().with_ui_mode(ui_mode);
             let meta = MemMetaStorageOptions::new().build();
             let storage = DashMapCookingStorage::default();
             Operon::new(service, storage, meta)
@@ -287,7 +286,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .await?;
         }
         Backend::Psql { uri } => {
-            let operon_options = OperonOptions::new().with_ui_mode(ui_mode);
             let meta = PsqlMetaStorageOptions::new(&uri)
                 .with_schema("ex2_meta")
                 .build()?;

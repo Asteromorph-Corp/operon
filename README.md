@@ -317,7 +317,7 @@ Surface-level run settings (UI mode, logging) live in a separate `OperonOptions`
 ```rust
 // In operon/examples/ex1.rs (slightly modified):
 
-use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
+use operon::options::{PsqlMetaStorageOptions, PsqlStorageOptions};
 use operon::{Operon, PsqlMetaStorage};
 
 #[tokio::main]
@@ -335,7 +335,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //# ———————————————————————— Running Operon ——————————————————————— #//
     Operon::new(service, storage, meta)
-        .with_options(OperonOptions::new())
         .run()
         .await?;
 

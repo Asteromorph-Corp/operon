@@ -1,4 +1,4 @@
-use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
+use operon::options::{PsqlMetaStorageOptions, PsqlStorageOptions};
 use operon::{Operon, OperonService, define_operon};
 use rand::Rng;
 
@@ -103,7 +103,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_schema("ex3_meta")
         .build()?;
     Operon::new(service, storage, meta)
-        .with_options(OperonOptions::new())
         .run()
         .await?;
 

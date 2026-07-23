@@ -329,7 +329,7 @@ C = create_c(B) for i;
 The generated artifacts integrate with the Operon runtime system:
 
 ```rust
-use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
+use operon::options::{PsqlMetaStorageOptions, PsqlStorageOptions};
 use operon::Operon;
 
 // Implement the generated service trait
@@ -351,7 +351,7 @@ let meta = PsqlMetaStorageOptions::new(&database_uri)
     .build()?;
 
 // Run the pipeline
-let operon = Operon::new(MyService, storage, meta).with_options(OperonOptions::new());
+let operon = Operon::new(MyService, storage, meta);
 operon.run().await?;
 ```
 
