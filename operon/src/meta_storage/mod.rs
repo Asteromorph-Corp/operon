@@ -14,10 +14,10 @@ pub(crate) use error::MetaResult;
 pub use error::MetaStorageError;
 
 mod mem;
-pub use mem::{MemMetaError, MemMetaStorageOptions};
+pub use mem::{MemMetaError, MemMetaStorage, MemMetaStorageOptions};
 
 mod psql;
-pub use psql::{PsqlMetaError, PsqlMetaStorageOptions};
+pub use psql::{PsqlMetaError, PsqlMetaStorage, PsqlMetaStorageOptions};
 
 #[cfg(test)]
 mod tests;

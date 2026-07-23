@@ -46,20 +46,19 @@ where
     Svc: OperonService,
     MSto: MetaBackend,
 {
-    /// Initialize a new scheduler and its associated storages.
+    /// Initialize a new scheduler with the given components.
     pub fn new(
         service: Arc<Svc>,
         storage: Arc<Sto>,
+        meta_storage: MSto,
         handler: SchedulerHandler<Svc, Sto, MSto>,
         progresses: SharedProgressMap,
         ctrl_rx: ControlEventReceiver,
         sched_tx: SchedulerStateSender,
         channel_size: usize,
         ui_mode: UiMode,
-        backend: MSto::Options,
-    ) -> SchedulerResult<Self, Svc::Error, Sto::Error, MSto::Error> {
+    ) -> Self {
         handler.validate_pool_sizes();
-        let meta_storage = MSto::new(backend)?;
 
         let ctx = SchedulerContext {
             service,
@@ -69,13 +68,13 @@ where
             progresses,
         };
 
-        Ok(Self {
+        Self {
             ctx,
             ctrl_rx,
             sched_tx,
             channel_size,
             ui_mode,
-        })
+        }
     }
 
     /// Main entry point for the scheduler.

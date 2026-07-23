@@ -286,20 +286,19 @@ The exact signature of each task function is parsed from the pipeline definition
 ### Implementing the Storage (Optional)
 
 The Operon engine assumes all entities are accessible through a storage interface — we call this interface the `{PipelineName}Storage` trait.
-We provide a struct `Psql{PipelineName}Storage` that already implements this trait using PostgreSQL, which can be constructed as follows:
+We provide a struct `Psql{PipelineName}Storage` that already implements this trait using PostgreSQL, which you build from `PsqlStorageOptions` — turbofish the storage alias to select your pipeline:
 
 ```rust
 // In operon/examples/ex1.rs (slightly modified):
 
-use operon::PsqlStorageOptions;
+use operon::options::PsqlStorageOptions;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // ...
-    let storage = PsqlSplitterStorage::new(
-        PsqlStorageOptions::new("postgres://username:password@hostname:port/dbname")
-            .with_schema("data"),
-    )?;
+    let storage = PsqlStorageOptions::new("postgres://username:password@hostname:port/dbname")
+        .with_schema("data")
+        .build::<PsqlSplitterStorage>()?;
     // ...
 }
 ```
@@ -312,29 +311,32 @@ However, note that the engine will not provide recoverability if the storage is 
 
 ### Running Operon
 
-Once you have all the pieces in place, you can run the Operon engine by constructing an `Operon` instance and calling the `.run()` method.
+Once you have all the pieces in place, you build the metadata backend, construct an `Operon` instance from your service, storage, and that backend, then call the `.run()` method.
+Surface-level run settings (UI mode, logging) live in a separate `OperonOptions` you attach with `.with_options(...)`.
 
 ```rust
 // In operon/examples/ex1.rs (slightly modified):
 
-use operon::{Operon, OperonOptions, OperonStorage, PsqlMetaStorageOptions, PsqlStorageOptions};
-use std::sync::Arc;
+use operon::options::{PsqlMetaStorageOptions, PsqlStorageOptions};
+use operon::{Operon, PsqlMetaStorage};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //# ——————————————————— Initializing Settings ————————————————————— #//
     let database_uri = "postgres://username:password@hostname:port/dbname";
-    
-    let storage_options = PsqlStorageOptions::new(&database_uri).with_schema("ex1_data");
-    let operon_options = OperonOptions::from_backend(
-        PsqlMetaStorageOptions::new(&database_uri).with_schema("ex1_meta"),
-    );
-    
+
     let service = MySplitterService;
-    let storage = PsqlSplitterStorage::new(storage_options)?;
+    let storage = PsqlStorageOptions::new(&database_uri)
+        .with_schema("ex1_data")
+        .build::<PsqlSplitterStorage>()?;
+    let meta = PsqlMetaStorageOptions::new(&database_uri)
+        .with_schema("ex1_meta")
+        .build()?;
 
     //# ———————————————————————— Running Operon ——————————————————————— #//
-    Operon::new(service, storage, operon_options).run().await?;
+    Operon::new(service, storage, meta)
+        .run()
+        .await?;
 
     Ok(())
 }
@@ -345,7 +347,7 @@ If the execution is successful, the results will be stored in the storage, and y
 
 #### Operon TUI
 
-When run in Interactive mode (`.with_ui_options(UiOptions::Interactive)` in `OperonOptions`, which is the default behavior), the Operon engine takes over the terminal and launches a text user interface (TUI).
+When run in Interactive mode (`.with_ui_mode(UiMode::Interactive)` in `OperonOptions`, which is the default behavior), the Operon engine takes over the terminal and launches a text user interface (TUI).
 The UI allows you to interact with the engine and control the workflow using shell-like commands.
 
 ```text
@@ -394,7 +396,7 @@ Commands:
     help                Print this help message.
 ```
 
-You may disable the UI by setting `.with_ui_options(UiOptions::Headless)` in `OperonOptions`.
+You may disable the UI by setting `.with_ui_mode(UiMode::Headless)` in `OperonOptions`.
 Certain features, such as real-time monitoring, pause/resume functionality, and recovery options, will not be available in Headless mode.
 
 ## Roadmap

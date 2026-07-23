@@ -1,7 +1,7 @@
 //! The runtime-selected metadata backend.
 //!
 //! [`AnyBackend`] is a [`MetaBackend`] whose concrete backend is chosen at runtime from
-//! [`MetaBackendOptions`].
+//! [`MetaBackendOptions`](crate::meta_storage::MetaBackendOptions).
 //! It is the default `MSto` for [`Operon`](crate::Operon), and is used to select between available
 //! backends at runtime.
 
@@ -16,8 +16,8 @@ use crate::meta_storage::psql::{
     PsqlTicketQueryBuilder, PsqlTx,
 };
 use crate::meta_storage::{
-    MetaBackend, MetaBackendOptions, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaResult,
-    MetaStorageError, MetaTicketApi, MetaTxApi,
+    MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaResult, MetaStorageError,
+    MetaTicketApi, MetaTxApi,
 };
 use crate::schema::{
     DimensionMetadata, Job, JobMetadata, Resolution, RunFootprint, Ticket, TicketStatus,
@@ -27,14 +27,14 @@ use crate::schema::{
 macro_rules! map_lift_backend {
     ($self:expr, | $inner:ident | $call:expr) => {
         match $self {
-            Self::Psql($inner) => $call.map_err(lift_psql),
-            Self::Mem($inner) => $call.map_err(lift_mem),
+            Self::Psql($inner) => $call.map_err(Into::into),
+            Self::Mem($inner) => $call.map_err(Into::into),
         }
     };
     ($self:expr, | $inner:ident | $call:expr => $wrap:ident) => {
         match $self {
-            Self::Psql($inner) => $call.map($wrap::Psql).map_err(lift_psql),
-            Self::Mem($inner) => $call.map($wrap::Mem).map_err(lift_mem),
+            Self::Psql($inner) => $call.map($wrap::Psql).map_err(Into::into),
+            Self::Mem($inner) => $call.map($wrap::Mem).map_err(Into::into),
         }
     };
 }
@@ -49,7 +49,8 @@ macro_rules! map_backend {
     };
 }
 
-/// A metadata backend selected at runtime from [`MetaBackendOptions`].
+/// A metadata backend selected at runtime from
+/// [`MetaBackendOptions`](crate::meta_storage::MetaBackendOptions).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum AnyBackend {
@@ -68,34 +69,26 @@ pub enum AnyBackendError {
 }
 
 /// Lifts a Postgres backend error into the runtime-selected backend's error.
-fn lift_psql(err: MetaStorageError<PsqlMetaError>) -> MetaStorageError<AnyBackendError> {
-    err.map_backend(AnyBackendError::Psql)
+impl From<MetaStorageError<PsqlMetaError>> for MetaStorageError<AnyBackendError> {
+    fn from(err: MetaStorageError<PsqlMetaError>) -> Self {
+        err.map_backend(AnyBackendError::Psql)
+    }
 }
 
 /// Lifts an in-memory backend error into the runtime-selected backend's error.
-fn lift_mem(err: MetaStorageError<MemMetaError>) -> MetaStorageError<AnyBackendError> {
-    err.map_backend(AnyBackendError::Mem)
+impl From<MetaStorageError<MemMetaError>> for MetaStorageError<AnyBackendError> {
+    fn from(err: MetaStorageError<MemMetaError>) -> Self {
+        err.map_backend(AnyBackendError::Mem)
+    }
 }
 
 impl MetaBackend for AnyBackend {
-    type Options = MetaBackendOptions;
     type Error = AnyBackendError;
     type Conn<'a> = AnyConn<'a>;
     type Tx<'a> = AnyTx<'a>;
     type Client<'a> = AnyClient<'a>;
     type Ticket<'a, const N: usize> = AnyTicket<'a, N>;
     type Resolution<'a, const N: usize> = AnyResolution<'a, N>;
-
-    fn new(options: MetaBackendOptions) -> MetaResult<Self, AnyBackendError> {
-        match options {
-            MetaBackendOptions::Psql(options) => Ok(AnyBackend::Psql(
-                PsqlMetaStorage::new(options).map_err(lift_psql)?,
-            )),
-            MetaBackendOptions::Mem(options) => Ok(AnyBackend::Mem(
-                MemMetaStorage::new(options).map_err(lift_mem)?,
-            )),
-        }
-    }
 
     async fn worker_conn(&self) -> MetaResult<AnyConn<'_>, AnyBackendError> {
         map_lift_backend!(self, |backend| backend.worker_conn().await => AnyConn)

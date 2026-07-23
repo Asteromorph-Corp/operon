@@ -4,8 +4,7 @@ use crate::meta_storage::MetaBackend;
 use crate::meta_storage::mem::error::MemResult;
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::mem::{
-    MemClient, MemConn, MemMetaError, MemMetaStorageOptions, MemResolutionQueryBuilder,
-    MemTicketQueryBuilder, MemTx,
+    MemClient, MemConn, MemMetaError, MemResolutionQueryBuilder, MemTicketQueryBuilder, MemTx,
 };
 
 /// The in-memory implementation of the metadata backend.
@@ -29,17 +28,12 @@ impl std::fmt::Debug for MemMetaStorage {
 }
 
 impl MetaBackend for MemMetaStorage {
-    type Options = MemMetaStorageOptions;
     type Error = MemMetaError;
     type Conn<'a> = MemConn;
     type Tx<'a> = MemTx<'a>;
     type Client<'a> = MemClient<'a>;
     type Ticket<'a, const N: usize> = MemTicketQueryBuilder<'a, N>;
     type Resolution<'a, const N: usize> = MemResolutionQueryBuilder<'a, N>;
-
-    fn new(_options: MemMetaStorageOptions) -> MemResult<Self> {
-        Ok(Self::default())
-    }
 
     async fn worker_conn(&self) -> MemResult<MemConn> {
         Ok(MemConn::new(self.store.clone()))

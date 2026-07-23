@@ -10,7 +10,7 @@ mod storage;
 mod ui;
 mod utils;
 
-pub use meta_storage::AnyBackend;
+pub use meta_storage::{AnyBackend, MemMetaStorage, PsqlMetaStorage};
 pub use operon::Operon;
 pub use operon_macros::define_operon;
 pub use schema::{Direction, Entity};
@@ -54,6 +54,6 @@ pub mod __private {
         PeerEventSenders, REBUILD_CONCURRENCY, SchedulerHandler, SpecWithMetadata, ValidOperon,
     };
     pub use crate::schema::*;
-    pub use crate::storage::psql::{EntityQueries, PsqlStorage};
+    pub use crate::storage::psql::{EntityQueries, FromPsqlStorageOptions, PsqlStorage};
     pub use crate::utils::{SchemaPrefix, get_dop_coords, get_dop_tags};
 }

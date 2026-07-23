@@ -1,16 +1,12 @@
 use std::hash::{Hash, Hasher};
-use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
 
-use secrecy::ExposeSecret;
 use tokio::sync::OnceCell;
 use twox_hash::XxHash3_64;
 
 use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{
-    PsqlClient, PsqlConn, PsqlMetaError, PsqlMetaStorageOptions, PsqlResolutionQueryBuilder,
-    PsqlTicketQueryBuilder, PsqlTx,
+    PsqlClient, PsqlConn, PsqlMetaError, PsqlResolutionQueryBuilder, PsqlTicketQueryBuilder, PsqlTx,
 };
 use crate::meta_storage::{MetaBackend, MetaStorageError};
 
@@ -23,68 +19,25 @@ pub struct PsqlMetaStorage {
     pub worker_pool: deadpool_postgres::Pool,
     pub scheduler_pool: deadpool_postgres::Pool,
     pub schema: Option<String>,
-    lock_pool: deadpool_postgres::Pool,
-    lock: Arc<OnceCell<AdvisoryLock>>,
+    pub(super) lock_pool: deadpool_postgres::Pool,
+    pub(super) lock: Arc<OnceCell<AdvisoryLock>>,
 }
 
 /// The connection holding a schema's advisory lock, and everything needed to check on it later.
 #[derive(Debug)]
 pub(crate) struct AdvisoryLock {
-    conn: deadpool_postgres::Object,
-    schema: String,
-    key: i64,
+    pub(super) conn: deadpool_postgres::Object,
+    pub(super) schema: String,
+    pub(super) key: i64,
 }
 
 impl MetaBackend for PsqlMetaStorage {
-    type Options = PsqlMetaStorageOptions;
     type Error = PsqlMetaError;
     type Conn<'a> = PsqlConn<'a>;
     type Tx<'a> = PsqlTx<'a>;
     type Client<'a> = PsqlClient<'a>;
     type Ticket<'a, const N: usize> = PsqlTicketQueryBuilder<'a, N>;
     type Resolution<'a, const N: usize> = PsqlResolutionQueryBuilder<'a, N>;
-
-    fn new(options: PsqlMetaStorageOptions) -> PsqlResult<Self> {
-        let PsqlMetaStorageOptions {
-            uri,
-            pool_size,
-            schema,
-            keepalives_idle,
-            keepalives_interval,
-        } = options;
-
-        let mk_pool = |size| {
-            create_pool(
-                uri.expose_secret(),
-                keepalives_idle,
-                keepalives_interval,
-                size,
-            )
-        };
-
-        // The user specifies how many connections we may open to the metadata database.
-        // We require at least two, and split the connections into three tiers:
-        // 1. One single connection for the advisory lock on the schema.
-        // 2. One to five connections for synchronous (individual-)scheduler operations.
-        // 3. The remaining connections for spawned workers.
-        let (worker_pool, scheduler_pool, lock_pool) = match pool_size {
-            0..=1 => return Err(PsqlMetaError::PoolSizeTooSmall(pool_size).into()),
-            2 => {
-                let p = mk_pool(1)?;
-                (p.clone(), p, mk_pool(1)?)
-            }
-            n @ ..=6 => (mk_pool(n - 2)?, mk_pool(1)?, mk_pool(1)?),
-            n => (mk_pool(n - 6)?, mk_pool(5)?, mk_pool(1)?),
-        };
-
-        Ok(PsqlMetaStorage {
-            worker_pool,
-            scheduler_pool,
-            schema,
-            lock_pool,
-            lock: Arc::new(OnceCell::new()),
-        })
-    }
 
     async fn worker_conn(&self) -> PsqlResult<PsqlConn<'_>> {
         let client = self.worker_pool.get().await.map_err(PsqlMetaError::from)?;
@@ -199,27 +152,4 @@ fn lock_key(schema: &str) -> i64 {
     let mut hasher = XxHash3_64::new();
     schema.hash(&mut hasher);
     hasher.finish() as i64
-}
-
-fn create_pool(
-    uri: &str,
-    keepalives_idle: Duration,
-    keepalives_interval: Duration,
-    pool_size: usize,
-) -> Result<deadpool_postgres::Pool, PsqlMetaError> {
-    // Might want to make these hardcoded config values configurable.
-    let mut pg_config = tokio_postgres::Config::from_str(uri)?;
-    pg_config
-        .keepalives(true)
-        .keepalives_idle(keepalives_idle)
-        .keepalives_interval(keepalives_interval);
-    let manager_config = deadpool_postgres::ManagerConfig {
-        recycling_method: deadpool_postgres::RecyclingMethod::Clean,
-    };
-    let manager =
-        deadpool_postgres::Manager::from_config(pg_config, tokio_postgres::NoTls, manager_config);
-    let pool = deadpool_postgres::Pool::builder(manager)
-        .max_size(pool_size)
-        .build()?;
-    Ok(pool)
 }
