@@ -145,7 +145,9 @@ impl UiLoop {
 
     /// Records the scheduler as gone and paints every job as errored.
     async fn mark_scheduler_lost(&mut self) {
-        tracing::error!("Operon's UI lost contact with the scheduler and cannot continue execution.");
+        tracing::error!(
+            "Operon's UI lost contact with the scheduler and cannot continue execution."
+        );
         self.finished = true;
         for progress in self.progresses.0.iter() {
             progress.1.write().await.set_state(TaskState::Error);
