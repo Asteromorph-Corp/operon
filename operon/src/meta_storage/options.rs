@@ -8,8 +8,8 @@ use crate::meta_storage::{AnyBackend, AnyBackendError, MetaBackend, MetaStorageE
 /// variant owns its backend's full parameter set (e.g. [`Psql`](MetaBackendOptions::Psql) carries a
 /// [`PsqlMetaStorageOptions`]), so backend-specific knobs never leak into backend-agnostic options.
 ///
-/// Build the selected backend into an [`AnyBackend`](crate::AnyBackend) with
-/// [`build`](Self::build), then hand it to [`Operon::new`](crate::Operon::new).
+/// Build the selected backend into an [`AnyBackend`] with [`build`](Self::build), then hand it to
+/// [`Operon::new`](crate::Operon::new).
 /// To pin a backend at compile time, build its concrete options directly (e.g.
 /// [`PsqlMetaStorageOptions::build`]).
 ///
