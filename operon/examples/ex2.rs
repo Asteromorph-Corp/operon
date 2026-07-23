@@ -1,7 +1,9 @@
+use std::convert::Infallible;
+
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use dashmap::DashMap;
-use operon::error::{StorageError, UserError};
+use operon::error::StorageResult;
 use operon::options::{
     MemMetaStorageOptions, OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions, UiMode,
 };
@@ -54,11 +56,11 @@ struct ExampleService;
 
 #[async_trait]
 impl CookingService for ExampleService {
-    async fn alpha(&self) -> Result<Vec<A>, UserError> {
+    async fn alpha(&self) -> Result<Vec<A>, Self::Error> {
         Ok((0..100).map(|i| A(format!("A ({i})"))).collect())
     }
 
-    async fn beta(&self, a: A) -> Result<Vec<B>, UserError> {
+    async fn beta(&self, a: A) -> Result<Vec<B>, Self::Error> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -73,7 +75,7 @@ impl CookingService for ExampleService {
         Ok(result)
     }
 
-    async fn gamma(&self, a: A) -> Result<Vec<C>, UserError> {
+    async fn gamma(&self, a: A) -> Result<Vec<C>, Self::Error> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -89,7 +91,7 @@ impl CookingService for ExampleService {
         Ok(result)
     }
 
-    async fn delta(&self, a: A, b: B, c: C) -> Result<D, UserError> {
+    async fn delta(&self, a: A, b: B, c: C) -> Result<D, Self::Error> {
         // // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -106,7 +108,7 @@ impl CookingService for ExampleService {
         Ok(d)
     }
 
-    async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, UserError> {
+    async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, Self::Error> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -119,7 +121,7 @@ impl CookingService for ExampleService {
         Ok(e)
     }
 
-    async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, UserError> {
+    async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, Self::Error> {
         // Poison this function to simulate a failure
         // let mut rng = rand::rng();
         // if rng.random_bool(0.0005) {
@@ -159,11 +161,13 @@ pub struct DashMapCookingStorage {
 
 #[async_trait]
 impl OperonStorage for DashMapCookingStorage {
-    async fn init(&self) -> Result<(), StorageError> {
+    type Error = Infallible;
+
+    async fn init(&self) -> StorageResult<(), Self::Error> {
         Ok(())
     }
 
-    async fn clear(&self) -> Result<(), StorageError> {
+    async fn clear(&self) -> StorageResult<(), Self::Error> {
         self.a.clear();
         self.b.clear();
         self.c.clear();
@@ -179,56 +183,56 @@ impl OperonStorage for DashMapCookingStorage {
 
 #[async_trait]
 impl CookingStorage for DashMapCookingStorage {
-    async fn get_a(&self, coordinate: [usize; 1]) -> Result<Option<A>, StorageError> {
+    async fn get_a(&self, coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error> {
         Ok(self.a.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_a(&self, entity: Entity<1, A>) -> Result<(), StorageError> {
+    async fn put_a(&self, entity: Entity<1, A>) -> StorageResult<(), Self::Error> {
         self.a.insert(entity.coordinate, entity.value);
         Ok(())
     }
 
-    async fn get_b(&self, coordinate: [usize; 2]) -> Result<Option<B>, StorageError> {
+    async fn get_b(&self, coordinate: [usize; 2]) -> StorageResult<Option<B>, Self::Error> {
         Ok(self.b.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_b(&self, entity: Entity<2, B>) -> Result<(), StorageError> {
+    async fn put_b(&self, entity: Entity<2, B>) -> StorageResult<(), Self::Error> {
         self.b.insert(entity.coordinate, entity.value);
         Ok(())
     }
 
-    async fn get_c(&self, coordinate: [usize; 2]) -> Result<Option<C>, StorageError> {
+    async fn get_c(&self, coordinate: [usize; 2]) -> StorageResult<Option<C>, Self::Error> {
         Ok(self.c.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_c(&self, entity: Entity<2, C>) -> Result<(), StorageError> {
+    async fn put_c(&self, entity: Entity<2, C>) -> StorageResult<(), Self::Error> {
         self.c.insert(entity.coordinate, entity.value);
         Ok(())
     }
 
-    async fn get_d(&self, coordinate: [usize; 3]) -> Result<Option<D>, StorageError> {
+    async fn get_d(&self, coordinate: [usize; 3]) -> StorageResult<Option<D>, Self::Error> {
         Ok(self.d.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_d(&self, entity: Entity<3, D>) -> Result<(), StorageError> {
+    async fn put_d(&self, entity: Entity<3, D>) -> StorageResult<(), Self::Error> {
         self.d.insert(entity.coordinate, entity.value);
         Ok(())
     }
 
-    async fn get_e(&self, coordinate: [usize; 2]) -> Result<Option<E>, StorageError> {
+    async fn get_e(&self, coordinate: [usize; 2]) -> StorageResult<Option<E>, Self::Error> {
         Ok(self.e.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_e(&self, entity: Entity<2, E>) -> Result<(), StorageError> {
+    async fn put_e(&self, entity: Entity<2, E>) -> StorageResult<(), Self::Error> {
         self.e.insert(entity.coordinate, entity.value);
         Ok(())
     }
 
-    async fn get_f(&self, coordinate: [usize; 1]) -> Result<Option<F>, StorageError> {
+    async fn get_f(&self, coordinate: [usize; 1]) -> StorageResult<Option<F>, Self::Error> {
         Ok(self.f.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_f(&self, entity: Entity<1, F>) -> Result<(), StorageError> {
+    async fn put_f(&self, entity: Entity<1, F>) -> StorageResult<(), Self::Error> {
         self.f.insert(entity.coordinate, entity.value);
         Ok(())
     }

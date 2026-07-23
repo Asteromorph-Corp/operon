@@ -3,7 +3,7 @@ async fn on_receive_job(
     &self,
     client: MSto::Client<'_>,
     job: schema::JobEnum,
-) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<MSto::Error>> {
+) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
     match job {
         schema::JobEnum::Beta(job) => Ok([client
             .ticket(self.job_meta())

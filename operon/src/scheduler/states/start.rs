@@ -47,7 +47,7 @@ where
         channel_size: usize,
         run_id: Uuid,
         clean: bool,
-    ) -> TransitionState<SchedulerError<MSto::Error>> {
+    ) -> TransitionState<SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         TransitionState::new(Self::new(ctx, channel_size, run_id, clean))
     }
 
@@ -69,7 +69,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    type Error = SchedulerError<MSto::Error>;
+    type Error = SchedulerError<Svc::Error, Sto::Error, MSto::Error>;
 
     fn warn_msg(&self) -> Option<&'static str> {
         None

@@ -8,4 +8,4 @@ mod options;
 pub use options::{PsqlStorageOptions, StorageOptions};
 
 mod error;
-pub use error::{DimState, StorageError};
+pub use error::{DimState, StorageError, StorageResult};

@@ -95,7 +95,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
     pub(crate) async fn init_meta_storage(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         client.init_schema().await?;
         client.init_dimension_hash().await?;
         client.init_ticket_hash().await?;
@@ -122,7 +122,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         storage: &Sto,
         client: MSto::Client<'_>,
         mode: CheckMode,
-    ) -> Result<Vec<&'static str>, SchedulerError<MSto::Error>> {
+    ) -> Result<Vec<&'static str>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let mut inconsistent_jobs = Vec::new();
         for schedule in &self.job_handlers {
             if !schedule.check_consistency(storage, client, mode).await? {
@@ -144,7 +144,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
     pub(crate) async fn clear_resolution(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         for spec in &self.job_handlers {
             spec.clear_resolution(client).await?;
         }
@@ -154,7 +154,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
     pub(crate) async fn clear_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         for schedule in &self.job_handlers {
             schedule.clear_tickets(client).await?;
         }
@@ -164,7 +164,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
     pub(crate) async fn put_default_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         for schedule in &self.job_handlers {
             schedule.put_default_tickets(client).await?;
         }
@@ -175,7 +175,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         &self,
         progresses: &SharedProgressMap,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         for schedule in &self.job_handlers {
             let (done, queued, waiting) = schedule.get_status(client).await?;
             let Some(progress) = progresses.0.get(schedule.job_id()) else {
@@ -192,7 +192,10 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         progresses: &SharedProgressMap,
         client: MSto::Client<'_>,
         skip: &HashSet<String>,
-    ) -> Result<Vec<Box<dyn JobRebuilder<MSto>>>, SchedulerError<MSto::Error>> {
+    ) -> Result<
+        Vec<Box<dyn JobRebuilder<Svc, Sto, MSto>>>,
+        SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
+    > {
         futures::stream::iter(self.job_handlers.iter().filter(|handler| {
             std::iter::once(handler.job_id())
                 .chain(handler.all_upstream_jobs())

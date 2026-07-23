@@ -26,6 +26,14 @@ pub fn define_operon(input: TokenStream) -> TokenStream {
     operon.into_token_stream().into()
 }
 
+/// Derives `OperonService` for a pipeline service type.
+///
+/// # Attributes
+///
+/// - `#[operon(error = "MyError")]`: the service's error type `Self::Error` (default
+///   `::operon::error::UserError`)
+/// - `#[operon(defined_at = "path")]`: path to where `define_operon!` was invoked (default `self`)
+/// - `#[operon(crate = "path")]`: path to the `operon` crate (default `::operon`)
 #[proc_macro_derive(OperonService, attributes(operon))]
 pub fn derive_operon_service(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -34,10 +42,14 @@ pub fn derive_operon_service(input: TokenStream) -> TokenStream {
     let service = input.ident;
     let operon = attrs.crate_path.unwrap_or_else(|| operon_ident().into());
     let definition = attrs.definition_path.unwrap_or(parse_quote!(self));
+    let error_ty: syn::Type = attrs
+        .error_type
+        .unwrap_or_else(|| parse_quote!(#operon::error::UserError));
 
     quote! {
         #[automatically_derived]
         impl #operon::OperonService for #service {
+            type Error = #error_ty;
             type JobEnum = #definition::schema::JobEnum;
             type ResolutionEnum = #definition::schema::ResolutionEnum;
             type TicketEnum = #definition::schema::TicketEnum;

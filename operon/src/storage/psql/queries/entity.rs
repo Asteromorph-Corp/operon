@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::schema::{Entity, EntityMetadata};
-use crate::storage::StorageError;
+use crate::storage::psql::PsqlStorageResult;
 use crate::storage::psql::client::StorageClient;
 use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams, replace_if_updated};
 
@@ -31,7 +31,7 @@ impl<'a> StorageClient<'a> {
 
 impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     /// Initializes the entity table.
-    pub async fn init(&self) -> Result<(), StorageError> {
+    pub async fn init(&self) -> PsqlStorageResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = self.entity_meta.init_stmt(schema_prefix);
         self.client.execute(&stmt, &[]).await?;
@@ -39,7 +39,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 
     /// Clears the entity table.
-    pub async fn clear(&self) -> Result<(), StorageError> {
+    pub async fn clear(&self) -> PsqlStorageResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = self.entity_meta.clear_stmt(schema_prefix);
         self.client.execute_stmt(&stmt, &[]).await?;
@@ -47,7 +47,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 
     /// Gets the entity for the given primary key.
-    pub async fn get(&self, coordinate: [usize; N]) -> Result<Option<T>, StorageError> {
+    pub async fn get(&self, coordinate: [usize; N]) -> PsqlStorageResult<Option<T>> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetEntityQuery(schema_prefix, self.entity_meta);
         let params = SqlParams::from_usize(coordinate)?;
@@ -59,7 +59,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 
     /// Puts an entity into the table.
-    pub async fn put(&self, entity: Entity<N, T>) -> Result<(), StorageError> {
+    pub async fn put(&self, entity: Entity<N, T>) -> PsqlStorageResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutEntityQuery(schema_prefix, self.entity_meta);
         let params = SqlParams::from_usize(entity.coordinate)?
@@ -73,7 +73,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         &self,
         coordinate: [usize; M],
         over: [&'static str; K],
-    ) -> Result<Vec<Entity<K, T>>, StorageError> {
+    ) -> PsqlStorageResult<Vec<Entity<K, T>>> {
         const { assert!(M + K == N) }
 
         let schema_prefix = self.client.schema_prefix();
@@ -82,7 +82,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let entities = rows
             .into_iter()
-            .map(|r| -> Result<Entity<K, T>, StorageError> {
+            .map(|r| -> PsqlStorageResult<Entity<K, T>> {
                 let value = serde_json::from_value::<T>(r.get(0))?;
                 let coordinate: [usize; K] = (1..=K)
                     .map(|idx| usize::try_from(r.get::<_, i64>(idx)))
@@ -99,7 +99,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     pub async fn batch_put<const M: usize>(
         &mut self,
         entity: Entity<M, Vec<T>>,
-    ) -> Result<(), StorageError> {
+    ) -> PsqlStorageResult<()> {
         const { assert!(M + 1 == N) }
 
         let schema_prefix = self.client.schema_prefix().to_owned();

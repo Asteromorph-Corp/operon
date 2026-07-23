@@ -4,11 +4,12 @@
 // with `MetaBackendOptions::mem()`, and the entity data to the `DashMapStorage` below. Nothing
 // survives the process. See ex1 for an introduction to Operon itself.
 
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use operon::error::{StorageError, UserError};
+use operon::error::StorageResult;
 use operon::options::{MetaBackendOptions, OperonOptions, UiMode};
 use operon::{Entity, Operon, OperonService, OperonStorage, define_operon};
 
@@ -31,18 +32,18 @@ struct WordCounter;
 
 #[async_trait]
 impl FanoutService for WordCounter {
-    async fn alpha(&self) -> Result<Vec<A>, UserError> {
+    async fn alpha(&self) -> Result<Vec<A>, Self::Error> {
         Ok(vec![
             "the quick brown fox".to_owned(),
             "jumps over the lazy dog".to_owned(),
         ])
     }
 
-    async fn beta(&self, document: A) -> Result<Vec<B>, UserError> {
+    async fn beta(&self, document: A) -> Result<Vec<B>, Self::Error> {
         Ok(document.split_whitespace().map(str::to_owned).collect())
     }
 
-    async fn gamma(&self, document: A) -> Result<Vec<C>, UserError> {
+    async fn gamma(&self, document: A) -> Result<Vec<C>, Self::Error> {
         let mut characters = document
             .chars()
             .filter(|character| !character.is_whitespace())
@@ -53,7 +54,7 @@ impl FanoutService for WordCounter {
         Ok(characters)
     }
 
-    async fn delta(&self, word: B, character: C) -> Result<D, UserError> {
+    async fn delta(&self, word: B, character: C) -> Result<D, Self::Error> {
         Ok(word.matches(&character).count())
     }
 }
@@ -73,11 +74,13 @@ struct DashMapStorage {
 
 #[async_trait]
 impl OperonStorage for DashMapStorage {
-    async fn init(&self) -> Result<(), StorageError> {
+    type Error = Infallible;
+
+    async fn init(&self) -> StorageResult<(), Self::Error> {
         Ok(())
     }
 
-    async fn clear(&self) -> Result<(), StorageError> {
+    async fn clear(&self) -> StorageResult<(), Self::Error> {
         self.documents.clear();
         self.words.clear();
         self.characters.clear();
@@ -91,38 +94,38 @@ impl OperonStorage for DashMapStorage {
 
 #[async_trait]
 impl FanoutStorage for DashMapStorage {
-    async fn get_a(&self, coordinate: [usize; 1]) -> Result<Option<A>, StorageError> {
+    async fn get_a(&self, coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error> {
         Ok(self.documents.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_a(&self, entity: Entity<1, A>) -> Result<(), StorageError> {
+    async fn put_a(&self, entity: Entity<1, A>) -> StorageResult<(), Self::Error> {
         self.documents.insert(entity.coordinate, entity.value);
         Ok(())
     }
 
-    async fn get_b(&self, coordinate: [usize; 2]) -> Result<Option<B>, StorageError> {
+    async fn get_b(&self, coordinate: [usize; 2]) -> StorageResult<Option<B>, Self::Error> {
         Ok(self.words.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_b(&self, entity: Entity<2, B>) -> Result<(), StorageError> {
+    async fn put_b(&self, entity: Entity<2, B>) -> StorageResult<(), Self::Error> {
         self.words.insert(entity.coordinate, entity.value);
         Ok(())
     }
 
-    async fn get_c(&self, coordinate: [usize; 2]) -> Result<Option<C>, StorageError> {
+    async fn get_c(&self, coordinate: [usize; 2]) -> StorageResult<Option<C>, Self::Error> {
         Ok(self.characters.get(&coordinate).map(|entry| entry.clone()))
     }
 
-    async fn put_c(&self, entity: Entity<2, C>) -> Result<(), StorageError> {
+    async fn put_c(&self, entity: Entity<2, C>) -> StorageResult<(), Self::Error> {
         self.characters.insert(entity.coordinate, entity.value);
         Ok(())
     }
 
-    async fn get_d(&self, coordinate: [usize; 3]) -> Result<Option<D>, StorageError> {
+    async fn get_d(&self, coordinate: [usize; 3]) -> StorageResult<Option<D>, Self::Error> {
         Ok(self.counts.get(&coordinate).map(|entry| *entry))
     }
 
-    async fn put_d(&self, entity: Entity<3, D>) -> Result<(), StorageError> {
+    async fn put_d(&self, entity: Entity<3, D>) -> StorageResult<(), Self::Error> {
         self.counts.insert(entity.coordinate, entity.value);
         Ok(())
     }

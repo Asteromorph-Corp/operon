@@ -11,7 +11,7 @@ use crate::utils::{get_entity_ident, put_entity_ident, to_snake_case, to_type};
 /// async fn get_b(
 ///     &self,
 ///     coordinate: [usize; 2usize],
-/// ) -> Result<Option<B>, operon::error::StorageError> {
+/// ) -> operon::error::StorageResult<Option<B>, Self::Error> {
 ///     self.conn()
 ///         .await?
 ///         .entity(self.entities_meta.b)
@@ -27,7 +27,7 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let id = to_snake_case(&entity.id);
 
     parse_quote! {
-        async fn #get_fn_name(&self, coordinate: [usize; #n]) -> Result<Option<#ty>, operon::error::StorageError> {
+        async fn #get_fn_name(&self, coordinate: [usize; #n]) -> operon::error::StorageResult<Option<#ty>, Self::Error> {
             self
                 .conn()
                 .await?
@@ -45,7 +45,7 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
 /// async fn put_b(
 ///     &self,
 ///     entity: operon::Entity<2usize, B>,
-/// ) -> Result<(), operon::error::StorageError> {
+/// ) -> operon::error::StorageResult<(), Self::Error> {
 ///     self.conn()
 ///         .await?
 ///         .entity(self.entities_meta.b)
@@ -62,7 +62,7 @@ fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let ty = to_type(&entity.id);
 
     parse_quote! {
-        async fn #put_fn_name(&self, entity: #operon::Entity<#n, #ty>) -> Result<(), operon::error::StorageError> {
+        async fn #put_fn_name(&self, entity: #operon::Entity<#n, #ty>) -> operon::error::StorageResult<(), Self::Error> {
             self
                 .conn()
                 .await?

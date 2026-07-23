@@ -66,7 +66,7 @@ where
     /// context. Running this will take over the terminal, so it is strongly discouraged to make
     /// any other writes to `stdout` or `stderr` while this is running.
     /// Instead, you can use the provided macros to log messages to the UI.
-    pub async fn run(self) -> Result<(), OperonError<MSto::Error>> {
+    pub async fn run(self) -> Result<(), OperonError> {
         let Operon {
             service,
             storage,
@@ -92,7 +92,7 @@ where
 
         let progresses = SharedProgressMap::from_jobs(&handler.job_ids());
 
-        // Create the scheduler, resolving the backend from the options.
+        // TODO (#79): push this into the scheduler thread and let the UI consume this error.
         let scheduler = Scheduler::<Svc, Sto, MSto>::new(
             service,
             storage,
@@ -103,7 +103,8 @@ where
             channel_size,
             ui_mode,
             backend,
-        )?;
+        )
+        .map_err(|err| OperonError::Startup(Box::new(err)))?;
         let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
@@ -112,7 +113,7 @@ where
         try_join(
             async {
                 ui_loop.run().await?;
-                Ok::<_, OperonError<MSto::Error>>(())
+                Ok::<_, OperonError>(())
             },
             async {
                 // A panic (`JoinError`) is fatal (kills the UI);

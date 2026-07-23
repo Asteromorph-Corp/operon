@@ -5,3 +5,7 @@ mod queries;
 pub use queries::EntityQueries;
 
 mod client;
+
+mod error;
+pub use error::PsqlStorageError;
+pub(crate) use error::PsqlStorageResult;

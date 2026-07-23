@@ -1,26 +1,18 @@
 use thiserror::Error;
 
-use crate::meta_storage::MetaStorageError;
-use crate::scheduler::SchedulerError;
-use crate::storage::StorageError;
 use crate::ui::UiError;
 
-/// Error type returned by Operon, generic over the metadata backend's error type `MErr`
-/// ([`MetaBackend::Error`](crate::meta_storage::MetaBackend::Error)).
+/// The error [`Operon::run`](crate::Operon::run) returns.
+///
+/// Operon runs its scheduler behind a UI that consumes backend errors,
+/// so the error surface is limited to UI errors and critical failures in the scheduler.
 #[derive(Debug, Error)]
-pub enum OperonError<MErr> {
-    /// Error in the scheduler
-    #[error("Scheduler error: {0}")]
-    Scheduler(SchedulerError<MErr>),
-    /// Error in a user function
-    #[error("User function error: {0}")]
-    User(UserError),
-    /// Error in a storage operation
-    #[error("Storage error: {0}")]
-    Storage(#[from] StorageError),
-    /// Error in the metadata storage
-    #[error("Metadata storage error: {0}")]
-    MetaStorage(#[from] MetaStorageError<MErr>),
+pub enum OperonError {
+    /// The scheduler failed to start, e.g. the metadata backend could not be constructed.
+    // TODO(#79): drop this once the UI surfaces construction failures gracefully.
+    // `Operon::run` would then return only `UI` and `SchedulerJoinError`.
+    #[error("Startup error: {0}")]
+    Startup(Box<dyn std::error::Error + Send + Sync>),
     /// Error in the terminal UI
     #[error("Terminal UI error: {0}")]
     UI(#[from] UiError),
@@ -29,16 +21,5 @@ pub enum OperonError<MErr> {
     SchedulerJoinError(#[from] tokio::task::JoinError),
 }
 
+/// The default error type for user functions.
 pub type UserError = Box<dyn std::error::Error + Send + Sync>;
-
-impl<MErr> From<SchedulerError<MErr>> for OperonError<MErr> {
-    fn from(e: SchedulerError<MErr>) -> Self {
-        match e {
-            SchedulerError::Storage(e) => OperonError::Storage(e),
-            SchedulerError::MetaStorage(e) => OperonError::MetaStorage(e),
-            SchedulerError::UserError(e) => OperonError::User(e),
-            // Convert other scheduler errors to OperonError::Scheduler
-            other => OperonError::Scheduler(other),
-        }
-    }
-}

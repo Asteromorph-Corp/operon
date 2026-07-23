@@ -14,7 +14,7 @@ use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, to_lit_str,
 ///     &self,
 ///     client: MSto::Client<'_>,
 ///     job: schema::JobEnum,
-/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<MSto::Error>> {
+/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///     match job {
 ///         schema::JobEnum::Beta(job) => Ok([client
 ///             .ticket(self.job_meta())
@@ -70,7 +70,7 @@ pub(super) fn fn_on_receive_job(
             &self,
             client: MSto::Client<'_>,
             job: schema::#job_enum_ident,
-        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError<MSto::Error>> {
+        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
             match job {
                 #(#job_arms)*
                 _ => Err(#operon::error::SchedulerError::InvalidPeerEventReceived("job", #job_id)),

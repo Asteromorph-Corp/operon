@@ -42,14 +42,14 @@ where
     async fn init_resolution(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>>;
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Clear the primary resolution from the fact storage, assuming the table is already
     /// initialized.
     async fn clear_resolution(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>>;
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Initialize the ticket storage.
     ///
@@ -59,25 +59,25 @@ where
     async fn init_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>>;
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Clear the data from the ticket storage, assuming the tables are already initialized.
     async fn clear_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>>;
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Put the default (fully unresolved) tickets into the ticket storage.
     async fn put_default_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>>;
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Get the status of the tickets.
     async fn get_status(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(i64, i64, i64), SchedulerError<MSto::Error>>;
+    ) -> Result<(i64, i64, i64), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
     /// Return `true` if the data storage holds all needed data to restore, `false` if it does not.
@@ -86,7 +86,7 @@ where
         storage: &Sto,
         client: MSto::Client<'_>,
         mode: CheckMode,
-    ) -> Result<bool, SchedulerError<MSto::Error>>;
+    ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Prepare the job rebuilder for the given storage and metadata client by fetching the
     /// necessary data.
@@ -95,7 +95,10 @@ where
         storage: &Sto,
         progress: SharedProgress,
         client: MSto::Client<'_>,
-    ) -> Result<Box<dyn JobRebuilder<MSto>>, SchedulerError<MSto::Error>>;
+    ) -> Result<
+        Box<dyn JobRebuilder<Svc, Sto, MSto>>,
+        SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
+    >;
 
     /// Start the job manager, initializing the individual scheduler and running it.
     #[allow(clippy::too_many_arguments)]
@@ -136,7 +139,7 @@ where
     async fn init_resolution(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         if let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() {
             client.resolution(spawn_dim_meta).init().await?;
         }
@@ -146,7 +149,7 @@ where
     async fn clear_resolution(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         if let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() {
             client.resolution(spawn_dim_meta).clear().await?;
         }
@@ -156,7 +159,7 @@ where
     async fn init_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         client.ticket(self.job_meta).init().await?;
         Ok(())
     }
@@ -164,7 +167,7 @@ where
     async fn clear_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         client.ticket(self.job_meta).clear().await?;
         Ok(())
     }
@@ -172,7 +175,7 @@ where
     async fn put_default_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<MSto::Error>> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let default_ticket = self.spec.default_ticket();
         client.ticket(self.job_meta).put(default_ticket).await?;
         Ok(())
@@ -181,7 +184,7 @@ where
     async fn get_status(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(i64, i64, i64), SchedulerError<MSto::Error>> {
+    ) -> Result<(i64, i64, i64), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let status = client.ticket(self.job_meta).get_status().await?;
         Ok(status)
     }
@@ -191,7 +194,7 @@ where
         storage: &Sto,
         client: MSto::Client<'_>,
         mode: CheckMode,
-    ) -> Result<bool, SchedulerError<MSto::Error>> {
+    ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         self.spec.check_consistency(storage, client, mode).await
     }
 
@@ -200,7 +203,10 @@ where
         storage: &Sto,
         progress: SharedProgress,
         client: MSto::Client<'_>,
-    ) -> Result<Box<dyn JobRebuilder<MSto>>, SchedulerError<MSto::Error>> {
+    ) -> Result<
+        Box<dyn JobRebuilder<Svc, Sto, MSto>>,
+        SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
+    > {
         self.spec.prepare_rebuild(storage, progress, client).await
     }
 

@@ -19,7 +19,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use operon::error::UserError;
 use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
 use operon::{Operon, OperonService, define_operon};
 use serde::{Deserialize, Serialize};
@@ -62,7 +61,7 @@ struct SensorService;
 impl SensorsService for SensorService {
     /// Produces sensor data.
     /// Uses `tracing` — the native, recommended logging facade.
-    async fn collect(&self) -> Result<Vec<Sensor>, UserError> {
+    async fn collect(&self) -> Result<Vec<Sensor>, Self::Error> {
         tracing::info!("Collecting sensor data");
 
         Ok(vec![
@@ -87,7 +86,7 @@ impl SensorsService for SensorService {
     ///   - `println!` (captured stdout → WARN)
     ///   - `eprintln!` (captured stderr → ERROR)
     ///   - custom `tracing::info_span!` for user-defined context
-    async fn aggregate(&self, sensor: Sensor) -> Result<Vec<Summary>, UserError> {
+    async fn aggregate(&self, sensor: Sensor) -> Result<Vec<Summary>, Self::Error> {
         // Custom span — wraps this job's work with structured context.
         // Any tracing events inside will carry [sensor=temperature] in the UI.
         let span = tracing::info_span!("aggregate", sensor = %sensor.name);
@@ -125,7 +124,7 @@ impl SensorsService for SensorService {
 
     /// Generates reports.
     /// Uses `tracing` with structured fields to demonstrate span context.
-    async fn report(&self, summary: Summary) -> Result<Report, UserError> {
+    async fn report(&self, summary: Summary) -> Result<Report, Self::Error> {
         tracing::info!(
             sensor = %summary.sensor_name,
             mean = %format!("{:.1}", summary.mean),

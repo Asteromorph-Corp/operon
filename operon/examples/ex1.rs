@@ -17,7 +17,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use operon::error::UserError;
 use operon::options::{OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions};
 use operon::{Operon, OperonService, define_operon};
 use serde::{Deserialize, Serialize};
@@ -71,7 +70,9 @@ define_operon! {
 // The necessary functions are generated as traits,
 // so we will need to create a struct to implement them.
 // The struct must derive `OperonService`.
+// Since this example is infallible, we denote the error type as such.
 #[derive(OperonService)]
+#[operon(error = std::convert::Infallible)]
 struct MySplitterService;
 
 // The following is the main trait that we need to implement.
@@ -80,7 +81,7 @@ struct MySplitterService;
 // to see what methods are required.
 #[async_trait]
 impl SplitterService for MySplitterService {
-    async fn get_inputs(&self) -> Result<Vec<Input>, UserError> {
+    async fn get_inputs(&self) -> Result<Vec<Input>, Self::Error> {
         Ok(vec![
             Input::from("Hello World"),
             Input::from("Hello Operon"),
@@ -88,14 +89,14 @@ impl SplitterService for MySplitterService {
         ])
     }
 
-    async fn get_words(&self, input: Input) -> Result<Vec<Intermediate>, UserError> {
+    async fn get_words(&self, input: Input) -> Result<Vec<Intermediate>, Self::Error> {
         Ok(input
             .split_whitespace()
             .map(|s| Intermediate(s.to_string()))
             .collect())
     }
 
-    async fn get_chars(&self, intermediate: Intermediate) -> Result<Vec<Output>, UserError> {
+    async fn get_chars(&self, intermediate: Intermediate) -> Result<Vec<Output>, Self::Error> {
         // To print something to the UI,
         // we can use the `log` crate directly,
         // Do not write to `stdout` or `stderr` directly,

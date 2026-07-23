@@ -13,7 +13,7 @@ use crate::utils::{
 /// async fn get_all_b_over_j(
 ///     &self,
 ///     [i]: [usize; 1usize],
-/// ) -> Result<Vec<B>, operon::error::StorageError> {
+/// ) -> operon::error::StorageResult<Vec<B>, Self::Error> {
 ///     let entities = self
 ///         .conn()
 ///         .await?
@@ -78,7 +78,7 @@ pub fn batch_gets(
         });
 
         parse_quote! {
-            async fn #batch_get_fn_name(&self, [#(#arg_dims),*]: [usize; #n]) -> Result<#return_ty, #operon::error::StorageError> {
+            async fn #batch_get_fn_name(&self, [#(#arg_dims),*]: [usize; #n]) -> #operon::error::StorageResult<#return_ty, Self::Error> {
                 let entities = self
                     .conn()
                     .await?

@@ -10,6 +10,13 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
+/// The scheduler's result over its composite service/storage/metadata error.
+type SchedulerResult<T, UErr, SErr, MErr> = Result<T, SchedulerError<UErr, SErr, MErr>>;
+
+/// A boxed scheduler state keyed by the scheduler's composite error.
+type BoxedState<UErr, SErr, MErr> =
+    Box<dyn SchedulerState<Error = SchedulerError<UErr, SErr, MErr>>>;
+
 /// # Scheduler
 ///
 /// The orchestrating scheduler that manages the individual schedulers.
@@ -50,7 +57,7 @@ where
         channel_size: usize,
         ui_mode: UiMode,
         backend: MSto::Options,
-    ) -> Result<Self, SchedulerError<MSto::Error>> {
+    ) -> SchedulerResult<Self, Svc::Error, Sto::Error, MSto::Error> {
         handler.validate_pool_sizes();
         let meta_storage = MSto::new(backend)?;
 
@@ -72,13 +79,13 @@ where
     }
 
     /// Main entry point for the scheduler.
-    pub async fn work(mut self) -> Result<(), SchedulerError<MSto::Error>> {
+    pub async fn work(mut self) -> SchedulerResult<(), Svc::Error, Sto::Error, MSto::Error> {
         self.ctx.meta_storage.ensure_lock().await?;
         self.ctx.storage.init().await?;
         self.init_meta_storage().await?;
 
         let heartbeat_handle = self.ctx.meta_storage.clone();
-        let mut state: Box<dyn SchedulerState<Error = SchedulerError<MSto::Error>>> = Box::new(
+        let mut state: BoxedState<Svc::Error, Sto::Error, MSto::Error> = Box::new(
             InitTransition::state(self.ctx, self.ui_mode, self.channel_size),
         );
 
@@ -118,7 +125,7 @@ where
     }
 
     /// An helper function to call `self.spec.init_meta_storage` with a transaction.
-    async fn init_meta_storage(&self) -> Result<(), SchedulerError<MSto::Error>> {
+    async fn init_meta_storage(&self) -> SchedulerResult<(), Svc::Error, Sto::Error, MSto::Error> {
         let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
         self.ctx.handler.init_meta_storage(tx.as_client()).await?;
