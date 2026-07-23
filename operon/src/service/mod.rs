@@ -9,7 +9,7 @@ pub trait OperonService: Send + Sync + 'static {
     /// Defaults to [`UserError`](crate::operon::UserError) (alias of `Box<dyn std::error::Error +
     /// Send + Sync>`).
     ///
-    /// To change this type, use `#[operon(error = "MyError")]` on your service type with
+    /// To change this type, use `#[operon(error = MyError)]` on your service type with
     /// `#[derive(OperonService)]`.
     type Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static;
 
