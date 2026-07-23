@@ -258,6 +258,15 @@ where
 
         // Main event loop.
         loop {
+            // Normal exit guard:
+            // 1. `self.state == TaskState::Finished` only if all tickets are `Done`; this notably
+            //    implies no more peer events are to be handled.
+            // 2. `self.handles.is_empty()` only if all internal events are drained; i.e., all peer
+            //    events to downstream schedulers have been sent.
+            if self.state == TaskState::Finished && self.handles.is_empty() {
+                return Ok(());
+            }
+
             if is_stopping && self.handles.is_empty() && got_all_updates {
                 self.set_state(TaskState::Stopped).await;
                 return Ok(());
@@ -302,12 +311,6 @@ where
 
                             // Broadcast the job result events
                             self.spec.send_on_finish(peer_txs, job, resolution).await?;
-                            // If all the tickets are finished
-                            // AND the scheduler's internal events are drained,
-                            // exit the loop.
-                            if self.state == TaskState::Finished && self.handles.is_empty() {
-                                return Ok(());
-                            }
                         }
                         InternalEvent::JobFailure(job, e) => {
                             // Log the error
