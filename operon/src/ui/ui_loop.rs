@@ -143,6 +143,23 @@ impl UiLoop {
         self.progresses.0.contains_key(job_name)
     }
 
+    /// Records the scheduler as gone and paints every job as errored.
+    async fn mark_scheduler_lost(&mut self) {
+        tracing::error!("Operon's UI lost contact with the scheduler and cannot continue execution.");
+        self.finished = true;
+        for progress in self.progresses.0.iter() {
+            progress.1.write().await.set_state(TaskState::Error);
+        }
+    }
+
+    /// Sends a control event, treating a dropped scheduler channel as a graceful fatal exit.
+    async fn send_control(&mut self, event: ControlEvent) -> Result<(), UiError> {
+        if self.ctrl_tx.send(event).await.is_err() {
+            self.mark_scheduler_lost().await;
+        }
+        Ok(())
+    }
+
     pub async fn run(self) -> Result<(), UiError> {
         match self.mode {
             UiMode::Interactive => self.run_interactive().await,
@@ -213,15 +230,7 @@ impl UiLoop {
                         // Scheduler exited gracefully with a signal to continue the UI
                         Ok(false) => self.finished = true,
                         // Scheduler dropped the channel and early-returned
-                        Err(_) => {
-                            tracing::error!(
-                                "Operon could not continue execution due to a fatal error."
-                            );
-                            self.finished = true;
-                            for progress in self.progresses.0.iter() {
-                                progress.1.write().await.set_state(TaskState::Error);
-                            }
-                        }
+                        Err(_) => self.mark_scheduler_lost().await,
                     }
                 }
 
@@ -260,7 +269,7 @@ impl UiLoop {
         // Recovery is disabled for this mode,
         // so we always run fresh off the bat and wait
         // until everything finishes or something errors.
-        self.ctrl_tx.send(ControlEvent::FRESH_RUN).await?;
+        self.send_control(ControlEvent::FRESH_RUN).await?;
         loop {
             if self.finished {
                 break;
@@ -271,15 +280,7 @@ impl UiLoop {
                     match scheduler_exit {
                         Ok(true) => break,
                         Ok(false) => self.finished = true,
-                        Err(_) => {
-                            tracing::error!(
-                                "Operon could not continue execution due to a fatal error."
-                            );
-                            self.finished = true;
-                            for progress in self.progresses.0.iter() {
-                                progress.1.write().await.set_state(TaskState::Error);
-                            }
-                        }
+                        Err(_) => self.mark_scheduler_lost().await,
                     }
                 }
                 Ok(record) = self.log_rx.recv() => record.write_to_posix(&mut std::io::stdout(), &mut std::io::stderr())?,
@@ -291,7 +292,7 @@ impl UiLoop {
             // If a new error state is detected, abort the execution.
             if state == TaskState::Error {
                 tracing::error!("Aborting execution due to previous error.");
-                self.ctrl_tx.send(ControlEvent::FORCE_QUIT).await?;
+                self.send_control(ControlEvent::FORCE_QUIT).await?;
             }
         }
 
@@ -378,23 +379,21 @@ impl UiLoop {
                 {
                     tracing::error!("Unknown job name: {invalid_job}")
                 } else {
-                    self.ctrl_tx.send(ControlEvent::Run(event_inner)).await?
+                    self.send_control(ControlEvent::Run(event_inner)).await?
                 }
             }
-            Command::Check { mode } => self.ctrl_tx.send(ControlEvent::Check { mode }).await?,
+            Command::Check { mode } => self.send_control(ControlEvent::Check { mode }).await?,
             Command::Quit { force, no_exit } => {
-                self.ctrl_tx
-                    .send(ControlEvent::Quit { force, no_exit })
+                self.send_control(ControlEvent::Quit { force, no_exit })
                     .await?;
                 self.exit_on_finish = !no_exit;
             }
-            Command::Exit => self.ctrl_tx.send(ControlEvent::Exit).await?,
+            Command::Exit => self.send_control(ControlEvent::Exit).await?,
             Command::Pause { targets, cascade } => {
                 if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
                     tracing::error!("Unknown job name: {invalid_job}")
                 } else {
-                    self.ctrl_tx
-                        .send(ControlEvent::Pause { targets, cascade })
+                    self.send_control(ControlEvent::Pause { targets, cascade })
                         .await?
                 }
             }
@@ -402,7 +401,7 @@ impl UiLoop {
                 if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
                     tracing::error!("Unknown job name: {invalid_job}")
                 } else {
-                    self.ctrl_tx.send(ControlEvent::Resume { targets }).await?
+                    self.send_control(ControlEvent::Resume { targets }).await?
                 }
             }
             Command::Clear => {
