@@ -70,7 +70,9 @@ define_operon! {
 // The necessary functions are generated as traits,
 // so we will need to create a struct to implement them.
 // The struct must derive `OperonService`.
+// Since this example is infallible, we denote the error type as such.
 #[derive(OperonService)]
+#[operon(error = std::convert::Infallible)]
 struct MySplitterService;
 
 // The following is the main trait that we need to implement.
