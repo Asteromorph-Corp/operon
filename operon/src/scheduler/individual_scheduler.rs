@@ -253,8 +253,8 @@ where
                 "Some initial tickets are not actually ready to run",
             ))?;
         let mut ready_jobs = AnyJobQueue::from_meta(initial_jobs, &self.meta);
-        let mut got_all_updates = false;
-        let mut is_stopping = false;
+        let mut got_all_peer_events = false;
+        let mut is_gracefully_stopping = false;
 
         // Main event loop.
         loop {
@@ -267,7 +267,7 @@ where
                 return Ok(());
             }
 
-            if is_stopping && self.handles.is_empty() && got_all_updates {
+            if is_gracefully_stopping && self.handles.is_empty() && got_all_peer_events {
                 self.set_state(TaskState::Stopped).await;
                 return Ok(());
             }
@@ -280,7 +280,7 @@ where
                         IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await,
                         IndividualControlEvent::Quit { force: false } => {
                             self.handle_graceful_stop().await;
-                            is_stopping = true;
+                            is_gracefully_stopping = true;
                         }
                         IndividualControlEvent::Quit { force: true } => {
                             tracing::info!("Aborting `{}` jobs.", self.meta.id);
@@ -322,7 +322,7 @@ where
                 }
 
                 // 2. A peer event.
-                event = peer_rx.recv(), if !got_all_updates => {
+                event = peer_rx.recv(), if !got_all_peer_events => {
                     match event {
                         Some(evt) => {
                             // Trace the peer event
@@ -339,7 +339,7 @@ where
                             // or that the upstream scheduler was gracefully stopped.
                             // Either way, we stop listening this branch.
                             tracing::debug!("`{}` finished receiving updates.", self.meta.id);
-                            got_all_updates = true;
+                            got_all_peer_events = true;
                         }
                     }
                 }
