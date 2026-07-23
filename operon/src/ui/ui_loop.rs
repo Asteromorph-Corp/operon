@@ -296,6 +296,18 @@ impl UiLoop {
             }
         }
 
+        // Drain records buffered past the scheduler's exit so a final message,
+        // such as the wall-clock summary, still reaches the terminal.
+        loop {
+            match self.log_rx.try_recv() {
+                Ok(record) => {
+                    record.write_to_posix(&mut std::io::stdout(), &mut std::io::stderr())?
+                }
+                Err(::tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+                Err(_) => break,
+            }
+        }
+
         Ok(())
     }
 
