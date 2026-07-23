@@ -1,7 +1,7 @@
 //! The runtime-selected metadata backend.
 //!
 //! [`AnyBackend`] is a [`MetaBackend`] whose concrete backend is chosen at runtime from
-//! [`MetaBackendOptions`].
+//! [`MetaBackendOptions`](crate::meta_storage::MetaBackendOptions).
 //! It is the default `MSto` for [`Operon`](crate::Operon), and is used to select between available
 //! backends at runtime.
 
@@ -49,7 +49,8 @@ macro_rules! map_backend {
     };
 }
 
-/// A metadata backend selected at runtime from [`MetaBackendOptions`].
+/// A metadata backend selected at runtime from
+/// [`MetaBackendOptions`](crate::meta_storage::MetaBackendOptions).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum AnyBackend {
