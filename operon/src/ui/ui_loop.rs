@@ -155,11 +155,10 @@ impl UiLoop {
     }
 
     /// Sends a control event, treating a dropped scheduler channel as a graceful fatal exit.
-    async fn send_control(&mut self, event: ControlEvent) -> Result<(), UiError> {
+    async fn send_control(&mut self, event: ControlEvent) {
         if self.ctrl_tx.send(event).await.is_err() {
             self.mark_scheduler_lost().await;
         }
-        Ok(())
     }
 
     pub async fn run(self) -> Result<(), UiError> {
@@ -271,7 +270,7 @@ impl UiLoop {
         // Recovery is disabled for this mode,
         // so we always run fresh off the bat and wait
         // until everything finishes or something errors.
-        self.send_control(ControlEvent::FRESH_RUN).await?;
+        self.send_control(ControlEvent::FRESH_RUN).await;
         loop {
             if self.finished {
                 break;
@@ -294,7 +293,7 @@ impl UiLoop {
             // If a new error state is detected, abort the execution.
             if state == TaskState::Error {
                 tracing::error!("Aborting execution due to previous error.");
-                self.send_control(ControlEvent::FORCE_QUIT).await?;
+                self.send_control(ControlEvent::FORCE_QUIT).await;
             }
         }
 
@@ -393,29 +392,29 @@ impl UiLoop {
                 {
                     tracing::error!("Unknown job name: {invalid_job}")
                 } else {
-                    self.send_control(ControlEvent::Run(event_inner)).await?
+                    self.send_control(ControlEvent::Run(event_inner)).await
                 }
             }
-            Command::Check { mode } => self.send_control(ControlEvent::Check { mode }).await?,
+            Command::Check { mode } => self.send_control(ControlEvent::Check { mode }).await,
             Command::Quit { force, no_exit } => {
                 self.send_control(ControlEvent::Quit { force, no_exit })
-                    .await?;
+                    .await;
                 self.exit_on_finish = !no_exit;
             }
-            Command::Exit => self.send_control(ControlEvent::Exit).await?,
+            Command::Exit => self.send_control(ControlEvent::Exit).await,
             Command::Pause { targets, cascade } => {
                 if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
                     tracing::error!("Unknown job name: {invalid_job}")
                 } else {
                     self.send_control(ControlEvent::Pause { targets, cascade })
-                        .await?
+                        .await
                 }
             }
             Command::Resume { targets } => {
                 if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
                     tracing::error!("Unknown job name: {invalid_job}")
                 } else {
-                    self.send_control(ControlEvent::Resume { targets }).await?
+                    self.send_control(ControlEvent::Resume { targets }).await
                 }
             }
             Command::Clear => {
