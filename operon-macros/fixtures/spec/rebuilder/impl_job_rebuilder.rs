@@ -1,10 +1,10 @@
 #[operon::__private::async_trait::async_trait]
 #[automatically_derived]
-impl operon::__private::JobRebuilder for BetaRebuilder {
+impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__private::MetaBackend> operon::__private::JobRebuilder<Svc, Sto, MSto> for BetaRebuilder {
     async fn rebuild(
         &self,
-        client: operon::__private::MetaClient<'_>,
-    ) -> Result<(), operon::error::SchedulerError> {
+        client: MSto::Client<'_>,
+    ) -> Result<(), operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         use operon::__private::futures::{StreamExt, TryStreamExt};
 
         let ready_tickets = client
@@ -60,7 +60,7 @@ impl operon::__private::JobRebuilder for BetaRebuilder {
                 let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
                 (*self.progress.write().await).update(done, queued, waiting);
 
-                Ok::<_, operon::error::SchedulerError>(())
+                Ok::<_, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>(())
             },
         ))
         .buffer_unordered(operon::__private::REBUILD_CONCURRENCY)

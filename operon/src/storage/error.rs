@@ -1,21 +1,17 @@
-use std::error::Error;
 use std::fmt;
 use std::num::TryFromIntError;
 
 use thiserror::Error;
 
+/// A storage result over a backend error `SErr`.
+pub type StorageResult<T, SErr> = Result<T, StorageError<SErr>>;
+
+/// An entity-storage error.
+///
+/// Collects the backend-neutral domain errors any storage backend can raise, alongside the
+/// backend's own error type `SErr` carried by [`Backend`](Self::Backend).
 #[derive(Debug, Error)]
-pub enum StorageError {
-    #[error("Database error: {}{}", .0, .0.source().map_or_else(String::new, |e| format!(", cause: {e}")))]
-    DatabaseError(#[from] tokio_postgres::Error),
-    #[error("Database pool error: {0}")]
-    DatabasePoolError(#[from] deadpool_postgres::PoolError),
-    #[error("JSON error: {0}")]
-    JsonError(#[from] serde_json::Error),
-    #[error("CSV error: {0}")]
-    CsvError(#[from] csv::Error),
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+pub enum StorageError<SErr> {
     #[error("Integer conversion error: {0}")]
     IntegerConversionError(#[from] TryFromIntError),
     #[error("Invalid run state: {0}")]
@@ -34,6 +30,8 @@ pub enum StorageError {
     },
     #[error("Internal error: {0}")]
     Internal(&'static str),
+    #[error(transparent)]
+    Backend(SErr),
 }
 
 /// Describes the state of a dimension in an entity lookup.
@@ -69,16 +67,4 @@ fn fmt_dim_states(dims: &[(&'static str, DimState)]) -> String {
         .map(|(name, state)| format!("{name} = {state}"))
         .collect::<Vec<_>>()
         .join(", ")
-}
-
-impl From<csv::IntoInnerError<csv::Writer<Vec<u8>>>> for StorageError {
-    fn from(err: csv::IntoInnerError<csv::Writer<Vec<u8>>>) -> Self {
-        StorageError::IoError(err.into_error())
-    }
-}
-
-impl From<deadpool_postgres::BuildError> for StorageError {
-    fn from(_: deadpool_postgres::BuildError) -> Self {
-        Self::Internal("Failed to build connection pool")
-    }
 }

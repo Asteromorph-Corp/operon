@@ -1,9 +1,9 @@
 #[allow(unused_variables, clippy::match_single_binding)]
 async fn on_receive_explosion(
     &self,
-    client: operon::__private::MetaClient<'_>,
+    client: MSto::Client<'_>,
     explosion: operon::__private::TicketExplosion<schema::TicketEnum>,
-) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
+) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
     match explosion.ticket {
         schema::TicketEnum::Beta(ticket) => {
             let mut out = Vec::new();

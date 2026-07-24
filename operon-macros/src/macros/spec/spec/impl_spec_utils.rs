@@ -23,9 +23,9 @@ use crate::utils::{
 ///         std::collections::HashSet::from_iter(["alpha", "beta"])
 ///     }
 ///
-///     pub fn into_handler<Svc: CookingService, Sto: CookingStorage>(
+///     pub fn into_handler<Svc: CookingService, Sto: CookingStorage, MSto: operon::__private::MetaBackend>(
 ///         self,
-///     ) -> Box<dyn operon::__private::JobHandler<Svc, Sto>> {
+///     ) -> Box<dyn operon::__private::JobHandler<Svc, Sto, MSto>> {
 ///         let job_meta = self.job_meta();
 ///         let all_upstream_jobs = self.all_upstream_jobs();
 ///         Box::new(operon::__private::SpecWithMetadata::new(
@@ -62,7 +62,7 @@ pub fn impl_spec_utils(service_id: &syn::Ident, job: &JobConfig) -> syn::ItemImp
             }
             #maybe_spawn_dim_meta
 
-            pub fn into_handler<Svc: #svc_ident, Sto: #sto_ident>(self) -> Box<dyn #operon::__private::JobHandler<Svc, Sto>> {
+            pub fn into_handler<Svc: #svc_ident, Sto: #sto_ident, MSto: #operon::__private::MetaBackend>(self) -> Box<dyn #operon::__private::JobHandler<Svc, Sto, MSto>> {
                 let job_meta = self.job_meta();
                 Box::new(#operon::__private::SpecWithMetadata::new(self, job_meta))
             }

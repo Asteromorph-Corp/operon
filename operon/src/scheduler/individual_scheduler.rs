@@ -3,7 +3,9 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
-use crate::meta_storage::{MetaClient, MetaStorage, MetaStorageError};
+use crate::meta_storage::{
+    MetaBackend, MetaClientApi, MetaConnApi, MetaStorageError, MetaTicketApi, MetaTxApi,
+};
 use crate::scheduler::events::{
     IndividualControlEvent, IndividualControlEventReceiver, InternalEvent, PeerEvent,
     PeerEventSenders, ServicePeerEventReceiver, ServicePeerEventSenderMap,
@@ -24,35 +26,44 @@ use crate::storage::OperonStorage;
 /// * Picking up job results and sending out `Event` messages, and
 /// * Updating waiting tickets from `Event` messages.
 ///
+/// The result a spawned worker task reports back to its individual scheduler.
+type WorkerResult<J, R, UErr, SErr, MErr> =
+    Result<InternalEvent<J, R, UErr, SErr, MErr>, SchedulerError<UErr, SErr, MErr>>;
+
+/// The set of worker tasks an individual scheduler is currently awaiting.
+type WorkerHandles<J, R, UErr, SErr, MErr> = JoinSet<WorkerResult<J, R, UErr, SErr, MErr>>;
+
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Svc, Sto, JS, const N: usize>
+pub struct IndividualScheduler<Svc, Sto, JS, MSto, const N: usize>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto>,
+    MSto: MetaBackend,
+    JS: JobSpec<Svc, Sto, MSto>,
 {
     pub spec: JS,
     pub meta: JobMetadata<N>,
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
-    pub meta_storage: MetaStorage,
+    pub meta_storage: MSto,
     pub pool: Arc<Semaphore>,
     pub progress: SharedProgress,
     pub state: TaskState,
-    pub handles: JoinSet<Result<InternalEvent<Job<N>, JS::Resolution>, SchedulerError>>,
+    pub handles: WorkerHandles<Job<N>, JS::Resolution, Svc::Error, Sto::Error, MSto::Error>,
 }
 
-impl<Svc, Sto, JS, const N: usize> IndividualScheduler<Svc, Sto, JS, N>
+impl<Svc, Sto, JS, MSto, const N: usize> IndividualScheduler<Svc, Sto, JS, MSto, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto, Job = Job<N>, Ticket = Ticket<N>>,
+    MSto: MetaBackend,
+    JS: JobSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
 {
     pub fn new(
         spec: SpecWithMetadata<Svc, Sto, JS, N>,
         service: Arc<Svc>,
         storage: Arc<Sto>,
-        meta_storage: MetaStorage,
+        meta_storage: MSto,
         pool_size: usize,
         progress: SharedProgress,
     ) -> Self {
@@ -74,7 +85,9 @@ where
         (*self.progress.write().await).set_state(state);
     }
 
-    async fn update_progress(&mut self) -> Result<(), SchedulerError> {
+    async fn update_progress(
+        &mut self,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let conn = self.meta_storage.scheduler_conn().await?;
         self.update_progress_with_client(conn.as_client()).await?;
         Ok(())
@@ -83,8 +96,8 @@ where
     /// Call `update_state` with an ongoing connection.
     async fn update_progress_with_client(
         &mut self,
-        client: MetaClient<'_>,
-    ) -> Result<(), SchedulerError> {
+        client: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let (done, queued, waiting) = client.ticket(self.meta).get_status().await?;
         let finished = (*self.progress.write().await).update(done, queued, waiting);
         if finished && self.state != TaskState::Finished {
@@ -94,7 +107,7 @@ where
         Ok(())
     }
 
-    async fn initial_ready_tickets(&self) -> Result<Vec<Ticket<N>>, MetaStorageError> {
+    async fn initial_ready_tickets(&self) -> Result<Vec<Ticket<N>>, MetaStorageError<MSto::Error>> {
         let conn = self.meta_storage.scheduler_conn().await?;
         conn.as_client()
             .ticket(self.meta)
@@ -109,7 +122,7 @@ where
         &mut self,
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
         peer_txs: &JS::PeerEventSenders,
-    ) -> Result<Vec<Job<N>>, SchedulerError> {
+    ) -> Result<Vec<Job<N>>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let mut conn = self.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
         let ready_tickets = match event {
@@ -229,7 +242,7 @@ where
         peer_txs: &JS::PeerEventSenders,
         mut peer_rx: ServicePeerEventReceiver<Svc>,
         mut ctrl_rx: IndividualControlEventReceiver,
-    ) -> Result<(), SchedulerError> {
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let pool = self.pool.clone();
 
         let initial_jobs = initial_tickets
@@ -240,12 +253,21 @@ where
                 "Some initial tickets are not actually ready to run",
             ))?;
         let mut ready_jobs = AnyJobQueue::from_meta(initial_jobs, &self.meta);
-        let mut got_all_updates = false;
-        let mut is_stopping = false;
+        let mut got_all_peer_events = false;
+        let mut is_gracefully_stopping = false;
 
         // Main event loop.
         loop {
-            if is_stopping && self.handles.is_empty() && got_all_updates {
+            // Normal exit guard:
+            // 1. `self.state == TaskState::Finished` only if all tickets are `Done`; this notably
+            //    implies no more peer events are to be handled.
+            // 2. `self.handles.is_empty()` only if all internal events are drained; i.e., all peer
+            //    events to downstream schedulers have been sent.
+            if self.state == TaskState::Finished && self.handles.is_empty() {
+                return Ok(());
+            }
+
+            if is_gracefully_stopping && self.handles.is_empty() && got_all_peer_events {
                 self.set_state(TaskState::Stopped).await;
                 return Ok(());
             }
@@ -258,7 +280,7 @@ where
                         IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await,
                         IndividualControlEvent::Quit { force: false } => {
                             self.handle_graceful_stop().await;
-                            is_stopping = true;
+                            is_gracefully_stopping = true;
                         }
                         IndividualControlEvent::Quit { force: true } => {
                             tracing::info!("Aborting `{}` jobs.", self.meta.id);
@@ -289,12 +311,6 @@ where
 
                             // Broadcast the job result events
                             self.spec.send_on_finish(peer_txs, job, resolution).await?;
-                            // If all the tickets are finished
-                            // AND the scheduler's internal events are drained,
-                            // exit the loop.
-                            if self.state == TaskState::Finished && self.handles.is_empty() {
-                                return Ok(());
-                            }
                         }
                         InternalEvent::JobFailure(job, e) => {
                             // Log the error
@@ -306,7 +322,7 @@ where
                 }
 
                 // 2. A peer event.
-                event = peer_rx.recv(), if !got_all_updates => {
+                event = peer_rx.recv(), if !got_all_peer_events => {
                     match event {
                         Some(evt) => {
                             // Trace the peer event
@@ -323,7 +339,7 @@ where
                             // or that the upstream scheduler was gracefully stopped.
                             // Either way, we stop listening this branch.
                             tracing::debug!("`{}` finished receiving updates.", self.meta.id);
-                            got_all_updates = true;
+                            got_all_peer_events = true;
                         }
                     }
                 }

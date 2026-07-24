@@ -1,7 +1,7 @@
 async fn get_b(
     &self,
     coordinate: [usize; 2usize],
-) -> Result<Option<B>, operon::error::StorageError> {
+) -> operon::error::StorageResult<Option<B>, Self::Error> {
     self.conn()
         .await?
         .entity(self.entities_meta.b)

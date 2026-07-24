@@ -1,10 +1,10 @@
 #[allow(unused_variables, unreachable_code, clippy::match_single_binding)]
 async fn on_receive_resolution(
     &self,
-    client: operon::__private::MetaClient<'_>,
+    client: MSto::Client<'_>,
     peer_txs: &Self::PeerEventSenders,
     resolution: schema::ResolutionEnum,
-) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
+) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
     match resolution {
         schema::ResolutionEnum::I(res) => {
             let affected = client

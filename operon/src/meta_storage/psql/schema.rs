@@ -1,9 +1,9 @@
-use crate::meta_storage::MetaStorageError;
 use crate::meta_storage::psql::PsqlClient;
+use crate::meta_storage::psql::error::PsqlResult;
 
 impl PsqlClient<'_> {
     /// Initializes the metadata storage schema, if specified.
-    pub async fn init_schema(&self) -> Result<(), MetaStorageError> {
+    pub async fn init_schema(&self) -> PsqlResult<()> {
         let Some(schema) = self.schema() else {
             return Ok(());
         };
@@ -12,7 +12,7 @@ impl PsqlClient<'_> {
         Ok(())
     }
 
-    pub async fn init_ticket_hash(&self) -> Result<(), MetaStorageError> {
+    pub async fn init_ticket_hash(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
         let stmt = format!(
             "CREATE TABLE IF NOT EXISTS {schema_prefix}_ticket_hash (
@@ -24,7 +24,7 @@ impl PsqlClient<'_> {
         Ok(())
     }
 
-    pub async fn init_dimension_hash(&self) -> Result<(), MetaStorageError> {
+    pub async fn init_dimension_hash(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
         let stmt = format!(
             "CREATE TABLE IF NOT EXISTS {schema_prefix}_dimension_hash (
@@ -37,7 +37,7 @@ impl PsqlClient<'_> {
     }
 
     /// Initializes the `ticket_status` type.
-    pub async fn init_ticket_status_type(&self) -> Result<(), MetaStorageError> {
+    pub async fn init_ticket_status_type(&self) -> PsqlResult<()> {
         let schema = self.schema_prefix();
         let create_status_type = format!(
             "DO $$ BEGIN
@@ -55,7 +55,7 @@ impl PsqlClient<'_> {
     }
 
     /// Initializes the ticket summary table.
-    pub async fn init_ticket_summary(&self) -> Result<(), MetaStorageError> {
+    pub async fn init_ticket_summary(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
         let stmt = format!(
             "CREATE TABLE IF NOT EXISTS {schema_prefix}ticket_summary (

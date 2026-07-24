@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::error::SchedulerError;
+use crate::meta_storage::MetaBackend;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::events::{ControlEvent, RunEventInner};
 use crate::scheduler::states::clean::CleanTransition;
@@ -9,23 +11,25 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct FreshState<Svc, Sto>
+pub struct FreshState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    ctx: SchedulerContext<Svc, Sto>,
+    ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     run_id: Uuid,
 }
 
-impl<Svc, Sto> FreshState<Svc, Sto>
+impl<Svc, Sto, MSto> FreshState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     pub fn new(
-        ctx: SchedulerContext<Svc, Sto>,
+        ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
         run_id: Uuid,
@@ -42,33 +46,34 @@ where
         }
     }
 
-    fn into_running(self) -> TransitionState {
+    fn into_running(self) -> TransitionState<SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         CleanTransition::state(self.ctx, self.channel_size, self.run_id)
     }
 }
 
 #[async_trait]
-impl<Svc, Sto> SchedulerState for FreshState<Svc, Sto>
+impl<Svc, Sto, MSto> SchedulerState for FreshState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
-    async fn handle_progress(
-        self: Box<Self>,
-    ) -> Result<NextState, crate::scheduler::SchedulerError> {
+    type Error = SchedulerError<Svc::Error, Sto::Error, MSto::Error>;
+
+    async fn handle_progress(self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         Ok(NextState::Next(self))
     }
 
     async fn handle_control_event(
         self: Box<Self>,
         evt: ControlEvent,
-    ) -> Result<NextState, crate::scheduler::SchedulerError> {
+    ) -> Result<NextState<Self::Error>, Self::Error> {
         match evt {
             ControlEvent::Check { .. } => tracing::warn!("Cannot check on a fresh run"),
             ControlEvent::Run(RunEventInner::Rebuild { .. }) => {
                 tracing::error!("Cannot rebuild on a fresh run.")
             }
-            ControlEvent::Run(..) => return Ok(NextState::from(self.into_running())),
+            ControlEvent::Run(..) => return Ok(NextState::next(self.into_running())),
             ControlEvent::Pause { .. } => {
                 tracing::warn!("Cannot pause before the run has started.")
             }

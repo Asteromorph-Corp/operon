@@ -14,10 +14,10 @@ use crate::utils::{
 /// #[allow(unused_variables, clippy::match_single_binding)]
 /// async fn on_receive_resolution(
 ///     &self,
-///     client: operon::__private::MetaClient<'_>,
+///     client: MSto::Client<'_>,
 ///     peer_txs: &Self::PeerEventSenders,
 ///     resolution: schema::ResolutionEnum,
-/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError> {
+/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///     match resolution {
 ///         schema::ResolutionEnum::I(res) => Ok(client
 ///             .ticket(self.job_meta())
@@ -112,10 +112,10 @@ pub(super) fn fn_on_receive_resolution(
         #[allow(unused_variables, unreachable_code, clippy::match_single_binding)]
         async fn on_receive_resolution(
             &self,
-            client: #operon::__private::MetaClient<'_>,
+            client: MSto::Client<'_>,
             peer_txs: &Self::PeerEventSenders,
             resolution: schema::#res_enum_ident,
-        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError> {
+        ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
             match resolution {
                 #(#explode_arms)*
                 _ => return Err(#operon::error::SchedulerError::InvalidPeerEventReceived("resolution", #job_id)),

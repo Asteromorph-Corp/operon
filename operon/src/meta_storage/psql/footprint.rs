@@ -6,12 +6,13 @@ use uuid::Uuid;
 
 use crate::meta_storage::MetaStorageError;
 use crate::meta_storage::psql::PsqlClient;
+use crate::meta_storage::psql::error::PsqlResult;
 use crate::schema::{RunFootprint, RunState};
 use crate::utils::GLOBAL;
 
 impl PsqlClient<'_> {
     /// Initializes the footprint table.
-    pub async fn init_footprint(&self) -> Result<(), MetaStorageError> {
+    pub async fn init_footprint(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
 
         let stmt = format!(
@@ -42,7 +43,7 @@ impl PsqlClient<'_> {
     }
 
     /// Clears the footprint table.
-    pub async fn clear_footprint(&self) -> Result<(), MetaStorageError> {
+    pub async fn clear_footprint(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
 
         let stmt = format!("TRUNCATE TABLE {schema_prefix}runs CASCADE");
@@ -51,7 +52,7 @@ impl PsqlClient<'_> {
     }
 
     /// Gets the run metadata.
-    pub async fn get_footprint(&self) -> Result<Option<RunFootprint>, MetaStorageError> {
+    pub async fn get_footprint(&self) -> PsqlResult<Option<RunFootprint>> {
         let schema_prefix = self.schema_prefix();
 
         let stmt =
@@ -68,7 +69,7 @@ impl PsqlClient<'_> {
     }
 
     /// Updates the run table on run state change.
-    pub async fn upsert_run(&self, footprint: &RunFootprint) -> Result<(), MetaStorageError> {
+    pub async fn upsert_run(&self, footprint: &RunFootprint) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
         let run_id = footprint.metadata.run_id;
         let run_state = footprint.metadata.state.to_string();
@@ -91,11 +92,7 @@ impl PsqlClient<'_> {
     }
 
     /// Inserts a new execution row on execution start.
-    pub async fn put_execution(
-        &self,
-        run_id: Uuid,
-        execution_id: Uuid,
-    ) -> Result<(), MetaStorageError> {
+    pub async fn put_execution(&self, run_id: Uuid, execution_id: Uuid) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
 
         let stmt = format!(
@@ -111,7 +108,7 @@ impl PsqlClient<'_> {
         &self,
         footprint: &RunFootprint,
         execution_id: Uuid,
-    ) -> Result<(), MetaStorageError> {
+    ) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
         let run_id = &footprint.metadata.run_id;
         let at = &footprint.at;

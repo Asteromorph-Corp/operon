@@ -45,8 +45,10 @@ uuid = { version = "1", features = ["v4"] }
 nix = { version = "0.29", features = ["fs"] }
 
 [dev-dependencies]
+clap = { version = "4.0.1", features = ["env"]}
 indoc = "2"
 pretty_assertions = "1"
 rstest = "0.26"
 log = "0.4.17"
 rand = "0.9"
+dashmap = "6"

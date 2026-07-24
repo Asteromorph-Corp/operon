@@ -11,9 +11,13 @@ fn fn_scheduler_handler(all_configs: &AllConfig) -> syn::ItemFn {
     let specs = all_configs.jobs.keys().map(spec_ident);
 
     parse_quote! {
-        pub fn scheduler_handler<Svc: #service_trait, Sto: #storage_trait>() -> #operon::__private::SchedulerHandler<Svc, Sto> {
+        pub fn scheduler_handler<
+            Svc: #service_trait,
+            Sto: #storage_trait,
+            MSto: #operon::__private::MetaBackend,
+        >() -> #operon::__private::SchedulerHandler<Svc, Sto, MSto> {
             #operon::__private::SchedulerHandler::new(vec![
-                #(spec::#specs.into_handler(),)*
+                #(spec::#specs.into_handler::<Svc, Sto, MSto>(),)*
             ])
         }
     }

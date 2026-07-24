@@ -329,7 +329,8 @@ C = create_c(B) for i;
 The generated artifacts integrate with the Operon runtime system:
 
 ```rust
-use operon::{Operon, OperonOptions, PsqlStorageOptions};
+use operon::options::{PsqlMetaStorageOptions, PsqlStorageOptions};
+use operon::Operon;
 
 // Implement the generated service trait
 struct MyService;
@@ -339,13 +340,18 @@ impl MyPipelineService for MyService {
     }
 }
 
-// Use generated storage or implement custom storage
-let storage = PsqlMyPipelineStorage::new(
-    PsqlStorageOptions::new(&database_uri).with_schema(Some("data".to_string()))
-)?;
+// Build the generated storage (or implement your own) from its options
+let storage = PsqlStorageOptions::new(&database_uri)
+    .with_schema("data")
+    .build::<PsqlMyPipelineStorage>()?;
+
+// Build the metadata backend
+let meta = PsqlMetaStorageOptions::new(&database_uri)
+    .with_schema("meta")
+    .build()?;
 
 // Run the pipeline
-let operon = Operon::new(Arc::new(MyService), Arc::new(storage), options);
+let operon = Operon::new(MyService, storage, meta);
 operon.run().await?;
 ```
 

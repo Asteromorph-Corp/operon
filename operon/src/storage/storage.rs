@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::schema::RunFootprint;
-use crate::storage::StorageError;
+use crate::storage::StorageResult;
 
 /// # OperonStorage trait
 ///
@@ -70,18 +70,22 @@ use crate::storage::StorageError;
 /// ```
 #[async_trait]
 pub trait OperonStorage: Send + Sync + 'static {
-    async fn init(&self) -> Result<(), StorageError>;
-    async fn clear(&self) -> Result<(), StorageError>;
+    /// This storage backend's own error type, surfaced through
+    /// [`StorageError::Backend`](crate::storage::StorageError::Backend).
+    type Error: std::error::Error + Send + Sync + 'static;
 
-    async fn get_footprint(&self) -> Result<Option<RunFootprint>, StorageError> {
+    async fn init(&self) -> StorageResult<(), Self::Error>;
+    async fn clear(&self) -> StorageResult<(), Self::Error>;
+
+    async fn get_footprint(&self) -> StorageResult<Option<RunFootprint>, Self::Error> {
         // This function is no-op by default, disallowing recovery runs if not implemented.
         Ok(None)
     }
-    async fn put_footprint(&self, _footprint: &RunFootprint) -> Result<(), StorageError> {
+    async fn put_footprint(&self, _footprint: &RunFootprint) -> StorageResult<(), Self::Error> {
         // This function is no-op by default, disallowing recovery runs if not implemented.
         Ok(())
     }
-    async fn clear_footprint(&self) -> Result<(), StorageError> {
+    async fn clear_footprint(&self) -> StorageResult<(), Self::Error> {
         // This function is no-op by default, disallowing recovery runs if not implemented.
         Ok(())
     }

@@ -2,18 +2,21 @@ use thiserror::Error;
 use tokio::sync::AcquireError;
 use tokio::task::JoinError;
 
-use crate::error::UserError;
 use crate::meta_storage::MetaStorageError;
 use crate::storage::StorageError;
 
+/// The scheduler's error, generic over the service's error type `UErr`
+/// ([`OperonService::Error`](crate::service::OperonService::Error)), the entity storage's error
+/// type `SErr` ([`OperonStorage::Error`](crate::storage::OperonStorage::Error)), and the metadata
+/// backend's error type `MErr` ([`MetaBackend::Error`](crate::meta_storage::MetaBackend::Error)).
 #[derive(Debug, Error)]
-pub enum SchedulerError {
+pub enum SchedulerError<UErr, SErr, MErr> {
     #[error("Error in user provided function: {0}")]
-    UserError(#[from] UserError),
+    UserError(UErr),
     #[error("Storage error: {0}")]
-    Storage(#[from] StorageError),
+    Storage(#[from] StorageError<SErr>),
     #[error("Metadata storage error: {0}")]
-    MetaStorage(#[from] MetaStorageError),
+    MetaStorage(#[from] MetaStorageError<MErr>),
     #[error("Join failed: {0}")]
     JoinFailed(#[from] JoinError),
     #[error("Failed to acquire semaphore")]
@@ -30,7 +33,7 @@ pub enum SchedulerError {
     Other(String),
 }
 
-impl SchedulerError {
+impl<UErr, SErr, MErr> SchedulerError<UErr, SErr, MErr> {
     pub(crate) fn missing_progress(id: impl Into<String>) -> Self {
         Self::MissingProgressEntry(id.into())
     }
@@ -40,13 +43,15 @@ impl SchedulerError {
     }
 }
 
-impl From<AcquireError> for SchedulerError {
+impl<UErr, SErr, MErr> From<AcquireError> for SchedulerError<UErr, SErr, MErr> {
     fn from(_: AcquireError) -> Self {
         SchedulerError::SemaphoreAcquireFailed
     }
 }
 
-impl From<tokio::sync::watch::error::RecvError> for SchedulerError {
+impl<UErr, SErr, MErr> From<tokio::sync::watch::error::RecvError>
+    for SchedulerError<UErr, SErr, MErr>
+{
     fn from(_: tokio::sync::watch::error::RecvError) -> Self {
         SchedulerError::ControlEventReceiveFailed
     }

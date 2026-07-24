@@ -10,7 +10,7 @@ use crate::utils::{batch_put_entity_ident, operon_ident, to_snake_case, to_type}
 /// async fn put_all_a(
 ///     &self,
 ///     entity: operon::Entity<0usize, Vec<A>>,
-/// ) -> Result<(), operon::error::StorageError> {
+/// ) -> operon::error::StorageResult<(), Self::Error> {
 ///     self.conn()
 ///         .await?
 ///         .entity(self.entities_meta.a)
@@ -30,7 +30,7 @@ pub fn batch_puts(jobs: &JobConfigMap) -> impl Iterator<Item = syn::TraitItemFn>
         let ty = to_type(&job.to);
 
         Some(parse_quote! {
-            async fn #batch_put_fn_name(&self, entity: #operon::Entity<#n, Vec<#ty>>) -> Result<(), #operon::error::StorageError> {
+            async fn #batch_put_fn_name(&self, entity: #operon::Entity<#n, Vec<#ty>>) -> #operon::error::StorageResult<(), Self::Error> {
                 self
                     .conn()
                     .await?

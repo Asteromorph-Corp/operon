@@ -1,11 +1,7 @@
 use thiserror::Error;
 
-use crate::scheduler::ControlEventError;
-
 #[derive(Debug, Error)]
 pub enum UiError {
-    #[error("Control event send error: {0}")]
-    ControlEventSendFailed(#[from] ControlEventError),
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Log buffer error: {0}")]

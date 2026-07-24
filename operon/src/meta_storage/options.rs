@@ -1,4 +1,6 @@
+use crate::meta_storage::mem::MemMetaStorageOptions;
 use crate::meta_storage::psql::PsqlMetaStorageOptions;
+use crate::meta_storage::{AnyBackend, AnyBackendError, MetaStorageError};
 
 /// Selects and parameterizes the metadata storage backend.
 ///
@@ -6,31 +8,63 @@ use crate::meta_storage::psql::PsqlMetaStorageOptions;
 /// variant owns its backend's full parameter set (e.g. [`Psql`](MetaBackendOptions::Psql) carries a
 /// [`PsqlMetaStorageOptions`]), so backend-specific knobs never leak into backend-agnostic options.
 ///
+/// Build the selected backend into an [`AnyBackend`] with [`build`](Self::build), then hand it to
+/// [`Operon::new`](crate::Operon::new).
+/// To pin a backend at compile time, build its concrete options directly (e.g.
+/// [`PsqlMetaStorageOptions::build`]).
+///
 /// # Stability
 ///
 /// This enum is `#[non_exhaustive]`: adding a backend variant must stay a non-breaking change.
-/// Prefer the provided constructors (e.g. [`psql`]) over naming variants directly.
-///
-/// Note that the *convenience* entry points that assume Postgres — notably
-/// [`OperonOptions::new`](crate::options::OperonOptions::new) — are **not** covered by this
-/// guarantee. Once a second backend exists, those will be replaced by backend-specific
-/// constructors (e.g. `OperonOptions::from_psql_uri`), which *is* a breaking change. Code that
-/// wants to be forward-compatible should go through this enum via
-/// [`OperonOptions::from_backend`](crate::options::OperonOptions::from_backend).
+/// Reach it through the provided constructors (e.g. [`psql`]) or a [`From`] conversion rather than
+/// naming variants directly.
 ///
 /// [`psql`]: MetaBackendOptions::psql
 #[non_exhaustive]
 pub enum MetaBackendOptions {
     /// The Postgres backend and its configuration.
     Psql(PsqlMetaStorageOptions),
+    /// The in-memory backend and its configuration.
+    Mem(MemMetaStorageOptions),
 }
 
 impl MetaBackendOptions {
     /// Selects the Postgres backend with the given connection URI and default tuning.
     ///
-    /// For finer control, build a [`PsqlMetaStorageOptions`] and wrap it in
-    /// [`MetaBackendOptions::Psql`] directly.
+    /// For finer control, build a [`PsqlMetaStorageOptions`] and convert it with
+    /// [`Into`]/[`From`].
     pub fn psql(uri: impl Into<String>) -> Self {
         MetaBackendOptions::Psql(PsqlMetaStorageOptions::new(uri))
+    }
+
+    /// Selects the in-memory backend.
+    ///
+    /// The metadata lives in process and is lost when it exits.
+    pub fn mem() -> Self {
+        MetaBackendOptions::Mem(MemMetaStorageOptions::new())
+    }
+
+    /// Builds the metadata backend selected by these options into an [`AnyBackend`].
+    ///
+    /// The concrete backend is resolved at runtime from the chosen variant.
+    /// To pin a backend at compile time, build its concrete options instead
+    /// (e.g. [`PsqlMetaStorageOptions::build`]).
+    pub fn build(self) -> Result<AnyBackend, MetaStorageError<AnyBackendError>> {
+        match self {
+            MetaBackendOptions::Psql(options) => Ok(AnyBackend::Psql(options.build()?)),
+            MetaBackendOptions::Mem(options) => Ok(AnyBackend::Mem(options.build())),
+        }
+    }
+}
+
+impl From<PsqlMetaStorageOptions> for MetaBackendOptions {
+    fn from(options: PsqlMetaStorageOptions) -> Self {
+        MetaBackendOptions::Psql(options)
+    }
+}
+
+impl From<MemMetaStorageOptions> for MetaBackendOptions {
+    fn from(options: MemMetaStorageOptions) -> Self {
+        MetaBackendOptions::Mem(options)
     }
 }

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::meta_storage::{MetaClient, MetaStorage};
+use crate::meta_storage::MetaBackend;
 use crate::scheduler::events::PeerEventSenders;
 use crate::scheduler::{JobRebuilder, SchedulerError};
 use crate::schema::{
@@ -9,23 +9,13 @@ use crate::schema::{
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct SpecWithMetadata<Svc, Sto, JS, const N: usize>
-where
-    Svc: OperonService,
-    Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto>,
-{
+pub struct SpecWithMetadata<Svc, Sto, JS, const N: usize> {
     pub spec: JS,
     pub job_meta: JobMetadata<N>,
     _phantom: std::marker::PhantomData<(Svc, Sto)>,
 }
 
-impl<Svc, Sto, JS, const N: usize> SpecWithMetadata<Svc, Sto, JS, N>
-where
-    Svc: OperonService,
-    Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto>,
-{
+impl<Svc, Sto, JS, const N: usize> SpecWithMetadata<Svc, Sto, JS, N> {
     pub fn new(spec: JS, job_meta: JobMetadata<N>) -> Self {
         Self {
             spec,
@@ -37,9 +27,7 @@ where
 
 impl<Svc, Sto, JS, const N: usize> Clone for SpecWithMetadata<Svc, Sto, JS, N>
 where
-    Svc: OperonService,
-    Sto: OperonStorage,
-    JS: JobSpec<Svc, Sto> + Clone,
+    JS: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -51,10 +39,11 @@ where
 }
 
 #[async_trait]
-pub trait JobSpec<Svc, Sto>: Clone + Send + Sync + 'static
+pub trait JobSpec<Svc, Sto, MSto>: Clone + Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
+    MSto: MetaBackend,
 {
     type Job: JobLike;
     type Resolution: ResolutionLike;
@@ -71,9 +60,9 @@ where
     async fn check_consistency(
         &self,
         storage: &Sto,
-        client: MetaClient<'_>,
+        client: MSto::Client<'_>,
         mode: CheckMode,
-    ) -> Result<bool, SchedulerError>;
+    ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Prepare the job rebuilder for the given storage and metadata client by fetching the
     /// necessary data.
@@ -81,8 +70,11 @@ where
         &self,
         storage: &Sto,
         progress: SharedProgress,
-        client: MetaClient<'_>,
-    ) -> Result<Box<dyn JobRebuilder>, SchedulerError>;
+        client: MSto::Client<'_>,
+    ) -> Result<
+        Box<dyn JobRebuilder<Svc, Sto, MSto>>,
+        SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
+    >;
 
     /// Call the user function and stores the result in the storage.
     ///
@@ -91,33 +83,33 @@ where
         &self,
         service: &Svc,
         storage: &Sto,
-        client: MetaStorage,
+        meta: MSto,
         job: Self::Job,
-    ) -> Result<Self::Resolution, SchedulerError>;
+    ) -> Result<Self::Resolution, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     async fn send_on_finish(
         &self,
         peer_txs: &Self::PeerEventSenders,
         job: Self::Job,
         resolution: Self::Resolution,
-    ) -> Result<(), SchedulerError>;
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     async fn on_receive_job(
         &self,
-        client: MetaClient<'_>,
+        client: MSto::Client<'_>,
         job: Svc::JobEnum,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     async fn on_receive_resolution(
         &self,
-        client: MetaClient<'_>,
+        client: MSto::Client<'_>,
         peer_txs: &Self::PeerEventSenders,
         resolution: Svc::ResolutionEnum,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     async fn on_receive_explosion(
         &self,
-        client: MetaClient<'_>,
+        client: MSto::Client<'_>,
         explosion: TicketExplosion<Svc::TicketEnum>,
-    ) -> Result<Vec<Self::Ticket>, SchedulerError>;
+    ) -> Result<Vec<Self::Ticket>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 }

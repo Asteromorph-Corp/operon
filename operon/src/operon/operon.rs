@@ -3,6 +3,7 @@ use std::sync::Arc;
 use futures::future::try_join;
 
 use crate::logger::UiBroadcastLayer;
+use crate::meta_storage::MetaBackend;
 use crate::operon::{OperonError, OperonOptions};
 use crate::scheduler::{Scheduler, ValidOperon};
 use crate::schema::SharedProgressMap;
@@ -14,46 +15,58 @@ use crate::ui::UiLoop;
 ///
 /// The interface for the Operon library.
 ///
-/// Provided a data storage and a service, calling `run` will start executing the jobs.
-pub struct Operon<Svc, Sto>
+/// Provided a data storage, a service, and a metadata backend, calling `run` will start executing
+/// the jobs.
+pub struct Operon<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     (Svc, Sto): ValidOperon<Svc, Sto>,
+    MSto: MetaBackend,
 {
     service: Arc<Svc>,
     storage: Arc<Sto>,
+    meta_storage: MSto,
     options: OperonOptions,
 }
 
-impl<Svc, Sto> Operon<Svc, Sto>
+impl<Svc, Sto, MSto> Operon<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     (Svc, Sto): ValidOperon<Svc, Sto>,
+    MSto: MetaBackend,
 {
-    /// Create a new Operon instance with the given storage and service.
+    /// Create a new Operon instance with the given service, storage, and metadata backend.
     pub fn new(
         service: impl Into<Arc<Svc>>,
         storage: impl Into<Arc<Sto>>,
-        options: OperonOptions,
+        meta_storage: MSto,
     ) -> Self {
         Self {
             service: service.into(),
             storage: storage.into(),
-            options,
+            meta_storage,
+            options: OperonOptions::default(),
         }
     }
 
-    /// Run the Operon instance with the given primary upper bound.
-    ///
-    /// This function is intended to be called ONCE in the main thread in a binary executable
-    /// context. Running this will take over the terminal, so it is strongly discouraged to make
-    /// any other writes to `stdout` or `stderr` while this is running.
-    /// Instead, you can use the provided macros to log messages to the UI.
+    /// Overrides the run settings, replacing any previously set options.
+    pub fn with_options(mut self, options: OperonOptions) -> Self {
+        self.options = options;
+        self
+    }
+
+    /// Run the Operon instance.
     pub async fn run(self) -> Result<(), OperonError> {
-        let handler = <(Svc, Sto) as ValidOperon<Svc, Sto>>::scheduler_handler();
-        let (ui_options, scheduler_options, log_options) = self.options.split();
+        let Operon {
+            service,
+            storage,
+            meta_storage,
+            options,
+        } = self;
+        let (ui_options, scheduler_options, log_options) = options.split();
+        let (channel_size, ui_mode) = scheduler_options.split();
 
         // Initialize the logger
         let (log_tx, log_rx) = ::tokio::sync::broadcast::channel(log_options.buffer_size);
@@ -67,18 +80,21 @@ where
         // Set up the tracing subscriber
         UiBroadcastLayer::new(log_tx, log_options).setup()?;
 
+        let handler = <(Svc, Sto) as ValidOperon<Svc, Sto>>::scheduler_handler::<MSto>();
+
         let progresses = SharedProgressMap::from_jobs(&handler.job_ids());
 
-        // Create the scheduler
-        let scheduler = Scheduler::<Svc, Sto>::new(
-            self.service,
-            self.storage,
+        let scheduler = Scheduler::<Svc, Sto, MSto>::new(
+            service,
+            storage,
+            meta_storage,
             handler,
             progresses.clone(),
             ctrl_rx,
             sched_tx,
-            scheduler_options,
-        )?;
+            channel_size,
+            ui_mode,
+        );
         let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
