@@ -253,12 +253,21 @@ where
                 "Some initial tickets are not actually ready to run",
             ))?;
         let mut ready_jobs = AnyJobQueue::from_meta(initial_jobs, &self.meta);
-        let mut got_all_updates = false;
-        let mut is_stopping = false;
+        let mut got_all_peer_events = false;
+        let mut is_gracefully_stopping = false;
 
         // Main event loop.
         loop {
-            if is_stopping && self.handles.is_empty() && got_all_updates {
+            // Normal exit guard:
+            // 1. `self.state == TaskState::Finished` only if all tickets are `Done`; this notably
+            //    implies no more peer events are to be handled.
+            // 2. `self.handles.is_empty()` only if all internal events are drained; i.e., all peer
+            //    events to downstream schedulers have been sent.
+            if self.state == TaskState::Finished && self.handles.is_empty() {
+                return Ok(());
+            }
+
+            if is_gracefully_stopping && self.handles.is_empty() && got_all_peer_events {
                 self.set_state(TaskState::Stopped).await;
                 return Ok(());
             }
@@ -271,7 +280,7 @@ where
                         IndividualControlEvent::Resume if self.state == TaskState::Paused => self.handle_resume().await,
                         IndividualControlEvent::Quit { force: false } => {
                             self.handle_graceful_stop().await;
-                            is_stopping = true;
+                            is_gracefully_stopping = true;
                         }
                         IndividualControlEvent::Quit { force: true } => {
                             tracing::info!("Aborting `{}` jobs.", self.meta.id);
@@ -302,12 +311,6 @@ where
 
                             // Broadcast the job result events
                             self.spec.send_on_finish(peer_txs, job, resolution).await?;
-                            // If all the tickets are finished
-                            // AND the scheduler's internal events are drained,
-                            // exit the loop.
-                            if self.state == TaskState::Finished && self.handles.is_empty() {
-                                return Ok(());
-                            }
                         }
                         InternalEvent::JobFailure(job, e) => {
                             // Log the error
@@ -319,7 +322,7 @@ where
                 }
 
                 // 2. A peer event.
-                event = peer_rx.recv(), if !got_all_updates => {
+                event = peer_rx.recv(), if !got_all_peer_events => {
                     match event {
                         Some(evt) => {
                             // Trace the peer event
@@ -336,7 +339,7 @@ where
                             // or that the upstream scheduler was gracefully stopped.
                             // Either way, we stop listening this branch.
                             tracing::debug!("`{}` finished receiving updates.", self.meta.id);
-                            got_all_updates = true;
+                            got_all_peer_events = true;
                         }
                     }
                 }
