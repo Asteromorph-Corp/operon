@@ -401,12 +401,9 @@ Certain features, such as real-time monitoring, pause/resume functionality, and 
 
 ## Roadmap
 
-Operon is under active development. Planned features and improvements include:
-
-- In-memory and file-based backends for lightweight use cases.
-- More flexible logging options (custom log levels per crate/task, dump formats, etc.).
-
-Please reach out via [opening an issue](https://github.com/Asteromorph-Corp/operon/issues) if you have any suggestions or feature requests.
+Operon is under active development.
+Please check the [issues](https://github.com/Asteromorph-Corp/operon/issues) page for the full list of planned features and known problems.
+You can also reach out via opening an issue if you [experienced bugs](https://github.com/Asteromorph-Corp/operon/issues/new?template=bug-report.yml) or [have any suggestions](https://github.com/Asteromorph-Corp/operon/issues/new?template=feature-request.yml).
 
 ## License
 
