@@ -4,7 +4,6 @@ use crate::schema::CheckMode;
 
 pub type ControlEventReceiver = tokio::sync::mpsc::Receiver<ControlEvent>;
 pub type ControlEventSender = tokio::sync::mpsc::Sender<ControlEvent>;
-pub type ControlEventError = tokio::sync::mpsc::error::SendError<ControlEvent>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunEventInner {
