@@ -9,6 +9,9 @@ use uuid::Uuid;
 /// [`OperonStorage::put_footprint`](crate::OperonStorage::put_footprint) and to the metadata
 /// storage.
 /// The next run compares the two, and resumes only when they agree — timestamp included.
+///
+/// [`Uuid`](crate::Uuid), [`DateTime`](crate::DateTime), and [`Utc`](crate::Utc) are re-exported
+/// from the `uuid` and `chrono` crates for construction of the footprint.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunFootprint {
     /// The run this footprint belongs to.

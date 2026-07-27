@@ -19,6 +19,8 @@ use crate::storage::StorageResult;
 /// Operon compares the footprint stored here against the one held by the metadata storage to decide
 /// whether a previous run can be resumed, and treats a disagreement between the two as an aborted
 /// run.
+/// [`Uuid`](crate::Uuid), [`DateTime`](crate::DateTime), and [`Utc`](crate::Utc) are re-exported
+/// from the `uuid` and `chrono` crates for construction of the footprint.
 ///
 /// The three footprint methods default to no-ops, and a backend that does not implement them will
 /// have recovery disabled.
