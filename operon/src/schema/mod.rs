@@ -20,7 +20,7 @@ mod option_coordinate;
 pub use option_coordinate::OptionCoordinate;
 
 mod run_metadata;
-pub(crate) use run_metadata::{RunFootprint, RunMetadata, RunState};
+pub use run_metadata::{RunFootprint, RunMetadata, RunState};
 
 mod progress;
 pub use progress::{Progress, SharedProgress, SharedProgressMap, TaskState};

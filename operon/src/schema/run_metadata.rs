@@ -3,25 +3,41 @@ use std::str::FromStr;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-/// The "footprint" for a run used to check the consistency of run across restarts.
+/// The trace a run leaves behind, used to check that a restart picks up consistent data.
+///
+/// A finishing run writes the same footprint to the entity storage through
+/// [`OperonStorage::put_footprint`](crate::OperonStorage::put_footprint) and to the metadata
+/// storage.
+/// The next run compares the two, and resumes only when they agree — timestamp included.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunFootprint {
+    /// The run this footprint belongs to.
     pub metadata: RunMetadata,
+    /// When the footprint was taken.
     pub at: DateTime<Utc>,
 }
 
+/// The identity of a run and how far it got.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunMetadata {
+    /// Distinguishes this run from other runs over the same data.
     pub run_id: Uuid,
+    /// The state the run had reached when it was recorded.
     pub state: RunState,
 }
 
+/// How far a run got. Decides whether a restart resumes it or starts over.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunState {
+    /// No run has been recorded yet.
     Fresh,
+    /// The run is under way.
     Running,
+    /// The run stopped gracefully and is resumable immediately.
     Paused,
+    /// Every task of the run finished.
     Completed,
+    /// The run stopped without recording a graceful stop, so its progress is not trusted.
     Aborted,
 }
 
