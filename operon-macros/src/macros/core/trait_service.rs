@@ -2,6 +2,7 @@ use indoc::formatdoc;
 use syn::parse_quote;
 
 use crate::configs::{AllConfig, JobConfig};
+use crate::macros::core::DocumentedFn;
 use crate::utils::{
     entity_over_dim_ident, job_enum_ident, operon_ident, resolution_enum_ident,
     service_trait_ident_spanned, ticket_enum_ident, to_type,
@@ -90,7 +91,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let (job_sigs, job_fns) = all_configs
         .jobs
         .values()
-        .map(|job| -> (String, syn::TraitItemFn) {
+        .map(|job| -> DocumentedFn {
             let fn_name = &job.id;
             let args = job
                 .from
