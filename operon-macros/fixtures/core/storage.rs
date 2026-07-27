@@ -23,6 +23,7 @@
 /// # Provided methods
 /// Each of these covers a whole range of one entity in a single call.
 /// They default to walking the accessors above one entity at a time; override them wherever the backend can serve the range in one query.
+/// The return value of `get_all_*` should be ordered by the dimensions they iterate over.
 /// ```rust,ignore
 /// async fn get_all_b_j(&self, coordinate: [usize; 1]) -> StorageResult<Vec<B>, Self::Error>
 /// async fn get_all_c_k(&self, coordinate: [usize; 1]) -> StorageResult<Vec<C>, Self::Error>
