@@ -24,7 +24,7 @@ fn format_dims(dims: &[syn::Ident]) -> String {
 /// # Example
 /// ```rust,ignore
 /// /// ```rust,ignore
-/// /// async fn get_a(coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error>
+/// /// async fn get_a(&self, coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error>
 /// /// ```
 /// /// Reads the `A` stored at `[i]`, or `None` if that coordinate holds nothing.
 /// async fn get_a(
@@ -33,7 +33,7 @@ fn format_dims(dims: &[syn::Ident]) -> String {
 /// ) -> operon::error::StorageResult<Option<A>, Self::Error>;
 ///
 /// /// ```rust,ignore
-/// /// async fn put_a(entity: Entity<1, A>) -> StorageResult<(), Self::Error>
+/// /// async fn put_a(&self, entity: Entity<1, A>) -> StorageResult<(), Self::Error>
 /// /// ```
 /// /// Writes the given `A` at its own coordinate `[i]`, replacing whatever is stored there.
 /// async fn put_a(
@@ -51,7 +51,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> 
         let coordinate = format_coordinate(&entity.dims);
 
         let get_sig = format!(
-            "async fn {get_fn_name}(coordinate: [usize; {n}]) -> StorageResult<Option<{ty}>, Self::Error>"
+            "async fn {get_fn_name}(&self, coordinate: [usize; {n}]) -> StorageResult<Option<{ty}>, Self::Error>"
         );
         let get_doc = formatdoc! {"
             ```rust,ignore
@@ -64,8 +64,9 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> 
             async fn #get_fn_name(&self, coordinate: [usize; #n]) -> #operon::error::StorageResult<Option<#ty>, Self::Error>;
         };
 
-        let put_sig =
-            format!("async fn {put_fn_name}(entity: Entity<{n}, {ty}>) -> StorageResult<(), Self::Error>");
+        let put_sig = format!(
+            "async fn {put_fn_name}(&self, entity: Entity<{n}, {ty}>) -> StorageResult<(), Self::Error>"
+        );
         let put_doc = formatdoc! {"
             ```rust,ignore
             {put_sig}
@@ -86,7 +87,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> 
 /// # Example
 /// ```rust,ignore
 /// /// ```rust,ignore
-/// /// async fn get_all_b_j(coordinate: [usize; 1]) -> StorageResult<Vec<B>, Self::Error>
+/// /// async fn get_all_b_j(&self, coordinate: [usize; 1]) -> StorageResult<Vec<B>, Self::Error>
 /// /// ```
 /// /// Reads every `B` stored at `[i, j]` over `j`, counting that dimension up from `0` and
 /// /// stopping at the first coordinate that holds nothing.
@@ -169,7 +170,7 @@ fn batch_gets(
         let dimensions = if arg.over.len() == 1 { "that dimension" } else { "those dimensions" };
 
         let sig = format!(
-            "async fn {fn_name}(coordinate: [usize; {n}]) -> StorageResult<{return_ty_name}, Self::Error>"
+            "async fn {fn_name}(&self, coordinate: [usize; {n}]) -> StorageResult<{return_ty_name}, Self::Error>"
         );
         let doc = formatdoc! {"
             ```rust,ignore
@@ -196,7 +197,7 @@ fn batch_gets(
 /// # Example
 /// ```rust,ignore
 /// /// ```rust,ignore
-/// /// async fn put_all_a(entity: Entity<0, Vec<A>>) -> StorageResult<(), Self::Error>
+/// /// async fn put_all_a(&self, entity: Entity<0, Vec<A>>) -> StorageResult<(), Self::Error>
 /// /// ```
 /// /// Writes a whole run of `A` at `[i]`, taking `i` from each value's position in
 /// /// `entity.value`.
@@ -231,7 +232,7 @@ fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = DocumentedFn> {
         let coordinate =
             format_coordinate(&[coord_vars.as_slice(), std::slice::from_ref(&spawn_dim)].concat());
         let sig = format!(
-            "async fn {fn_name}(entity: Entity<{n}, Vec<{entity_id}>>) -> StorageResult<(), Self::Error>"
+            "async fn {fn_name}(&self, entity: Entity<{n}, Vec<{entity_id}>>) -> StorageResult<(), Self::Error>"
         );
         let doc = formatdoc! {"
             ```rust,ignore

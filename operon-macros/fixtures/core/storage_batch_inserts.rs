@@ -1,5 +1,5 @@
 /// ```rust,ignore
-/// async fn put_all_a(entity: Entity<0, Vec<A>>) -> StorageResult<(), Self::Error>
+/// async fn put_all_a(&self, entity: Entity<0, Vec<A>>) -> StorageResult<(), Self::Error>
 /// ```
 /// Writes a whole run of `A` at `[i]`, taking `i` from each value's position in `entity.value`.
 /// Defaults to walking `put_a` one entity at a time.
@@ -19,7 +19,7 @@ async fn put_all_a(
 }
 
 /// ```rust,ignore
-/// async fn put_all_b(entity: Entity<1, Vec<B>>) -> StorageResult<(), Self::Error>
+/// async fn put_all_b(&self, entity: Entity<1, Vec<B>>) -> StorageResult<(), Self::Error>
 /// ```
 /// Writes a whole run of `B` at `[i, j]`, taking `j` from each value's position in `entity.value`.
 /// Defaults to walking `put_b` one entity at a time.
@@ -39,7 +39,7 @@ async fn put_all_b(
 }
 
 /// ```rust,ignore
-/// async fn put_all_c(entity: Entity<1, Vec<C>>) -> StorageResult<(), Self::Error>
+/// async fn put_all_c(&self, entity: Entity<1, Vec<C>>) -> StorageResult<(), Self::Error>
 /// ```
 /// Writes a whole run of `C` at `[i, k]`, taking `k` from each value's position in `entity.value`.
 /// Defaults to walking `put_c` one entity at a time.

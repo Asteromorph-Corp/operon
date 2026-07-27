@@ -1,5 +1,5 @@
 /// ```rust,ignore
-/// async fn get_all_b_j(coordinate: [usize; 1]) -> StorageResult<Vec<B>, Self::Error>
+/// async fn get_all_b_j(&self, coordinate: [usize; 1]) -> StorageResult<Vec<B>, Self::Error>
 /// ```
 /// Reads every `B` stored at `[i, j]` over `j`, counting that dimension up from `0` and stopping at the first coordinate that holds nothing.
 /// Defaults to walking `get_b` one entity at a time.
@@ -17,7 +17,7 @@ async fn get_all_b_j(&self, [i]: [usize; 1usize]) -> operon::error::StorageResul
 }
 
 /// ```rust,ignore
-/// async fn get_all_c_k(coordinate: [usize; 1]) -> StorageResult<Vec<C>, Self::Error>
+/// async fn get_all_c_k(&self, coordinate: [usize; 1]) -> StorageResult<Vec<C>, Self::Error>
 /// ```
 /// Reads every `C` stored at `[i, k]` over `k`, counting that dimension up from `0` and stopping at the first coordinate that holds nothing.
 /// Defaults to walking `get_c` one entity at a time.
@@ -35,7 +35,7 @@ async fn get_all_c_k(&self, [i]: [usize; 1usize]) -> operon::error::StorageResul
 }
 
 /// ```rust,ignore
-/// async fn get_all_d_j(coordinate: [usize; 2]) -> StorageResult<Vec<D>, Self::Error>
+/// async fn get_all_d_j(&self, coordinate: [usize; 2]) -> StorageResult<Vec<D>, Self::Error>
 /// ```
 /// Reads every `D` stored at `[i, j, k]` over `j`, counting that dimension up from `0` and stopping at the first coordinate that holds nothing.
 /// Defaults to walking `get_d` one entity at a time.
@@ -56,7 +56,7 @@ async fn get_all_d_j(
 }
 
 /// ```rust,ignore
-/// async fn get_all_e_k(coordinate: [usize; 1]) -> StorageResult<Vec<E>, Self::Error>
+/// async fn get_all_e_k(&self, coordinate: [usize; 1]) -> StorageResult<Vec<E>, Self::Error>
 /// ```
 /// Reads every `E` stored at `[i, k]` over `k`, counting that dimension up from `0` and stopping at the first coordinate that holds nothing.
 /// Defaults to walking `get_e` one entity at a time.

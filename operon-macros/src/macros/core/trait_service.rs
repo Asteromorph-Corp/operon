@@ -42,15 +42,13 @@ fn format_definition(job: &JobConfig) -> String {
 }
 
 fn format_signature(job: &JobConfig) -> String {
-    let args = job
-        .from
-        .iter()
-        .map(|arg| {
+    let args = std::iter::once("&self".to_owned())
+        .chain(job.from.iter().map(|arg| {
             let arg_ident = entity_over_dim_ident(&arg.id, &arg.over);
             let arg_ty =
                 (0..arg.over.len()).fold(arg.id.to_string(), |acc, _| format!("Vec<{acc}>"));
             format!("{arg_ident}: {arg_ty}")
-        })
+        }))
         .collect::<Vec<_>>()
         .join(", ");
     let return_ty = job
