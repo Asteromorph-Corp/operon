@@ -94,7 +94,9 @@ impl FromStr for RunState {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq_ignore_ascii_case("running") {
+        if s.eq_ignore_ascii_case("fresh") {
+            Ok(RunState::Fresh)
+        } else if s.eq_ignore_ascii_case("running") {
             Ok(RunState::Running)
         } else if s.eq_ignore_ascii_case("paused") {
             Ok(RunState::Paused)
@@ -105,5 +107,22 @@ impl FromStr for RunState {
         } else {
             Err(s.to_owned())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case::fresh(RunState::Fresh)]
+    #[case::running(RunState::Running)]
+    #[case::paused(RunState::Paused)]
+    #[case::completed(RunState::Completed)]
+    #[case::aborted(RunState::Aborted)]
+    fn test_run_state_round_trip(#[case] state: RunState) {
+        assert_eq!(RunState::from_str(&state.to_string()), Ok(state));
     }
 }
