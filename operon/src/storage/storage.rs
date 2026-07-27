@@ -26,7 +26,7 @@ use crate::storage::StorageResult;
 #[async_trait]
 pub trait OperonStorage: Send + Sync + 'static {
     /// This storage backend's own error type, surfaced through
-    /// [`StorageError::Backend`](crate::storage::StorageError::Backend).
+    /// [`StorageError::Backend`](crate::error::StorageError::Backend).
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Prepares the backend to hold entity data, creating whatever tables, files or indices it
