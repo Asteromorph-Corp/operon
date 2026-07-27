@@ -319,11 +319,11 @@ mod tests {
 
     use super::*;
     use crate::configs::{EntityConfigMap, JobConfigMap};
-    use crate::test_utils::assert_items_eq_in_trait;
     use crate::test_utils::complicated_pipeline::{
         all_entities as all_entities_complicated, all_jobs as all_jobs_complicated,
     };
-    use crate::test_utils::simple_pipeline::{all_entities, all_jobs};
+    use crate::test_utils::simple_pipeline::{all_entities, all_jobs, simple_pipeline};
+    use crate::test_utils::{assert_item_eq, assert_items_eq_in_trait};
 
     #[rstest]
     fn test_single_ops(all_entities: EntityConfigMap) {
@@ -357,5 +357,12 @@ mod tests {
             .map(|(_, item)| item)
             .collect::<Vec<_>>();
         assert_items_eq_in_trait(&items, "core/storage_batch_inserts.rs");
+    }
+
+    #[rstest]
+    fn test_trait_storage(simple_pipeline: AllConfig) {
+        let mut result = trait_storage(&simple_pipeline);
+        result.attrs.retain(|attr| attr.path().is_ident("doc"));
+        assert_item_eq(&result, "core/storage.rs");
     }
 }
