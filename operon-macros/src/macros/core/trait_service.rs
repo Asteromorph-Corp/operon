@@ -169,10 +169,8 @@ mod tests {
 
     #[rstest]
     fn test_trait_service(all_config: AllConfig) {
-        let result = syn::ItemTrait {
-            attrs: vec![],
-            ..trait_service(&all_config)
-        };
+        let mut result = trait_service(&all_config);
+        result.attrs.retain(|attr| attr.path().is_ident("doc"));
         assert_item_eq(&result, "core/service.rs");
     }
 }

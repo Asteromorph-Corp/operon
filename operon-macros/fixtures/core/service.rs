@@ -1,3 +1,18 @@
+/// Generated trait containing task methods that should be implemented for use with Operon.
+///
+/// Each task method returns `Self::Error`, the service's error type.
+/// `#[derive(OperonService)]` defaults it to `operon::error::UserError`.
+/// Select a concrete type with `#[operon(error = "MyError")]` on the derive.
+///
+/// # Methods
+/// ```rust,ignore
+/// async fn alpha(&self) -> Result<Vec<A>, Self::Error>
+/// async fn beta(&self, a: A) -> Result<Vec<B>, Self::Error>
+/// async fn gamma(&self, a: A) -> Result<Vec<C>, Self::Error>
+/// async fn delta(&self, a: A, b: B, c: C) -> Result<D, Self::Error>
+/// async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, Self::Error>
+/// async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, Self::Error>
+/// ```
 pub trait CookingService:
     operon::OperonService<
         JobEnum = schema::JobEnum,
