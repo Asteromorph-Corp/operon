@@ -2,6 +2,7 @@ use indoc::formatdoc;
 use syn::parse_quote;
 
 use crate::configs::{AllConfig, JobConfig};
+use crate::macros::core::DocumentedFn;
 use crate::utils::{
     entity_over_dim_ident, job_enum_ident, operon_ident, resolution_enum_ident,
     service_trait_ident_spanned, ticket_enum_ident, to_type,
@@ -41,15 +42,13 @@ fn format_definition(job: &JobConfig) -> String {
 }
 
 fn format_signature(job: &JobConfig) -> String {
-    let args = job
-        .from
-        .iter()
-        .map(|arg| {
+    let args = std::iter::once("&self".to_owned())
+        .chain(job.from.iter().map(|arg| {
             let arg_ident = entity_over_dim_ident(&arg.id, &arg.over);
             let arg_ty =
                 (0..arg.over.len()).fold(arg.id.to_string(), |acc, _| format!("Vec<{acc}>"));
             format!("{arg_ident}: {arg_ty}")
-        })
+        }))
         .collect::<Vec<_>>()
         .join(", ");
     let return_ty = job
@@ -90,7 +89,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let (job_sigs, job_fns) = all_configs
         .jobs
         .values()
-        .map(|job| -> (String, syn::TraitItemFn) {
+        .map(|job| -> DocumentedFn {
             let fn_name = &job.id;
             let args = job
                 .from
@@ -170,10 +169,8 @@ mod tests {
 
     #[rstest]
     fn test_trait_service(all_config: AllConfig) {
-        let result = syn::ItemTrait {
-            attrs: vec![],
-            ..trait_service(&all_config)
-        };
+        let mut result = trait_service(&all_config);
+        result.attrs.retain(|attr| attr.path().is_ident("doc"));
         assert_item_eq(&result, "core/service.rs");
     }
 }

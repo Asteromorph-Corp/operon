@@ -130,7 +130,7 @@ pub fn normalize_comments(input: &str) -> String {
                         out.push_str("/// ");
                         out.push_str(trimmed);
                     } else {
-                        out.push_str("///\n");
+                        out.push_str("///");
                     }
                 }
                 continue;
@@ -283,6 +283,14 @@ haha*/"#;
         let expected = r#"    /// multiline
     /// comment
     /// haha"#;
+        assert_eq!(normalize_comments(input), expected);
+
+        let input = r#"    /**paragraph
+
+separated*/"#;
+        let expected = r#"    /// paragraph
+    ///
+    /// separated"#;
         assert_eq!(normalize_comments(input), expected);
     }
 

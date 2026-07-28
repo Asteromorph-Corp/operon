@@ -10,12 +10,14 @@ mod storage;
 mod ui;
 mod utils;
 
+pub use chrono::{DateTime, Utc};
 pub use meta_storage::{AnyBackend, MemMetaStorage, PsqlMetaStorage};
 pub use operon::Operon;
 pub use operon_macros::define_operon;
-pub use schema::{Direction, Entity};
+pub use schema::{Direction, Entity, RunFootprint, RunMetadata, RunState};
 pub use service::OperonService;
 pub use storage::OperonStorage;
+pub use uuid::Uuid;
 
 pub mod error {
     pub use crate::meta_storage::{AnyBackendError, MemMetaError, MetaStorageError, PsqlMetaError};

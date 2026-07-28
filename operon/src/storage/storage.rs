@@ -3,90 +3,57 @@ use async_trait::async_trait;
 use crate::schema::RunFootprint;
 use crate::storage::StorageResult;
 
-/// # OperonStorage trait
+/// The pipeline-independent half of an entity storage backend.
 ///
-/// FIXME: Most functions in this trait are moved to the generated `{PipelineName}Storage` trait.
+/// A backend implements this trait together with the `{PipelineName}Storage` trait that
+/// [`define_operon!`](crate::define_operon) generates.
+/// This trait specifically owns the backend's lifecycle and its run footprint,
+/// while the generated half owns the per-entity accessors.
+/// Every method reports failure as [`Self::Error`], which reaches the caller as
+/// [`StorageError::Backend`](crate::error::StorageError::Backend).
 ///
-/// This trait contains the storage operations Operon will use.
-/// Implement this trait to provide a custom storage backend.
+/// # Run footprints
 ///
-/// Notes:
+/// A [`RunFootprint`] records which run last wrote to this backend and the
+/// [`RunState`](crate::RunState) it ended in.
+/// Operon compares the footprint stored here against the one held by the metadata storage to decide
+/// whether a previous run can be resumed, and treats a disagreement between the two as an aborted
+/// run.
+/// [`Uuid`](crate::Uuid), [`DateTime`](crate::DateTime), and [`Utc`](crate::Utc) are re-exported
+/// from the `uuid` and `chrono` crates for construction of the footprint.
 ///
-/// * All functions are async methods and must return a `Result<(), StorageError>`.
-/// * The `clear` function should clear all data EXCEPT the primary data in the storage.
-/// * The `put_*` functions' default behaviour must be to *overwrite* existing data. While this is
-///   almost never a problem, choosing not to do so may lead to undefined behaviour in certain
-///   pause-and-resume scenarios.
-/// * The `get_*` functions must return `None` instead of an error if the data is not found.
-/// * The optional `clear_footprint`, `put_footprint` and `get_footprint` functions are used to
-///   manipulate the footprint of the data. The footprint is used to verify the integrity of the
-///   data on a recovery from previous runs that were gracefully shut down. Provide these functions
-///   if you want to support fast progress restorations from graceful stops.
-/// * Due to having repeated types in the `OperonService` signatures, the default implementations of
-///   the `put_*` and `get_*` functions may cause DB-intensive behaviour. If you wish to minimize
-///   the number of DB operations, you can implement the provided `put_all_*` and `get_all_*_over_*`
-///   functions. The same rules for the `put_*` and `get_*` functions apply to these as well.
-///   Additionally, note that these functions assume that repeated data is sorted by the dimension
-///   it is repeated on.
-///
-/// Please consult the following section for exact function signatures.
-///
-/// ## Function Signatures
-///
-/// The functions were parsed as follows:
-///
-/// ```rust,ignore
-/// use operon::storage::StorageError;
-/// use async_trait::async_trait;
-/// use operon::dimension::*;
-/// use operon::entity::*;
-/// #[async_trait]
-/// pub trait OperonStorage {
-///     async fn clear(&self) -> Result<(), StorageError>;
-///     async fn put_a(&self, i: I, value: &A) -> Result<(), StorageError>;
-///     async fn get_a(&self, i: I) -> Result<Option<A>, StorageError>;
-///     async fn put_b(&self, i: I, j: J, value: &B) -> Result<(), StorageError>;
-///     async fn get_b(&self, i: I, j: J) -> Result<Option<B>, StorageError>;
-///     async fn put_c(&self, i: I, k: K, value: &C) -> Result<(), StorageError>;
-///     async fn get_c(&self, i: I, k: K) -> Result<Option<C>, StorageError>;
-///     async fn put_d(&self, i: I, j: J, k: K, value: &D) -> Result<(), StorageError>;
-///     async fn get_d(&self, i: I, j: J, k: K) -> Result<Option<D>, StorageError>;
-///     async fn put_e(&self, i: I, k: K, value: &E) -> Result<(), StorageError>;
-///     async fn get_e(&self, i: I, k: K) -> Result<Option<E>, StorageError>;
-///     async fn put_f(&self, i: I, value: &F) -> Result<(), StorageError>;
-///     async fn get_f(&self, i: I) -> Result<Option<F>, StorageError>;
-///     // Optional footprint operations:
-///     async fn clear_footprint(&self) -> Result<(), StorageError>;
-///     async fn put_footprint(&self, footprint: &str) -> Result<(), StorageError>;
-///     async fn get_footprint(&self) -> Result<Option<String>, StorageError>;
-///     // Optional batch operations:
-///     async fn put_all_b(&self, i: I, values: &[B]) -> Result<(), StorageError>;
-///     async fn put_all_c(&self, i: I, values: &[C]) -> Result<(), StorageError>;
-///     async fn get_all_b_over_j(&self, i: I) -> Result<Vec<B>, StorageError>;
-///     async fn get_all_c_over_k(&self, i: I) -> Result<Vec<C>, StorageError>;
-///     async fn get_all_d_over_j(&self, i: I, k: K) -> Result<Vec<D>, StorageError>;
-///     async fn get_all_e_over_k(&self, i: I) -> Result<Vec<E>, StorageError>;
-/// }
-/// ```
+/// The three footprint methods default to no-ops, and a backend that does not implement them will
+/// have recovery disabled.
+/// Implement all three to resume a gracefully stopped run instead of recomputing it.
 #[async_trait]
 pub trait OperonStorage: Send + Sync + 'static {
     /// This storage backend's own error type, surfaced through
-    /// [`StorageError::Backend`](crate::storage::StorageError::Backend).
+    /// [`StorageError::Backend`](crate::error::StorageError::Backend).
     type Error: std::error::Error + Send + Sync + 'static;
 
+    /// Prepares the backend to hold entity data, creating whatever tables, files or indices it
+    /// needs.
+    ///
+    /// Operon calls this once as the scheduler starts, so it has to tolerate a backend that is
+    /// already initialized.
     async fn init(&self) -> StorageResult<(), Self::Error>;
+
+    /// Empties the backend, discarding every stored entity along with the run footprint while
+    /// leaving the structures [`init`](Self::init) created in place.
     async fn clear(&self) -> StorageResult<(), Self::Error>;
 
+    /// Reads the footprint of the run that last wrote to this backend, or `None` if there is none.
     async fn get_footprint(&self) -> StorageResult<Option<RunFootprint>, Self::Error> {
-        // This function is no-op by default, disallowing recovery runs if not implemented.
         Ok(None)
     }
+
+    /// Records `footprint` as this backend's view of the current run, replacing any earlier one.
     async fn put_footprint(&self, _footprint: &RunFootprint) -> StorageResult<(), Self::Error> {
-        // This function is no-op by default, disallowing recovery runs if not implemented.
         Ok(())
     }
+
+    /// Drops the recorded footprint, so that the next run starts from scratch.
     async fn clear_footprint(&self) -> StorageResult<(), Self::Error> {
-        // This function is no-op by default, disallowing recovery runs if not implemented.
         Ok(())
     }
 }
