@@ -89,7 +89,7 @@ where
     /// individual schedulers.
     /// (Errors are non-fatal to the scheduler, as execution should continue for the non-erroring
     /// schedulers.)
-    /// 
+    ///
     /// This method therefore waits for all handles and early-returns an error if any of the handles
     /// panicked.
     async fn wait_progress(&mut self) -> Result<(), Self::Error> {
