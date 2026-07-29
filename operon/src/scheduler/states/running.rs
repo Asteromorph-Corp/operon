@@ -84,11 +84,22 @@ where
 {
     type Error = SchedulerError<Svc::Error, Sto::Error, MSto::Error>;
 
-    async fn handle_progress(mut self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
-        if self.handles.try_join_next().is_none() || !self.handles.is_empty() {
-            return Ok(NextState::Next(self));
+    /// The running state only progresses into the `Exit` state, when all individual schedulers ran
+    /// to completion, when a stopping command was issued, or when a panic occurred in one of the
+    /// individual schedulers.
+    /// (Errors are non-fatal to the scheduler, as execution should continue for the non-erroring
+    /// schedulers.)
+    /// 
+    /// This method therefore waits for all handles and early-returns an error if any of the handles
+    /// panicked.
+    async fn wait_progress(&mut self) -> Result<(), Self::Error> {
+        while let Some(joined) = self.handles.join_next().await {
+            joined?;
         }
+        Ok(())
+    }
 
+    async fn handle_progress(self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
         let snapshot = self.ctx.progresses.snapshot().await;
 
         let state = if snapshot.all_finished() {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::meta_storage::{MetaBackend, MetaConnApi, MetaTxApi};
 use crate::scheduler::context::SchedulerContext;
-use crate::scheduler::events::{ControlEventReceiver, SchedulerStateSender};
+use crate::scheduler::events::{ControlEvent, ControlEventReceiver, SchedulerStateSender};
 use crate::scheduler::states::{InitTransition, NextState, SchedulerState};
 use crate::scheduler::{SchedulerError, SchedulerHandler};
 use crate::schema::SharedProgressMap;
@@ -17,15 +17,15 @@ type SchedulerResult<T, UErr, SErr, MErr> = Result<T, SchedulerError<UErr, SErr,
 type BoxedState<UErr, SErr, MErr> =
     Box<dyn SchedulerState<Error = SchedulerError<UErr, SErr, MErr>>>;
 
+/// What woke the scheduler loop.
+enum WakeupEvent {
+    Progress,
+    Control(ControlEvent),
+}
+
 /// # Scheduler
 ///
 /// The orchestrating scheduler that manages the individual schedulers.
-///
-/// It is responsible for:
-///
-/// * Initialization of the metadata storage,
-/// * initialization of the individual schedulers, and
-/// * communication between the UI and the individual schedulers.
 pub struct Scheduler<Svc, Sto, MSto>
 where
     Svc: OperonService,
@@ -88,8 +88,6 @@ where
             InitTransition::state(self.ctx, self.ui_mode, self.channel_size),
         );
 
-        // Main work tick
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
         // Heartbeat tick
         let heartbeat_period = std::time::Duration::from_secs(30);
         let mut lock_heartbeat = tokio::time::interval_at(
@@ -98,15 +96,23 @@ where
         );
 
         loop {
-            let next = tokio::select! {
-                _ = interval.tick() => state.handle_progress().await?,
-                Some(evt) = self.ctrl_rx.recv() => state.handle_control_event(evt).await?,
+            let wake = tokio::select! {
+                result = state.wait_progress() => {
+                    result?;
+                    WakeupEvent::Progress
+                }
+                Some(evt) = self.ctrl_rx.recv() => WakeupEvent::Control(evt),
                 _ = lock_heartbeat.tick() => {
                     heartbeat_handle
                         .check_lock()
                         .await?;
                     continue;
                 }
+            };
+
+            let next = match wake {
+                WakeupEvent::Progress => state.handle_progress().await?,
+                WakeupEvent::Control(evt) => state.handle_control_event(evt).await?,
             };
 
             match next {
