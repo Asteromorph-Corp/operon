@@ -5,7 +5,7 @@ use std::num::TryFromIntError;
 use postgres_types::ToSql;
 use twox_hash::XxHash3_64;
 
-use crate::schema::TicketStatus;
+use crate::schema::{TableShape, TicketStatus};
 
 /// The primary key for the run footprint table.
 pub(crate) const GLOBAL: &str = "global";
@@ -118,8 +118,30 @@ fn hash_metadata<T: Hash>(metadata: &T) -> String {
     format!("{:016x}", hasher.finish())
 }
 
+/// The statement reading the hash the table keyed to `id` was last built under.
+pub fn recorded_hash_query(
+    id: &str,
+    schema_prefix: SchemaPrefix<'_>,
+    hash_table: &'static str,
+) -> String {
+    format!("SELECT hash FROM {schema_prefix}{hash_table} WHERE id = '{id}';")
+}
+
+/// The shape of the table `recorded` was recorded for, against the current `metadata`.
+///
+/// [`Stale`](TableShape::Stale) is the condition [`replace_if_updated`] rebuilds a table under.
+pub fn table_shape<T: Hash>(recorded: Option<&str>, metadata: &T) -> TableShape {
+    match recorded {
+        Some(hash) if hash != hash_metadata(metadata) => TableShape::Stale,
+        _ => TableShape::Current,
+    }
+}
+
+/// Wraps `init_query` in a guard that only executes if the metadata hash is absent or has changed.
+/// Also sets the database-side hash to the current metadata hash.
 pub fn replace_if_updated<T: Hash>(
     id: &str,
+    table: &str,
     metadata: &T,
     schema_prefix: SchemaPrefix<'_>,
     hash_table: &'static str,
@@ -144,7 +166,7 @@ pub fn replace_if_updated<T: Hash>(
                 VALUES ('{id}', '{hash}');
 
             ELSIF existing_hash != '{hash}' THEN
-                DROP TABLE IF EXISTS {schema_prefix}{id};
+                DROP TABLE IF EXISTS {schema_prefix}{table};
 
                 {init_query}
 

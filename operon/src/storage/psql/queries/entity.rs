@@ -142,6 +142,7 @@ impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<
     fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String {
         replace_if_updated(
             self.id,
+            self.id,
             self,
             schema,
             "_entity_hash",

@@ -3,8 +3,8 @@ use std::num::TryFromIntError;
 use crate::meta_storage::MetaResolutionApi;
 use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
-use crate::schema::{DimensionMetadata, Resolution};
-use crate::utils::{SchemaPrefix, SqlParams, replace_if_updated};
+use crate::schema::{DimensionMetadata, Resolution, TableShape};
+use crate::utils::{SchemaPrefix, SqlParams, recorded_hash_query, replace_if_updated, table_shape};
 
 /// Postgres wire serialization for [`Resolution`], alongside the query builders that use it.
 impl<const N: usize> Resolution<N> {
@@ -36,12 +36,25 @@ impl<'a> PsqlClient<'a> {
 impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> {
     type Error = PsqlMetaError;
 
+    /// Whether the resolution table matches the shape of the dimension it was built under.
+    async fn shape(&self) -> PsqlResult<TableShape> {
+        let schema_prefix = self.client.schema_prefix();
+        let stmt = recorded_hash_query(self.dim_meta.id, schema_prefix, "_dimension_hash");
+        let recorded = self.client.query_opt(&stmt, &[]).await?;
+        Ok(table_shape(
+            recorded.as_ref().map(|row| row.get("hash")),
+            &self.dim_meta,
+        ))
+    }
+
     /// Initializes the resolution table.
     async fn init(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
+        let id = self.dim_meta.id;
 
         let stmt = replace_if_updated(
-            self.dim_meta.id,
+            id,
+            &format!("dimension_{id}"),
             &self.dim_meta,
             schema_prefix,
             "_dimension_hash",

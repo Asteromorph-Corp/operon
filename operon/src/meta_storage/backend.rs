@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::meta_storage::MetaResult;
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, Resolution, RunFootprint, Ticket, TicketStatus,
+    DimensionMetadata, Job, JobMetadata, Resolution, RunFootprint, TableShape, Ticket, TicketStatus,
 };
 
 /// A concrete metadata storage backend.
@@ -134,8 +134,17 @@ pub trait MetaTicketApi<const N: usize> {
     /// This builder's backend error type, matching its backend's [`MetaBackend::Error`].
     type Error: std::error::Error + Send + Sync + 'static;
 
+    /// Whether the ticket table matches the shape of the job it was built under.
+    ///
+    /// A [`Stale`](TableShape::Stale) table is rebuilt by [`init`](Self::init), which discards the
+    /// tickets in it.
+    /// Backends that keep no record of the shape should report [`Current`](TableShape::Current).
+    fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
+        async { Ok(TableShape::Current) }
+    }
     fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
     fn clear(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
+
     fn get_all(
         &self,
         status: TicketStatus,
@@ -168,8 +177,17 @@ pub trait MetaResolutionApi<const N: usize> {
     /// This builder's backend error type, matching its backend's [`MetaBackend::Error`].
     type Error: std::error::Error + Send + Sync + 'static;
 
+    /// Whether the resolution table matches the shape of the dimension it was built under.
+    ///
+    /// A [`Stale`](TableShape::Stale) table is rebuilt by [`init`](Self::init), which discards the
+    /// resolutions in it.
+    /// Backends that keep no record of the shape should report [`Current`](TableShape::Current).
+    fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
+        async { Ok(TableShape::Current) }
+    }
     fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
     fn clear(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
+
     fn get(
         &self,
         coordinate: [usize; N],
