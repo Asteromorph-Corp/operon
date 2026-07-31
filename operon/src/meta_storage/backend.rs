@@ -40,7 +40,7 @@ pub trait MetaBackend: Clone + std::fmt::Debug + Send + Sync + Sized + 'static {
     where
         Self: 'a;
 
-    /// The ticket query builder for a job of arity `N`, borrowed from a `Client`.
+    /// The ticket query builder for a task of arity `N`, borrowed from a `Client`.
     type Ticket<'a, const N: usize>: MetaTicketApi<N, Error = Self::Error> + Send
     where
         Self: 'a;
@@ -91,7 +91,7 @@ pub trait MetaTxApi<MSto: MetaBackend>: Send {
 
 /// A handle for issuing metadata queries, in terms of the domain types.
 pub trait MetaClientApi<MSto: MetaBackend>: Copy + Send + Sync {
-    /// Builds ticket queries for the given job.
+    /// Builds ticket queries for the given task.
     fn ticket<const N: usize>(&self, job_meta: JobMetadata<N>) -> MSto::Ticket<'_, N>;
 
     /// Builds resolution queries for the given dimension.
@@ -159,12 +159,12 @@ pub trait MetaClientApi<MSto: MetaBackend>: Copy + Send + Sync {
     ) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
 }
 
-/// Ticket operations for a job of arity `N`.
+/// Ticket operations for a task of arity `N`.
 pub trait MetaTicketApi<const N: usize> {
     /// This builder's backend error type, matching its backend's [`MetaBackend::Error`].
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Whether the ticket table matches the shape of the job it was built under.
+    /// Whether the ticket table matches the shape of the task it was built under.
     ///
     /// A [`STALE`](TableShape::STALE) table is rebuilt by [`init`](Self::init), which discards the
     /// tickets in it.

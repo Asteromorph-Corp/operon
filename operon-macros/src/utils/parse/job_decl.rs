@@ -34,7 +34,7 @@ impl JobDecl {
             return Err(syn::Error::new(
                 self.spawned_entity._span,
                 format!(
-                    "Job '{}' can only spawn an entity with one dimension, found {} dimensions",
+                    "Task '{}' can only spawn an entity with one dimension, found {} dimensions",
                     self.id,
                     self.spawned_entity.dims.len()
                 ),
@@ -43,14 +43,17 @@ impl JobDecl {
         if self._for_token.is_none() && self.pool.is_some() {
             return Err(syn::Error::new(
                 self._span,
-                format!("Job '{}' has a pool specified but no 'for' clause", self.id),
+                format!(
+                    "Task '{}' has a pool specified but no 'for' clause",
+                    self.id
+                ),
             ));
         }
         if self._for_token.is_none() && !self.dims.is_empty() {
             return Err(syn::Error::new(
                 self._span,
                 format!(
-                    "Job '{}' has dimensions specified but no 'for' clause",
+                    "Task '{}' has dimensions specified but no 'for' clause",
                     self.id
                 ),
             ));
@@ -61,7 +64,7 @@ impl JobDecl {
             return Err(syn::Error::new(
                 for_token.span(),
                 format!(
-                    "Job '{}' has a 'for' clause but no dimensions are specified",
+                    "Task '{}' has a 'for' clause but no dimensions are specified",
                     self.id
                 ),
             ));
@@ -70,14 +73,14 @@ impl JobDecl {
             let Ok(pool_val) = pool.base10_parse::<usize>() else {
                 return Err(syn::Error::new(
                     pool.span(),
-                    format!("Job '{}' has an invalid pool value: '{}'", self.id, pool),
+                    format!("Task '{}' has an invalid pool value: '{}'", self.id, pool),
                 ));
             };
             if pool_val == 0 {
                 return Err(syn::Error::new(
                     pool.span(),
                     format!(
-                        "Job '{}' has a pool value of 0, which is not allowed",
+                        "Task '{}' has a pool value of 0, which is not allowed",
                         self.id
                     ),
                 ));
@@ -89,7 +92,7 @@ impl JobDecl {
                     return Err(syn::Error::new(
                         dim.span(),
                         format!(
-                            "Priority dimension '{}' is not in the dimension set of job '{}'",
+                            "Priority dimension '{}' is not in the dimension set of task '{}'",
                             dim, self.id
                         ),
                     ));
@@ -102,7 +105,7 @@ impl JobDecl {
                     return Err(syn::Error::new(
                         dim.span(),
                         format!(
-                            "Priority dimension '{}' appears more than once in job '{}'",
+                            "Priority dimension '{}' appears more than once in task '{}'",
                             dim, self.id
                         ),
                     ));
@@ -113,7 +116,7 @@ impl JobDecl {
             return Err(syn::Error::new(
                 self._span,
                 format!(
-                    "Job '{}' specifies concurrency via both 'for(N)' and '#[operon(...)]'; use only one",
+                    "Task '{}' specifies concurrency via both 'for(N)' and '#[operon(...)]'; use only one",
                     self.id
                 ),
             ));
@@ -197,7 +200,7 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
         if !attr.path().is_ident("operon") {
             return Err(syn::Error::new_spanned(
                 attr,
-                "Unknown attribute on job declaration; only `#[operon(...)]` is supported",
+                "Unknown attribute on task declaration; only `#[operon(...)]` is supported",
             ));
         }
         attr.parse_nested_meta(|meta| {
@@ -271,7 +274,7 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
                         Ok(0) => return Err(syn::Error::new(
                             ident.span(),
                             format!(
-                                "Environment variable `{var_name}` must not be zero for job concurrency"
+                                "Environment variable `{var_name}` must not be zero for task concurrency"
                             ),
                         )),
                         Ok(_) => {}

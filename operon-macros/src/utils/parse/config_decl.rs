@@ -17,7 +17,7 @@ impl ConfigDecl {
         if self.jobs.is_empty() {
             return Err(syn::Error::new(
                 self._span,
-                "Configuration must contain at least one job",
+                "Configuration must contain at least one task",
             ));
         }
         Ok(())

@@ -111,7 +111,7 @@ impl Parse for AllConfig {
             if jobs.contains_key(&job.id) {
                 return Err(syn::Error::new(
                     job._span,
-                    format!("Job '{}' is already defined", job.id),
+                    format!("Task '{}' is already defined", job.id),
                 ));
             }
             // Constraint 4: Arguments must be already-defined, valid entities
@@ -184,10 +184,10 @@ impl Parse for AllConfig {
             if job_dims != bigcup {
                 let expected = bigcup.iter().map(|d| d.to_string()).collect::<Vec<_>>();
                 let err_msg = if expected.is_empty() {
-                    format!("Job {} expected no dimensions", job.id)
+                    format!("Task {} expected no dimensions", job.id)
                 } else {
                     format!(
-                        "Job {} expected dimensions: {}",
+                        "Task {} expected dimensions: {}",
                         job.id,
                         expected.join(", ")
                     )
