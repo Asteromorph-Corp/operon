@@ -133,8 +133,16 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 }
 
+/// The statements preparing and emptying one entity's table, erased of the entity's arity and type.
+///
+/// The generated storage holds these for every entity of a pipeline, so that its `init` and `clear`
+/// walk one collection.
 pub trait EntityQueries: Send + Sync + 'static {
+    /// The statement creating this entity's table, rebuilding it when the recorded shape no longer
+    /// matches the entity.
     fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String;
+
+    /// The statement discarding every row of this entity's table.
     fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String;
 }
 
