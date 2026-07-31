@@ -15,23 +15,27 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
 #[async_trait]
-/// An helper trait to expose `Resolution`, `Ticket`, and `JobManager` interfaces while being dyn
-/// compatible.
+/// The dyn-compatible face of one task's [`JobSpec`], carrying the arity `N` as a type parameter
+/// would not.
 ///
-/// The trait is automatically implemented for any structs that implements `JobManagerImpl`,
-/// and is used to initialize the job metadata storage and to run the individual job schedulers.
+/// Implemented for every [`SpecWithMetadata`], so that the scheduler holds the tasks of a pipeline
+/// in one collection despite their differing arities.
+/// It is what the scheduler prepares a task's metadata and starts its individual scheduler through.
 pub trait JobHandler<Svc, Sto, MSto>: Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
+    /// The id of the task this handler runs.
     fn job_id(&self) -> &'static str;
 
+    /// The ids of every task this one transitively depends on, in lexicographic order.
     fn all_upstream_jobs(&self) -> Vec<&'static str>;
 
+    /// How many of this task's jobs may run at once.
     fn pool_size(&self) -> usize {
-        1 // Default pool size, can be overridden by the job configuration
+        1
     }
 
     /// Initialize the fact storage for the primary resolution.
