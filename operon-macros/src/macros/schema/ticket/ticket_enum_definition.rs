@@ -4,10 +4,11 @@ use crate::configs::JobConfigMap;
 use crate::operon_ident;
 use crate::utils::{ticket_enum_ident, to_pascal_case};
 
-/// Generates an enum representing all ticket for jobs in the job configuration map.
+/// Generates an enum representing the ticket of any task in the job configuration map.
 ///
 /// # Example
 /// ```rust,ignore
+/// /// An enum representing the ticket of any task.
 /// #[derive(Debug, Clone)]
 /// pub enum TicketEnum {
 ///     Alpha(operon::__private::Ticket<0usize>),
@@ -29,7 +30,7 @@ pub fn ticket_enum_definition(jobs: &JobConfigMap) -> syn::ItemEnum {
             #variant_ident(#operon::__private::Ticket<#n>)
         }
     });
-    let doc = "An enum representing any job.";
+    let doc = "An enum representing the ticket of any task.";
 
     parse_quote! {
         #[doc = #doc]

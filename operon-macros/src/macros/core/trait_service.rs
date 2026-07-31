@@ -67,9 +67,12 @@ fn format_signature(job: &JobConfig) -> String {
 /// # Example
 /// ```rust,ignore
 /// #[operon::__private::async_trait::async_trait]
-/// #[automatically_derived]
 /// pub trait CookingService:
-///     operon::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum>
+///     operon::OperonService<
+///         JobEnum = schema::JobEnum,
+///         ResolutionEnum = schema::ResolutionEnum,
+///         TicketEnum = schema::TicketEnum,
+///     >
 /// {
 ///     async fn alpha(&self) -> Result<Vec<A>, Self::Error>;
 ///     async fn beta(&self, a: A) -> Result<Vec<B>, Self::Error>;
@@ -137,7 +140,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
 
         Each task method returns `Self::Error`, the service's error type.
         `#[derive(OperonService)]` defaults it to `operon::error::UserError`.
-        Select a concrete type with `#[operon(error = \"MyError\")]` on the derive.
+        Select a concrete type with `#[operon(error = MyError)]` on the derive.
 
         # Methods
         ```rust,ignore

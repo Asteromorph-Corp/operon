@@ -21,7 +21,7 @@ pub struct SchedulerHandler<Svc: OperonService, Sto: OperonStorage, MSto: MetaBa
 
 /// Helper struct for `Scheduler::prepare_channel`
 ///
-/// An association of `JobManager` and event receiver channel
+/// An association of [`JobHandler`] and event receiver channel
 pub(crate) struct HandlerWithRx<'a, Svc, Sto, MSto>
 where
     Svc: OperonService,

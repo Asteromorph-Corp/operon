@@ -1,4 +1,4 @@
-/// An enum representing any job.
+/// An enum representing the ticket of any task.
 #[derive(Debug, Clone)]
 pub enum TicketEnum {
     Alpha(operon::__private::Ticket<0usize>),
