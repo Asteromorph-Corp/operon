@@ -17,7 +17,7 @@ use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, Tic
 /// The schema the differential sequences own outright.
 const SCHEMA: &str = "operon_differential";
 
-/// A job with no dimensions, spawning the dimension `i`.
+/// A task with no dimensions, spawning the dimension `i`.
 fn job_alpha() -> JobMetadata<0> {
     JobMetadata {
         id: "alpha",
@@ -27,7 +27,7 @@ fn job_alpha() -> JobMetadata<0> {
     }
 }
 
-/// A job over `i`, downstream of `alpha`.
+/// A task over `i`, downstream of `alpha`.
 fn job_beta() -> JobMetadata<1> {
     JobMetadata {
         id: "beta",
@@ -37,7 +37,7 @@ fn job_beta() -> JobMetadata<1> {
     }
 }
 
-/// A job over `i`, downstream of `beta`, used to pin `raise_deps_done` to one coordinate.
+/// A task over `i`, downstream of `beta`, used to pin `raise_deps_done` to one coordinate.
 fn job_gamma() -> JobMetadata<1> {
     JobMetadata {
         id: "gamma",
@@ -47,7 +47,7 @@ fn job_gamma() -> JobMetadata<1> {
     }
 }
 
-/// A job over both `i` and `j`, whose upstreams pin one of the two.
+/// A task over both `i` and `j`, whose upstreams pin one of the two.
 ///
 /// Its upstreams pin a proper subset of its dimensions, which is the query shape a single-dimension
 /// job cannot produce.

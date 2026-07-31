@@ -82,8 +82,8 @@ where
         mode: CheckMode,
     ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
-    /// Prepare the job rebuilder for the given storage and metadata client by fetching the
-    /// necessary data.
+    /// Prepare this task's [`JobRebuilder`] for the given storage and metadata client by fetching
+    /// the necessary data.
     async fn prepare_rebuild(
         &self,
         storage: &Sto,

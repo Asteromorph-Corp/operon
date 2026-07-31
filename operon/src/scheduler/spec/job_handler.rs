@@ -96,8 +96,8 @@ where
         mode: CheckMode,
     ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
-    /// Prepare the job rebuilder for the given storage and metadata client by fetching the
-    /// necessary data.
+    /// Prepare this task's [`JobRebuilder`] for the given storage and metadata client by fetching
+    /// the necessary data.
     async fn prepare_rebuild(
         &self,
         storage: &Sto,
@@ -108,7 +108,7 @@ where
         SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
     >;
 
-    /// Start the job manager, initializing the individual scheduler and running it.
+    /// Start this task's individual scheduler and run it.
     #[allow(clippy::too_many_arguments)]
     fn run_scheduler(
         &self,

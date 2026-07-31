@@ -143,7 +143,7 @@ impl UiLoop {
         self.progresses.0.contains_key(job_name)
     }
 
-    /// Records the scheduler as gone and paints every job as errored.
+    /// Records the scheduler as gone and paints every task as errored.
     async fn mark_scheduler_lost(&mut self) {
         tracing::error!(
             "Operon's UI lost contact with the scheduler and cannot continue execution."

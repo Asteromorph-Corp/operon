@@ -94,7 +94,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
 
     /// Initializes every metadata table the run needs.
     ///
-    /// Returns [`STALE`](TableShape::STALE) if any job or dimension changed shape, discarding what
+    /// Returns [`STALE`](TableShape::STALE) if any task or dimension changed shape, discarding what
     /// its table held.
     pub(crate) async fn init_meta_storage(
         &self,
@@ -125,7 +125,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
     }
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
-    /// Return the list of jobs that are found to be inconsistent.
+    /// Return the list of tasks that are found to be inconsistent.
     ///
     /// This should be called only when the stale state is either `Abort`, `GracefulStop`, or
     /// `Complete`.

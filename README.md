@@ -78,31 +78,33 @@ If you do not have a database at hand, [ex5](operon/examples/ex5.rs) runs a whol
 
 ### Running DAG-Defined Tasks
 
-Operon's primary use case is best described as _a known pipeline of an unknown number of tasks_.
-It executes these tasks in parallel until all possible tasks have completed.
+Operon's primary use case is best described as _a known pipeline of an unknown number of jobs_.
+It executes these jobs in parallel until all possible jobs have completed.
 
-Here, a _task_ is a discrete unit of work that runs in parallel, where each task's outputs ([_entities_](#defining-entities)) can serve as inputs for other tasks.
+Here, a _task_ is one kind of work the pipeline does, and a _job_ is one execution of a task.
+A task's outputs ([_entities_](#defining-entities)) can serve as inputs for other tasks.
 Tasks and their dependencies must be predefined, forming a directed acyclic graph (DAG).
 This DAG's validity is checked at macro-expansion time.
+How many jobs each task runs, on the other hand, is discovered as the run proceeds.
 
 ### Multiplexing
 
-Tasks in Operon are _multiplex_, meaning that one task may produce multiple entities of the same type (as a Rust `Vec`).
-From another perspective, allowing multiplexing means that a task of a single type may be run multiple times, each using different input entities.
-In this sense, a single node in the DAG represents a unique task _type_ that can be run repeatedly.
-The number of individual tasks of that type cannot be known until upstream tasks produce the necessary entities.
-Due to this, the number of tasks are quantified using an abstraction called _named dimensions_ instead of a simple count.
+Tasks in Operon are _multiplex_, meaning that one job may produce multiple entities of the same type (as a Rust `Vec`).
+From another perspective, allowing multiplexing means that a single task may run many jobs, each using different input entities.
+In this sense, a single node in the DAG is one task, run once per job.
+The number of jobs a task runs cannot be known until upstream tasks produce the necessary entities.
+Due to this, the number of jobs is quantified using an abstraction called _named dimensions_ instead of a simple count.
 
 ### Incremental Scheduling
 
 Operon utilizes incremental scheduling, which means the scheduler never needs to know the entire task graph up front, saving memory and startup time.
-As an event-driven system, each individual task runner is only aware of the tasks it can execute immediately, enabling efficient resource usage and pooling.
+As an event-driven system, each individual task runner is only aware of the jobs it can execute immediately, enabling efficient resource usage and pooling.
 
 ### Transactional Backend
 
 Operon keeps two kinds of state: the _metadata_ that drives scheduling and recovery, and the _entity data_ that tasks produce and consume.
 Both are backed by a PostgreSQL implementation that ships with the engine.
-Its transactional design allows for atomic updates to task states, and by extension, reliable recovery from failures.
+Its transactional design allows for atomic updates to job states, and by extension, reliable recovery from failures.
 
 As a tradeoff, the PostgreSQL backend often requires heavy database access, which may become a bottleneck for systems with high-throughput workloads.
 Both halves are swappable: an in-memory metadata backend ships alongside the PostgreSQL one, and the entity storage is an interface you may implement over any store you like.
@@ -115,7 +117,7 @@ Users can track task progress, browse past logs, and interact with the workflow 
 
 ### Per-Task Parallelism
 
-Operon supports per-task parallelism, meaning that each task type maintains its own thread pool.
+Operon supports per-task parallelism, meaning that each task maintains its own thread pool for the jobs it runs.
 This is particularly useful for tasks that benefit from internal parallel execution or must adhere to external concurrency limits (e.g., database connections or API rate limits).
 The pipeline definition sizes each pool, and may also fix the order in which a task's jobs are picked up.
 See [the `define_operon!` documentation](docs/define_operon_dsl.md).

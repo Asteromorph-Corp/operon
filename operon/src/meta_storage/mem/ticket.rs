@@ -20,7 +20,7 @@ struct TicketRow {
     status: TicketStatus,
 }
 
-/// One job's ticket table.
+/// One task's ticket table.
 #[derive(Default)]
 pub(super) struct TicketTable {
     rows: RwLock<TicketRows>,
@@ -147,7 +147,7 @@ impl TicketRows {
     }
 }
 
-/// One of a job's dimensions, as a query sees it: pinned to a concrete value, or free to vary.
+/// One of a task's dimensions, as a query sees it: pinned to a concrete value, or free to vary.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 enum PinSlot {
@@ -155,9 +155,9 @@ enum PinSlot {
     Pinned,
 }
 
-/// The set of a job's dimensions that a query pins, one slot per dimension.
+/// The set of a task's dimensions that a query pins, one slot per dimension.
 ///
-/// Every op pins a subset that the DAG fixes in advance, so a job sees only a handful of masks.
+/// Every op pins a subset that the DAG fixes in advance, so a task sees only a handful of masks.
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct PinMask(Box<[PinSlot]>);
 
@@ -165,8 +165,8 @@ impl PinMask {
     /// Builds the pin set a query fixes and the coordinate it pins to, from the upstream dimensions
     /// and the values they carry.
     ///
-    /// A dimension is pinned when it belongs to this job, is not aggregated, and carries a resolved
-    /// value; every other dimension stays free.
+    /// A dimension is pinned when it belongs to this task, is not aggregated, and carries a
+    /// resolved value; every other dimension stays free.
     fn project<const N: usize>(
         job_meta: JobMetadata<N>,
         pins: impl IntoIterator<Item = (&'static str, OptionCoordinate)>,
@@ -214,14 +214,14 @@ impl PinMask {
 /// A secondary index over one pin set, mapping a projected coordinate to the keys holding it.
 type PinIndex = HashMap<TicketKey, HashSet<TicketKey>>;
 
-/// Helper struct for querying the in-memory tickets of a job.
+/// Helper struct for querying the in-memory tickets of a task.
 pub struct MemTicketQueryBuilder<'a, const N: usize> {
     store: &'a MemStore,
     job_meta: JobMetadata<N>,
 }
 
 impl MemStore {
-    /// Helper method to create a `MemTicketQueryBuilder` for a ticket of given job.
+    /// Helper method to create a `MemTicketQueryBuilder` for the tickets of a given task.
     pub(super) fn ticket<const N: usize>(
         &self,
         job_meta: JobMetadata<N>,
@@ -234,12 +234,12 @@ impl MemStore {
 }
 
 impl<const N: usize> MemTicketQueryBuilder<'_, N> {
-    /// The table this job's tickets live in, if it has been initialized.
+    /// The table this task's tickets live in, if it has been initialized.
     fn table(&self) -> MemResult<Option<std::sync::Arc<TicketTable>>> {
         self.store.ticket_table(self.job_meta.id)
     }
 
-    /// The table this job's tickets live in, erroring if it has not been initialized.
+    /// The table this task's tickets live in, erroring if it has not been initialized.
     fn require_table(&self) -> MemResult<std::sync::Arc<TicketTable>> {
         self.table()?.ok_or(MetaStorageError::Internal(
             "ticket table was not initialized",
@@ -472,7 +472,7 @@ mod tests {
     use crate::meta_storage::mem::{MemConn, MemMetaStorage};
     use crate::meta_storage::{MetaBackend, MetaClientApi, MetaConnApi};
 
-    /// A job over one dimension `i`, which is also the dimension it spawns.
+    /// A task over one dimension `i`, which is also the dimension it spawns.
     fn job_beta() -> JobMetadata<1> {
         JobMetadata {
             id: "beta",
@@ -482,7 +482,7 @@ mod tests {
         }
     }
 
-    /// An upstream job over the same dimension `i`.
+    /// An upstream task over the same dimension `i`.
     fn job_alpha() -> JobMetadata<1> {
         JobMetadata {
             id: "alpha",
@@ -492,7 +492,7 @@ mod tests {
         }
     }
 
-    /// A job over two dimensions, whose upstreams pin one dimension each.
+    /// A task over two dimensions, whose upstreams pin one dimension each.
     fn job_gamma() -> JobMetadata<2> {
         JobMetadata {
             id: "gamma",

@@ -121,7 +121,7 @@ where
 
     /// An helper function to call `self.spec.init_meta_storage` with a transaction.
     ///
-    /// Returns [`STALE`](TableShape::STALE) if any job or dimension changed shape, discarding what
+    /// Returns [`STALE`](TableShape::STALE) if any task or dimension changed shape, discarding what
     /// its table held.
     async fn init_meta_storage(
         &self,

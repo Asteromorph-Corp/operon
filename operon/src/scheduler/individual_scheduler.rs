@@ -18,7 +18,7 @@ use crate::storage::OperonStorage;
 
 /// # IndividualScheduler
 ///
-/// IndividualScheduler is a scheduler for a single job type.
+/// IndividualScheduler is a scheduler for a single task.
 /// It is responsible for:
 ///
 /// * Keeping track of the tickets that are ready to run,
@@ -26,11 +26,11 @@ use crate::storage::OperonStorage;
 /// * Picking up job results and sending out `Event` messages, and
 /// * Updating waiting tickets from `Event` messages.
 ///
-/// The result a spawned worker task reports back to its individual scheduler.
+/// The result a spawned worker reports back to its individual scheduler.
 type WorkerResult<J, R, UErr, SErr, MErr> =
     Result<InternalEvent<J, R, UErr, SErr, MErr>, SchedulerError<UErr, SErr, MErr>>;
 
-/// The set of worker tasks an individual scheduler is currently awaiting.
+/// The set of workers an individual scheduler is currently awaiting.
 type WorkerHandles<J, R, UErr, SErr, MErr> = JoinSet<WorkerResult<J, R, UErr, SErr, MErr>>;
 
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
@@ -163,7 +163,7 @@ where
         all_ready
     }
 
-    /// Drive the scheduler until every ticket of this job type is finished
+    /// Drive the scheduler until every ticket of this task is finished
     /// **and** the broadcast channel has closed.
     ///
     /// Usually called by the top-level `Scheduler::run` with `tokio::spawn`.
@@ -182,7 +182,7 @@ where
             return;
         };
 
-        // Check if the initial data is valid, it can only be done if the job is not clean.
+        // Check if the initial data is valid, it can only be done if the task is not clean.
         if !clean && !self.check_initial_data(&initial_tickets) {
             self.set_state(TaskState::Error).await;
             return;
@@ -195,7 +195,7 @@ where
             return;
         }
 
-        // Early return if the scheduler is already finished (e.g. the last run completed this job).
+        // Early return if the scheduler already finished (e.g. the last run completed this task).
         if self.state == TaskState::Finished {
             tracing::debug!(
                 "Scheduler for `{}` exited due to being finished from the start.",

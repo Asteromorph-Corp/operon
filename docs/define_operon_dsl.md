@@ -92,7 +92,7 @@ Each can be:
 **`dimensional_context`**: The `for` clause defines the set of indices over which the task runs.
 A task's `for` clause must not repeat a dimension.
 
-**`concurrency`** (optional): A positive integer which limits the number of concurrent jobs for that task type within a single pipeline execution globally.
+**`concurrency`** (optional): A positive integer which limits the number of concurrent jobs of that task within a single pipeline execution globally.
 Each job corresponds to one index tuple in the task's context.
 Additional jobs are queued.
 If not specified, defaults to `1`.
@@ -140,7 +140,7 @@ This ensures that all dependencies can be resolved in a valid topological order 
 Each task implicitly depends on the entities it consumes.
 Tasks can only depend on entities that have been **previously declared**, so the dependency graph remains acyclic by design.
 
-Standalone jobs are disallowed: every task must consume at least one entity.
+Standalone tasks are disallowed: every task must consume at least one entity.
 
 ### Dimensions
 
@@ -419,7 +419,7 @@ B = create_b(A) for ...;
 **Dimension rule violation**:
 
 ```rust
-// ERROR: Job create_c expected dimensions: i, j
+// ERROR: Task create_c expected dimensions: i, j
 // (`B` is left with a hanging `j`, which `create_c` neither iterates over nor aggregates)
 B<j> = create_b(A) for i;
 C = create_c(B) for i;

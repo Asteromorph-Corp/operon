@@ -68,7 +68,7 @@ pub struct PsqlTicketQueryBuilder<'a, const N: usize> {
 }
 
 impl<'a> PsqlClient<'a> {
-    /// Helper method to create a `PsqlTicketQueryBuilder` for a ticket of given job.
+    /// Helper method to create a `PsqlTicketQueryBuilder` for the tickets of a given task.
     pub fn ticket<const N: usize>(
         &'a self,
         job_meta: JobMetadata<N>,
@@ -335,9 +335,9 @@ impl<'a> std::fmt::Display for TicketSummaryInsertQuery<'a> {
     }
 }
 
-/// Helper struct to generate the SQL query dropping a job's ticket summary row.
+/// Helper struct to generate the SQL query dropping a task's ticket summary row.
 ///
-/// Leaves the row absent, exactly as it is for a job whose ticket table has never been
+/// Leaves the row absent, exactly as it is for a task whose ticket table has never been
 /// initialized, so that the trailing `TicketSummaryInsertQuery` in `init` recreates it.
 struct TicketSummaryDeleteQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
 
@@ -415,7 +415,7 @@ impl<const N: usize> std::fmt::Display for ClearTicketQuery<'_, N> {
     }
 }
 
-/// Helper struct to generate the SQL query for getting all tickets for a given job.
+/// Helper struct to generate the SQL query for getting all tickets of a given task.
 struct GetAllTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for GetAllTicketQuery<'_, N> {
@@ -427,7 +427,7 @@ impl<const N: usize> std::fmt::Display for GetAllTicketQuery<'_, N> {
     }
 }
 
-/// Helper struct to generate the SQL query for inserting tickets for a job.
+/// Helper struct to generate the SQL query for inserting tickets for a task.
 struct PutTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for PutTicketQuery<'_, N> {
@@ -579,7 +579,7 @@ impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
     }
 }
 
-/// An helper struct to generate the SQL query for marking a ticket as done for a given job.
+/// A helper struct to generate the SQL query for marking the ticket of a given job as done.
 struct MarkDoneQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for MarkDoneQuery<'_, N> {
@@ -601,7 +601,7 @@ impl<const N: usize> std::fmt::Display for MarkDoneQuery<'_, N> {
     }
 }
 
-/// An helper struct to generate the SQL query for fetching the job status.
+/// A helper struct to generate the SQL query for fetching a task's ticket counts.
 struct GetStatusQuery<'a>(SchemaPrefix<'a>);
 
 impl<'a> std::fmt::Display for GetStatusQuery<'a> {
