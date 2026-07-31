@@ -89,7 +89,8 @@ This DAG's validity is checked at macro-expansion time.
 
 Tasks in Operon are _multiplex_, meaning that one task may produce multiple entities of the same type (as a Rust `Vec`).
 From another perspective, allowing multiplexing means that a task of a single type may be run multiple times, each using different input entities.
-In this sense, a single node in the DAG represents a unique task _type_ that can be run repeatedly, where the number of individual tasks of that type cannot be known until upstream tasks produce the necessary entities.
+In this sense, a single node in the DAG represents a unique task _type_ that can be run repeatedly.
+The number of individual tasks of that type cannot be known until upstream tasks produce the necessary entities.
 Due to this, the number of tasks are quantified using an abstraction called _named dimensions_ instead of a simple count.
 
 ### Incremental Scheduling
@@ -273,6 +274,7 @@ use async_trait::async_trait;
 use operon::OperonService;
 
 #[derive(OperonService)]
+#[operon(error = std::convert::Infallible)]
 struct MySplitterService;
 
 #[async_trait]
@@ -298,15 +300,16 @@ impl SplitterService for MySplitterService {
 
 The exact signature of each task function is parsed from the pipeline definition, and will be provided in a docstring of the generated `{PipelineName}Service` trait.
 
-A failing task reports it as `Self::Error`, which defaults to a boxed `std::error::Error`.
-Name a concrete error type instead with `#[operon(error = MyError)]` on the derive — for an infallible service, `#[operon(error = std::convert::Infallible)]`.
-A job that returns an error puts its own task type into an error state and reports it to the UI.
+A task's methods report failure as `Self::Error`, which defaults to a boxed `std::error::Error`.
+You can name a concrete error type instead with `#[operon(error = MyError)]` on the derive.
+In the above example, we wrote `#[operon(error = std::convert::Infallible)]` because the service is infallible.
+A job that returns an error puts its own task into an error state and reports it to the UI.
 The run keeps going elsewhere and ends as aborted, leaving what did complete available to a later recovery.
 
 ### Implementing the Storage (Optional)
 
 The Operon engine assumes all entities are accessible through a storage interface — we call this interface the `{PipelineName}Storage` trait.
-We provide a struct `Psql{PipelineName}Storage` that already implements this trait using PostgreSQL, which you build from `PsqlStorageOptions` — turbofish the storage alias to select your pipeline:
+We provide a struct `Psql{PipelineName}Storage` that already implements this trait using PostgreSQL, which you build from `PsqlStorageOptions`.
 
 ```rust
 // In operon/examples/ex1.rs (slightly modified):
@@ -323,13 +326,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 ```
 
-You may also choose to implement your own storage by providing an `impl` for the `{PipelineName}Storage` trait, alongside one for `OperonStorage`.
-The generated half asks for a `get`/`put` pair per entity type, plus batched accessors that default to walking those pairs one entity at a time.
-Override a batched accessor wherever your backend can serve a whole range in one query.
-Analogous to the service implementation, signatures of the functions you need to implement are parsed from the pipeline definition and will be provided in a docstring of the generated `{PipelineName}Storage` trait.
-The `OperonStorage` half covers what does not depend on the pipeline: the error type the accessors report, the backend's lifecycle, and its run footprint.
+You may also choose to implement your own storage by providing an `impl` for two traits `OperonStorage` and `{PipelineName}Storage`.
 
-Having an alternative storage backend may be useful if you want to use a different database or have a quick in-memory storage for testing purposes — [ex5](operon/examples/ex5.rs) implements one over `DashMap`.
+The `OperonStorage` half covers the pipeline-independent interface: namely, the error type, the backend's lifecycle, and footprint operations.
+The generated half asks for a `get`/`put` pair per entity type and provides default implementations for batch operations.
+The batch operations will, by default, iterate over the `get`/`put` methods you provide, but you may override them if your backend supports more efficient bulk operations.
+Analogous to the service implementation, signatures of the functions you need to implement are parsed from the pipeline definition.
+The signatures will be provided in a generated docstring on the `{PipelineName}Storage` trait.
+
+Having an alternative storage backend may be useful if you want to use a different database or have a quick in-memory storage for testing purposes.
+For a concrete example, [ex5](operon/examples/ex5.rs) implements one over `DashMap`.
 However, note that the engine will not provide recoverability if the storage is volatile or you leave the footprint methods of `OperonStorage` at their defaults.
 
 ### Running Operon
@@ -377,13 +383,14 @@ use operon::options::MemMetaStorageOptions;
 let meta = MemMetaStorageOptions::new().build();
 ```
 
-The metadata is then lost when the process exits, and with it the ability to resume the run.
-To defer the choice to runtime — a flag, an environment variable — build the backend through `MetaBackendOptions` instead, which resolves either backend into a single `AnyBackend` type:
+If you use an in-memory metadata backend, the metadata will be dropped at the end of the run, which amounts to opting out of recoverability.
+To defer the choice to runtime, build the backend through `MetaBackendOptions` instead, which resolves either backend into a single `AnyBackend` type:
 
 ```rust
+use operon::AnyBackend;
 use operon::options::MetaBackendOptions;
 
-let meta = match std::env::var("POSTGRES_URI") {
+let meta: AnyBackend = match std::env::var("POSTGRES_URI") {
     Ok(uri) => MetaBackendOptions::psql(uri),
     Err(_) => MetaBackendOptions::mem(),
 }
