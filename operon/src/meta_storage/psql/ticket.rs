@@ -93,7 +93,6 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         ))
     }
 
-    /// Initializes the ticket table and its summary.
     async fn init(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let id = self.job_meta.id;
@@ -119,7 +118,6 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(())
     }
 
-    /// Clears the ticket table.
     async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearTicketQuery(schema_prefix, self.job_meta);
@@ -127,7 +125,6 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(())
     }
 
-    /// Gets all tickets with a given status.
     async fn get_all(&self, status: TicketStatus) -> PsqlResult<Vec<Ticket<N>>> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetAllTicketQuery(schema_prefix, self.job_meta);
@@ -139,7 +136,6 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(tickets)
     }
 
-    /// Puts a ticket into the table.
     async fn put(&self, ticket: Ticket<N>) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutTicketQuery(schema_prefix, self.job_meta);
@@ -148,9 +144,6 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(())
     }
 
-    /// Raises the `deps_done` count of eligible tickets by 1.
-    ///
-    /// Returns tickets that are newly `"queued"`.
     async fn raise_deps_done<const M: usize>(
         &self,
         upstream_meta: JobMetadata<M>,
@@ -176,9 +169,6 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(tickets)
     }
 
-    /// Raises the `deps_quota` count of eligible tickets by resolution's `ub` minus 1.
-    ///
-    /// Returns tickets that are newly `"queued"`.
     async fn raise_deps_quota<const M: usize>(
         &self,
         upstream_meta: JobMetadata<M>,
@@ -211,9 +201,6 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(tickets)
     }
 
-    /// Explodes the ticket along a dimension at a given coordinate.
-    ///
-    /// Returns tickets affected.
     async fn explode<const M: usize, const IDX: usize>(
         &self,
         res_meta: DimensionMetadata<M>,
@@ -273,7 +260,6 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(tickets)
     }
 
-    /// Marks the ticket corresponding to a given job as done.
     async fn mark_done(&self, job: Job<N>) -> PsqlResult<()> {
         let schema = self.client.schema_prefix();
         let stmt = MarkDoneQuery(schema, self.job_meta);

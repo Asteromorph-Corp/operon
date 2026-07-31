@@ -267,12 +267,10 @@ impl<const N: usize> MemTicketQueryBuilder<'_, N> {
 impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
     type Error = MemMetaError;
 
-    /// Initializes the ticket table.
     async fn init(&self) -> MemResult<()> {
         self.store.init_ticket_table(self.job_meta.id)
     }
 
-    /// Clears the ticket table.
     async fn clear(&self) -> MemResult<()> {
         if let Some(table) = self.table()? {
             table.rows.write()?.clear();
@@ -280,7 +278,6 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         Ok(())
     }
 
-    /// Gets all tickets with a given status.
     async fn get_all(&self, status: TicketStatus) -> MemResult<Vec<Ticket<N>>> {
         let Some(table) = self.table()? else {
             return Ok(Vec::new());
@@ -294,7 +291,6 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .collect())
     }
 
-    /// Puts a ticket into the table, leaving an existing one at the same coordinate untouched.
     async fn put(&self, ticket: Ticket<N>) -> MemResult<()> {
         let table = self.require_table()?;
         let (key, row) = Self::split(&ticket);
@@ -302,9 +298,6 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         Ok(())
     }
 
-    /// Raises the `deps_done` count of eligible tickets by 1.
-    ///
-    /// Returns tickets that are newly `"queued"`.
     async fn raise_deps_done<const M: usize>(
         &self,
         upstream_meta: JobMetadata<M>,
@@ -345,9 +338,6 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         Ok(promoted)
     }
 
-    /// Raises the `deps_quota` count of eligible tickets by resolution's `ub` minus 1.
-    ///
-    /// Returns tickets that are newly `"queued"`.
     async fn raise_deps_quota<const M: usize>(
         &self,
         upstream_meta: JobMetadata<M>,
@@ -391,9 +381,6 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         Ok(promoted)
     }
 
-    /// Explodes the ticket along a dimension at a given coordinate.
-    ///
-    /// Returns tickets affected.
     async fn explode<const M: usize, const IDX: usize>(
         &self,
         res_meta: DimensionMetadata<M>,
@@ -447,7 +434,6 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         Ok(tickets)
     }
 
-    /// Marks the ticket corresponding to a given job as done.
     async fn mark_done(&self, job: Job<N>) -> MemResult<()> {
         let table = self.require_table()?;
         let mut rows = table.rows.write()?;
