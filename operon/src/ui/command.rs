@@ -15,13 +15,13 @@ pub enum Command {
         /// Rebuild the run from trusted data before starting.
         #[clap(short, long, conflicts_with_all = ["fresh", "redo"])]
         rebuild: bool,
-        /// Do not rebuild the given jobs when `--rebuild` is specified.
+        /// Do not rebuild the given tasks when `--rebuild` is specified.
         #[clap(short, long, requires = "rebuild", num_args = 1..)]
         skip: Vec<String>,
         /// Shorthand for `--rebuild --skip <...>`.
         #[clap(short = 'R', long, conflicts_with_all = ["fresh", "rebuild", "skip"], num_args = 1..)]
         redo: Vec<String>,
-        /// Rebuild the run while skipping inconsistent jobs.
+        /// Rebuild the run while skipping inconsistent tasks.
         #[clap(short = 'i', long, conflicts_with = "fresh")]
         redo_inconsistent_jobs: bool,
     },
@@ -48,22 +48,22 @@ pub enum Command {
         no_exit: bool,
     },
 
-    /// Pause jobs.
+    /// Pause tasks.
     Pause {
-        /// Target job(s) to pause.
-        /// If not specified, pauses all jobs.
+        /// Target task(s) to pause.
+        /// If not specified, pauses all tasks.
         #[clap()]
         targets: Vec<String>,
         /// Whether to cascade down the pause command
-        /// to all dependent jobs.
+        /// to all dependent tasks.
         #[clap(short, long)]
         cascade: bool,
     },
 
-    /// Resume jobs.
+    /// Resume tasks.
     Resume {
-        /// Target job(s) to resume.
-        /// If not specified, resumes all jobs.
+        /// Target task(s) to resume.
+        /// If not specified, resumes all tasks.
         #[clap()]
         targets: Vec<String>,
     },

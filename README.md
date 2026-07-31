@@ -421,15 +421,15 @@ Commands:
                         --fresh, --rebuild, and --redo are mutually exclusive.
         -f, --fresh         Start a fresh run, ignoring any existing data.
         -r, --rebuild       Rebuild the run from trusted data before starting.
-        -s, --skip <JOB_TYPE>[ ...]
-                            With --rebuild, do not rebuild the given 1 or more job(s).
-        -R, --redo <JOB_TYPE>[ ...]
+        -s, --skip <TASK>[ ...]
+                            With --rebuild, do not rebuild the given 1 or more task(s).
+        -R, --redo <TASK>[ ...]
                             Shorthand for --rebuild --skip <...>.
         -i, --redo-inconsistent-jobs
                             Rebuild the run even on a failed check,
-                            ignoring jobs with corrupt data and their downstream jobs.
+                            ignoring tasks with corrupt data and their downstream tasks.
                             Cannot be used with --fresh.
-                            Note that --redo <INCONSISTENT_JOBS> will NOT allow a rebuild
+                            Note that --redo <INCONSISTENT_TASKS> will NOT allow a rebuild
                             on a failed check without this flag.
     check [OPTIONS]     Check the consistency of the data from the last run.
         -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
@@ -442,11 +442,11 @@ Commands:
     quit [OPTIONS]      Stop all jobs and exit the UI. Defaults to graceful shutdown.
         -f, --force         Force quit.
         -n, --no-exit       Don't exit the UI.
-    pause [OPTIONS] [<JOB_TYPE>[ ...]]
+    pause [OPTIONS] [<TASK>[ ...]]
                         Pause executing new jobs.
-        -c, --cascade       Cascade the pause command to dependent jobs.
-    resume [<JOB_TYPE>[ ...]]
-                        Resume paused jobs.
+        -c, --cascade       Cascade the pause command to dependent tasks.
+    resume [<TASK>[ ...]]
+                        Resume paused tasks.
     help                Print this help message.
 ```
 

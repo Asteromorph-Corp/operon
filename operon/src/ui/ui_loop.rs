@@ -37,15 +37,15 @@ Commands:
                         --fresh, --rebuild, and --redo are mutually exclusive.
         -f, --fresh         Start a fresh run, ignoring any existing data.
         -r, --rebuild       Rebuild the run from trusted data before starting.
-        -s, --skip <JOB_TYPE>[ ...]
-                            With --rebuild, do not rebuild the given 1 or more job(s).
-        -R, --redo <JOB_TYPE>[ ...]
+        -s, --skip <TASK>[ ...]
+                            With --rebuild, do not rebuild the given 1 or more task(s).
+        -R, --redo <TASK>[ ...]
                             Shorthand for --rebuild --skip <...>.
         -i, --redo-inconsistent-jobs
                             Rebuild the run even on a failed check,
-                            ignoring jobs with corrupt data and their downstream jobs.
+                            ignoring tasks with corrupt data and their downstream tasks.
                             Cannot be used with --fresh.
-                            Note that --redo <INCONSISTENT_JOBS> will NOT allow a rebuild
+                            Note that --redo <INCONSISTENT_TASKS> will NOT allow a rebuild
                             on a failed check without this flag.
     check [OPTIONS]     Check the consistency of the data from the last run.
         -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
@@ -58,11 +58,11 @@ Commands:
     quit [OPTIONS]      Stop all jobs and exit the UI. Defaults to graceful shutdown.
         -f, --force         Force quit.
         -n, --no-exit       Don't exit the UI.
-    pause [OPTIONS] [<JOB_TYPE>[ ...]]
+    pause [OPTIONS] [<TASK>[ ...]]
                         Pause executing new jobs.
-        -c, --cascade       Cascade the pause command to dependent jobs.
-    resume [<JOB_TYPE>[ ...]]
-                        Resume paused jobs.
+        -c, --cascade       Cascade the pause command to dependent tasks.
+    resume [<TASK>[ ...]]
+                        Resume paused tasks.
     help                Print this help message."#;
 static MAX_JOB_NAME_LEN: OnceLock<u16> = OnceLock::new();
 
@@ -139,8 +139,8 @@ impl UiLoop {
         }
     }
 
-    pub fn is_job(&self, job_name: &str) -> bool {
-        self.progresses.0.contains_key(job_name)
+    pub fn is_task(&self, task_name: &str) -> bool {
+        self.progresses.0.contains_key(task_name)
     }
 
     /// Records the scheduler as gone and paints every task as errored.
@@ -388,9 +388,9 @@ impl UiLoop {
                     }
                 };
                 if let RunEventInner::Rebuild { skip, .. } = &event_inner
-                    && let Some(invalid_job) = skip.iter().find(|job| !self.is_job(job))
+                    && let Some(invalid_task) = skip.iter().find(|task| !self.is_task(task))
                 {
-                    tracing::error!("Unknown job name: {invalid_job}")
+                    tracing::error!("Unknown task name: {invalid_task}")
                 } else {
                     self.send_control(ControlEvent::Run(event_inner)).await
                 }
@@ -403,16 +403,16 @@ impl UiLoop {
             }
             Command::Exit => self.send_control(ControlEvent::Exit).await,
             Command::Pause { targets, cascade } => {
-                if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
-                    tracing::error!("Unknown job name: {invalid_job}")
+                if let Some(invalid_task) = targets.iter().find(|task| !self.is_task(task)) {
+                    tracing::error!("Unknown task name: {invalid_task}")
                 } else {
                     self.send_control(ControlEvent::Pause { targets, cascade })
                         .await
                 }
             }
             Command::Resume { targets } => {
-                if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
-                    tracing::error!("Unknown job name: {invalid_job}")
+                if let Some(invalid_task) = targets.iter().find(|task| !self.is_task(task)) {
+                    tracing::error!("Unknown task name: {invalid_task}")
                 } else {
                     self.send_control(ControlEvent::Resume { targets }).await
                 }
