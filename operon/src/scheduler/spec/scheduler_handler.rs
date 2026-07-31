@@ -135,10 +135,10 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         client: MSto::Client<'_>,
         mode: CheckMode,
     ) -> Result<Vec<&'static str>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        let mut inconsistent_jobs = Vec::new();
+        let mut inconsistent_tasks = Vec::new();
         for schedule in &self.job_handlers {
             if !schedule.check_consistency(storage, client, mode).await? {
-                inconsistent_jobs.push(schedule.job_id());
+                inconsistent_tasks.push(schedule.job_id());
                 tracing::warn!(
                     "Consistency check failed for job handler: {}",
                     schedule.job_id()
@@ -150,7 +150,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
                 );
             }
         }
-        Ok(inconsistent_jobs)
+        Ok(inconsistent_tasks)
     }
 
     pub(crate) async fn clear_resolution(

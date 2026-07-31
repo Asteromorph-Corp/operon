@@ -8,12 +8,12 @@ pub type ControlEventSender = tokio::sync::mpsc::Sender<ControlEvent>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunEventInner {
     Unspecified {
-        redo_inconsistent_jobs: bool,
+        redo_inconsistent_tasks: bool,
     },
     Fresh,
     Rebuild {
         skip: HashSet<String>,
-        redo_inconsistent_jobs: bool,
+        redo_inconsistent_tasks: bool,
     },
 }
 

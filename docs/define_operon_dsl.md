@@ -106,6 +106,7 @@ Keys may be combined in one attribute, but each may appear only once per task.
 A task may set its pool one way or the other, never both.
 
 **`concurrency_env = ENV_VAR_NAME`**: Reads the pool size from the named environment variable, letting a deployment size the pool without a rebuild.
+It sizes the pool in place of `for(N)` and `concurrency`, and a task may use only one of the three.
 Every pool is resolved as the engine starts, before any job runs, and a variable that is unset, unparseable, or zero panics there.
 A variable that is already set at macro-expansion time is validated then as well, turning a bad value into a compile error.
 
@@ -459,6 +460,7 @@ let operon = Operon::new(MyService, storage, meta);
 operon.run().await?;
 ```
 
+`PsqlStorageOptions::build` needs to be told which storage it is building, either by a turbofish or by annotating the binding.
 `Operon::new` takes the service and the storage by value or wrapped in an `Arc`.
 Wrap them yourself to keep a handle for reading the results once the run is over.
 Swapping `PsqlMetaStorageOptions` for `MemMetaStorageOptions` moves the metadata into memory, and together with an in-memory storage implementer, the pipeline runs without a database.

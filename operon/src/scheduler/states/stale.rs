@@ -28,7 +28,7 @@ where
     run_id: Uuid,
     kind: StaleKind,
     /// The result of the consistency check.
-    inconsistent_jobs: Option<Vec<&'static str>>,
+    inconsistent_tasks: Option<Vec<&'static str>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -98,7 +98,7 @@ where
             channel_size,
             run_id,
             kind,
-            inconsistent_jobs: None,
+            inconsistent_tasks: None,
         }
     }
 
@@ -122,7 +122,7 @@ where
         mode: CheckMode,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let check_start = Instant::now();
-        let inconsistent_jobs = self
+        let inconsistent_tasks = self
             .ctx
             .handler
             .check_consistency(
@@ -138,12 +138,12 @@ where
             check_start.elapsed()
         );
 
-        if !inconsistent_jobs.is_empty() {
+        if !inconsistent_tasks.is_empty() {
             tracing::warn!(
-                "Consistency check failed for the following jobs:\n\
-                {inconsistent_jobs:?}\n\
+                "Consistency check failed for the following tasks:\n\
+                {inconsistent_tasks:?}\n\
                 You may proceed to overwrite the existing data with `run`, or alternatively,\n\
-                you may rebuild other jobs by specifying --redo-inconsistent-jobs.",
+                you may rebuild other tasks by specifying --redo-inconsistent-jobs.",
             );
         } else {
             match self.kind {
@@ -162,7 +162,7 @@ where
             }
         }
 
-        self.inconsistent_jobs = Some(inconsistent_jobs);
+        self.inconsistent_tasks = Some(inconsistent_tasks);
         Ok(())
     }
 
@@ -175,20 +175,24 @@ where
 
             RunEventInner::Rebuild {
                 mut skip,
-                redo_inconsistent_jobs,
-            } => match (&self.kind, &self.inconsistent_jobs, redo_inconsistent_jobs) {
+                redo_inconsistent_tasks,
+            } => match (
+                &self.kind,
+                &self.inconsistent_tasks,
+                redo_inconsistent_tasks,
+            ) {
                 // Consistency check failed.
-                (_, Some(inconsistent_jobs), false) if !inconsistent_jobs.is_empty() => {
+                (_, Some(inconsistent_tasks), false) if !inconsistent_tasks.is_empty() => {
                     tracing::error!(
                         "Cannot rebuild because of the previously found inconsistencies."
                     );
                     None
                 }
-                // Consistency check failed, but the user chose to redo inconsistent jobs.
-                (_, Some(inconsistent_jobs), true) if !inconsistent_jobs.is_empty() => {
-                    tracing::info!("Rebuilding the run while redoing inconsistent jobs.");
-                    for job in inconsistent_jobs {
-                        skip.insert(job.to_string());
+                // Consistency check failed, but the user chose to redo inconsistent tasks.
+                (_, Some(inconsistent_tasks), true) if !inconsistent_tasks.is_empty() => {
+                    tracing::info!("Rebuilding the run while redoing inconsistent tasks.");
+                    for task in inconsistent_tasks {
+                        skip.insert(task.to_string());
                     }
                     Some(RunMode::Rebuild { skip })
                 }
@@ -208,17 +212,21 @@ where
             },
 
             RunEventInner::Unspecified {
-                redo_inconsistent_jobs,
-            } => match (&self.kind, &self.inconsistent_jobs, redo_inconsistent_jobs) {
+                redo_inconsistent_tasks,
+            } => match (
+                &self.kind,
+                &self.inconsistent_tasks,
+                redo_inconsistent_tasks,
+            ) {
                 // Consistency check failed, and the user does not wish to preserve data.
-                (_, Some(inconsistent_jobs), false) if !inconsistent_jobs.is_empty() => {
+                (_, Some(inconsistent_tasks), false) if !inconsistent_tasks.is_empty() => {
                     Some(RunMode::Clean)
                 }
                 // Consistency check failed, and the user wishes to rebuild as much as we can.
-                (_, Some(inconsistent_jobs), true) if !inconsistent_jobs.is_empty() => {
-                    tracing::info!("Rebuilding the run while redoing inconsistent jobs.");
+                (_, Some(inconsistent_tasks), true) if !inconsistent_tasks.is_empty() => {
+                    tracing::info!("Rebuilding the run while redoing inconsistent tasks.");
                     Some(RunMode::Rebuild {
-                        skip: HashSet::from_iter(inconsistent_jobs.iter().map(|s| s.to_string())),
+                        skip: HashSet::from_iter(inconsistent_tasks.iter().map(|s| s.to_string())),
                     })
                 }
                 // Previous run was aborted, and no consistency check was performed.
@@ -266,7 +274,7 @@ where
         evt: ControlEvent,
     ) -> Result<NextState<Self::Error>, Self::Error> {
         match evt {
-            ControlEvent::Check { .. } if self.inconsistent_jobs.is_some() => {
+            ControlEvent::Check { .. } if self.inconsistent_tasks.is_some() => {
                 tracing::warn!("Already run a check.")
             }
             ControlEvent::Check { mode } => {

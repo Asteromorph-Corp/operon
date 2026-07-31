@@ -64,7 +64,7 @@ Commands:
     resume [<TASK>[ ...]]
                         Resume paused tasks.
     help                Print this help message."#;
-static MAX_JOB_NAME_LEN: OnceLock<u16> = OnceLock::new();
+static MAX_TASK_NAME_LEN: OnceLock<u16> = OnceLock::new();
 
 /// `Drop`-guarded terminal wrapper.
 struct TerminalGuard<W: ::std::io::Write> {
@@ -203,15 +203,15 @@ impl UiLoop {
         terminal.clear()?;
 
         let snapshot = self.progresses.snapshot().await;
-        MAX_JOB_NAME_LEN
+        MAX_TASK_NAME_LEN
             .set(
                 snapshot
                     .0
                     .keys()
                     .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
                     .max()
-                    .expect("At least one job name exists")
-                    .clamp(3, 20),
+                    .expect("At least one task name exists")
+                    .clamp(4, 20),
             )
             .ok();
 
@@ -253,9 +253,9 @@ impl UiLoop {
                     let width = terminal.size()?.width;
                     let verbose = width
                         >= VERBOSE_THRESHOLD
-                            + MAX_JOB_NAME_LEN
+                            + MAX_TASK_NAME_LEN
                                 .get()
-                                .ok_or(UiError::Other("Max job name length not set".to_string()))?;
+                                .ok_or(UiError::Other("Max task name length not set".to_string()))?;
                     self.logs.push(record, width, verbose);
                 }
                 _ = interval.tick() => self.draw(&mut terminal).await?,
@@ -368,23 +368,23 @@ impl UiLoop {
                 rebuild,
                 skip,
                 redo,
-                redo_inconsistent_jobs,
+                redo_inconsistent_tasks,
             } => {
                 let event_inner = if fresh {
                     RunEventInner::Fresh
                 } else if rebuild {
                     RunEventInner::Rebuild {
                         skip: skip.into_iter().collect(),
-                        redo_inconsistent_jobs,
+                        redo_inconsistent_tasks,
                     }
                 } else if !redo.is_empty() {
                     RunEventInner::Rebuild {
                         skip: redo.into_iter().collect(),
-                        redo_inconsistent_jobs,
+                        redo_inconsistent_tasks,
                     }
                 } else {
                     RunEventInner::Unspecified {
-                        redo_inconsistent_jobs,
+                        redo_inconsistent_tasks,
                     }
                 };
                 if let RunEventInner::Rebuild { skip, .. } = &event_inner
@@ -429,9 +429,9 @@ impl UiLoop {
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
         let size = terminal.size()?;
-        let max_len = *MAX_JOB_NAME_LEN
+        let max_len = *MAX_TASK_NAME_LEN
             .get()
-            .ok_or(UiError::Other("Max job name length not set".to_string()))?;
+            .ok_or(UiError::Other("Max task name length not set".to_string()))?;
 
         let min_width = MIN_TERMINAL_WIDTH_THRESHOLD + max_len;
         if size.width < min_width || size.height < 10 {
@@ -560,9 +560,9 @@ impl UiLoop {
                         Span::raw(format!(
                             "{:width$}",
                             "",
-                            width = (max_len.saturating_sub(3)) as usize
+                            width = (max_len.saturating_sub(4)) as usize
                         )),
-                        Span::raw("job").underlined(),
+                        Span::raw("task").underlined(),
                         Span::raw("   "),
                         Span::raw("done").underlined(),
                         Span::raw(" "),
@@ -585,9 +585,9 @@ impl UiLoop {
                         Span::raw(format!(
                             "{:width$}",
                             "",
-                            width = (max_len.saturating_sub(3)) as usize
+                            width = (max_len.saturating_sub(4)) as usize
                         )),
-                        Span::raw("job").underlined(),
+                        Span::raw("task").underlined(),
                         Span::raw("   "),
                         Span::raw("done").underlined(),
                         Span::raw(" "),

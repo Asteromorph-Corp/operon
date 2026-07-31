@@ -91,7 +91,8 @@ How many jobs each task runs, on the other hand, is discovered as the run procee
 
 Tasks in Operon are _multiplex_, meaning that one job may produce multiple entities of the same type (as a Rust `Vec`).
 From another perspective, allowing multiplexing means that a single task may run many jobs, each using different input entities.
-In this sense, a single node in the DAG is one task, run once per job.
+In this sense, Operon's DAG could also be viewed as a dynamic graph of _jobs_ that evolves as the run progresses.
+
 The number of jobs a task runs cannot be known until upstream tasks produce the necessary entities.
 Due to this, the number of jobs is quantified using an abstraction called _named dimensions_ instead of a simple count.
 
@@ -312,6 +313,7 @@ The run keeps going elsewhere and ends as aborted, leaving what did complete ava
 
 The Operon engine assumes all entities are accessible through a storage interface — we call this interface the `{PipelineName}Storage` trait.
 We provide a struct `Psql{PipelineName}Storage` that already implements this trait using PostgreSQL, which you build from `PsqlStorageOptions`.
+The `build` method needs to be told which storage it is building, either by a turbofish or by annotating the binding.
 
 ```rust
 // In operon/examples/ex1.rs (slightly modified):

@@ -30,7 +30,8 @@ where
     /// The id of the task this handler runs.
     fn job_id(&self) -> &'static str;
 
-    /// The ids of every task this one transitively depends on, in lexicographic order.
+    /// This task's id and the ids of every task it transitively depends on, in lexicographic
+    /// order.
     fn all_upstream_jobs(&self) -> Vec<&'static str>;
 
     /// How many of this task's jobs may run at once.
