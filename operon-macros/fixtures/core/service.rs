@@ -4,6 +4,9 @@
 /// `#[derive(OperonService)]` defaults it to `operon::error::UserError`.
 /// Select a concrete type with `#[operon(error = MyError)]` on the derive.
 ///
+/// The derive also takes `#[operon(defined_at = "path")]`, the module `define_operon!`
+/// expanded in, and `#[operon(crate = "path")]`, the `operon` crate itself.
+///
 /// # Methods
 /// ```rust,ignore
 /// async fn alpha(&self) -> Result<Vec<A>, Self::Error>
