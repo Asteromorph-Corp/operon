@@ -21,6 +21,7 @@ where
     ctx: SchedulerContext<Svc, Sto, MSto>,
     channel_size: usize,
     ui_mode: UiMode,
+    shape_changed: bool,
 }
 
 impl<Svc, Sto, MSto> InitTransition<Svc, Sto, MSto>
@@ -33,11 +34,13 @@ where
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
+        shape_changed: bool,
     ) -> Self {
         Self {
             ctx,
             channel_size,
             ui_mode,
+            shape_changed,
         }
     }
 
@@ -45,8 +48,9 @@ where
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
+        shape_changed: bool,
     ) -> TransitionState<SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        TransitionState::new(Self::new(ctx, ui_mode, channel_size))
+        TransitionState::new(Self::new(ctx, ui_mode, channel_size, shape_changed))
     }
 
     // TODO: rename states
@@ -115,7 +119,10 @@ where
             RunState::Completed => NextState::next(self.into_stale(run_id, StaleKind::Complete)),
             RunState::Paused => NextState::next(self.into_stale(run_id, StaleKind::GracefulStop)),
             RunState::Running | RunState::Aborted => {
-                NextState::next(self.into_stale(run_id, StaleKind::Abort))
+                let kind = StaleKind::Abort {
+                    shape_changed: self.shape_changed,
+                };
+                NextState::next(self.into_stale(run_id, kind))
             }
         };
 

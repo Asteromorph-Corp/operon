@@ -81,13 +81,14 @@ where
     pub async fn work(mut self) -> SchedulerResult<(), Svc::Error, Sto::Error, MSto::Error> {
         self.ctx.meta_storage.ensure_lock().await?;
         self.ctx.storage.init().await?;
-        if self.init_meta_storage().await?.is_stale {
+        let shape_changed = self.init_meta_storage().await?.is_stale;
+        if shape_changed {
             self.abort_recorded_run().await?;
         }
 
         let heartbeat_handle = self.ctx.meta_storage.clone();
         let mut state: BoxedState<Svc::Error, Sto::Error, MSto::Error> = Box::new(
-            InitTransition::state(self.ctx, self.ui_mode, self.channel_size),
+            InitTransition::state(self.ctx, self.ui_mode, self.channel_size, shape_changed),
         );
 
         // Main work tick
@@ -152,11 +153,6 @@ where
         self.ctx.storage.put_footprint(&footprint).await?;
         conn.as_client().upsert_run(&footprint).await?;
 
-        tracing::warn!(
-            "The pipeline has changed since the previous run.\n\
-             Recording the run as aborted; \
-             you may still attempt a rebuild to restore progress from unchanged tasks."
-        );
         Ok(())
     }
 }
