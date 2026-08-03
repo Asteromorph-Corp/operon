@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::utils::spec_ident;
 
-/// Generates a struct definition for a job specification.
+/// Generates a struct definition for a task specification.
 ///
 /// # Example
 /// ```rust,ignore

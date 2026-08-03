@@ -6,7 +6,7 @@ use crate::utils::{
     task_id_ident, ticket_enum_ident,
 };
 
-/// Generates an implementation of `PeerEventSenders` for a job's peer event senders.
+/// Generates an implementation of `PeerEventSenders` for a task's peer event senders.
 ///
 /// # Example
 /// ```rust,ignore

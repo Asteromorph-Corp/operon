@@ -2,11 +2,11 @@ use indexmap::IndexSet;
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::{JobConfig, JobConfigMap};
-use crate::dependency_analysis::get_direct_downstream_jobs;
+use crate::configs::{TaskConfig, TaskConfigMap};
+use crate::dependency_analysis::get_direct_downstream_tasks;
 use crate::utils::{operon_ident, rebuilder_ident, task_metadata_ident, to_lit_str};
 
-/// Generates the implementation of the `TaskRebuilder` trait for a given job.
+/// Generates the implementation of the `TaskRebuilder` trait for a given task.
 ///
 /// # Example
 /// ```rust,ignore
@@ -93,41 +93,41 @@ use crate::utils::{operon_ident, rebuilder_ident, task_metadata_ident, to_lit_st
 /// }
 /// ```
 pub fn impl_task_rebuilder(
-    job: &JobConfig,
-    spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
-    downstream_jobs: &IndexSet<&JobConfig>,
-    all_jobs: &JobConfigMap,
+    task: &TaskConfig,
+    spawn_dim_repeating_tasks: &IndexSet<&TaskConfig>,
+    downstream_tasks: &IndexSet<&TaskConfig>,
+    all_tasks: &TaskConfigMap,
 ) -> syn::ItemImpl {
     let operon = operon_ident();
-    let rebuilder_ident = rebuilder_ident(&job.id);
+    let rebuilder_ident = rebuilder_ident(&task.id);
 
-    let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
+    let resolve_fail_msg = format!("Failed to resolve a {} ticket", task.id);
     let invalid_ticket_msg = format!(
         "The following {{}} {} ticket(s) were incorrectly marked as done: {{}}",
-        job.id
+        task.id
     );
 
-    let maybe_put_resolution = job.spawn_dim.is_some().then(|| -> syn::Stmt {
+    let maybe_put_resolution = task.spawn_dim.is_some().then(|| -> syn::Stmt {
         parse_quote! { client.resolution(self.spawn_dim_meta).put(resolution).await?; }
     });
 
-    // Jobs without a `spawn_dim` carry a `()` resolution that nothing in the body reads.
-    let resolution_pat: syn::Pat = match job.spawn_dim {
+    // A task without a `spawn_dim` produces jobs whose `()` resolution nothing in the body reads.
+    let resolution_pat: syn::Pat = match task.spawn_dim {
         Some(_) => parse_quote!(resolution),
         None => parse_quote!(_),
     };
 
-    let explode_exprs = if let Some(spawn_dim) = &job.spawn_dim {
-        spawn_dim_repeating_jobs
+    let explode_exprs = if let Some(spawn_dim) = &task.spawn_dim {
+        spawn_dim_repeating_tasks
             .iter()
-            .map(|repeating_job| {
-                let Some(idx) = repeating_job.dims.iter().position(|d| d == spawn_dim) else {
+            .map(|repeating_task| {
+                let Some(idx) = repeating_task.dims.iter().position(|d| d == spawn_dim) else {
                     panic!(
-                        "{} not found in repeating job {}",
-                        spawn_dim, repeating_job.id
+                        "{} not found in repeating task {}",
+                        spawn_dim, repeating_task.id
                     );
                 };
-                let task_meta = task_metadata_ident(&repeating_job.id);
+                let task_meta = task_metadata_ident(&repeating_task.id);
 
                 let explode: syn::Stmt = parse_quote! {
                     let affected = client
@@ -135,22 +135,22 @@ pub fn impl_task_rebuilder(
                         .explode::<_, #idx>(self.spawn_dim_meta, resolution)
                         .await?;
                 };
-                let raise_quotas = get_direct_downstream_jobs(repeating_job, all_jobs)
+                let raise_quotas = get_direct_downstream_tasks(repeating_task, all_tasks)
                     .into_iter()
-                    .flat_map(|downstream_job| {
-                        downstream_job
+                    .flat_map(|downstream_task| {
+                        downstream_task
                             .from
                             .iter()
                             .filter(|arg| {
-                                arg.id == repeating_job.to && arg.over.contains(spawn_dim)
+                                arg.id == repeating_task.to && arg.over.contains(spawn_dim)
                             })
                             .map(|arg| -> syn::Stmt {
-                                let repeating_job_meta = task_metadata_ident(&repeating_job.id);
-                                let downstream_job_meta = task_metadata_ident(&downstream_job.id);
+                                let repeating_task_meta = task_metadata_ident(&repeating_task.id);
+                                let downstream_task_meta = task_metadata_ident(&downstream_task.id);
                                 let over = arg.over.iter().map(to_lit_str);
                                 parse_quote! {
-                                    client.ticket(metadata::#downstream_job_meta())
-                                        .raise_deps_quota(metadata::#repeating_job_meta(), ticket, &[#(#over),*], resolution.ub)
+                                    client.ticket(metadata::#downstream_task_meta())
+                                        .raise_deps_quota(metadata::#repeating_task_meta(), ticket, &[#(#over),*], resolution.ub)
                                         .await?;
                                 }
                             })
@@ -164,23 +164,23 @@ pub fn impl_task_rebuilder(
                 }
             })
             .collect::<Vec<_>>()
-    } else if !spawn_dim_repeating_jobs.is_empty() {
-        panic!("`spawn_dim` is `None`, but `spawn_dim_repeating_jobs` is not empty")
+    } else if !spawn_dim_repeating_tasks.is_empty() {
+        panic!("`spawn_dim` is `None`, but `spawn_dim_repeating_tasks` is not empty")
     } else {
         vec![]
     };
 
-    let raise_dep_exprs = downstream_jobs
+    let raise_dep_exprs = downstream_tasks
         .iter()
-        .flat_map(|downstream_job| {
-            let affected_args = downstream_job.from.iter().filter(|arg| arg.id == job.to);
+        .flat_map(|downstream_task| {
+            let affected_args = downstream_task.from.iter().filter(|arg| arg.id == task.to);
             affected_args.map(|arg| -> syn::Stmt {
-                let downstream_job_meta = task_metadata_ident(&downstream_job.id);
+                let downstream_task_meta = task_metadata_ident(&downstream_task.id);
                 let aggregate_dims = arg.over.iter().map(to_lit_str);
 
                 parse_quote! {
                     client
-                        .ticket(metadata::#downstream_job_meta())
+                        .ticket(metadata::#downstream_task_meta())
                         .raise_deps_done(self.task_meta, job, &[#(#aggregate_dims),*])
                         .await?;
                 }
@@ -268,27 +268,31 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobConfigMap;
-    use crate::dependency_analysis::{get_direct_downstream_jobs, get_jobs_repeating_on};
+    use crate::configs::TaskConfigMap;
+    use crate::dependency_analysis::{get_direct_downstream_tasks, get_tasks_repeating_on};
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{all_jobs, job_beta};
+    use crate::test_utils::simple_pipeline::{all_tasks, task_beta};
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/rebuilder/impl_task_rebuilder.rs")]
+    #[case::simple(task_beta(), "spec/rebuilder/impl_task_rebuilder.rs")]
     fn test_impl_task_rebuilder(
-        all_jobs: JobConfigMap,
-        #[case] job: JobConfig,
+        all_tasks: TaskConfigMap,
+        #[case] task: TaskConfig,
         #[case] fixture_path: &str,
     ) {
-        let spawn_dim_repeating_jobs = job
+        let spawn_dim_repeating_tasks = task
             .spawn_dim
             .as_ref()
-            .map(|dim| get_jobs_repeating_on(dim, &all_jobs))
+            .map(|dim| get_tasks_repeating_on(dim, &all_tasks))
             .unwrap_or_default();
-        let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
+        let downstream_tasks = get_direct_downstream_tasks(&task, &all_tasks);
 
-        let item =
-            impl_task_rebuilder(&job, &spawn_dim_repeating_jobs, &downstream_jobs, &all_jobs);
+        let item = impl_task_rebuilder(
+            &task,
+            &spawn_dim_repeating_tasks,
+            &downstream_tasks,
+            &all_tasks,
+        );
         assert_item_eq(&item, fixture_path);
     }
 }

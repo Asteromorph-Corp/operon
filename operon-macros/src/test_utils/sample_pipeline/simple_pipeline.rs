@@ -16,12 +16,12 @@ use quote::format_ident;
 use rstest::fixture;
 
 use crate::configs::{
-    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
-    JobConfig, JobConfigMap, PoolSizeSpec,
+    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, PoolSizeSpec,
+    TaskArg, TaskConfig, TaskConfigMap,
 };
 
-pub fn job_alpha() -> JobConfig {
-    JobConfig {
+pub fn task_alpha() -> TaskConfig {
+    TaskConfig {
         id: format_ident!("alpha"),
         from: vec![],
         to: format_ident!("A"),
@@ -32,10 +32,10 @@ pub fn job_alpha() -> JobConfig {
     }
 }
 
-pub fn job_beta() -> JobConfig {
-    JobConfig {
+pub fn task_beta() -> TaskConfig {
+    TaskConfig {
         id: format_ident!("beta"),
-        from: vec![JobArg {
+        from: vec![TaskArg {
             id: format_ident!("A"),
             over: vec![],
         }],
@@ -47,10 +47,10 @@ pub fn job_beta() -> JobConfig {
     }
 }
 
-pub fn job_gamma() -> JobConfig {
-    JobConfig {
+pub fn task_gamma() -> TaskConfig {
+    TaskConfig {
         id: format_ident!("gamma"),
-        from: vec![JobArg {
+        from: vec![TaskArg {
             id: format_ident!("A"),
             over: vec![],
         }],
@@ -62,19 +62,19 @@ pub fn job_gamma() -> JobConfig {
     }
 }
 
-pub fn job_delta() -> JobConfig {
-    JobConfig {
+pub fn task_delta() -> TaskConfig {
+    TaskConfig {
         id: format_ident!("delta"),
         from: vec![
-            JobArg {
+            TaskArg {
                 id: format_ident!("A"),
                 over: vec![],
             },
-            JobArg {
+            TaskArg {
                 id: format_ident!("B"),
                 over: vec![],
             },
-            JobArg {
+            TaskArg {
                 id: format_ident!("C"),
                 over: vec![],
             },
@@ -87,15 +87,15 @@ pub fn job_delta() -> JobConfig {
     }
 }
 
-pub fn job_epsilon() -> JobConfig {
-    JobConfig {
+pub fn task_epsilon() -> TaskConfig {
+    TaskConfig {
         id: format_ident!("epsilon"),
         from: vec![
-            JobArg {
+            TaskArg {
                 id: format_ident!("B"),
                 over: vec![format_ident!("j")],
             },
-            JobArg {
+            TaskArg {
                 id: format_ident!("D"),
                 over: vec![format_ident!("j")],
             },
@@ -108,15 +108,15 @@ pub fn job_epsilon() -> JobConfig {
     }
 }
 
-pub fn job_zeta() -> JobConfig {
-    JobConfig {
+pub fn task_zeta() -> TaskConfig {
+    TaskConfig {
         id: format_ident!("zeta"),
         from: vec![
-            JobArg {
+            TaskArg {
                 id: format_ident!("C"),
                 over: vec![format_ident!("k")],
             },
-            JobArg {
+            TaskArg {
                 id: format_ident!("E"),
                 over: vec![format_ident!("k")],
             },
@@ -130,14 +130,14 @@ pub fn job_zeta() -> JobConfig {
 }
 
 #[fixture]
-pub fn all_jobs() -> JobConfigMap {
-    JobConfigMap::from_iter([
-        (format_ident!("alpha"), job_alpha()),
-        (format_ident!("beta"), job_beta()),
-        (format_ident!("gamma"), job_gamma()),
-        (format_ident!("delta"), job_delta()),
-        (format_ident!("epsilon"), job_epsilon()),
-        (format_ident!("zeta"), job_zeta()),
+pub fn all_tasks() -> TaskConfigMap {
+    TaskConfigMap::from_iter([
+        (format_ident!("alpha"), task_alpha()),
+        (format_ident!("beta"), task_beta()),
+        (format_ident!("gamma"), task_gamma()),
+        (format_ident!("delta"), task_delta()),
+        (format_ident!("epsilon"), task_epsilon()),
+        (format_ident!("zeta"), task_zeta()),
     ])
 }
 
@@ -236,6 +236,6 @@ pub fn simple_pipeline() -> AllConfig {
         service_id: service_id(),
         dimensions: all_dimensions(),
         entities: all_entities(),
-        jobs: all_jobs(),
+        tasks: all_tasks(),
     }
 }

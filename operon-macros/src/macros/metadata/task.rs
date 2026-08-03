@@ -1,11 +1,11 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::{Direction, JobConfig};
+use crate::configs::{Direction, TaskConfig};
 use crate::operon_ident;
 use crate::utils::{task_metadata_ident, to_lit_str};
 
-/// Generates a metadata function for a job.
+/// Generates a metadata function for a task.
 ///
 /// # Example
 /// ```rust,ignore
@@ -18,20 +18,20 @@ use crate::utils::{task_metadata_ident, to_lit_str};
 ///     }
 /// }
 /// ```
-pub fn task_metadata(job: &JobConfig) -> syn::ItemFn {
+pub fn task_metadata(task: &TaskConfig) -> syn::ItemFn {
     let operon = operon_ident();
-    let fn_name = task_metadata_ident(&job.id);
-    let n = job.dims.len();
-    let id = to_lit_str(&job.id);
-    let dims = job.dims.iter().map(to_lit_str);
-    let spawn_dim: syn::Expr = match &job.spawn_dim {
+    let fn_name = task_metadata_ident(&task.id);
+    let n = task.dims.len();
+    let id = to_lit_str(&task.id);
+    let dims = task.dims.iter().map(to_lit_str);
+    let spawn_dim: syn::Expr = match &task.spawn_dim {
         Some(spawn_dim) => {
             let spawn_dim = to_lit_str(spawn_dim);
             parse_quote! { Some(#spawn_dim) }
         }
         None => parse_quote! { None },
     };
-    let priority_items = job.priority.iter().map(|(dim, dir)| {
+    let priority_items = task.priority.iter().map(|(dim, dir)| {
         let dim_str = to_lit_str(dim);
         let dir_tokens = match dir {
             Direction::Ascending => quote! { #operon::__private::Direction::Ascending },
@@ -59,20 +59,20 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::job_beta;
+    use crate::test_utils::simple_pipeline::task_beta;
 
-    fn job_beta_with_priority() -> JobConfig {
-        JobConfig {
+    fn task_beta_with_priority() -> TaskConfig {
+        TaskConfig {
             priority: vec![(format_ident!("i"), Direction::Ascending)],
-            ..job_beta()
+            ..task_beta()
         }
     }
 
     #[rstest]
-    #[case(job_beta(), "metadata/task.rs")]
-    #[case(job_beta_with_priority(), "metadata/task.with_priority.rs")]
-    fn test_job_metadata(#[case] job: JobConfig, #[case] fixture_path: &str) {
-        let result = task_metadata(&job);
+    #[case(task_beta(), "metadata/task.rs")]
+    #[case(task_beta_with_priority(), "metadata/task.with_priority.rs")]
+    fn test_task_metadata(#[case] task: TaskConfig, #[case] fixture_path: &str) {
+        let result = task_metadata(&task);
         assert_item_eq(&result, fixture_path);
     }
 }

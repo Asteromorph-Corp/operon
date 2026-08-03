@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::utils::{task_id_ident, to_lit_str};
 
-/// Generates a constant variable for the given job ID.
+/// Generates a constant variable for the given task ID.
 ///
 /// # Example:
 /// ```rust,ignore
@@ -22,9 +22,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_const_job_id() {
-        let job = format_ident!("beta");
-        let item = task_id(&job);
+    fn test_const_task_id() {
+        let task = format_ident!("beta");
+        let item = task_id(&task);
         let expected: syn::ItemConst = parse_quote! { pub const BETA_ID: &str = "beta"; };
         assert_eq!(item, expected);
     }

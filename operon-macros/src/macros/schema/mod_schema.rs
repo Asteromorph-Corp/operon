@@ -7,13 +7,13 @@ use crate::macros::schema::ticket::{impl_ticket_enum, ticket_enum_definition};
 
 /// Generates the `mod schema` module with all schema-related items.
 pub fn mod_schema(all_configs: &AllConfig) -> syn::ItemMod {
-    let job_enum_def = job_enum_definition(&all_configs.jobs);
+    let job_enum_def = job_enum_definition(&all_configs.tasks);
     let impl_job_enum = impl_job_enum();
 
     let resolution_enum_def = resolution_enum_definition(&all_configs.dimensions);
     let impl_resolution_enum = impl_resolution_enum();
 
-    let ticket_enum_def = ticket_enum_definition(&all_configs.jobs);
+    let ticket_enum_def = ticket_enum_definition(&all_configs.tasks);
     let impl_ticket_enum = impl_ticket_enum();
 
     parse_quote! {

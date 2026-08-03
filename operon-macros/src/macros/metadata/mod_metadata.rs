@@ -7,8 +7,8 @@ use crate::macros::metadata::task::task_metadata;
 use crate::macros::metadata::task_id::task_id;
 
 pub fn mod_metadata(all_configs: &AllConfig) -> syn::ItemMod {
-    let job_ids = all_configs.jobs.keys().map(task_id);
-    let jobs = all_configs.jobs.values().map(task_metadata);
+    let task_ids = all_configs.tasks.keys().map(task_id);
+    let tasks = all_configs.tasks.values().map(task_metadata);
     let dimensions = all_configs.dimensions.values().map(dimension_metadata);
     let entities = all_configs.entities.values().map(entity_metadata);
 
@@ -16,8 +16,8 @@ pub fn mod_metadata(all_configs: &AllConfig) -> syn::ItemMod {
         mod metadata {
             use super::*;
 
-            #(#job_ids)*
-            #(#jobs)*
+            #(#task_ids)*
+            #(#tasks)*
             #(#dimensions)*
             #(#entities)*
         }

@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use quote::format_ident;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::TaskConfig;
 use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_case};
 
 /// Generates the `send_on_finish` function for the implementation of the trait `TaskSpec`.
@@ -59,26 +59,26 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 /// }
 /// ```
 pub(super) fn fn_send_on_finish(
-    job: &JobConfig,
-    spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
-    downstream_jobs: &IndexSet<&JobConfig>,
+    task: &TaskConfig,
+    spawn_dim_repeating_tasks: &IndexSet<&TaskConfig>,
+    downstream_tasks: &IndexSet<&TaskConfig>,
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let resolution_enum_ident = resolution_enum_ident();
 
-    let send_resolutions = spawn_dim_repeating_jobs
+    let send_resolutions = spawn_dim_repeating_tasks
         .iter()
-        .map(|repeating_job| -> syn::Expr {
+        .map(|repeating_task| -> syn::Expr {
             // TODO: remove unwrap
-            let resolution_variant_ident = to_pascal_case(job.spawn_dim.as_ref().unwrap());
-            let sender_ident = sender_ident(&repeating_job.id);
+            let resolution_variant_ident = to_pascal_case(task.spawn_dim.as_ref().unwrap());
+            let sender_ident = sender_ident(&repeating_task.id);
             let ok_msg = format!(
                 "`{}` sent peer event to `{}`: {{resolution:?}}",
-                job.id, repeating_job.id
+                task.id, repeating_task.id
             );
             let err_msg = format!(
                 "`{}`'s peer channel closed before handling `{}`'s {{resolution:?}}",
-                repeating_job.id, job.id
+                repeating_task.id, task.id
             );
 
             parse_quote! {
@@ -93,16 +93,16 @@ pub(super) fn fn_send_on_finish(
             }
         });
 
-    let send_jobs = downstream_jobs.iter().map(|downstream_job| -> syn::Expr {
-        let job_variant_ident = to_pascal_case(&format_ident!("{}", job.id));
-        let sender_ident = sender_ident(&downstream_job.id);
+    let send_jobs = downstream_tasks.iter().map(|downstream_task| -> syn::Expr {
+        let job_variant_ident = to_pascal_case(&format_ident!("{}", task.id));
+        let sender_ident = sender_ident(&downstream_task.id);
         let ok_msg = format!(
             "`{}` sent peer event to `{}`: {{job:?}}",
-            job.id, downstream_job.id
+            task.id, downstream_task.id
         );
         let err_msg = format!(
             "`{}`'s peer channel closed before handling `{}`'s {{job:?}}",
-            downstream_job.id, job.id
+            downstream_task.id, task.id
         );
 
         parse_quote! {
@@ -136,26 +136,26 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobConfigMap;
-    use crate::dependency_analysis::{get_direct_downstream_jobs, get_jobs_repeating_on};
+    use crate::configs::TaskConfigMap;
+    use crate::dependency_analysis::{get_direct_downstream_tasks, get_tasks_repeating_on};
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{all_jobs, job_beta};
+    use crate::test_utils::simple_pipeline::{all_tasks, task_beta};
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/spec/fn_send_on_finish.rs")]
+    #[case::simple(task_beta(), "spec/spec/fn_send_on_finish.rs")]
     fn test_fn_send_on_finish(
-        all_jobs: JobConfigMap,
-        #[case] job: JobConfig,
+        all_tasks: TaskConfigMap,
+        #[case] task: TaskConfig,
         #[case] fixture_path: &str,
     ) {
-        let spawn_dim_repeating_jobs = job
+        let spawn_dim_repeating_tasks = task
             .spawn_dim
             .as_ref()
-            .map(|dim| get_jobs_repeating_on(dim, &all_jobs))
+            .map(|dim| get_tasks_repeating_on(dim, &all_tasks))
             .unwrap_or_default();
-        let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
+        let downstream_tasks = get_direct_downstream_tasks(&task, &all_tasks);
 
-        let item = fn_send_on_finish(&job, &spawn_dim_repeating_jobs, &downstream_jobs);
+        let item = fn_send_on_finish(&task, &spawn_dim_repeating_tasks, &downstream_tasks);
         assert_item_eq(&item, fixture_path);
     }
 }

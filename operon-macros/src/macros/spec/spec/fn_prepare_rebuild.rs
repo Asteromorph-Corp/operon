@@ -1,7 +1,7 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::TaskConfig;
 use crate::utils::{operon_ident, rebuilder_ident};
 
 /// Generates the `prepare_rebuild` function for the implementation of the trait `TaskSpec`.
@@ -51,13 +51,13 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     }))
 /// }
 /// ```
-pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
+pub(super) fn fn_prepare_rebuild(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
-    let rebuilder_ident = rebuilder_ident(&job.id);
+    let rebuilder_ident = rebuilder_ident(&task.id);
 
-    let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
+    let resolve_fail_msg = format!("Failed to resolve a {} ticket", task.id);
 
-    let resolution_expr: syn::Expr = match job.spawn_dim.as_ref() {
+    let resolution_expr: syn::Expr = match task.spawn_dim.as_ref() {
         Some(spawn_dim) => {
             let missing_resolution_msg = format!("No resolution found for {spawn_dim}_{{:?}}");
             parse_quote! {
@@ -73,7 +73,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
         }
         None => parse_quote! { () },
     };
-    let maybe_spawn_dim_meta = job.spawn_dim.is_some().then(|| {
+    let maybe_spawn_dim_meta = task.spawn_dim.is_some().then(|| {
         quote! { spawn_dim_meta: self.spawn_dim_meta(), }
     });
 
@@ -123,12 +123,12 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::job_beta;
+    use crate::test_utils::simple_pipeline::task_beta;
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/spec/fn_prepare_rebuild.rs")]
-    fn test_fn_prepare_rebuild(#[case] job: JobConfig, #[case] fixture_path: &str) {
-        let item = fn_prepare_rebuild(&job);
+    #[case::simple(task_beta(), "spec/spec/fn_prepare_rebuild.rs")]
+    fn test_fn_prepare_rebuild(#[case] task: TaskConfig, #[case] fixture_path: &str) {
+        let item = fn_prepare_rebuild(&task);
         assert_item_eq(&item, fixture_path);
     }
 }

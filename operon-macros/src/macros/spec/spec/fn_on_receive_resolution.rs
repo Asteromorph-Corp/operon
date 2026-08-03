@@ -1,7 +1,7 @@
 use indexmap::IndexSet;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::TaskConfig;
 use crate::utils::{
     dimension_metadata_ident, operon_ident, resolution_enum_ident, sender_ident, ticket_enum_ident,
     to_lit_str, to_pascal_case,
@@ -57,28 +57,28 @@ use crate::utils::{
 /// }
 /// ```
 pub(super) fn fn_on_receive_resolution(
-    job: &JobConfig,
-    downstream_jobs: &IndexSet<&JobConfig>,
+    task: &TaskConfig,
+    downstream_tasks: &IndexSet<&TaskConfig>,
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
     let ticket_enum_ident = ticket_enum_ident();
-    let task_id = to_lit_str(&job.id);
+    let task_id = to_lit_str(&task.id);
 
-    let explode_arms = job.dims.iter().enumerate().map(|(idx, dim)| -> syn::Arm {
+    let explode_arms = task.dims.iter().enumerate().map(|(idx, dim)| -> syn::Arm {
         let res_variant_ident = to_pascal_case(dim);
-        let ticket_variant_ident = to_pascal_case(&job.id);
+        let ticket_variant_ident = to_pascal_case(&task.id);
         let dim_meta = dimension_metadata_ident(dim);
-        let send_explosions = downstream_jobs.iter().flat_map(|downstream_job| {
-            let cnt = downstream_job.from.iter().filter(|arg| arg.id == job.to && arg.over.contains(dim)).count();
-            let sender_ident = sender_ident(&downstream_job.id);
+        let send_explosions = downstream_tasks.iter().flat_map(|downstream_task| {
+            let cnt = downstream_task.from.iter().filter(|arg| arg.id == task.to && arg.over.contains(dim)).count();
+            let sender_ident = sender_ident(&downstream_task.id);
             let ok_msg = format!(
                 "`{}` sent peer event to `{}`: {{resolution:?}}",
-                job.id, downstream_job.id
+                task.id, downstream_task.id
             );
             let err_msg = format!(
                 "`{}`'s peer channel closed before handling `{}`'s {{resolution:?}}",
-                downstream_job.id, job.id
+                downstream_task.id, task.id
             );
             let dim_str = to_lit_str(dim);
             let stmt: syn::Stmt = parse_quote! {
@@ -130,20 +130,20 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobConfigMap;
-    use crate::dependency_analysis::get_direct_downstream_jobs;
+    use crate::configs::TaskConfigMap;
+    use crate::dependency_analysis::get_direct_downstream_tasks;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{all_jobs, job_delta};
+    use crate::test_utils::simple_pipeline::{all_tasks, task_delta};
 
     #[rstest]
-    #[case::simple(job_delta(), "spec/spec/fn_on_receive_resolution.rs")]
+    #[case::simple(task_delta(), "spec/spec/fn_on_receive_resolution.rs")]
     fn test_fn_on_receive_resolution(
-        all_jobs: JobConfigMap,
-        #[case] job: JobConfig,
+        all_tasks: TaskConfigMap,
+        #[case] task: TaskConfig,
         #[case] fixture_path: &str,
     ) {
-        let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
-        let item = fn_on_receive_resolution(&job, &downstream_jobs);
+        let downstream_tasks = get_direct_downstream_tasks(&task, &all_tasks);
+        let item = fn_on_receive_resolution(&task, &downstream_tasks);
         assert_item_eq(&item, fixture_path);
     }
 }

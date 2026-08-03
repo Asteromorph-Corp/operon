@@ -43,8 +43,8 @@ mod tests {
 
     #[rstest]
     #[case(dimension_j(), "metadata/dimension.rs")]
-    fn test_dimension_metadata(#[case] job: DimensionConfig, #[case] fixture_path: &str) {
-        let result = dimension_metadata(&job);
+    fn test_dimension_metadata(#[case] task: DimensionConfig, #[case] fixture_path: &str) {
+        let result = dimension_metadata(&task);
         assert_item_eq(&result, fixture_path);
     }
 }

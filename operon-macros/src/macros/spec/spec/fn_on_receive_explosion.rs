@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::TaskConfig;
 use crate::utils::{
     operon_ident, task_metadata_ident, ticket_enum_ident, to_lit_str, to_pascal_case,
 };
@@ -30,21 +30,21 @@ use crate::utils::{
 /// }
 /// ```
 pub(super) fn fn_on_receive_explosion(
-    job: &JobConfig,
-    upstream_jobs: &IndexSet<&JobConfig>,
+    task: &TaskConfig,
+    upstream_tasks: &IndexSet<&TaskConfig>,
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let ticket_enum_ident = ticket_enum_ident();
-    let task_id = to_lit_str(&job.id);
+    let task_id = to_lit_str(&task.id);
 
-    let arms = upstream_jobs.into_iter().map(|upstream_job| -> syn::Arm {
-        let variant_ident = to_pascal_case(&upstream_job.id);
-        let task_meta = task_metadata_ident(&upstream_job.id);
+    let arms = upstream_tasks.into_iter().map(|upstream_task| -> syn::Arm {
+        let variant_ident = to_pascal_case(&upstream_task.id);
+        let task_meta = task_metadata_ident(&upstream_task.id);
 
-        let raise_quotas = job
+        let raise_quotas = task
             .from
             .iter()
-            .filter(|arg| arg.id == upstream_job.to)
+            .filter(|arg| arg.id == upstream_task.to)
             .map(|arg| {
                 let over = arg.over.iter().map(to_lit_str);
                 quote! {
@@ -88,21 +88,21 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::configs::JobConfigMap;
-    use crate::dependency_analysis::get_direct_upstream_jobs;
+    use crate::configs::TaskConfigMap;
+    use crate::dependency_analysis::get_direct_upstream_tasks;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::all_jobs;
+    use crate::test_utils::simple_pipeline::all_tasks;
 
     #[rstest]
     #[case::simple(format_ident!("epsilon"), "spec/spec/fn_on_receive_explosion.rs")]
     fn test_fn_on_receive_explosion(
-        all_jobs: JobConfigMap,
+        all_tasks: TaskConfigMap,
         #[case] task_id: syn::Ident,
         #[case] fixture_path: &str,
     ) {
-        let job = all_jobs.get(&task_id).unwrap();
-        let upstream_jobs = get_direct_upstream_jobs(job, &all_jobs);
-        let item = fn_on_receive_explosion(job, &upstream_jobs);
+        let task = all_tasks.get(&task_id).unwrap();
+        let upstream_tasks = get_direct_upstream_tasks(task, &all_tasks);
+        let item = fn_on_receive_explosion(task, &upstream_tasks);
         assert_item_eq(&item, fixture_path);
     }
 }
