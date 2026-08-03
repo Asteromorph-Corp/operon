@@ -68,11 +68,9 @@ where
     ) -> Result<Option<RunMetadata>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let meta_conn = self.ctx.meta_storage.scheduler_conn().await?;
 
-        // Get footprints from both storages.
         let data_footprint = self.ctx.storage.get_footprint().await?;
         let meta_footprint = meta_conn.as_client().get_footprint().await?;
 
-        // Early return if the state can be inferred through the footprints.
         match (data_footprint, meta_footprint) {
             (Some(df), Some(mf)) if df == mf => return Ok(Some(mf.metadata)),
             (Some(df), Some(mf)) if df != mf => {
@@ -109,10 +107,6 @@ where
 
     async fn execute(self) -> Result<NextState<Self::Error>, Self::Error> {
         let RunMetadata { run_id, state } = self.get_run_metadata().await?.unwrap_or_default();
-
-        // if self.ui_mode == UiMode::Headless {
-        //     return Ok(NextState::next(self.into_fresh(run_id)));
-        // }
 
         let next = match state {
             RunState::Fresh => NextState::next(self.into_fresh(run_id)),

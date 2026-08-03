@@ -470,29 +470,6 @@ mod test {
         assert_eq!(stmt, expected);
     }
 
-    // #[rstest]
-    // #[case::simple(
-    //     JobArg {
-    //         id: "d".to_string(),
-    //         over: vec!["j".to_string()],
-    //     },
-    //     entity_d(),
-    //     indoc! {"
-    //         SELECT value, j
-    //         FROM {schema_prefix}d
-    //         WHERE i = $1 AND k = $2
-    //         ORDER BY j"
-    //     },
-    // )]
-    // fn test_batch_get_query(
-    //     #[case] job_arg: JobArg,
-    //     #[case] entity: EntityConfig,
-    //     #[case] expected: &str,
-    // ) {
-    //     let stmt = BatchGetQuery(&job_arg, &entity).to_string();
-    //     assert_eq!(stmt, expected);
-    // }
-
     #[rstest]
     #[case::simple(
         entity_b(),

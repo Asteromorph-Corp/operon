@@ -22,7 +22,6 @@ pub fn job_enum_definition(tasks: &TaskConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
     let variants = tasks.values().map(|task| -> syn::Variant {
-        // TODO: Fix this
         let variant_ident = to_pascal_case(&task.id);
         let n = task.dims.len();
         parse_quote! {

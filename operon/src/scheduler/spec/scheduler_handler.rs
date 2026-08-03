@@ -56,9 +56,8 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         Self { task_handlers }
     }
 
-    /// Eagerly resolve every handler's pool size, panicking immediately if an
-    /// environment variable is missing or invalid rather than waiting until
-    /// the user issues a `run` command.
+    /// Resolves every handler's pool size as the engine starts, so an environment variable that is
+    /// missing or invalid panics before the user reaches the `run` command.
     pub(crate) fn validate_pool_sizes(&self) {
         for handler in &self.task_handlers {
             let _ = handler.pool_size();

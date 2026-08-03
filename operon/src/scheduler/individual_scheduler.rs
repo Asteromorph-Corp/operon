@@ -174,7 +174,6 @@ where
         ctrl_rx: IndividualControlEventReceiver,
         clean: bool,
     ) {
-        // Create an internal channel for `InternalEvent`s.
         let peer_txs = TS::PeerEventSenders::gather_from(peer_tx_map);
 
         let Ok(initial_tickets) = self.initial_ready_tickets().await else {
@@ -188,7 +187,6 @@ where
             return;
         }
 
-        // Update the UI state before entering the loop.
         if let Err(e) = self.update_progress().await {
             tracing::error!("Failed to update UI state after initial data processing: {e}");
             self.set_state(TaskState::Error).await;
@@ -229,7 +227,6 @@ where
             }
         }
 
-        // Update the UI state one last time.
         if let Err(e) = self.update_progress().await {
             tracing::error!("Failed to update UI state after scheduler run: {e}");
             self.set_state(TaskState::Error).await;
@@ -303,19 +300,15 @@ where
                     self.update_progress().await?;
                     match int_event {
                         InternalEvent::JobSuccess(job, resolution) => {
-                            // Trace the job success
                             tracing::trace!(
                                 "{} received internal event: JobSuccess({job:?}, {resolution:?}).",
                                 self.meta.id
                             );
 
-                            // Broadcast the job result events
                             self.spec.send_on_finish(peer_txs, job, resolution).await?;
                         }
                         InternalEvent::JobFailure(job, e) => {
-                            // Log the error
                             tracing::error!("Job {job:?} failed: {e}");
-                            // Return the error to the top-level scheduler
                             return Err(e);
                         }
                     }
@@ -325,7 +318,6 @@ where
                 event = peer_rx.recv(), if !got_all_peer_events => {
                     match event {
                         Some(evt) => {
-                            // Trace the peer event
                             tracing::trace!(
                                 "{} received peer event: {evt:?}; \
                                 Peer channel has {} events left.",
@@ -360,19 +352,16 @@ where
 
                     // Move the permit into the task so it is released on drop.
                     self.handles.spawn(async move {
-                        // Trace the job start.
                         tracing::trace!("Running job {job:?} in `{task_id}` scheduler.");
                         let _permit = permit;
                         match spec.run_job(&*service, &*storage, meta_storage, job).await {
                             Ok(resolution) => {
-                                // Alert the results to the scheduler
                                 tracing::trace!(
                                     "{task_id} worker exited with: JobSuccess({job:?}, {resolution:?}).",
                                 );
                                 Ok(InternalEvent::JobSuccess(job, resolution))
                             }
                             Err(e) => {
-                                // Alert the error to the scheduler
                                 tracing::trace!(
                                     "{task_id} worker exited with: JobFailure({job:?}, {e:?});",
                                 );

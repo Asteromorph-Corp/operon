@@ -9,8 +9,8 @@ pub enum Direction {
 }
 
 impl Direction {
-    /// Applies the direction to `ord`: no-op for `Descending` (higher values
-    /// win in the max-heap), reversed for `Ascending` (lower values win).
+    /// Applies the direction to `ord`: `Descending` keeps it (higher values win in the max-heap),
+    /// `Ascending` reverses it (lower values win).
     pub fn apply(self, ord: Ordering) -> Ordering {
         match self {
             Direction::Descending => ord,

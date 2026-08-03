@@ -75,7 +75,7 @@ where
     fn default_ticket(&self) -> Self::Ticket;
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
-    /// Return `true` if the data storage holds all needed data to restore, `false` if it does not.
+    /// Return `true` if the data storage holds everything needed to restore.
     async fn check_consistency(
         &self,
         storage: &Sto,

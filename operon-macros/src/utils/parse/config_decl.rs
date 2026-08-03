@@ -86,8 +86,5 @@ mod tests {
             .map(|input| parse_str::<ConfigDecl>(input))
             .collect::<Vec<_>>();
         assert!(results.iter().all(|result| result.is_err()));
-        // for result in results {
-        //     println!("Result: {result:?}");
-        // }
     }
 }
