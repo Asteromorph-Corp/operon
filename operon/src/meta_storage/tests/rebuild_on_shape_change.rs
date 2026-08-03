@@ -129,7 +129,7 @@ async fn ticket_table_is_rebuilt_when_a_job_gains_a_dimension() {
             .shape()
             .await
             .expect("wide shape"),
-        TableShape::Stale
+        TableShape::STALE
     );
     client
         .ticket(delta_over_i_j())
@@ -142,7 +142,7 @@ async fn ticket_table_is_rebuilt_when_a_job_gains_a_dimension() {
             .shape()
             .await
             .expect("wide shape after init"),
-        TableShape::Current
+        TableShape::CURRENT
     );
 
     assert_eq!(
@@ -227,7 +227,7 @@ async fn resolution_table_is_rebuilt_when_a_dimension_gains_a_dependency() {
             .shape()
             .await
             .expect("wide shape"),
-        TableShape::Stale
+        TableShape::STALE
     );
     client
         .resolution(dim_j_over_i())
@@ -240,7 +240,7 @@ async fn resolution_table_is_rebuilt_when_a_dimension_gains_a_dependency() {
             .shape()
             .await
             .expect("wide shape after init"),
-        TableShape::Current
+        TableShape::CURRENT
     );
 
     assert_eq!(

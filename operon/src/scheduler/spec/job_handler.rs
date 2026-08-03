@@ -145,13 +145,13 @@ where
         client: MSto::Client<'_>,
     ) -> Result<TableShape, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() else {
-            return Ok(TableShape::Current);
+            return Ok(TableShape::CURRENT);
         };
         let id = spawn_dim_meta.id;
         let resolution = client.resolution(spawn_dim_meta);
 
         let shape = resolution.shape().await?;
-        if shape.is_stale() {
+        if shape.is_stale {
             tracing::warn!(
                 "Dimension `{id}` changed shape, so its resolutions are discarded. \
                  A rebuild will discard progress of all jobs over `{id}`."
@@ -180,7 +180,7 @@ where
         let ticket = client.ticket(self.job_meta);
 
         let shape = ticket.shape().await?;
-        if shape.is_stale() {
+        if shape.is_stale {
             tracing::warn!(
                 "Task `{id}` changed shape, so its tickets are discarded. \
                  A rebuild will discard progress of all `{id}` and downstream jobs."

@@ -136,11 +136,11 @@ pub trait MetaTicketApi<const N: usize> {
 
     /// Whether the ticket table matches the shape of the job it was built under.
     ///
-    /// A [`Stale`](TableShape::Stale) table is rebuilt by [`init`](Self::init), which discards the
+    /// A [`STALE`](TableShape::STALE) table is rebuilt by [`init`](Self::init), which discards the
     /// tickets in it.
-    /// Backends that keep no record of the shape should report [`Current`](TableShape::Current).
+    /// Backends that keep no record of the shape should report [`CURRENT`](TableShape::CURRENT).
     fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
-        async { Ok(TableShape::Current) }
+        async { Ok(TableShape::CURRENT) }
     }
     fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
     fn clear(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
@@ -179,11 +179,11 @@ pub trait MetaResolutionApi<const N: usize> {
 
     /// Whether the resolution table matches the shape of the dimension it was built under.
     ///
-    /// A [`Stale`](TableShape::Stale) table is rebuilt by [`init`](Self::init), which discards the
+    /// A [`STALE`](TableShape::STALE) table is rebuilt by [`init`](Self::init), which discards the
     /// resolutions in it.
-    /// Backends that keep no record of the shape should report [`Current`](TableShape::Current).
+    /// Backends that keep no record of the shape should report [`CURRENT`](TableShape::CURRENT).
     fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
-        async { Ok(TableShape::Current) }
+        async { Ok(TableShape::CURRENT) }
     }
     fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
     fn clear(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;

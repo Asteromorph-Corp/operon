@@ -81,7 +81,7 @@ where
     pub async fn work(mut self) -> SchedulerResult<(), Svc::Error, Sto::Error, MSto::Error> {
         self.ctx.meta_storage.ensure_lock().await?;
         self.ctx.storage.init().await?;
-        if self.init_meta_storage().await?.is_stale() {
+        if self.init_meta_storage().await?.is_stale {
             self.abort_recorded_run().await?;
         }
 
@@ -127,7 +127,7 @@ where
 
     /// An helper function to call `self.spec.init_meta_storage` with a transaction.
     ///
-    /// Returns [`Stale`](TableShape::Stale) if any job or dimension changed shape, discarding what
+    /// Returns [`STALE`](TableShape::STALE) if any job or dimension changed shape, discarding what
     /// its table held.
     async fn init_meta_storage(
         &self,

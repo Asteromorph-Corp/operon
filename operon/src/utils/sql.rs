@@ -129,11 +129,11 @@ pub fn recorded_hash_query(
 
 /// The shape of the table `recorded` was recorded for, against the current `metadata`.
 ///
-/// [`Stale`](TableShape::Stale) is the condition [`replace_if_updated`] rebuilds a table under.
+/// [`STALE`](TableShape::STALE) is the condition [`replace_if_updated`] rebuilds a table under.
 pub fn table_shape<T: Hash>(recorded: Option<&str>, metadata: &T) -> TableShape {
     match recorded {
-        Some(hash) if hash != hash_metadata(metadata) => TableShape::Stale,
-        _ => TableShape::Current,
+        Some(hash) if hash != hash_metadata(metadata) => TableShape::STALE,
+        _ => TableShape::CURRENT,
     }
 }
 

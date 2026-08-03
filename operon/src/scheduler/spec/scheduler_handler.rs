@@ -94,7 +94,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
 
     /// Initializes every metadata table the run needs.
     ///
-    /// Returns [`Stale`](TableShape::Stale) if any job or dimension changed shape, discarding what
+    /// Returns [`STALE`](TableShape::STALE) if any job or dimension changed shape, discarding what
     /// its table held.
     pub(crate) async fn init_meta_storage(
         &self,
@@ -103,23 +103,25 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         client.init_schema().await?;
         client.init_dimension_hash().await?;
         client.init_ticket_hash().await?;
-        let resolution_shape = futures::stream::iter(&self.job_handlers)
+        let resolution_is_stale = futures::stream::iter(&self.job_handlers)
             .then(|job_handler| async { job_handler.init_resolution(client).await })
-            .try_fold(TableShape::Current, |shape, job_shape| async move {
-                Ok(shape.merge(job_shape))
+            .try_fold(false, |was_stale, shape| async move {
+                Ok(was_stale || shape.is_stale)
             })
             .await?;
         client.init_ticket_summary().await?;
         client.init_ticket_status_type().await?;
-        let ticket_shape = futures::stream::iter(&self.job_handlers)
+        let ticket_is_stale = futures::stream::iter(&self.job_handlers)
             .then(|job_handler| async { job_handler.init_tickets(client).await })
-            .try_fold(TableShape::Current, |shape, job_shape| async move {
-                Ok(shape.merge(job_shape))
+            .try_fold(false, |was_stale, shape| async move {
+                Ok(was_stale || shape.is_stale)
             })
             .await?;
         client.init_footprint().await?;
 
-        Ok(TableShape::merge(resolution_shape, ticket_shape))
+        Ok(TableShape {
+            is_stale: resolution_is_stale || ticket_is_stale,
+        })
     }
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
