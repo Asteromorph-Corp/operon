@@ -176,8 +176,8 @@ pub trait MetaTicketApi<const N: usize> {
     /// Prepares this task's tickets, keeping the ones a previous run left behind.
     ///
     /// The scheduler calls this on every start.
-    /// Tickets held under a [`Stale`](TableShape::Stale) shape are discarded instead of kept, since
-    /// they no longer describe the task.
+    /// Tickets held under a [`STALE`](TableShape::STALE) shape are discarded, since the task they
+    /// describe has changed shape.
     fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
 
     /// Discards every ticket of this task, leaving what [`init`](Self::init) prepared in place.
@@ -249,12 +249,12 @@ pub trait MetaResolutionApi<const N: usize> {
     fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
         async { Ok(TableShape::CURRENT) }
     }
-    
+
     /// Prepares this dimension's resolutions, keeping the ones a previous run left behind.
     ///
     /// The scheduler calls this on every start.
-    /// Resolutions held under a [`Stale`](TableShape::Stale) shape are discarded instead of kept,
-    /// since they no longer describe the dimension.
+    /// Resolutions held under a [`STALE`](TableShape::STALE) shape are discarded, since the
+    /// dimension they describe has changed shape.
     fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
 
     /// Discards every resolution of this dimension, leaving what [`init`](Self::init) prepared in
