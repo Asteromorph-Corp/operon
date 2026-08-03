@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::meta_storage::{MetaBackend, MetaConnApi, MetaTxApi};
 use crate::scheduler::context::SchedulerContext;
-use crate::scheduler::events::{ControlEvent, ControlEventReceiver, SchedulerStateSender};
+use crate::scheduler::events::{ControlEventReceiver, SchedulerStateSender};
 use crate::scheduler::states::{InitTransition, NextState, SchedulerState};
 use crate::scheduler::{SchedulerError, SchedulerHandler};
 use crate::schema::SharedProgressMap;
@@ -16,12 +16,6 @@ type SchedulerResult<T, UErr, SErr, MErr> = Result<T, SchedulerError<UErr, SErr,
 /// A boxed scheduler state keyed by the scheduler's composite error.
 type BoxedState<UErr, SErr, MErr> =
     Box<dyn SchedulerState<Error = SchedulerError<UErr, SErr, MErr>>>;
-
-/// What woke the scheduler loop.
-enum WakeupEvent {
-    Progress,
-    Control(ControlEvent),
-}
 
 /// # Scheduler
 ///
@@ -96,23 +90,16 @@ where
         );
 
         loop {
-            let wake = tokio::select! {
+            let next = tokio::select! {
                 result = state.wait_progress() => {
                     result?;
-                    WakeupEvent::Progress
+                    state.handle_progress().await?
                 }
-                Some(evt) = self.ctrl_rx.recv() => WakeupEvent::Control(evt),
+                Some(evt) = self.ctrl_rx.recv() => state.handle_control_event(evt).await?,
                 _ = lock_heartbeat.tick() => {
-                    heartbeat_handle
-                        .check_lock()
-                        .await?;
+                    heartbeat_handle.check_lock().await?;
                     continue;
                 }
-            };
-
-            let next = match wake {
-                WakeupEvent::Progress => state.handle_progress().await?,
-                WakeupEvent::Control(evt) => state.handle_control_event(evt).await?,
             };
 
             match next {
