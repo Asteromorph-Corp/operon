@@ -4,7 +4,7 @@ use crate::meta_storage::MetaBackend;
 use crate::scheduler::events::PeerEventSenders;
 use crate::scheduler::{SchedulerError, TaskRebuilder};
 use crate::schema::{
-    CheckMode, JobLike, JobMetadata, ResolutionLike, SharedProgress, TicketExplosion, TicketLike,
+    CheckMode, JobLike, ResolutionLike, SharedProgress, TaskMetadata, TicketExplosion, TicketLike,
 };
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -20,7 +20,7 @@ impl<Svc, Sto, TS, const N: usize> SpecWithMetadata<Svc, Sto, TS, N> {
     pub fn new(spec: TS, task_meta: TaskMetadata<N>) -> Self {
         Self {
             spec,
-            job_meta,
+            task_meta,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -33,7 +33,7 @@ where
     fn clone(&self) -> Self {
         Self {
             spec: self.spec.clone(),
-            job_meta: self.job_meta,
+            task_meta: self.task_meta,
             _phantom: std::marker::PhantomData,
         }
     }

@@ -35,8 +35,8 @@ pub fn sql_storage_ident(service_id: &syn::Ident) -> syn::Ident {
     format_ident!("Psql{}Storage", service_id.to_string().to_pascal_case())
 }
 
-pub fn job_metadata_ident(job_id: &syn::Ident) -> syn::Ident {
-    format_ident!("job_{}_meta", job_id.to_string().to_snake_case())
+pub fn task_metadata_ident(job_id: &syn::Ident) -> syn::Ident {
+    format_ident!("task_{}_meta", job_id.to_string().to_snake_case())
 }
 
 pub fn dimension_metadata_ident(dimension_id: &syn::Ident) -> syn::Ident {

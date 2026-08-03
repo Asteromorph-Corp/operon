@@ -4,7 +4,7 @@ use syn::parse_quote;
 
 use crate::configs::JobConfig;
 use crate::utils::{
-    job_metadata_ident, operon_ident, ticket_enum_ident, to_lit_str, to_pascal_case,
+    operon_ident, task_metadata_ident, ticket_enum_ident, to_lit_str, to_pascal_case,
 };
 
 /// Generates the `on_receive_explosion` function for the implementation of the trait `TaskSpec`.
@@ -19,7 +19,7 @@ use crate::utils::{
 /// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///     match resolution {
 ///         schema::ResolutionEnum::J(res) => Ok(client
-///             .ticket(self.job_meta())
+///             .ticket(self.task_meta())
 ///             .raise_deps_quota(metadata::dimension_j_meta(), res)
 ///             .await?),
 ///         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
@@ -39,7 +39,7 @@ pub(super) fn fn_on_receive_explosion(
 
     let arms = upstream_jobs.into_iter().map(|upstream_job| -> syn::Arm {
         let variant_ident = to_pascal_case(&upstream_job.id);
-        let job_meta = job_metadata_ident(&upstream_job.id);
+        let task_meta = task_metadata_ident(&upstream_job.id);
 
         let raise_quotas = job
             .from
@@ -50,8 +50,8 @@ pub(super) fn fn_on_receive_explosion(
                 quote! {
                     let aggregate_dims = [#(#over),*];
                     if aggregate_dims.contains(&explosion.dim) {
-                        let tickets = client.ticket(self.job_meta())
-                            .raise_deps_quota(metadata::#job_meta(), ticket, &aggregate_dims, explosion.ub)
+                        let tickets = client.ticket(self.task_meta())
+                            .raise_deps_quota(metadata::#task_meta(), ticket, &aggregate_dims, explosion.ub)
                             .await?;
                         out.extend(tickets);
                     }

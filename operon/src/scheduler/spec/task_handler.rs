@@ -134,7 +134,7 @@ where
     TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>> + Clone,
 {
     fn job_id(&self) -> &'static str {
-        self.job_meta.id
+        self.task_meta.id
     }
 
     fn all_upstream_tasks(&self) -> Vec<&'static str> {
@@ -149,7 +149,7 @@ where
         &self,
         client: MSto::Client<'_>,
     ) -> Result<TableShape, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() else {
+        let Some(spawn_dim_meta) = self.task_meta.spawn_dim_meta() else {
             return Ok(TableShape::CURRENT);
         };
         let id = spawn_dim_meta.id;
@@ -171,7 +171,7 @@ where
         &self,
         client: MSto::Client<'_>,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        if let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() {
+        if let Some(spawn_dim_meta) = self.task_meta.spawn_dim_meta() {
             client.resolution(spawn_dim_meta).clear().await?;
         }
         Ok(())
@@ -181,8 +181,8 @@ where
         &self,
         client: MSto::Client<'_>,
     ) -> Result<TableShape, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        let id = self.job_meta.id;
-        let ticket = client.ticket(self.job_meta);
+        let id = self.task_meta.id;
+        let ticket = client.ticket(self.task_meta);
 
         let shape = ticket.shape().await?;
         if shape.is_stale {
@@ -200,7 +200,7 @@ where
         &self,
         client: MSto::Client<'_>,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        client.ticket(self.job_meta).clear().await?;
+        client.ticket(self.task_meta).clear().await?;
         Ok(())
     }
 
@@ -209,7 +209,7 @@ where
         client: MSto::Client<'_>,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let default_ticket = self.spec.default_ticket();
-        client.ticket(self.job_meta).put(default_ticket).await?;
+        client.ticket(self.task_meta).put(default_ticket).await?;
         Ok(())
     }
 
@@ -217,7 +217,7 @@ where
         &self,
         client: MSto::Client<'_>,
     ) -> Result<(i64, i64, i64), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        let status = client.ticket(self.job_meta).get_status().await?;
+        let status = client.ticket(self.task_meta).get_status().await?;
         Ok(status)
     }
 

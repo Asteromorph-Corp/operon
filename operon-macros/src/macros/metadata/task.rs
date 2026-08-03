@@ -3,14 +3,14 @@ use syn::parse_quote;
 
 use crate::configs::{Direction, JobConfig};
 use crate::operon_ident;
-use crate::utils::{job_metadata_ident, to_lit_str};
+use crate::utils::{task_metadata_ident, to_lit_str};
 
 /// Generates a metadata function for a job.
 ///
 /// # Example
 /// ```rust,ignore
-/// pub const fn job_beta_meta() -> operon::__private::JobMetadata<1usize> {
-///     operon::__private::JobMetadata {
+/// pub const fn task_beta_meta() -> operon::__private::TaskMetadata<1usize> {
+///     operon::__private::TaskMetadata {
 ///         id: "beta",
 ///         dims: ["i"],
 ///         spawn_dim: Some("j"),
@@ -18,9 +18,9 @@ use crate::utils::{job_metadata_ident, to_lit_str};
 ///     }
 /// }
 /// ```
-pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
+pub fn task_metadata(job: &JobConfig) -> syn::ItemFn {
     let operon = operon_ident();
-    let fn_name = job_metadata_ident(&job.id);
+    let fn_name = task_metadata_ident(&job.id);
     let n = job.dims.len();
     let id = to_lit_str(&job.id);
     let dims = job.dims.iter().map(to_lit_str);
@@ -41,8 +41,8 @@ pub fn job_metadata(job: &JobConfig) -> syn::ItemFn {
     });
 
     parse_quote! {
-        pub const fn #fn_name() -> #operon::__private::JobMetadata<#n> {
-            #operon::__private::JobMetadata {
+        pub const fn #fn_name() -> #operon::__private::TaskMetadata<#n> {
+            #operon::__private::TaskMetadata {
                 id: #id,
                 dims: [#(#dims),*],
                 spawn_dim: #spawn_dim,
@@ -69,10 +69,10 @@ mod tests {
     }
 
     #[rstest]
-    #[case(job_beta(), "metadata/job.rs")]
-    #[case(job_beta_with_priority(), "metadata/job.with_priority.rs")]
+    #[case(job_beta(), "metadata/task.rs")]
+    #[case(job_beta_with_priority(), "metadata/task.with_priority.rs")]
     fn test_job_metadata(#[case] job: JobConfig, #[case] fixture_path: &str) {
-        let result = job_metadata(&job);
+        let result = task_metadata(&job);
         assert_item_eq(&result, fixture_path);
     }
 }

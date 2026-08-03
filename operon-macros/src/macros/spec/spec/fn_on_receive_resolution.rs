@@ -20,7 +20,7 @@ use crate::utils::{
 /// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///     match resolution {
 ///         schema::ResolutionEnum::I(res) => Ok(client
-///             .ticket(self.job_meta())
+///             .ticket(self.task_meta())
 ///             .explode::<_, 0usize>(metadata::dimension_i_meta(), res)
 ///             .await?),
 ///         schema::ResolutionEnum::J(res) => {
@@ -41,12 +41,12 @@ use crate::utils::{
 ///                 }
 ///             }
 ///             Ok(client
-///                 .ticket(self.job_meta())
+///                 .ticket(self.task_meta())
 ///                 .explode::<_, 1usize>(metadata::dimension_j_meta(), res)
 ///                 .await?)
 ///         }
 ///         schema::ResolutionEnum::K(res) => Ok(client
-///             .ticket(self.job_meta())
+///             .ticket(self.task_meta())
 ///             .explode::<_, 2usize>(metadata::dimension_k_meta(), res)
 ///             .await?),
 ///         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
@@ -100,7 +100,7 @@ pub(super) fn fn_on_receive_resolution(
 
         parse_quote! {
             schema::#res_enum_ident::#res_variant_ident(res) => {
-                let affected = client.ticket(self.job_meta()).explode::<_, #idx>(metadata::#dim_meta(), res).await?;
+                let affected = client.ticket(self.task_meta()).explode::<_, #idx>(metadata::#dim_meta(), res).await?;
                 for ticket in affected {
                     #(#send_explosions)*
                 }

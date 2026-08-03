@@ -12,14 +12,14 @@ use crate::meta_storage::tests::utils::psql_backend;
 use crate::meta_storage::{
     MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi,
 };
-use crate::schema::{DimensionMetadata, Job, JobMetadata, Resolution, Ticket, TicketStatus};
+use crate::schema::{DimensionMetadata, Job, Resolution, TaskMetadata, Ticket, TicketStatus};
 
 /// The schema the differential sequences own outright.
 const SCHEMA: &str = "operon_differential";
 
 /// A task with no dimensions, spawning the dimension `i`.
-fn job_alpha() -> JobMetadata<0> {
-    JobMetadata {
+fn job_alpha() -> TaskMetadata<0> {
+    TaskMetadata {
         id: "alpha",
         dims: [],
         spawn_dim: Some("i"),
@@ -28,8 +28,8 @@ fn job_alpha() -> JobMetadata<0> {
 }
 
 /// A task over `i`, downstream of `alpha`.
-fn job_beta() -> JobMetadata<1> {
-    JobMetadata {
+fn job_beta() -> TaskMetadata<1> {
+    TaskMetadata {
         id: "beta",
         dims: ["i"],
         spawn_dim: None,
@@ -38,8 +38,8 @@ fn job_beta() -> JobMetadata<1> {
 }
 
 /// A task over `i`, downstream of `beta`, used to pin `raise_deps_done` to one coordinate.
-fn job_gamma() -> JobMetadata<1> {
-    JobMetadata {
+fn job_gamma() -> TaskMetadata<1> {
+    TaskMetadata {
         id: "gamma",
         dims: ["i"],
         spawn_dim: None,
@@ -51,8 +51,8 @@ fn job_gamma() -> JobMetadata<1> {
 ///
 /// Its upstreams pin a proper subset of its dimensions, which is the query shape a single-dimension
 /// job cannot produce.
-fn job_delta() -> JobMetadata<2> {
-    JobMetadata {
+fn job_delta() -> TaskMetadata<2> {
+    TaskMetadata {
         id: "delta",
         dims: ["i", "j"],
         spawn_dim: None,
@@ -61,8 +61,8 @@ fn job_delta() -> JobMetadata<2> {
 }
 
 /// An upstream of `delta` over `j` alone.
-fn job_over_j() -> JobMetadata<1> {
-    JobMetadata {
+fn job_over_j() -> TaskMetadata<1> {
+    TaskMetadata {
         id: "over_j",
         dims: ["j"],
         spawn_dim: None,

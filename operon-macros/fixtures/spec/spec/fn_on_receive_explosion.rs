@@ -10,9 +10,9 @@ async fn on_receive_explosion(
             let aggregate_dims = ["j"];
             if aggregate_dims.contains(&explosion.dim) {
                 let tickets = client
-                    .ticket(self.job_meta())
+                    .ticket(self.task_meta())
                     .raise_deps_quota(
-                        metadata::job_beta_meta(),
+                        metadata::task_beta_meta(),
                         ticket,
                         &aggregate_dims,
                         explosion.ub,
@@ -27,9 +27,9 @@ async fn on_receive_explosion(
             let aggregate_dims = ["j"];
             if aggregate_dims.contains(&explosion.dim) {
                 let tickets = client
-                    .ticket(self.job_meta())
+                    .ticket(self.task_meta())
                     .raise_deps_quota(
-                        metadata::job_delta_meta(),
+                        metadata::task_delta_meta(),
                         ticket,
                         &aggregate_dims,
                         explosion.ub,

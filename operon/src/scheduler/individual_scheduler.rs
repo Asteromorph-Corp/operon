@@ -12,7 +12,7 @@ use crate::scheduler::events::{
 };
 use crate::scheduler::queue::{AnyJobQueue, JobQueue};
 use crate::scheduler::{SchedulerError, SpecWithMetadata, TaskSpec};
-use crate::schema::{Job, JobMetadata, SharedProgress, TaskState, Ticket, TicketStatus};
+use crate::schema::{Job, SharedProgress, TaskMetadata, TaskState, Ticket, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -69,7 +69,7 @@ where
     ) -> Self {
         Self {
             spec: spec.spec,
-            meta: spec.job_meta,
+            meta: spec.task_meta,
             storage,
             service,
             meta_storage,

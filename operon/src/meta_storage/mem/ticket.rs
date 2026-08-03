@@ -6,7 +6,7 @@ use crate::meta_storage::mem::error::{MemMetaError, MemResult};
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
+    DimensionMetadata, Job, OptionCoordinate, Resolution, TaskMetadata, Ticket, TicketStatus,
 };
 
 /// A ticket's primary key: its coordinate, with unresolved dimensions left as `None`.
@@ -168,7 +168,7 @@ impl PinMask {
     /// A dimension is pinned when it belongs to this task, is not aggregated, and carries a
     /// resolved value; every other dimension stays free.
     fn project<const N: usize>(
-        job_meta: JobMetadata<N>,
+        task_meta: TaskMetadata<N>,
         pins: impl IntoIterator<Item = (&'static str, OptionCoordinate)>,
         aggregate_dims: &[&'static str],
     ) -> (Self, TicketKey) {
@@ -181,7 +181,7 @@ impl PinMask {
             let Some(value) = coord.0 else {
                 continue;
             };
-            let Some(idx) = job_meta.dims.iter().position(|d| *d == dim) else {
+            let Some(idx) = task_meta.dims.iter().position(|d| *d == dim) else {
                 continue;
             };
             slots[idx] = PinSlot::Pinned;
@@ -217,18 +217,18 @@ type PinIndex = HashMap<TicketKey, HashSet<TicketKey>>;
 /// Helper struct for querying the in-memory tickets of a task.
 pub struct MemTicketQueryBuilder<'a, const N: usize> {
     store: &'a MemStore,
-    job_meta: JobMetadata<N>,
+    task_meta: TaskMetadata<N>,
 }
 
 impl MemStore {
     /// Helper method to create a `MemTicketQueryBuilder` for the tickets of a given task.
     pub(super) fn ticket<const N: usize>(
         &self,
-        job_meta: JobMetadata<N>,
+        task_meta: TaskMetadata<N>,
     ) -> MemTicketQueryBuilder<'_, N> {
         MemTicketQueryBuilder {
             store: self,
-            job_meta,
+            task_meta,
         }
     }
 }
@@ -236,7 +236,7 @@ impl MemStore {
 impl<const N: usize> MemTicketQueryBuilder<'_, N> {
     /// The table this task's tickets live in, if it has been initialized.
     fn table(&self) -> MemResult<Option<std::sync::Arc<TicketTable>>> {
-        self.store.ticket_table(self.job_meta.id)
+        self.store.ticket_table(self.task_meta.id)
     }
 
     /// The table this task's tickets live in, erroring if it has not been initialized.
@@ -268,7 +268,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
     type Error = MemMetaError;
 
     async fn init(&self) -> MemResult<()> {
-        self.store.init_ticket_table(self.job_meta.id)
+        self.store.init_ticket_table(self.task_meta.id)
     }
 
     async fn clear(&self) -> MemResult<()> {
@@ -300,7 +300,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
 
     async fn raise_deps_done<const M: usize>(
         &self,
-        upstream_meta: JobMetadata<M>,
+        upstream_meta: TaskMetadata<M>,
         upstream_job: Job<M>,
         aggregate_dims: &[&'static str],
     ) -> MemResult<Vec<Ticket<N>>> {
@@ -313,7 +313,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let mut rows = table.rows.write()?;
 
-        let (mask, pinned) = PinMask::project(self.job_meta, pins, aggregate_dims);
+        let (mask, pinned) = PinMask::project(self.task_meta, pins, aggregate_dims);
         let stale = rows.matching_waiting(&mask, &pinned);
 
         let mut promoted = Vec::new();
@@ -340,7 +340,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
 
     async fn raise_deps_quota<const M: usize>(
         &self,
-        upstream_meta: JobMetadata<M>,
+        upstream_meta: TaskMetadata<M>,
         upstream_ticket: Ticket<M>,
         aggregate_dims: &[&'static str],
         ub: usize,
@@ -354,7 +354,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let mut rows = table.rows.write()?;
 
-        let (mask, pinned) = PinMask::project(self.job_meta, pins, aggregate_dims);
+        let (mask, pinned) = PinMask::project(self.task_meta, pins, aggregate_dims);
         let stale = rows.matching_waiting(&mask, &pinned);
 
         let mut promoted = Vec::new();
@@ -387,7 +387,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         res: Resolution<M>,
     ) -> MemResult<Vec<Ticket<N>>> {
         const { assert!(IDX < N) }
-        if self.job_meta.dims[IDX] != res_meta.id {
+        if self.task_meta.dims[IDX] != res_meta.id {
             tracing::warn!("Invalid resolution received for explosion.");
             return Ok(vec![]);
         }
@@ -401,7 +401,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let mut rows = table.rows.write()?;
 
-        let (mask, pinned) = PinMask::project(self.job_meta, pins, &[]);
+        let (mask, pinned) = PinMask::project(self.task_meta, pins, &[]);
         let popped_keys = rows.matching(&mask, &pinned);
 
         let popped = popped_keys
@@ -418,7 +418,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
             .any(|ticket| ticket.coordinate[IDX].is_some())
         {
             return Err(MetaStorageError::invalid_explosion(
-                self.job_meta.id,
+                self.task_meta.id,
                 res_meta.id,
             ));
         }
@@ -457,7 +457,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
 
     async fn get_status(&self) -> MemResult<(i64, i64, i64)> {
         let Some(table) = self.table()? else {
-            return Err(MetaStorageError::missing_ticket_summary(self.job_meta.id));
+            return Err(MetaStorageError::missing_ticket_summary(self.task_meta.id));
         };
         let rows = table.rows.read()?;
         Ok((rows.done, rows.queued, rows.waiting))
@@ -473,8 +473,8 @@ mod tests {
     use crate::meta_storage::{MetaBackend, MetaClientApi, MetaConnApi};
 
     /// A task over one dimension `i`, which is also the dimension it spawns.
-    fn job_beta() -> JobMetadata<1> {
-        JobMetadata {
+    fn task_beta() -> TaskMetadata<1> {
+        TaskMetadata {
             id: "beta",
             dims: ["i"],
             spawn_dim: Some("i"),
@@ -483,8 +483,8 @@ mod tests {
     }
 
     /// An upstream task over the same dimension `i`.
-    fn job_alpha() -> JobMetadata<1> {
-        JobMetadata {
+    fn task_alpha() -> TaskMetadata<1> {
+        TaskMetadata {
             id: "alpha",
             dims: ["i"],
             spawn_dim: None,
@@ -493,8 +493,8 @@ mod tests {
     }
 
     /// A task over two dimensions, whose upstreams pin one dimension each.
-    fn job_gamma() -> JobMetadata<2> {
-        JobMetadata {
+    fn task_gamma() -> TaskMetadata<2> {
+        TaskMetadata {
             id: "gamma",
             dims: ["i", "j"],
             spawn_dim: None,
@@ -502,9 +502,9 @@ mod tests {
         }
     }
 
-    /// An upstream job over `j` alone.
-    fn job_over_j() -> JobMetadata<1> {
-        JobMetadata {
+    /// An upstream task over `j` alone.
+    fn task_over_j() -> TaskMetadata<1> {
+        TaskMetadata {
             id: "over_j",
             dims: ["j"],
             spawn_dim: None,
@@ -523,7 +523,7 @@ mod tests {
     async fn put_counts_tickets_by_status() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -547,7 +547,7 @@ mod tests {
     async fn put_leaves_existing_coordinate_untouched() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -566,7 +566,7 @@ mod tests {
     async fn raise_deps_done_promotes_only_pinned_coordinate() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -579,7 +579,7 @@ mod tests {
             .unwrap();
 
         let promoted = tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
 
@@ -592,7 +592,7 @@ mod tests {
     async fn raise_deps_done_holds_ticket_short_of_its_quota() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -601,7 +601,7 @@ mod tests {
             .unwrap();
 
         let promoted = tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
 
@@ -613,7 +613,7 @@ mod tests {
     async fn raise_deps_quota_reopens_ready_ticket() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -623,7 +623,7 @@ mod tests {
 
         // A quota of 3 leaves the ticket needing 3 dependencies, none of which are done.
         let promoted = tickets
-            .raise_deps_quota(job_alpha(), Ticket::new(1).with_coordinate::<0>(0), &[], 3)
+            .raise_deps_quota(task_alpha(), Ticket::new(1).with_coordinate::<0>(0), &[], 3)
             .await
             .unwrap();
 
@@ -635,7 +635,7 @@ mod tests {
     async fn explode_expands_ticket_along_its_spawn_dimension() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets.put(Ticket::new(0)).await.unwrap();
@@ -666,7 +666,7 @@ mod tests {
     async fn explode_rejects_already_resolved_dimension() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -694,7 +694,7 @@ mod tests {
     async fn mark_done_moves_ticket_to_done() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -710,7 +710,7 @@ mod tests {
     async fn clear_resets_rows_and_counters() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -733,7 +733,7 @@ mod tests {
     async fn get_status_reports_missing_table() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
 
         assert!(matches!(
             tickets.get_status().await,
@@ -745,7 +745,7 @@ mod tests {
     async fn put_reaches_index_built_before_it() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -753,7 +753,7 @@ mod tests {
             .await
             .unwrap();
         tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
 
@@ -762,7 +762,7 @@ mod tests {
             .await
             .unwrap();
         let promoted = tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [1] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [1] }, &[])
             .await
             .unwrap();
 
@@ -774,13 +774,13 @@ mod tests {
     async fn explosion_reaches_index_built_before_it() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets.put(Ticket::new(1)).await.unwrap();
         // Builds the index over `i` while the only ticket is still unexploded.
         tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [1] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [1] }, &[])
             .await
             .unwrap();
 
@@ -796,7 +796,7 @@ mod tests {
             .unwrap();
 
         let promoted = tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [1] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [1] }, &[])
             .await
             .unwrap();
 
@@ -809,7 +809,7 @@ mod tests {
     async fn clear_drops_index_built_before_it() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
 
         tickets
@@ -817,7 +817,7 @@ mod tests {
             .await
             .unwrap();
         tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
         tickets.clear().await.unwrap();
@@ -827,7 +827,7 @@ mod tests {
             .await
             .unwrap();
         let promoted = tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
 
@@ -839,7 +839,7 @@ mod tests {
     async fn upstreams_pinning_different_dimensions_keep_separate_indexes() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_gamma());
+        let tickets = client.ticket(task_gamma());
         tickets.init().await.unwrap();
 
         for i in 0..2 {
@@ -857,14 +857,14 @@ mod tests {
 
         // Pins `i` alone: reaches (0,0) and (0,1), neither of which meets its quota of 2.
         let promoted = tickets
-            .raise_deps_done(job_alpha(), Job { coordinate: [0] }, &[])
+            .raise_deps_done(task_alpha(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
         assert!(promoted.is_empty());
 
         // Pins `j` alone: reaches (0,0) and (1,0), so only (0,0) reaches its quota.
         let promoted = tickets
-            .raise_deps_done(job_over_j(), Job { coordinate: [0] }, &[])
+            .raise_deps_done(task_over_j(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
 
@@ -877,7 +877,7 @@ mod tests {
     async fn init_is_idempotent() {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
-        let tickets = client.ticket(job_beta());
+        let tickets = client.ticket(task_beta());
         tickets.init().await.unwrap();
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
@@ -892,7 +892,7 @@ mod tests {
     #[tokio::test]
     async fn a_poisoned_table_errors_rather_than_panicking() {
         let store = MemStore::default();
-        let tickets = store.ticket(job_beta());
+        let tickets = store.ticket(task_beta());
         tickets.init().await.unwrap();
 
         let table = store.ticket_table("beta").unwrap().expect("table");

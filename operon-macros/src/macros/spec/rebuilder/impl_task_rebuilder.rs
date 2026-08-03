@@ -4,7 +4,7 @@ use syn::parse_quote;
 
 use crate::configs::{JobConfig, JobConfigMap};
 use crate::dependency_analysis::get_direct_downstream_jobs;
-use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str};
+use crate::utils::{operon_ident, rebuilder_ident, task_metadata_ident, to_lit_str};
 
 /// Generates the implementation of the `TaskRebuilder` trait for a given job.
 ///
@@ -21,7 +21,7 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///     ) -> Result<(), operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///         use operon::__private::futures::{StreamExt, TryStreamExt};
 ///         let ready_tickets = client
-///             .ticket(self.job_meta)
+///             .ticket(self.task_meta)
 ///             .get_all(operon::__private::TicketStatus::Queued)
 ///             .await?
 ///             .into_iter()
@@ -49,17 +49,17 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///                     .resolution(self.spawn_dim_meta)
 ///                     .put(resolution)
 ///                     .await?;
-///                 client.ticket(self.job_meta).mark_done(job).await?;
+///                 client.ticket(self.task_meta).mark_done(job).await?;
 ///
 ///                 let affected = client
-///                     .ticket(metadata::job_delta_meta())
+///                     .ticket(metadata::task_delta_meta())
 ///                     .explode::<_, 1usize>(self.spawn_dim_meta, resolution)
 ///                     .await?;
 ///                 for ticket in affected {
 ///                     client
-///                         .ticket(metadata::job_epsilon_meta())
+///                         .ticket(metadata::task_epsilon_meta())
 ///                         .raise_deps_quota(
-///                             metadata::job_delta_meta(),
+///                             metadata::task_delta_meta(),
 ///                             ticket,
 ///                             &["j"],
 ///                             resolution.ub,
@@ -67,16 +67,16 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///                         .await?;
 ///                 }
 ///                 client
-///                     .ticket(metadata::job_delta_meta())
-///                     .raise_deps_done(self.job_meta, job, &[])
+///                     .ticket(metadata::task_delta_meta())
+///                     .raise_deps_done(self.task_meta, job, &[])
 ///                     .await?;
 ///                 client
-///                     .ticket(metadata::job_epsilon_meta())
-///                     .raise_deps_done(self.job_meta, job, &["j"])
+///                     .ticket(metadata::task_epsilon_meta())
+///                     .raise_deps_done(self.task_meta, job, &["j"])
 ///                     .await?;
 ///
 ///                 let (done, queued, waiting) =
-///                     client.ticket(self.job_meta).get_status().await?;
+///                     client.ticket(self.task_meta).get_status().await?;
 ///                 (*self.progress.write().await).update(done, queued, waiting);
 ///
 ///                 Ok::<_, operon::error::SchedulerError>(())
@@ -127,11 +127,11 @@ pub fn impl_task_rebuilder(
                         spawn_dim, repeating_job.id
                     );
                 };
-                let job_meta = job_metadata_ident(&repeating_job.id);
+                let task_meta = task_metadata_ident(&repeating_job.id);
 
                 let explode: syn::Stmt = parse_quote! {
                     let affected = client
-                        .ticket(metadata::#job_meta())
+                        .ticket(metadata::#task_meta())
                         .explode::<_, #idx>(self.spawn_dim_meta, resolution)
                         .await?;
                 };
@@ -145,8 +145,8 @@ pub fn impl_task_rebuilder(
                                 arg.id == repeating_job.to && arg.over.contains(spawn_dim)
                             })
                             .map(|arg| -> syn::Stmt {
-                                let repeating_job_meta = job_metadata_ident(&repeating_job.id);
-                                let downstream_job_meta = job_metadata_ident(&downstream_job.id);
+                                let repeating_job_meta = task_metadata_ident(&repeating_job.id);
+                                let downstream_job_meta = task_metadata_ident(&downstream_job.id);
                                 let over = arg.over.iter().map(to_lit_str);
                                 parse_quote! {
                                     client.ticket(metadata::#downstream_job_meta())
@@ -175,13 +175,13 @@ pub fn impl_task_rebuilder(
         .flat_map(|downstream_job| {
             let affected_args = downstream_job.from.iter().filter(|arg| arg.id == job.to);
             affected_args.map(|arg| -> syn::Stmt {
-                let downstream_job_meta = job_metadata_ident(&downstream_job.id);
+                let downstream_job_meta = task_metadata_ident(&downstream_job.id);
                 let aggregate_dims = arg.over.iter().map(to_lit_str);
 
                 parse_quote! {
                     client
                         .ticket(metadata::#downstream_job_meta())
-                        .raise_deps_done(self.job_meta, job, &[#(#aggregate_dims),*])
+                        .raise_deps_done(self.task_meta, job, &[#(#aggregate_dims),*])
                         .await?;
                 }
             })
@@ -204,7 +204,7 @@ pub fn impl_task_rebuilder(
                 use #operon::__private::futures::{StreamExt, TryStreamExt};
 
                 let ready_tickets = client
-                    .ticket(self.job_meta)
+                    .ticket(self.task_meta)
                     .get_all(#operon::__private::TicketStatus::Queued)
                     .await?
                     .into_iter()
@@ -229,12 +229,12 @@ pub fn impl_task_rebuilder(
                 #operon::__private::futures::stream::iter(ready_data.into_iter().map(
                     |(job, #resolution_pat)| async move {
                         #maybe_put_resolution
-                        client.ticket(self.job_meta).mark_done(job).await?;
+                        client.ticket(self.task_meta).mark_done(job).await?;
 
                         #(#explode_exprs)*
                         #(#raise_dep_exprs)*
 
-                        let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
+                        let (done, queued, waiting) = client.ticket(self.task_meta).get_status().await?;
                         (*self.progress.write().await).update(done, queued, waiting);
 
                         Ok::<_, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>(())

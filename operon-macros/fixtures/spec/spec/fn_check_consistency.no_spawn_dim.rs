@@ -9,7 +9,7 @@ async fn check_consistency(
     }
 
     let tickets = client
-        .ticket(self.job_meta())
+        .ticket(self.task_meta())
         .get_all(operon::__private::TicketStatus::Done)
         .await?;
     // Pull the "done" epsilon jobs from the metadata storage...

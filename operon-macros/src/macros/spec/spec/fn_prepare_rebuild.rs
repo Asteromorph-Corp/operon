@@ -17,7 +17,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     use operon::__private::futures::{StreamExt, TryStreamExt};
 ///
 ///     let tickets = client
-///         .ticket(self.job_meta())
+///         .ticket(self.task_meta())
 ///         .get_all(operon::__private::TicketStatus::Done)
 ///         .await?;
 ///     let data = operon::__private::futures::stream::iter(tickets.into_iter().map(
@@ -44,7 +44,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     .await?;
 ///
 ///     Ok(Box::new(BetaRebuilder {
-///         job_meta: self.job_meta(),
+///         task_meta: self.task_meta(),
 ///         spawn_dim_meta: self.spawn_dim_meta(),
 ///         data,
 ///         progress,
@@ -88,7 +88,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             use #operon::__private::futures::{StreamExt, TryStreamExt};
 
             let tickets = client
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .get_all(#operon::__private::TicketStatus::Done)
                 .await?;
             let data = #operon::__private::futures::stream::iter(tickets.into_iter().map(
@@ -108,7 +108,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             .await?;
 
             Ok(Box::new(#rebuilder_ident {
-                job_meta: self.job_meta(),
+                task_meta: self.task_meta(),
                 #maybe_spawn_dim_meta
                 data,
                 progress,

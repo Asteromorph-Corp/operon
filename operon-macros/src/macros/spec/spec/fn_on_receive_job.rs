@@ -3,7 +3,7 @@ use quote::format_ident;
 use syn::parse_quote;
 
 use crate::configs::JobConfig;
-use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, to_lit_str, to_pascal_case};
+use crate::utils::{job_enum_ident, operon_ident, task_metadata_ident, to_lit_str, to_pascal_case};
 
 /// Generates the `on_receive_job` function for the implementation of the trait `TaskSpec`.
 ///
@@ -17,13 +17,13 @@ use crate::utils::{job_enum_ident, job_metadata_ident, operon_ident, to_lit_str,
 /// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///     match job {
 ///         schema::JobEnum::Beta(job) => Ok([client
-///             .ticket(self.job_meta())
-///             .raise_deps_done(metadata::job_beta_meta(), job, &["j"])
+///             .ticket(self.task_meta())
+///             .raise_deps_done(metadata::task_beta_meta(), job, &["j"])
 ///             .await?]
 ///         .concat()),
 ///         schema::JobEnum::Delta(job) => Ok([client
-///             .ticket(self.job_meta())
-///             .raise_deps_done(metadata::job_delta_meta(), job, &["j"])
+///             .ticket(self.task_meta())
+///             .raise_deps_done(metadata::task_delta_meta(), job, &["j"])
 ///             .await?]
 ///         .concat()),
 ///         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
@@ -41,7 +41,7 @@ pub(super) fn fn_on_receive_job(
     let job_id = to_lit_str(&job.id);
 
     let job_arms = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
-        let upstream_job_meta = job_metadata_ident(&upstream_job.id);
+        let upstream_job_meta = task_metadata_ident(&upstream_job.id);
         let variant_ident = to_pascal_case(&format_ident!("{}", upstream_job.id));
         let affected_args = job.from.iter().filter(|arg| arg.id == upstream_job.to);
 
@@ -49,7 +49,7 @@ pub(super) fn fn_on_receive_job(
             let aggregate_dims = arg.over.iter().map(to_lit_str);
             parse_quote! {
                 client
-                    .ticket(self.job_meta())
+                    .ticket(self.task_meta())
                     .raise_deps_done(metadata::#upstream_job_meta(), job, &[#(#aggregate_dims),*])
                     .await?
             }

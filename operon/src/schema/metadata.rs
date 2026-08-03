@@ -21,7 +21,7 @@ impl Direction {
 
 /// The metadata describing one task.
 #[derive(Debug, Clone, Copy, Hash)]
-pub struct JobMetadata<const N: usize> {
+pub struct TaskMetadata<const N: usize> {
     pub id: &'static str,
     pub dims: [&'static str; N],
     pub spawn_dim: Option<&'static str>,
@@ -56,7 +56,7 @@ pub struct DimensionMetadata<const N: usize> {
     pub deps: [&'static str; N],
 }
 
-impl<const N: usize> JobMetadata<N> {
+impl<const N: usize> TaskMetadata<N> {
     /// Returns the metadata for the dimension that the task spawns, if any.
     pub fn spawn_dim_meta(&self) -> Option<DimensionMetadata<N>> {
         let id = self.spawn_dim?;

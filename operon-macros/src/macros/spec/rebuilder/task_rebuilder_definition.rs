@@ -12,7 +12,7 @@ use crate::utils::rebuilder_ident;
 /// ```rust,ignore
 /// #[derive(Debug)]
 /// pub struct BetaRebuilder {
-///     job_meta: operon::__private::JobMetadata<1usize>,
+///     task_meta: operon::__private::TaskMetadata<1usize>,
 ///     spawn_dim_meta: operon::__private::DimensionMetadata<1usize>,
 ///     data: Vec<(
 ///         operon::__private::Job<1usize>,
@@ -34,7 +34,7 @@ pub fn task_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
     parse_quote! {
         #[derive(Debug)]
         pub struct #rebuilder_ident {
-            job_meta: #operon::__private::JobMetadata<#n>,
+            task_meta: #operon::__private::TaskMetadata<#n>,
             #maybe_spawn_dim_meta
             data: Vec<(#operon::__private::Job<#n>, #resolution_type)>,
             progress: #operon::__private::SharedProgress,

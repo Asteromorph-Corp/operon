@@ -19,7 +19,7 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///     }
 ///
 ///     let tickets = client
-///         .ticket(self.job_meta())
+///         .ticket(self.task_meta())
 ///         .get_all(operon::__private::TicketStatus::Done)
 ///         .await?;
 ///     // Pull the "done" epsilon jobs from the metadata storage...
@@ -142,7 +142,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             }
 
             let tickets = client
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .get_all(#operon::__private::TicketStatus::Done)
                 .await?;
             let Some(coordinates) = tickets

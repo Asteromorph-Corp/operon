@@ -8,7 +8,7 @@ impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__pri
         use operon::__private::futures::{StreamExt, TryStreamExt};
 
         let ready_tickets = client
-            .ticket(self.job_meta)
+            .ticket(self.task_meta)
             .get_all(operon::__private::TicketStatus::Queued)
             .await?
             .into_iter()
@@ -36,28 +36,28 @@ impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__pri
                     .resolution(self.spawn_dim_meta)
                     .put(resolution)
                     .await?;
-                client.ticket(self.job_meta).mark_done(job).await?;
+                client.ticket(self.task_meta).mark_done(job).await?;
 
                 let affected = client
-                    .ticket(metadata::job_delta_meta())
+                    .ticket(metadata::task_delta_meta())
                     .explode::<_, 1usize>(self.spawn_dim_meta, resolution)
                     .await?;
                 for ticket in affected {
                     client
-                        .ticket(metadata::job_epsilon_meta())
-                        .raise_deps_quota(metadata::job_delta_meta(), ticket, &["j"], resolution.ub)
+                        .ticket(metadata::task_epsilon_meta())
+                        .raise_deps_quota(metadata::task_delta_meta(), ticket, &["j"], resolution.ub)
                         .await?;
                 }
                 client
-                    .ticket(metadata::job_delta_meta())
-                    .raise_deps_done(self.job_meta, job, &[])
+                    .ticket(metadata::task_delta_meta())
+                    .raise_deps_done(self.task_meta, job, &[])
                     .await?;
                 client
-                    .ticket(metadata::job_epsilon_meta())
-                    .raise_deps_done(self.job_meta, job, &["j"])
+                    .ticket(metadata::task_epsilon_meta())
+                    .raise_deps_done(self.task_meta, job, &["j"])
                     .await?;
 
-                let (done, queued, waiting) = client.ticket(self.job_meta).get_status().await?;
+                let (done, queued, waiting) = client.ticket(self.task_meta).get_status().await?;
                 (*self.progress.write().await).update(done, queued, waiting);
 
                 Ok::<_, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>(())

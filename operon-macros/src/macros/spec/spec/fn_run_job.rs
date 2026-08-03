@@ -282,7 +282,7 @@ fn arg_def_collected(
 ///         .put(resolution)
 ///         .await?;
 ///     tx.as_client()
-///         .ticket(self.job_meta())
+///         .ticket(self.task_meta())
 ///         .mark_done(job)
 ///         .await?;
 ///     tx.commit().await?;
@@ -393,7 +393,7 @@ pub(super) fn fn_run_job(
             let tx = conn.transaction().await?;
             #maybe_put_resolution;
             tx.as_client()
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .mark_done(job)
                 .await?;
             tx.commit().await?;

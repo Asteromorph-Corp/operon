@@ -10,7 +10,8 @@ use uuid::Uuid;
 
 use crate::meta_storage::MetaResult;
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, Resolution, RunFootprint, TableShape, Ticket, TicketStatus,
+    DimensionMetadata, Job, Resolution, RunFootprint, TableShape, TaskMetadata, Ticket,
+    TicketStatus,
 };
 
 /// A concrete metadata storage backend.
@@ -92,7 +93,7 @@ pub trait MetaTxApi<MSto: MetaBackend>: Send {
 /// A handle for issuing metadata queries, in terms of the domain types.
 pub trait MetaClientApi<MSto: MetaBackend>: Copy + Send + Sync {
     /// Builds ticket queries for the given task.
-    fn ticket<const N: usize>(&self, job_meta: JobMetadata<N>) -> MSto::Ticket<'_, N>;
+    fn ticket<const N: usize>(&self, task_meta: TaskMetadata<N>) -> MSto::Ticket<'_, N>;
 
     /// Builds resolution queries for the given dimension.
     fn resolution<const N: usize>(&self, dim_meta: DimensionMetadata<N>)
@@ -199,7 +200,7 @@ pub trait MetaTicketApi<const N: usize> {
     /// `aggregate_dims` this task aggregates over.
     fn raise_deps_done<const M: usize>(
         &self,
-        upstream_meta: JobMetadata<M>,
+        upstream_meta: TaskMetadata<M>,
         upstream_job: Job<M>,
         aggregate_dims: &[&'static str],
     ) -> impl Future<Output = MetaResult<Vec<Ticket<N>>, Self::Error>> + Send;
@@ -212,7 +213,7 @@ pub trait MetaTicketApi<const N: usize> {
     /// quota was first set.
     fn raise_deps_quota<const M: usize>(
         &self,
-        upstream_meta: JobMetadata<M>,
+        upstream_meta: TaskMetadata<M>,
         upstream_ticket: Ticket<M>,
         aggregate_dims: &[&'static str],
         ub: usize,
