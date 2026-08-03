@@ -307,8 +307,23 @@ pub trait TextProcessorService: OperonService<
 ```
 
 Implement it on a type that derives `OperonService`, which supplies the associated types above and the error type the task methods return.
-`Self::Error` defaults to `operon::error::UserError`, an alias of `Box<dyn std::error::Error + Send + Sync>`.
-Write `#[operon(error = MyError)]` on the derive to name a concrete type instead.
+
+#### Derive attributes
+
+`#[derive(OperonService)]` reads an `#[operon(...)]` attribute on the same type, carrying any of the keys below.
+Keys may be combined in one attribute, but each may appear only once.
+
+**`error = MyError`**: The type the task methods report failure as, written as a bare type.
+Defaults to `operon::error::UserError`, an alias of `Box<dyn std::error::Error + Send + Sync>`.
+
+**`defined_at = "path"`**: The module `define_operon!` expanded in, written as a path inside a string.
+The derive reads the generated `schema` module through it, so a service type declared outside that module needs it.
+Defaults to `self`.
+
+**`crate = "path"`**: The `operon` crate itself, written as a path inside a string.
+Defaults to the name the dependency is declared under.
+
+Note that `error` takes a type and the other two take strings.
 
 Method signatures are determined by the task declaration's input and output specifications.
 A parameter is named after the entity it carries, in `snake_case`, with the sliced dimensions appended: `Vec<B>` from `B<j>` arrives as `b_j`.
