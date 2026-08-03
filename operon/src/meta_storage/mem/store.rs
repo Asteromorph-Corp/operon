@@ -34,17 +34,20 @@ struct Execution {
 
 impl MemStore {
     /// Registers a task's ticket table, keeping an existing one.
-    pub(super) fn init_ticket_table(&self, job_id: &'static str) -> MemResult<()> {
+    pub(super) fn init_ticket_table(&self, task_id: &'static str) -> MemResult<()> {
         self.tickets
             .write()?
-            .entry(job_id)
+            .entry(task_id)
             .or_insert_with(|| Arc::new(TicketTable::default()));
         Ok(())
     }
 
     /// Returns a task's ticket table, if it has been registered.
-    pub(super) fn ticket_table(&self, job_id: &'static str) -> MemResult<Option<Arc<TicketTable>>> {
-        Ok(self.tickets.read()?.get(job_id).cloned())
+    pub(super) fn ticket_table(
+        &self,
+        task_id: &'static str,
+    ) -> MemResult<Option<Arc<TicketTable>>> {
+        Ok(self.tickets.read()?.get(task_id).cloned())
     }
 
     /// Registers a dimension's resolution table, keeping an existing one.

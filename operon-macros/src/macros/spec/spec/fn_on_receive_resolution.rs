@@ -63,7 +63,7 @@ pub(super) fn fn_on_receive_resolution(
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
     let ticket_enum_ident = ticket_enum_ident();
-    let job_id = to_lit_str(&job.id);
+    let task_id = to_lit_str(&job.id);
 
     let explode_arms = job.dims.iter().enumerate().map(|(idx, dim)| -> syn::Arm {
         let res_variant_ident = to_pascal_case(dim);
@@ -118,7 +118,7 @@ pub(super) fn fn_on_receive_resolution(
         ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
             match resolution {
                 #(#explode_arms)*
-                _ => return Err(#operon::error::SchedulerError::InvalidPeerEventReceived("resolution", #job_id)),
+                _ => return Err(#operon::error::SchedulerError::InvalidPeerEventReceived("resolution", #task_id)),
             }
             Ok(vec![])
         }

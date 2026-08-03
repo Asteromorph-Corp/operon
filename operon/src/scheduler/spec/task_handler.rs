@@ -28,7 +28,7 @@ where
     MSto: MetaBackend,
 {
     /// The id of the task this handler runs.
-    fn job_id(&self) -> &'static str;
+    fn task_id(&self) -> &'static str;
 
     /// This task's id and the ids of every task it transitively depends on, in lexicographic
     /// order.
@@ -133,7 +133,7 @@ where
     MSto: MetaBackend,
     TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>> + Clone,
 {
-    fn job_id(&self) -> &'static str {
+    fn task_id(&self) -> &'static str {
         self.task_meta.id
     }
 

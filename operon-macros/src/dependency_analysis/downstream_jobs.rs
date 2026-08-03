@@ -35,10 +35,10 @@ mod tests {
     #[case::zeta(format_ident!("zeta"), vec![])]
     fn test_get_direct_downstream_jobs(
         all_jobs: JobConfigMap,
-        #[case] job_id: syn::Ident,
+        #[case] task_id: syn::Ident,
         #[case] expected_job_ids: Vec<syn::Ident>,
     ) {
-        let job = all_jobs.get(&job_id).unwrap();
+        let job = all_jobs.get(&task_id).unwrap();
         let expected = expected_job_ids
             .into_iter()
             .map(|id| all_jobs.get(&id).unwrap())

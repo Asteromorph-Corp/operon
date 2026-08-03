@@ -177,9 +177,12 @@ where
                 let targets: HashSet<String> = HashSet::from_iter(targets);
 
                 for channel in &self.ctrl_channels {
-                    let is_target = targets.is_empty() || targets.contains(channel.job_id);
-                    let is_downstream =
-                        cascade && channel.upstream_jobs.iter().any(|id| targets.contains(*id));
+                    let is_target = targets.is_empty() || targets.contains(channel.task_id);
+                    let is_downstream = cascade
+                        && channel
+                            .upstream_tasks
+                            .iter()
+                            .any(|id| targets.contains(*id));
 
                     if is_target || is_downstream {
                         let _ = channel.tx.send(IndividualControlEvent::Pause).await;
@@ -193,7 +196,7 @@ where
                 let targets: HashSet<String> = HashSet::from_iter(targets);
 
                 for channel in &self.ctrl_channels {
-                    if targets.is_empty() || targets.contains(channel.job_id) {
+                    if targets.is_empty() || targets.contains(channel.task_id) {
                         let _ = channel.tx.send(IndividualControlEvent::Resume).await;
                     }
                 }

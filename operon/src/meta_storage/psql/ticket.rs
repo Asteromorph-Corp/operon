@@ -272,9 +272,9 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetStatusQuery(schema_prefix);
 
-        let job_id = self.task_meta.id;
-        let Some(row) = self.client.query_opt_stmt(&stmt, &[&job_id]).await? else {
-            return Err(MetaStorageError::missing_ticket_summary(job_id));
+        let task_id = self.task_meta.id;
+        let Some(row) = self.client.query_opt_stmt(&stmt, &[&task_id]).await? else {
+            return Err(MetaStorageError::missing_ticket_summary(task_id));
         };
 
         let done: i64 = row.get("done");
@@ -538,9 +538,9 @@ struct ExplodePopQuery<'a, const N: usize, const M: usize>(
 impl<const N: usize, const M: usize> std::fmt::Display for ExplodePopQuery<'_, N, M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
-        let job_id = self.1.id;
+        let task_id = self.1.id;
 
-        writeln!(f, "DELETE FROM {schema}ticket_{job_id}")?;
+        writeln!(f, "DELETE FROM {schema}ticket_{task_id}")?;
         for (idx, dep) in self
             .2
             .deps

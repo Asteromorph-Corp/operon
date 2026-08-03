@@ -33,10 +33,10 @@ pub enum TaskState {
 }
 
 impl SharedProgressMap {
-    pub fn from_jobs(job_ids: &[&'static str]) -> Self {
-        let progress = job_ids
+    pub fn from_tasks(task_ids: &[&'static str]) -> Self {
+        let progress = task_ids
             .iter()
-            .map(|job_id| (*job_id, Arc::new(RwLock::new(Progress::default()))))
+            .map(|task_id| (*task_id, Arc::new(RwLock::new(Progress::default()))))
             .collect();
         Self(progress)
     }

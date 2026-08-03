@@ -55,6 +55,8 @@ impl PsqlClient<'_> {
     }
 
     /// Initializes the ticket summary table.
+    // FIXME: the `job_id` column holds a task id and needs to be renamed at v0.6.0, where an
+    // existing metadata schema can be migrated.
     pub async fn init_ticket_summary(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
         let stmt = format!(

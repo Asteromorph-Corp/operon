@@ -352,7 +352,7 @@ where
                 => {
                     let permit = permit?;
                     let job = ready_jobs.pop().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
-                    let job_id = self.meta.id;
+                    let task_id = self.meta.id;
                     let spec = self.spec.clone();
                     let storage = self.storage.clone();
                     let service = self.service.clone();
@@ -361,20 +361,20 @@ where
                     // Move the permit into the task so it is released on drop.
                     self.handles.spawn(async move {
                         // Trace the job start.
-                        tracing::trace!("Running job {job:?} in `{job_id}` scheduler.");
+                        tracing::trace!("Running job {job:?} in `{task_id}` scheduler.");
                         let _permit = permit;
                         match spec.run_job(&*service, &*storage, meta_storage, job).await {
                             Ok(resolution) => {
                                 // Alert the results to the scheduler
                                 tracing::trace!(
-                                    "{job_id} worker exited with: JobSuccess({job:?}, {resolution:?}).",
+                                    "{task_id} worker exited with: JobSuccess({job:?}, {resolution:?}).",
                                 );
                                 Ok(InternalEvent::JobSuccess(job, resolution))
                             }
                             Err(e) => {
                                 // Alert the error to the scheduler
                                 tracing::trace!(
-                                    "{job_id} worker exited with: JobFailure({job:?}, {e:?});",
+                                    "{task_id} worker exited with: JobFailure({job:?}, {e:?});",
                                 );
                                 Ok(InternalEvent::JobFailure(job, e))
                             }

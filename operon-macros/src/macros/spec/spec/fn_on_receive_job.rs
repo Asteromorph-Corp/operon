@@ -38,7 +38,7 @@ pub(super) fn fn_on_receive_job(
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
-    let job_id = to_lit_str(&job.id);
+    let task_id = to_lit_str(&job.id);
 
     let job_arms = upstream_jobs.iter().map(|upstream_job| -> syn::Arm {
         let upstream_job_meta = task_metadata_ident(&upstream_job.id);
@@ -73,7 +73,7 @@ pub(super) fn fn_on_receive_job(
         ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
             match job {
                 #(#job_arms)*
-                _ => Err(#operon::error::SchedulerError::InvalidPeerEventReceived("job", #job_id)),
+                _ => Err(#operon::error::SchedulerError::InvalidPeerEventReceived("job", #task_id)),
             }
         }
     }
@@ -93,10 +93,10 @@ mod tests {
     #[case::simple(format_ident!("epsilon"), "spec/spec/fn_on_receive_job.rs")]
     fn test_fn_on_receive_job(
         all_jobs: JobConfigMap,
-        #[case] job_id: syn::Ident,
+        #[case] task_id: syn::Ident,
         #[case] fixture_path: &str,
     ) {
-        let job = all_jobs.get(&job_id).unwrap();
+        let job = all_jobs.get(&task_id).unwrap();
         let upstream_jobs = get_direct_upstream_jobs(job, &all_jobs);
         let item = fn_on_receive_job(job, &upstream_jobs);
         assert_item_eq(&item, fixture_path);

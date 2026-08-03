@@ -9,8 +9,8 @@ use crate::utils::spec_ident;
 /// #[derive(Debug, Clone, Copy)]
 /// pub struct BetaSpec;
 /// ```
-pub fn task_spec_definition(job_id: &syn::Ident) -> syn::ItemStruct {
-    let spec_ident = spec_ident(job_id);
+pub fn task_spec_definition(task_id: &syn::Ident) -> syn::ItemStruct {
+    let spec_ident = spec_ident(task_id);
 
     parse_quote! {
         #[derive(Debug, Clone, Copy)]
@@ -28,8 +28,8 @@ mod tests {
 
     #[rstest]
     #[case::simple(format_ident!("beta"), "spec/spec/task_spec_definition.rs")]
-    fn test_task_spec_definition(#[case] job_id: syn::Ident, #[case] fixture_path: &str) {
-        let item = task_spec_definition(&job_id);
+    fn test_task_spec_definition(#[case] task_id: syn::Ident, #[case] fixture_path: &str) {
+        let item = task_spec_definition(&task_id);
         assert_item_eq(&item, fixture_path);
     }
 }

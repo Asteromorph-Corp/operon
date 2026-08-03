@@ -46,8 +46,8 @@ where
 /// A control channel to a single `IndividualScheduler`, returned by
 /// [`HandlersWithChannels::run_schedulers`].
 pub(crate) struct ControlChannel {
-    pub job_id: &'static str,
-    pub upstream_jobs: Vec<&'static str>,
+    pub task_id: &'static str,
+    pub upstream_tasks: Vec<&'static str>,
     pub tx: IndividualControlEventSender,
 }
 
@@ -65,10 +65,10 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         }
     }
 
-    pub(crate) fn job_ids(&self) -> Vec<&'static str> {
+    pub(crate) fn task_ids(&self) -> Vec<&'static str> {
         self.task_handlers
             .iter()
-            .map(|task_handler| task_handler.job_id())
+            .map(|task_handler| task_handler.task_id())
             .collect()
     }
 
@@ -85,7 +85,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
             let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
                 PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
             >(channel_size);
-            peer_txs.insert(task_handler.job_id(), peer_tx);
+            peer_txs.insert(task_handler.task_id(), peer_tx);
             schedules_with_rx.push(HandlerWithRx::new(task_handler.as_ref(), peer_rx));
         });
 
@@ -138,15 +138,15 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         let mut inconsistent_tasks = Vec::new();
         for schedule in &self.task_handlers {
             if !schedule.check_consistency(storage, client, mode).await? {
-                inconsistent_tasks.push(schedule.job_id());
+                inconsistent_tasks.push(schedule.task_id());
                 tracing::warn!(
-                    "Consistency check failed for job handler: {}",
-                    schedule.job_id()
+                    "Consistency check failed for task handler: {}",
+                    schedule.task_id()
                 );
             } else {
                 tracing::info!(
-                    "Consistency check passed for job handler: {}",
-                    schedule.job_id()
+                    "Consistency check passed for task handler: {}",
+                    schedule.task_id()
                 );
             }
         }
@@ -190,8 +190,8 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         for schedule in &self.task_handlers {
             let (done, queued, waiting) = schedule.get_status(client).await?;
-            let Some(progress) = progresses.0.get(schedule.job_id()) else {
-                return Err(SchedulerError::missing_progress(schedule.job_id()));
+            let Some(progress) = progresses.0.get(schedule.task_id()) else {
+                return Err(SchedulerError::missing_progress(schedule.task_id()));
             };
             (*progress.write().await).update(done, queued, waiting);
         }
@@ -209,13 +209,13 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
     > {
         futures::stream::iter(self.task_handlers.iter().filter(|handler| {
-            std::iter::once(handler.job_id())
+            std::iter::once(handler.task_id())
                 .chain(handler.all_upstream_tasks())
-                .all(|job_id| !skip.contains(&job_id.to_string()))
+                .all(|task_id| !skip.contains(&task_id.to_string()))
         }))
         .then(|schedule| async {
-            let Some(progress) = progresses.0.get(schedule.job_id()) else {
-                return Err(SchedulerError::missing_progress(schedule.job_id()));
+            let Some(progress) = progresses.0.get(schedule.task_id()) else {
+                return Err(SchedulerError::missing_progress(schedule.task_id()));
             };
             schedule
                 .prepare_rebuild(storage, progress.clone(), client)
@@ -256,7 +256,7 @@ where
         for HandlerWithRx { handler, peer_rx } in self.handlers_with_rx {
             let progress = progresses
                 .0
-                .get(handler.job_id())
+                .get(handler.task_id())
                 .cloned()
                 .unwrap_or_else(|| Arc::new(RwLock::new(Progress::default())));
             let (ctrl_tx, ctrl_rx) = tokio::sync::mpsc::channel(64);
@@ -271,7 +271,7 @@ where
                 clean,
             ));
             channels.push(ControlChannel::new(
-                handler.job_id(),
+                handler.task_id(),
                 handler.all_upstream_tasks(),
                 ctrl_tx,
             ));
@@ -297,13 +297,13 @@ where
 
 impl ControlChannel {
     pub fn new(
-        job_id: &'static str,
-        upstream_jobs: Vec<&'static str>,
+        task_id: &'static str,
+        upstream_tasks: Vec<&'static str>,
         tx: IndividualControlEventSender,
     ) -> Self {
         Self {
-            job_id,
-            upstream_jobs,
+            task_id,
+            upstream_tasks,
             tx,
         }
     }

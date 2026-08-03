@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::utils::{job_id_ident, to_lit_str};
+use crate::utils::{task_id_ident, to_lit_str};
 
 /// Generates a constant variable for the given job ID.
 ///
@@ -8,9 +8,9 @@ use crate::utils::{job_id_ident, to_lit_str};
 /// ```rust,ignore
 /// pub const BETA_ID: &str = "beta";
 /// ```
-pub(super) fn job_id(job_id: &syn::Ident) -> syn::ItemConst {
-    let id = job_id_ident(job_id);
-    let id_str = to_lit_str(job_id);
+pub(super) fn task_id(task_id: &syn::Ident) -> syn::ItemConst {
+    let id = task_id_ident(task_id);
+    let id_str = to_lit_str(task_id);
     parse_quote! { pub const #id: &str = #id_str; }
 }
 
@@ -24,7 +24,7 @@ mod tests {
     #[test]
     fn test_const_job_id() {
         let job = format_ident!("beta");
-        let item = job_id(&job);
+        let item = task_id(&job);
         let expected: syn::ItemConst = parse_quote! { pub const BETA_ID: &str = "beta"; };
         assert_eq!(item, expected);
     }

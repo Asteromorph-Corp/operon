@@ -35,7 +35,7 @@ pub(super) fn fn_on_receive_explosion(
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
     let ticket_enum_ident = ticket_enum_ident();
-    let job_id = to_lit_str(&job.id);
+    let task_id = to_lit_str(&job.id);
 
     let arms = upstream_jobs.into_iter().map(|upstream_job| -> syn::Arm {
         let variant_ident = to_pascal_case(&upstream_job.id);
@@ -76,7 +76,7 @@ pub(super) fn fn_on_receive_explosion(
         ) -> Result<Vec<Self::Ticket>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
             match explosion.ticket {
                 #(#arms)*
-                _ => Err(#operon::error::SchedulerError::InvalidPeerEventReceived("explosion", #job_id)),
+                _ => Err(#operon::error::SchedulerError::InvalidPeerEventReceived("explosion", #task_id)),
             }
         }
     }
@@ -97,10 +97,10 @@ mod tests {
     #[case::simple(format_ident!("epsilon"), "spec/spec/fn_on_receive_explosion.rs")]
     fn test_fn_on_receive_explosion(
         all_jobs: JobConfigMap,
-        #[case] job_id: syn::Ident,
+        #[case] task_id: syn::Ident,
         #[case] fixture_path: &str,
     ) {
-        let job = all_jobs.get(&job_id).unwrap();
+        let job = all_jobs.get(&task_id).unwrap();
         let upstream_jobs = get_direct_upstream_jobs(job, &all_jobs);
         let item = fn_on_receive_explosion(job, &upstream_jobs);
         assert_item_eq(&item, fixture_path);

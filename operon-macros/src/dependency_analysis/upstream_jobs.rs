@@ -88,10 +88,10 @@ mod tests {
     #[case::zeta(format_ident!("zeta"), vec![format_ident!("alpha"), format_ident!("beta"), format_ident!("gamma"), format_ident!("delta"), format_ident!("epsilon"), format_ident!("zeta")])]
     fn test_get_upstream_jobs(
         all_jobs: JobConfigMap,
-        #[case] job_id: syn::Ident,
+        #[case] task_id: syn::Ident,
         #[case] expected_job_ids: Vec<syn::Ident>,
     ) {
-        let job = all_jobs.get(&job_id).unwrap();
+        let job = all_jobs.get(&task_id).unwrap();
         let expected = expected_job_ids
             .into_iter()
             .map(|id| all_jobs.get(&id).unwrap())
@@ -107,10 +107,10 @@ mod tests {
     #[case::zeta(format_ident!("zeta"), vec![format_ident!("gamma"), format_ident!("epsilon")])]
     fn test_get_direct_upstream_jobs(
         all_jobs: JobConfigMap,
-        #[case] job_id: syn::Ident,
+        #[case] task_id: syn::Ident,
         #[case] expected_job_ids: Vec<syn::Ident>,
     ) {
-        let job = all_jobs.get(&job_id).unwrap();
+        let job = all_jobs.get(&task_id).unwrap();
         let expected = expected_job_ids
             .into_iter()
             .map(|id| all_jobs.get(&id).unwrap())
