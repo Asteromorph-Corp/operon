@@ -20,12 +20,6 @@ type BoxedState<UErr, SErr, MErr> =
 /// # Scheduler
 ///
 /// The orchestrating scheduler that manages the individual schedulers.
-///
-/// It is responsible for:
-///
-/// * Initialization of the metadata storage,
-/// * initialization of the individual schedulers, and
-/// * communication between the UI and the individual schedulers.
 pub struct Scheduler<Svc, Sto, MSto>
 where
     Svc: OperonService,
@@ -88,8 +82,6 @@ where
             InitTransition::state(self.ctx, self.ui_mode, self.channel_size),
         );
 
-        // Main work tick
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
         // Heartbeat tick
         let heartbeat_period = std::time::Duration::from_secs(30);
         let mut lock_heartbeat = tokio::time::interval_at(
@@ -99,12 +91,13 @@ where
 
         loop {
             let next = tokio::select! {
-                _ = interval.tick() => state.handle_progress().await?,
+                result = state.wait_progress() => {
+                    result?;
+                    state.handle_progress().await?
+                }
                 Some(evt) = self.ctrl_rx.recv() => state.handle_control_event(evt).await?,
                 _ = lock_heartbeat.tick() => {
-                    heartbeat_handle
-                        .check_lock()
-                        .await?;
+                    heartbeat_handle.check_lock().await?;
                     continue;
                 }
             };
