@@ -35,7 +35,7 @@ where
 pub enum StaleKind {
     Complete,
     GracefulStop,
-    Abort,
+    Abort { shape_changed: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,10 +71,25 @@ where
                 "Found a gracefully stopped run.\n\
                 Type `run` to resume running jobs from the last run, or `help` for additional options."
             ),
-            (_, StaleKind::Abort) => tracing::info!(
+            (
+                _,
+                StaleKind::Abort {
+                    shape_changed: false,
+                },
+            ) => tracing::info!(
                 "Found an aborted run.\n\
                 Type `check` to check if the data is recoverable, `run` to start a new run and \
                 overwrite the existing data, or `help` for additional options."
+            ),
+            (
+                _,
+                StaleKind::Abort {
+                    shape_changed: true,
+                },
+            ) => tracing::warn!(
+                "The pipeline has changed since the previous run.\n\
+                You may attempt to `check` and `run --rebuild` to restore progress from unchanged tasks.\n\
+                Type `run` to start a new run and overwrite the existing data, or `help` for additional options."
             ),
         }
 
@@ -140,7 +155,7 @@ where
                     "No inconsistencies were found.\n\
                     Type `run` to resume running jobs from the last run, or `help` for additional options."
                 ),
-                StaleKind::Abort => tracing::info!(
+                StaleKind::Abort { .. } => tracing::info!(
                     "The data is recoverable.\n\
                     Type `run` to rebuild and resume running jobs from the last run, or `help` for additional options."
                 ),
@@ -178,13 +193,13 @@ where
                     Some(RunMode::Rebuild { skip })
                 }
                 // Previous run was aborted, and no consistency check was performed.
-                (StaleKind::Abort, None, _) => {
+                (StaleKind::Abort { .. }, None, _) => {
                     tracing::error!("Cannot rebuild before checking for consistency.");
                     None
                 }
                 // Previous run was either aborted but consistent, gracefully stopped, or
                 // complete.
-                (StaleKind::Abort, _, _)
+                (StaleKind::Abort { .. }, _, _)
                 | (StaleKind::GracefulStop, _, _)
                 | (StaleKind::Complete, _, _) => {
                     tracing::info!("Rebuilding the run from trusted data.");
@@ -207,15 +222,15 @@ where
                     })
                 }
                 // Previous run was aborted, and no consistency check was performed.
-                (StaleKind::Abort, None, false) => Some(RunMode::Clean),
+                (StaleKind::Abort { .. }, None, false) => Some(RunMode::Clean),
                 // Previous run was aborted, no consistency check was performed, but the user wishes
                 // to rebuild as much as we can.
-                (StaleKind::Abort, None, true) => {
+                (StaleKind::Abort { .. }, None, true) => {
                     tracing::error!("Cannot rebuild before checking for consistency.");
                     None
                 }
                 // Previous run was aborted, and the consistency check succeeded.
-                (StaleKind::Abort, Some(_), _) => {
+                (StaleKind::Abort { .. }, Some(_), _) => {
                     tracing::info!("Rebuilding the run from trusted data.");
                     Some(RunMode::Rebuild {
                         skip: HashSet::new(),

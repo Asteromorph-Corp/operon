@@ -10,7 +10,7 @@ use crate::scheduler::events::{
 use crate::scheduler::individual_scheduler::IndividualScheduler;
 use crate::scheduler::spec::SpecWithMetadata;
 use crate::scheduler::{JobRebuilder, JobSpec, SchedulerError};
-use crate::schema::{CheckMode, Job, SharedProgress, Ticket};
+use crate::schema::{CheckMode, Job, SharedProgress, TableShape, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -39,10 +39,12 @@ where
     /// This function should be idempotent,
     /// i.e. calling it multiple times, or calling it on an already-initialized storage should do
     /// nothing.
+    ///
+    /// Returns the shape the resolution table was found under.
     async fn init_resolution(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
+    ) -> Result<TableShape, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Clear the primary resolution from the fact storage, assuming the table is already
     /// initialized.
@@ -56,10 +58,12 @@ where
     /// This function should be idempotent,
     /// i.e. calling it multiple times, or calling it on an already-initialized storage should do
     /// nothing.
+    ///
+    /// Returns the shape the ticket table was found under.
     async fn init_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
+    ) -> Result<TableShape, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Clear the data from the ticket storage, assuming the tables are already initialized.
     async fn clear_tickets(
@@ -139,11 +143,23 @@ where
     async fn init_resolution(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        if let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() {
-            client.resolution(spawn_dim_meta).init().await?;
+    ) -> Result<TableShape, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        let Some(spawn_dim_meta) = self.job_meta.spawn_dim_meta() else {
+            return Ok(TableShape::CURRENT);
+        };
+        let id = spawn_dim_meta.id;
+        let resolution = client.resolution(spawn_dim_meta);
+
+        let shape = resolution.shape().await?;
+        if shape.is_stale {
+            tracing::warn!(
+                "Dimension `{id}` changed shape, so its resolutions are discarded. \
+                 A rebuild will discard progress of all jobs over `{id}`."
+            );
         }
-        Ok(())
+
+        resolution.init().await?;
+        Ok(shape)
     }
 
     async fn clear_resolution(
@@ -159,9 +175,20 @@ where
     async fn init_tickets(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        client.ticket(self.job_meta).init().await?;
-        Ok(())
+    ) -> Result<TableShape, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        let id = self.job_meta.id;
+        let ticket = client.ticket(self.job_meta);
+
+        let shape = ticket.shape().await?;
+        if shape.is_stale {
+            tracing::warn!(
+                "Task `{id}` changed shape, so its tickets are discarded. \
+                 A rebuild will discard progress of all `{id}` and downstream jobs."
+            );
+        }
+
+        ticket.init().await?;
+        Ok(shape)
     }
 
     async fn clear_tickets(

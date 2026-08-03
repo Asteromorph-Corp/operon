@@ -8,9 +8,12 @@ use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
+    DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, TableShape, Ticket,
+    TicketStatus,
 };
-use crate::utils::{SchemaPrefix, SqlParams, box_sql, replace_if_updated};
+use crate::utils::{
+    SchemaPrefix, SqlParams, box_sql, recorded_hash_query, replace_if_updated, table_shape,
+};
 
 /// Postgres wire (de)serialization for [`Ticket`], alongside the query builders that use it.
 ///
@@ -80,18 +83,31 @@ impl<'a> PsqlClient<'a> {
 impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     type Error = PsqlMetaError;
 
-    /// Initializes the ticket table.
+    async fn shape(&self) -> PsqlResult<TableShape> {
+        let schema_prefix = self.client.schema_prefix();
+        let stmt = recorded_hash_query(self.job_meta.id, schema_prefix, "_ticket_hash");
+        let recorded = self.client.query_opt(&stmt, &[]).await?;
+        Ok(table_shape(
+            recorded.as_ref().map(|row| row.get("hash")),
+            &self.job_meta,
+        ))
+    }
+
+    /// Initializes the ticket table and its summary.
     async fn init(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
+        let id = self.job_meta.id;
 
         let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
         let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.job_meta);
+        let delete_stmt = TicketSummaryDeleteQuery(schema_prefix, self.job_meta);
         let stmt = replace_if_updated(
-            self.job_meta.id,
+            id,
+            &format!("ticket_{id}"),
             &self.job_meta,
             schema_prefix,
             "_ticket_hash",
-            format!("{init_stmt}\n{trigger_stmts}"),
+            format!("{init_stmt}\n{trigger_stmts}\n{delete_stmt}"),
         );
 
         let summary_stmt = TicketSummaryInsertQuery(schema_prefix);
@@ -330,6 +346,24 @@ impl<'a> std::fmt::Display for TicketSummaryInsertQuery<'a> {
         )?;
         writeln!(f, "VALUES ($1, 0, 0, 0)")?;
         write!(f, "ON CONFLICT (job_id) DO NOTHING;")
+    }
+}
+
+/// Helper struct to generate the SQL query dropping a job's ticket summary row.
+///
+/// Leaves the row absent, exactly as it is for a job whose ticket table has never been
+/// initialized, so that the trailing `TicketSummaryInsertQuery` in `init` recreates it.
+struct TicketSummaryDeleteQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+
+impl<const N: usize> std::fmt::Display for TicketSummaryDeleteQuery<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        write!(
+            f,
+            "DELETE FROM {schema}ticket_summary WHERE job_id = '{id}';"
+        )
     }
 }
 
@@ -669,6 +703,20 @@ mod tests {
         #[case] expected: &str,
     ) {
         let stmt = TicketSummaryInsertQuery(schema_prefix).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(
+        job_beta(),
+        "DELETE FROM test_meta.ticket_summary WHERE job_id = 'beta';"
+    )]
+    fn test_ticket_summary_delete_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'static>,
+        #[case] job: JobMetadata<N>,
+        #[case] expected: &str,
+    ) {
+        let stmt = TicketSummaryDeleteQuery(schema_prefix, job).to_string();
         assert_eq!(stmt, expected);
     }
 

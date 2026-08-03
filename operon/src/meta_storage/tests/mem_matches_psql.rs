@@ -8,7 +8,7 @@
 //! They run against a schema of their own, which they clear before each sequence.
 
 use crate::meta_storage::mem::MemMetaStorage;
-use crate::meta_storage::psql::{PsqlMetaStorage, PsqlMetaStorageOptions};
+use crate::meta_storage::tests::utils::psql_backend;
 use crate::meta_storage::{
     MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi,
 };
@@ -476,18 +476,9 @@ async fn exercise<MSto: MetaBackend>(backend: &MSto) -> Vec<Step> {
     log
 }
 
-/// The Postgres backend to compare against, or `None` when no database is configured.
-///
-/// CI serves a Postgres to every test run, so a URI missing there fails the test.
-fn psql_backend() -> Option<PsqlMetaStorage> {
-    let uri = std::env::var("POSTGRES_URI").ok()?;
-    let options = PsqlMetaStorageOptions::new(uri).with_schema(SCHEMA);
-    Some(options.build().expect("build the Postgres backend"))
-}
-
 #[tokio::test]
 async fn mem_matches_psql() {
-    let Some(psql) = psql_backend() else {
+    let Some(psql) = psql_backend(SCHEMA) else {
         eprintln!("skipping: POSTGRES_URI is not set, so there is no Postgres to compare against");
         return;
     };

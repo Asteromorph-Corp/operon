@@ -11,7 +11,7 @@ use crate::scheduler::events::{
     ServicePeerEventSenderMap,
 };
 use crate::scheduler::{JobHandler, JobRebuilder, SchedulerError};
-use crate::schema::{CheckMode, Progress, SharedProgressMap};
+use crate::schema::{CheckMode, Progress, SharedProgressMap, TableShape};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
@@ -92,24 +92,36 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         HandlersWithChannels::new(schedules_with_rx, peer_txs)
     }
 
+    /// Initializes every metadata table the run needs.
+    ///
+    /// Returns [`STALE`](TableShape::STALE) if any job or dimension changed shape, discarding what
+    /// its table held.
     pub(crate) async fn init_meta_storage(
         &self,
         client: MSto::Client<'_>,
-    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+    ) -> Result<TableShape, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         client.init_schema().await?;
         client.init_dimension_hash().await?;
         client.init_ticket_hash().await?;
-        for job_handler in &self.job_handlers {
-            job_handler.init_resolution(client).await?;
-        }
+        let resolution_is_stale = futures::stream::iter(&self.job_handlers)
+            .then(|job_handler| async { job_handler.init_resolution(client).await })
+            .try_fold(false, |was_stale, shape| async move {
+                Ok(was_stale || shape.is_stale)
+            })
+            .await?;
         client.init_ticket_summary().await?;
         client.init_ticket_status_type().await?;
-        for job_handler in &self.job_handlers {
-            job_handler.init_tickets(client).await?;
-        }
+        let ticket_is_stale = futures::stream::iter(&self.job_handlers)
+            .then(|job_handler| async { job_handler.init_tickets(client).await })
+            .try_fold(false, |was_stale, shape| async move {
+                Ok(was_stale || shape.is_stale)
+            })
+            .await?;
         client.init_footprint().await?;
 
-        Ok(())
+        Ok(TableShape {
+            is_stale: resolution_is_stale || ticket_is_stale,
+        })
     }
 
     /// Run a check on the data consistency between the data storage and the metadata storage.

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use crate::meta_storage::{MetaBackend, MetaConnApi, MetaTxApi};
+use crate::meta_storage::{MetaBackend, MetaClientApi, MetaConnApi, MetaTxApi};
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::events::{ControlEventReceiver, SchedulerStateSender};
 use crate::scheduler::states::{InitTransition, NextState, SchedulerState};
 use crate::scheduler::{SchedulerError, SchedulerHandler};
-use crate::schema::SharedProgressMap;
+use crate::schema::{RunFootprint, RunState, SharedProgressMap, TableShape};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
@@ -75,11 +75,14 @@ where
     pub async fn work(mut self) -> SchedulerResult<(), Svc::Error, Sto::Error, MSto::Error> {
         self.ctx.meta_storage.ensure_lock().await?;
         self.ctx.storage.init().await?;
-        self.init_meta_storage().await?;
+        let shape_changed = self.init_meta_storage().await?.is_stale;
+        if shape_changed {
+            self.abort_recorded_run().await?;
+        }
 
         let heartbeat_handle = self.ctx.meta_storage.clone();
         let mut state: BoxedState<Svc::Error, Sto::Error, MSto::Error> = Box::new(
-            InitTransition::state(self.ctx, self.ui_mode, self.channel_size),
+            InitTransition::state(self.ctx, self.ui_mode, self.channel_size, shape_changed),
         );
 
         // Heartbeat tick
@@ -117,11 +120,32 @@ where
     }
 
     /// An helper function to call `self.spec.init_meta_storage` with a transaction.
-    async fn init_meta_storage(&self) -> SchedulerResult<(), Svc::Error, Sto::Error, MSto::Error> {
+    ///
+    /// Returns [`STALE`](TableShape::STALE) if any job or dimension changed shape, discarding what
+    /// its table held.
+    async fn init_meta_storage(
+        &self,
+    ) -> SchedulerResult<TableShape, Svc::Error, Sto::Error, MSto::Error> {
         let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
-        self.ctx.handler.init_meta_storage(tx.as_client()).await?;
+        let shape = self.ctx.handler.init_meta_storage(tx.as_client()).await?;
         tx.commit().await?;
+        Ok(shape)
+    }
+
+    /// Records the last run as aborted, since a dropped-and-rebuilt table leaves its progress
+    /// inconsistent.
+    /// Writes to both storages' footprint tables.
+    async fn abort_recorded_run(&self) -> SchedulerResult<(), Svc::Error, Sto::Error, MSto::Error> {
+        let conn = self.ctx.meta_storage.scheduler_conn().await?;
+        let Some(recorded) = conn.as_client().get_footprint().await? else {
+            return Ok(());
+        };
+
+        let footprint = RunFootprint::new(recorded.metadata.run_id, RunState::Aborted);
+        self.ctx.storage.put_footprint(&footprint).await?;
+        conn.as_client().upsert_run(&footprint).await?;
+
         Ok(())
     }
 }

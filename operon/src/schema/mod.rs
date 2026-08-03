@@ -27,3 +27,6 @@ pub use progress::{Progress, SharedProgress, SharedProgressMap, TaskState};
 
 mod check_mode;
 pub use check_mode::CheckMode;
+
+mod table_shape;
+pub use table_shape::TableShape;
