@@ -7,7 +7,7 @@ use crate::utils::{
     to_lit_str, to_pascal_case,
 };
 
-/// Generates the `on_receive_resolution` function for the implementation of the trait `JobSpec`.
+/// Generates the `on_receive_resolution` function for the implementation of the trait `TaskSpec`.
 ///
 /// # Example
 /// ```rust, ignore

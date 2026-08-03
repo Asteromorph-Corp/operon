@@ -9,7 +9,7 @@ use crate::storage::OperonStorage;
 /// [`Operon`](crate::Operon) rejects a service and a storage belonging to different pipelines at
 /// compile time.
 pub trait ValidOperon<Svc: OperonService, Sto: OperonStorage> {
-    /// Builds the handler holding one [`JobHandler`](crate::scheduler::JobHandler) per task of the
-    /// pipeline.
+    /// Builds the handler holding one [`TaskHandler`](crate::scheduler::TaskHandler) per task of
+    /// the pipeline.
     fn scheduler_handler<MSto: MetaBackend>() -> SchedulerHandler<Svc, Sto, MSto>;
 }

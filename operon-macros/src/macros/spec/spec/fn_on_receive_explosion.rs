@@ -7,7 +7,7 @@ use crate::utils::{
     job_metadata_ident, operon_ident, ticket_enum_ident, to_lit_str, to_pascal_case,
 };
 
-/// Generates the `on_receive_explosion` function for the implementation of the trait `JobSpec`.
+/// Generates the `on_receive_explosion` function for the implementation of the trait `TaskSpec`.
 ///
 /// # Example
 /// ```rust,ignore

@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::configs::{JobConfig, PoolSizeSpec};
 
-/// Generates the `pool_size` function for the implementation of the trait `JobSpec`.
+/// Generates the `pool_size` function for the implementation of the trait `TaskSpec`.
 ///
 /// # Example (literal)
 /// ```rust,ignore

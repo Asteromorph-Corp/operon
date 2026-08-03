@@ -239,7 +239,7 @@ fn arg_def_collected(
     }
 }
 
-/// Generates the `run_job` function for the implementation of the trait `JobSpec`.
+/// Generates the `run_job` function for the implementation of the trait `TaskSpec`.
 ///
 /// # Example
 /// ```rust,ignore

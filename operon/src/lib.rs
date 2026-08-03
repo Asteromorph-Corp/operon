@@ -52,8 +52,8 @@ pub mod __private {
         MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi, MetaTxApi,
     };
     pub use crate::scheduler::{
-        JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
-        PeerEventSenders, REBUILD_CONCURRENCY, SchedulerHandler, SpecWithMetadata, ValidOperon,
+        PeerEvent, PeerEventSender, PeerEventSenderMap, PeerEventSenders, REBUILD_CONCURRENCY,
+        SchedulerHandler, SpecWithMetadata, TaskHandler, TaskRebuilder, TaskSpec, ValidOperon,
     };
     pub use crate::schema::*;
     pub use crate::storage::psql::{EntityQueries, FromPsqlStorageOptions, PsqlStorage};

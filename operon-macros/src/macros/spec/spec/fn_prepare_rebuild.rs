@@ -4,7 +4,7 @@ use syn::parse_quote;
 use crate::configs::JobConfig;
 use crate::utils::{operon_ident, rebuilder_ident};
 
-/// Generates the `prepare_rebuild` function for the implementation of the trait `JobSpec`.
+/// Generates the `prepare_rebuild` function for the implementation of the trait `TaskSpec`.
 ///
 /// # Example
 /// ```rust,ignore
@@ -13,7 +13,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     storage: &Sto,
 ///     client: MSto::Client<'_>,
 ///     progress: operon::__private::SharedProgress,
-/// ) -> Result<Box<dyn operon::__private::JobRebuilder<Svc, Sto, MSto>>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+/// ) -> Result<Box<dyn operon::__private::TaskRebuilder<Svc, Sto, MSto>>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///     use operon::__private::futures::{StreamExt, TryStreamExt};
 ///
 ///     let tickets = client
@@ -83,7 +83,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             storage: &Sto,
             progress: #operon::__private::SharedProgress,
             client: MSto::Client<'_>,
-        ) -> Result<Box<dyn #operon::__private::JobRebuilder<Svc, Sto, MSto>>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>
+        ) -> Result<Box<dyn #operon::__private::TaskRebuilder<Svc, Sto, MSto>>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>
         {
             use #operon::__private::futures::{StreamExt, TryStreamExt};
 

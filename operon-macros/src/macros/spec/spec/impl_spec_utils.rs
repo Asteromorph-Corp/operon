@@ -19,19 +19,19 @@ use crate::utils::{
 ///         metadata::dimension_j_meta()
 ///     }
 ///
-///     pub fn all_upstream_jobs(&self) -> std::collections::HashSet<&'static str> {
+///     pub fn all_upstream_tasks(&self) -> std::collections::HashSet<&'static str> {
 ///         std::collections::HashSet::from_iter(["alpha", "beta"])
 ///     }
 ///
 ///     pub fn into_handler<Svc: CookingService, Sto: CookingStorage, MSto: operon::__private::MetaBackend>(
 ///         self,
-///     ) -> Box<dyn operon::__private::JobHandler<Svc, Sto, MSto>> {
+///     ) -> Box<dyn operon::__private::TaskHandler<Svc, Sto, MSto>> {
 ///         let job_meta = self.job_meta();
-///         let all_upstream_jobs = self.all_upstream_jobs();
+///         let all_upstream_tasks = self.all_upstream_tasks();
 ///         Box::new(operon::__private::SpecWithMetadata::new(
 ///             self,
 ///             job_meta,
-///             all_upstream_jobs,
+///             all_upstream_tasks,
 ///         ))
 ///     }
 /// }
@@ -62,7 +62,7 @@ pub fn impl_spec_utils(service_id: &syn::Ident, job: &JobConfig) -> syn::ItemImp
             }
             #maybe_spawn_dim_meta
 
-            pub fn into_handler<Svc: #svc_ident, Sto: #sto_ident, MSto: #operon::__private::MetaBackend>(self) -> Box<dyn #operon::__private::JobHandler<Svc, Sto, MSto>> {
+            pub fn into_handler<Svc: #svc_ident, Sto: #sto_ident, MSto: #operon::__private::MetaBackend>(self) -> Box<dyn #operon::__private::TaskHandler<Svc, Sto, MSto>> {
                 let job_meta = self.job_meta();
                 Box::new(#operon::__private::SpecWithMetadata::new(self, job_meta))
             }

@@ -11,11 +11,11 @@ pub const REBUILD_CONCURRENCY: usize = 64;
 
 /// One task's replay of a previous run, over the data that run left in the entity storage.
 ///
-/// [`JobSpec::prepare_rebuild`](crate::scheduler::JobSpec::prepare_rebuild) reads the entities the
-/// task already produced and hands back a rebuilder over them, which then writes the metadata
+/// [`TaskSpec::prepare_rebuild`](crate::scheduler::TaskSpec::prepare_rebuild) reads the entities
+/// the task already produced and hands back a rebuilder over them, which then writes the metadata
 /// those entities imply.
 #[async_trait]
-pub trait JobRebuilder<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend>:
+pub trait TaskRebuilder<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend>:
     Send + Sync + 'static
 {
     /// Replays every job this task already completed: marking their tickets done, recording the

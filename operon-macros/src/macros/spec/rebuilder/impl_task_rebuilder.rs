@@ -6,14 +6,14 @@ use crate::configs::{JobConfig, JobConfigMap};
 use crate::dependency_analysis::get_direct_downstream_jobs;
 use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str};
 
-/// Generates the implementation of the `JobRebuilder` trait for a given job.
+/// Generates the implementation of the `TaskRebuilder` trait for a given job.
 ///
 /// # Example
 /// ```rust,ignore
 /// #[operon::__private::async_trait::async_trait]
 /// #[automatically_derived]
 /// impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__private::MetaBackend>
-///     operon::__private::JobRebuilder<Svc, Sto, MSto> for BetaRebuilder
+///     operon::__private::TaskRebuilder<Svc, Sto, MSto> for BetaRebuilder
 /// {
 ///     async fn rebuild(
 ///         &self,
@@ -92,7 +92,7 @@ use crate::utils::{job_metadata_ident, operon_ident, rebuilder_ident, to_lit_str
 ///     }
 /// }
 /// ```
-pub fn impl_job_rebuilder(
+pub fn impl_task_rebuilder(
     job: &JobConfig,
     spawn_dim_repeating_jobs: &IndexSet<&JobConfig>,
     downstream_jobs: &IndexSet<&JobConfig>,
@@ -195,7 +195,7 @@ pub fn impl_job_rebuilder(
             Svc: #operon::OperonService,
             Sto: #operon::OperonStorage,
             MSto: #operon::__private::MetaBackend,
-        > #operon::__private::JobRebuilder<Svc, Sto, MSto> for #rebuilder_ident
+        > #operon::__private::TaskRebuilder<Svc, Sto, MSto> for #rebuilder_ident
         {
             async fn rebuild(
                 &self,
@@ -274,8 +274,8 @@ mod tests {
     use crate::test_utils::simple_pipeline::{all_jobs, job_beta};
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/rebuilder/impl_job_rebuilder.rs")]
-    fn test_impl_job_rebuilder(
+    #[case::simple(job_beta(), "spec/rebuilder/impl_task_rebuilder.rs")]
+    fn test_impl_task_rebuilder(
         all_jobs: JobConfigMap,
         #[case] job: JobConfig,
         #[case] fixture_path: &str,
@@ -287,7 +287,8 @@ mod tests {
             .unwrap_or_default();
         let downstream_jobs = get_direct_downstream_jobs(&job, &all_jobs);
 
-        let item = impl_job_rebuilder(&job, &spawn_dim_repeating_jobs, &downstream_jobs, &all_jobs);
+        let item =
+            impl_task_rebuilder(&job, &spawn_dim_repeating_jobs, &downstream_jobs, &all_jobs);
         assert_item_eq(&item, fixture_path);
     }
 }

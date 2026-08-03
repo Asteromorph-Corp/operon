@@ -1,6 +1,6 @@
 #[operon::__private::async_trait::async_trait]
 #[automatically_derived]
-impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__private::MetaBackend> operon::__private::JobRebuilder<Svc, Sto, MSto> for BetaRebuilder {
+impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__private::MetaBackend> operon::__private::TaskRebuilder<Svc, Sto, MSto> for BetaRebuilder {
     async fn rebuild(
         &self,
         client: MSto::Client<'_>,

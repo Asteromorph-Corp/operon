@@ -9,19 +9,19 @@ use crate::scheduler::events::{
 };
 use crate::scheduler::individual_scheduler::IndividualScheduler;
 use crate::scheduler::spec::SpecWithMetadata;
-use crate::scheduler::{JobRebuilder, JobSpec, SchedulerError};
+use crate::scheduler::{SchedulerError, TaskRebuilder, TaskSpec};
 use crate::schema::{CheckMode, Job, SharedProgress, TableShape, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
 #[async_trait]
-/// The dyn-compatible face of one task's [`JobSpec`], carrying the arity `N` as a type parameter
+/// The dyn-compatible face of one task's [`TaskSpec`], carrying the arity `N` as a type parameter
 /// would not.
 ///
 /// Implemented for every [`SpecWithMetadata`], so that the scheduler holds the tasks of a pipeline
 /// in one collection despite their differing arities.
 /// It is what the scheduler prepares a task's metadata and starts its individual scheduler through.
-pub trait JobHandler<Svc, Sto, MSto>: Send + Sync + 'static
+pub trait TaskHandler<Svc, Sto, MSto>: Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -32,7 +32,7 @@ where
 
     /// This task's id and the ids of every task it transitively depends on, in lexicographic
     /// order.
-    fn all_upstream_jobs(&self) -> Vec<&'static str>;
+    fn all_upstream_tasks(&self) -> Vec<&'static str>;
 
     /// How many of this task's jobs may run at once.
     fn pool_size(&self) -> usize {
@@ -97,7 +97,7 @@ where
         mode: CheckMode,
     ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
-    /// Prepare this task's [`JobRebuilder`] for the given storage and metadata client by fetching
+    /// Prepare this task's [`TaskRebuilder`] for the given storage and metadata client by fetching
     /// the necessary data.
     async fn prepare_rebuild(
         &self,
@@ -105,7 +105,7 @@ where
         progress: SharedProgress,
         client: MSto::Client<'_>,
     ) -> Result<
-        Box<dyn JobRebuilder<Svc, Sto, MSto>>,
+        Box<dyn TaskRebuilder<Svc, Sto, MSto>>,
         SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
     >;
 
@@ -125,20 +125,20 @@ where
 }
 
 #[async_trait]
-impl<Svc, Sto, JS, MSto, const N: usize> JobHandler<Svc, Sto, MSto>
-    for SpecWithMetadata<Svc, Sto, JS, N>
+impl<Svc, Sto, TS, MSto, const N: usize> TaskHandler<Svc, Sto, MSto>
+    for SpecWithMetadata<Svc, Sto, TS, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
-    JS: JobSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>> + Clone,
+    TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>> + Clone,
 {
     fn job_id(&self) -> &'static str {
         self.job_meta.id
     }
 
-    fn all_upstream_jobs(&self) -> Vec<&'static str> {
-        self.spec.all_upstream_jobs()
+    fn all_upstream_tasks(&self) -> Vec<&'static str> {
+        self.spec.all_upstream_tasks()
     }
 
     fn pool_size(&self) -> usize {
@@ -236,7 +236,7 @@ where
         progress: SharedProgress,
         client: MSto::Client<'_>,
     ) -> Result<
-        Box<dyn JobRebuilder<Svc, Sto, MSto>>,
+        Box<dyn TaskRebuilder<Svc, Sto, MSto>>,
         SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
     > {
         self.spec.prepare_rebuild(storage, progress, client).await

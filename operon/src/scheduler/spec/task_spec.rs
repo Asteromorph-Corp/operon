@@ -2,22 +2,22 @@ use async_trait::async_trait;
 
 use crate::meta_storage::MetaBackend;
 use crate::scheduler::events::PeerEventSenders;
-use crate::scheduler::{JobRebuilder, SchedulerError};
+use crate::scheduler::{SchedulerError, TaskRebuilder};
 use crate::schema::{
     CheckMode, JobLike, JobMetadata, ResolutionLike, SharedProgress, TicketExplosion, TicketLike,
 };
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-/// One task's [`JobSpec`] paired with the metadata describing the task it was generated for.
-pub struct SpecWithMetadata<Svc, Sto, JS, const N: usize> {
-    pub spec: JS,
-    pub job_meta: JobMetadata<N>,
+/// One task's [`TaskSpec`] paired with the metadata describing the task it was generated for.
+pub struct SpecWithMetadata<Svc, Sto, TS, const N: usize> {
+    pub spec: TS,
+    pub task_meta: TaskMetadata<N>,
     _phantom: std::marker::PhantomData<(Svc, Sto)>,
 }
 
-impl<Svc, Sto, JS, const N: usize> SpecWithMetadata<Svc, Sto, JS, N> {
-    pub fn new(spec: JS, job_meta: JobMetadata<N>) -> Self {
+impl<Svc, Sto, TS, const N: usize> SpecWithMetadata<Svc, Sto, TS, N> {
+    pub fn new(spec: TS, task_meta: TaskMetadata<N>) -> Self {
         Self {
             spec,
             job_meta,
@@ -26,9 +26,9 @@ impl<Svc, Sto, JS, const N: usize> SpecWithMetadata<Svc, Sto, JS, N> {
     }
 }
 
-impl<Svc, Sto, JS, const N: usize> Clone for SpecWithMetadata<Svc, Sto, JS, N>
+impl<Svc, Sto, TS, const N: usize> Clone for SpecWithMetadata<Svc, Sto, TS, N>
 where
-    JS: Clone,
+    TS: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -45,7 +45,7 @@ where
 /// ties the generic scheduler to a specific pipeline: the dimensions a task iterates over, the
 /// upstream tasks it waits for, and the downstream tasks it announces its jobs to.
 #[async_trait]
-pub trait JobSpec<Svc, Sto, MSto>: Clone + Send + Sync + 'static
+pub trait TaskSpec<Svc, Sto, MSto>: Clone + Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -65,7 +65,7 @@ where
 
     /// This task's id and the ids of every task it transitively depends on, in lexicographic
     /// order.
-    fn all_upstream_jobs(&self) -> Vec<&'static str>;
+    fn all_upstream_tasks(&self) -> Vec<&'static str>;
 
     /// How many of this task's jobs may run at once.
     fn pool_size(&self) -> usize;
@@ -83,7 +83,7 @@ where
         mode: CheckMode,
     ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
-    /// Prepare this task's [`JobRebuilder`] for the given storage and metadata client by fetching
+    /// Prepare this task's [`TaskRebuilder`] for the given storage and metadata client by fetching
     /// the necessary data.
     async fn prepare_rebuild(
         &self,
@@ -91,7 +91,7 @@ where
         progress: SharedProgress,
         client: MSto::Client<'_>,
     ) -> Result<
-        Box<dyn JobRebuilder<Svc, Sto, MSto>>,
+        Box<dyn TaskRebuilder<Svc, Sto, MSto>>,
         SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
     >;
 

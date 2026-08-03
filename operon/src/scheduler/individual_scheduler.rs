@@ -11,7 +11,7 @@ use crate::scheduler::events::{
     PeerEventSenders, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
 use crate::scheduler::queue::{AnyJobQueue, JobQueue};
-use crate::scheduler::{JobSpec, SchedulerError, SpecWithMetadata};
+use crate::scheduler::{SchedulerError, SpecWithMetadata, TaskSpec};
 use crate::schema::{Job, JobMetadata, SharedProgress, TaskState, Ticket, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
@@ -34,33 +34,33 @@ type WorkerResult<J, R, UErr, SErr, MErr> =
 type WorkerHandles<J, R, UErr, SErr, MErr> = JoinSet<WorkerResult<J, R, UErr, SErr, MErr>>;
 
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Svc, Sto, JS, MSto, const N: usize>
+pub struct IndividualScheduler<Svc, Sto, TS, MSto, const N: usize>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
-    JS: JobSpec<Svc, Sto, MSto>,
+    TS: TaskSpec<Svc, Sto, MSto>,
 {
-    pub spec: JS,
-    pub meta: JobMetadata<N>,
+    pub spec: TS,
+    pub meta: TaskMetadata<N>,
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
     pub meta_storage: MSto,
     pub pool: Arc<Semaphore>,
     pub progress: SharedProgress,
     pub state: TaskState,
-    pub handles: WorkerHandles<Job<N>, JS::Resolution, Svc::Error, Sto::Error, MSto::Error>,
+    pub handles: WorkerHandles<Job<N>, TS::Resolution, Svc::Error, Sto::Error, MSto::Error>,
 }
 
-impl<Svc, Sto, JS, MSto, const N: usize> IndividualScheduler<Svc, Sto, JS, MSto, N>
+impl<Svc, Sto, TS, MSto, const N: usize> IndividualScheduler<Svc, Sto, TS, MSto, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
-    JS: JobSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
+    TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
 {
     pub fn new(
-        spec: SpecWithMetadata<Svc, Sto, JS, N>,
+        spec: SpecWithMetadata<Svc, Sto, TS, N>,
         service: Arc<Svc>,
         storage: Arc<Sto>,
         meta_storage: MSto,
@@ -121,7 +121,7 @@ where
     async fn on_event_ready_jobs(
         &mut self,
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
-        peer_txs: &JS::PeerEventSenders,
+        peer_txs: &TS::PeerEventSenders,
     ) -> Result<Vec<Job<N>>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let mut conn = self.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
@@ -175,7 +175,7 @@ where
         clean: bool,
     ) {
         // Create an internal channel for `InternalEvent`s.
-        let peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
+        let peer_txs = TS::PeerEventSenders::gather_from(peer_tx_map);
 
         let Ok(initial_tickets) = self.initial_ready_tickets().await else {
             self.set_state(TaskState::Error).await;
@@ -239,7 +239,7 @@ where
     async fn run_internal(
         &mut self,
         initial_tickets: Vec<Ticket<N>>,
-        peer_txs: &JS::PeerEventSenders,
+        peer_txs: &TS::PeerEventSenders,
         mut peer_rx: ServicePeerEventReceiver<Svc>,
         mut ctrl_rx: IndividualControlEventReceiver,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {

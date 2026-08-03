@@ -5,7 +5,7 @@ impl EpsilonSpec {
 
     pub fn into_handler<Svc: CookingService, Sto: CookingStorage, MSto: operon::__private::MetaBackend>(
         self,
-    ) -> Box<dyn operon::__private::JobHandler<Svc, Sto, MSto>> {
+    ) -> Box<dyn operon::__private::TaskHandler<Svc, Sto, MSto>> {
         let job_meta = self.job_meta();
         Box::new(operon::__private::SpecWithMetadata::new(self, job_meta))
     }

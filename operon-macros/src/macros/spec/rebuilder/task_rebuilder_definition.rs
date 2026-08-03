@@ -21,7 +21,7 @@ use crate::utils::rebuilder_ident;
 ///     progress: operon::__private::SharedProgress,
 /// }
 /// ```
-pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
+pub fn task_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&job.id);
     let resolution_type = resolution_type(job);
@@ -51,9 +51,9 @@ mod tests {
     use crate::test_utils::simple_pipeline::job_beta;
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/rebuilder/job_rebuilder_definition.rs")]
-    fn test_job_rebuilder_definition(#[case] job: JobConfig, #[case] fixture_path: &str) {
-        let item = job_rebuilder_definition(&job);
+    #[case::simple(job_beta(), "spec/rebuilder/task_rebuilder_definition.rs")]
+    fn test_task_rebuilder_definition(#[case] job: JobConfig, #[case] fixture_path: &str) {
+        let item = task_rebuilder_definition(&job);
         assert_item_eq(&item, fixture_path);
     }
 }
