@@ -37,7 +37,7 @@ pub enum RunState {
     /// The run is under way.
     Running,
     /// The run stopped gracefully and is resumable immediately.
-    Paused,
+    Stopped,
     /// Every task of the run finished.
     Completed,
     /// The run stopped without recording a graceful stop, so its progress is not trusted.
@@ -85,7 +85,7 @@ impl std::fmt::Display for RunState {
         let state_str = match self {
             RunState::Fresh => "fresh",
             RunState::Running => "running",
-            RunState::Paused => "paused",
+            RunState::Stopped => "paused",
             RunState::Completed => "completed",
             RunState::Aborted => "aborted",
         };
@@ -102,7 +102,7 @@ impl FromStr for RunState {
         } else if s.eq_ignore_ascii_case("running") {
             Ok(RunState::Running)
         } else if s.eq_ignore_ascii_case("paused") {
-            Ok(RunState::Paused)
+            Ok(RunState::Stopped)
         } else if s.eq_ignore_ascii_case("completed") {
             Ok(RunState::Completed)
         } else if s.eq_ignore_ascii_case("aborted") {
@@ -122,7 +122,7 @@ mod tests {
     #[rstest]
     #[case::fresh(RunState::Fresh)]
     #[case::running(RunState::Running)]
-    #[case::paused(RunState::Paused)]
+    #[case::paused(RunState::Stopped)]
     #[case::completed(RunState::Completed)]
     #[case::aborted(RunState::Aborted)]
     fn test_run_state_round_trip(#[case] state: RunState) {

@@ -117,7 +117,7 @@ where
         let next = match state {
             RunState::Fresh => NextState::next(self.into_fresh(run_id)),
             RunState::Completed => NextState::next(self.into_stale(run_id, StaleKind::Complete)),
-            RunState::Paused => NextState::next(self.into_stale(run_id, StaleKind::GracefulStop)),
+            RunState::Stopped => NextState::next(self.into_stale(run_id, StaleKind::GracefulStop)),
             RunState::Running | RunState::Aborted => {
                 let kind = StaleKind::Abort {
                     shape_changed: self.shape_changed,
