@@ -85,7 +85,7 @@ impl std::fmt::Display for RunState {
         let state_str = match self {
             RunState::Fresh => "fresh",
             RunState::Running => "running",
-            RunState::Stopped => "paused",
+            RunState::Stopped => "stopped",
             RunState::Completed => "completed",
             RunState::Aborted => "aborted",
         };
@@ -101,7 +101,12 @@ impl FromStr for RunState {
             Ok(RunState::Fresh)
         } else if s.eq_ignore_ascii_case("running") {
             Ok(RunState::Running)
+        } else if s.eq_ignore_ascii_case("stopped") {
+            Ok(RunState::Stopped)
         } else if s.eq_ignore_ascii_case("paused") {
+            // FIXME: "paused" is recorded in the footprint store for this variant up to v0.5.0.
+            // We keep this branch for backwards compatibility,
+            // but it should be removed in a future breaking release.
             Ok(RunState::Stopped)
         } else if s.eq_ignore_ascii_case("completed") {
             Ok(RunState::Completed)
@@ -122,10 +127,20 @@ mod tests {
     #[rstest]
     #[case::fresh(RunState::Fresh)]
     #[case::running(RunState::Running)]
-    #[case::paused(RunState::Stopped)]
+    #[case::stopped(RunState::Stopped)]
     #[case::completed(RunState::Completed)]
     #[case::aborted(RunState::Aborted)]
     fn test_run_state_round_trip(#[case] state: RunState) {
         assert_eq!(RunState::from_str(&state.to_string()), Ok(state));
+    }
+
+    /// # Backwards compatibility
+    ///
+    /// "paused" was used for `RunState::Stopped` up to v0.5.0.
+    /// Should we deprecate compatibility with storages that record "paused" in a future breaking
+    /// release, this test should assert failure instead.
+    #[test]
+    fn test_parse_paused_as_stopped() {
+        assert_eq!(RunState::from_str("paused"), Ok(RunState::Stopped));
     }
 }
