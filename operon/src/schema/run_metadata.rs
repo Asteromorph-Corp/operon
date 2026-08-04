@@ -112,11 +112,6 @@ impl FromStr for RunState {
             Ok(RunState::Running)
         } else if s.eq_ignore_ascii_case("stopped") {
             Ok(RunState::Stopped)
-        } else if s.eq_ignore_ascii_case("paused") {
-            // FIXME: "paused" is recorded in the footprint store for this variant up to v0.5.0.
-            // We keep this branch for backwards compatibility,
-            // but it should be removed in a future breaking release.
-            Ok(RunState::Stopped)
         } else if s.eq_ignore_ascii_case("completed") {
             Ok(RunState::Completed)
         } else if s.eq_ignore_ascii_case("aborted") {
@@ -143,13 +138,8 @@ mod tests {
         assert_eq!(RunState::from_str(&state.to_string()), Ok(state));
     }
 
-    /// # Backwards compatibility
-    ///
-    /// "paused" was used for `RunState::Stopped` up to v0.5.0.
-    /// Should we deprecate compatibility with storages that record "paused" in a future breaking
-    /// release, this test should assert failure instead.
     #[test]
-    fn test_parse_paused_as_stopped() {
-        assert_eq!(RunState::from_str("paused"), Ok(RunState::Stopped));
+    fn test_parse_paused_is_rejected() {
+        assert_eq!(RunState::from_str("paused"), Err("paused".to_owned()));
     }
 }
