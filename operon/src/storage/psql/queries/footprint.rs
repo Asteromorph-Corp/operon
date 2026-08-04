@@ -17,7 +17,7 @@ impl StorageClient<'_> {
                 run_id UUID NOT NULL UNIQUE,
                 updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                 state TEXT NOT NULL DEFAULT 'running' CHECK (
-                    state IN ('running', 'paused', 'completed', 'aborted')
+                    state IN ('running', 'stopped', 'completed', 'aborted')
                 )
             )"
         );

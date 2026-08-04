@@ -23,7 +23,7 @@ impl PsqlClient<'_> {
                 finished_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
                 updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                 state TEXT NOT NULL DEFAULT 'running' CHECK (
-                    state IN ('running', 'paused', 'completed', 'aborted')
+                    state IN ('running', 'stopped', 'completed', 'aborted')
                 )
             );
 
@@ -33,7 +33,7 @@ impl PsqlClient<'_> {
                 started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                 ended_at TIMESTAMP WITH TIME ZONE,
                 end_reason TEXT CHECK (
-                    end_reason IN (NULL, 'paused', 'completed', 'aborted')
+                    end_reason IN (NULL, 'stopped', 'completed', 'aborted')
                 )
             );"
         );
