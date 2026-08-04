@@ -137,17 +137,25 @@ pub fn table_shape<T: Hash>(recorded: Option<&str>, metadata: &T) -> TableShape 
     }
 }
 
-/// Wraps `init_query` in a guard that only executes if the metadata hash is absent or has changed.
+/// Wraps `init_query` in a guard that runs it only when `tables` do not already carry the current
+/// `metadata` hash, dropping them together first when they carry another one.
 /// Also sets the database-side hash to the current metadata hash.
 pub fn replace_if_updated<T: Hash>(
     id: &str,
-    table: &str,
+    tables: &[&str],
     metadata: &T,
     schema_prefix: SchemaPrefix<'_>,
     hash_table: &'static str,
     init_query: impl Display,
 ) -> String {
     let hash = hash_metadata(metadata);
+
+    // Cross-referencing tables should be dropped in a single statement.
+    let qualified = tables
+        .iter()
+        .map(|table| format!("{schema_prefix}{table}"))
+        .collect::<Vec<_>>()
+        .join(", ");
 
     format! { r#"
         DO $$
@@ -159,22 +167,41 @@ pub fn replace_if_updated<T: Hash>(
             FROM {schema_prefix}{hash_table}
             WHERE id = '{id}';
 
-            IF existing_hash IS NULL THEN
-                {init_query}
-
-                INSERT INTO {schema_prefix}{hash_table} (id, hash)
-                VALUES ('{id}', '{hash}');
-
-            ELSIF existing_hash != '{hash}' THEN
-                DROP TABLE IF EXISTS {schema_prefix}{table};
-
-                {init_query}
-
-                UPDATE {schema_prefix}{hash_table}
-                SET hash = '{hash}'
-                WHERE id = '{id}';
+            IF existing_hash IS NOT DISTINCT FROM '{hash}' THEN
+                RETURN;
             END IF;
+
+            IF existing_hash IS NOT NULL THEN
+                DROP TABLE IF EXISTS {qualified};
+            END IF;
+
+            {init_query}
+
+            INSERT INTO {schema_prefix}{hash_table} (id, hash)
+            VALUES ('{id}', '{hash}')
+            ON CONFLICT (id) DO UPDATE SET hash = EXCLUDED.hash;
         END
         $$;"#
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_replace_if_updated_drops_named_tables_together() {
+        let stmt = replace_if_updated(
+            "runs",
+            &["run_executions", "runs"],
+            &1u32,
+            SchemaPrefix(Some("test_meta")),
+            "_footprint_hash",
+            "CREATE TABLE test_meta.runs ();",
+        );
+        assert!(
+            stmt.contains("DROP TABLE IF EXISTS test_meta.run_executions, test_meta.runs;"),
+            "{stmt}"
+        );
     }
 }

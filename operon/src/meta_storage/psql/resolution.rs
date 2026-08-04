@@ -54,7 +54,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
 
         let stmt = replace_if_updated(
             id,
-            &format!("dimension_{id}"),
+            &[&format!("dimension_{id}")],
             &self.dim_meta,
             schema_prefix,
             "_dimension_hash",

@@ -103,7 +103,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let delete_stmt = TicketSummaryDeleteQuery(schema_prefix, self.job_meta);
         let stmt = replace_if_updated(
             id,
-            &format!("ticket_{id}"),
+            &[&format!("ticket_{id}")],
             &self.job_meta,
             schema_prefix,
             "_ticket_hash",
