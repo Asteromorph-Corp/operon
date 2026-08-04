@@ -105,7 +105,7 @@ where
         let state = if snapshot.all_finished() {
             RunState::Completed
         } else if snapshot.all_stopped() && !self.force_exited {
-            RunState::Paused
+            RunState::Stopped
         } else {
             RunState::Aborted
         };
