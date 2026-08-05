@@ -11,6 +11,13 @@ use crate::schema::{TableShape, TicketStatus};
 /// The primary key for the run footprint table.
 pub(crate) const GLOBAL: &str = "global";
 
+/// The footprint's scheming version.
+///
+/// Whenever reading/writing the footprint changes, this is bumped to a new version.
+/// The footprint tables are dropped and rebuilt when the running version and the recorded version
+/// differ.
+pub(crate) const FOOTPRINT_VERSION: u32 = 1;
+
 /// An optional schema prefix with a `Display` impl.
 #[derive(Debug, Clone, Copy)]
 pub struct SchemaPrefix<'a>(pub Option<&'a str>);
@@ -252,6 +259,65 @@ pub fn build_tables(
             END
             $$;"
         }),
+    }
+}
+
+#[cfg(test)]
+pub mod fixtures {
+    use std::fmt::Display;
+    use std::path::{Path, PathBuf};
+
+    use super::FOOTPRINT_VERSION;
+
+    #[derive(Debug, Clone, Copy)]
+    pub enum FootprintStore {
+        Data,
+        Meta,
+    }
+    impl FootprintStore {
+        const ALL: [Self; 2] = [Self::Data, Self::Meta];
+    }
+    impl Display for FootprintStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                FootprintStore::Data => write!(f, "data"),
+                FootprintStore::Meta => write!(f, "meta"),
+            }
+        }
+    }
+
+    /// Whitespace-stripped tokens of a SQL query for comparison in tests.
+    pub fn query_tokens(stmt: &str) -> Vec<&str> {
+        stmt.split_whitespace().collect()
+    }
+
+    /// The current version of the footprint DDL as recorded in the fixtures.
+    pub fn footprint_shape(store: FootprintStore) -> String {
+        let path = fixture_path(FOOTPRINT_VERSION, store);
+        let shape = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Could not read {}: {e}", path.display()));
+        shape.trim_end().to_owned()
+    }
+
+    fn fixture_path(version: u32, store: FootprintStore) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures/footprint")
+            .join(format!("v{version}"))
+            .join(format!("{store}.sql"))
+    }
+
+    #[test]
+    fn test_all_fixtures_present() {
+        for version in 1..=FOOTPRINT_VERSION {
+            for store in FootprintStore::ALL {
+                let path = fixture_path(version, store);
+                assert!(
+                    path.exists(),
+                    "Missing footprint fixture for v{version} {store}: {}",
+                    path.display()
+                );
+            }
+        }
     }
 }
 
