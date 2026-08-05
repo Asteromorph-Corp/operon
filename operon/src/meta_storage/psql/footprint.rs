@@ -154,15 +154,15 @@ impl PsqlClient<'_> {
         let updated_at = &footprint.at;
         let completed = RunState::Completed;
 
-        let stmt = format!(
-            "INSERT INTO {schema_prefix}runs (key, run_id, state, updated_at, finished_at)
+        let stmt = formatdoc! {"
+            INSERT INTO {schema_prefix}runs (key, run_id, state, updated_at, finished_at)
             VALUES ($1, $2, $3, $4, CASE WHEN $3 = '{completed}' THEN $4 ELSE NULL::timestamptz END)
             ON CONFLICT (key) DO UPDATE SET
                 run_id = EXCLUDED.run_id,
                 state = EXCLUDED.state,
                 updated_at = EXCLUDED.updated_at,
                 finished_at = EXCLUDED.finished_at"
-        );
+        };
 
         self.execute(&stmt, &[&GLOBAL, &run_id, &run_state, updated_at])
             .await?;
@@ -174,10 +174,10 @@ impl PsqlClient<'_> {
     pub async fn put_execution(&self, run_id: Uuid, execution_id: Uuid) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
 
-        let stmt = format!(
-            "INSERT INTO {schema_prefix}run_executions (run_id, execution_id)
+        let stmt = formatdoc! {"
+            INSERT INTO {schema_prefix}run_executions (run_id, execution_id)
             VALUES ($1, $2)"
-        );
+        };
         self.execute(&stmt, &[&run_id, &execution_id]).await?;
         Ok(())
     }
@@ -193,11 +193,11 @@ impl PsqlClient<'_> {
         let at = &footprint.at;
         let end_reason = footprint.metadata.state.to_string();
 
-        let stmt = format!(
-            "UPDATE {schema_prefix}run_executions
+        let stmt = formatdoc! {"
+            UPDATE {schema_prefix}run_executions
             SET ended_at = $3, end_reason = $4
             WHERE run_id = $1 AND execution_id = $2"
-        );
+        };
         self.execute(&stmt, &[run_id, &execution_id, at, &end_reason])
             .await?;
         Ok(())

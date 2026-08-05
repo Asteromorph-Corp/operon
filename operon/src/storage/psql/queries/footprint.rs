@@ -139,11 +139,14 @@ impl StorageClient<'_> {
         let updated_at = &footprint.at;
         let state = footprint.metadata.state.to_string();
 
-        let stmt = format!(
-            "INSERT INTO {schema_prefix}_footprint (key, run_id, updated_at, state)
+        let stmt = formatdoc! {"
+            INSERT INTO {schema_prefix}_footprint (key, run_id, updated_at, state)
             VALUES ($1, $2, $3, $4)
-            ON CONFLICT (key) DO UPDATE SET run_id = EXCLUDED.run_id, updated_at = EXCLUDED.updated_at, state = EXCLUDED.state"
-        );
+            ON CONFLICT (key) DO UPDATE SET
+                run_id = EXCLUDED.run_id,
+                updated_at = EXCLUDED.updated_at,
+                state = EXCLUDED.state"
+        };
         self.execute(&stmt, &[&GLOBAL, run_id, updated_at, &state])
             .await?;
         Ok(())
