@@ -12,8 +12,18 @@ use crate::schema::{
     TicketStatus,
 };
 use crate::utils::{
-    SchemaPrefix, SqlParams, box_sql, recorded_hash_query, replace_if_updated, table_shape,
+    SchemaPrefix, ShapeAction, ShapeRecord, SqlParams, box_sql, build_tables, hash_metadata,
+    recorded_shape_query,
 };
+
+/// The pointer to the `id` task's shape ID.
+fn ticket_shape_record(id: &str) -> ShapeRecord<'_> {
+    ShapeRecord {
+        table: "_ticket_hash",
+        column: "hash",
+        id,
+    }
+}
 
 /// Postgres wire (de)serialization for [`Ticket`], alongside the query builders that use it.
 ///
@@ -83,40 +93,38 @@ impl<'a> PsqlClient<'a> {
 impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     type Error = PsqlMetaError;
 
-    async fn shape(&self) -> PsqlResult<TableShape> {
-        let schema_prefix = self.client.schema_prefix();
-        let stmt = recorded_hash_query(self.job_meta.id, schema_prefix, "_ticket_hash");
-        let recorded = self.client.query_opt(&stmt, &[]).await?;
-        Ok(table_shape(
-            recorded.as_ref().map(|row| row.get("hash")),
-            &self.job_meta,
-        ))
-    }
-
-    /// Initializes the ticket table and its summary.
-    async fn init(&self) -> PsqlResult<()> {
+    async fn init(&self) -> PsqlResult<TableShape> {
         let schema_prefix = self.client.schema_prefix();
         let id = self.job_meta.id;
+        let shape_record = ticket_shape_record(id);
+        let shape_id = hash_metadata(&self.job_meta);
+
+        let recorded_stmt = recorded_shape_query(shape_record, schema_prefix);
+        let recorded = self.client.query_opt(&recorded_stmt, &[]).await?;
+        let action = ShapeAction::new(
+            recorded.as_ref().map(|row| row.get(shape_record.column)),
+            &shape_id,
+        );
 
         let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
         let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.job_meta);
         let delete_stmt = TicketSummaryDeleteQuery(schema_prefix, self.job_meta);
-        let stmt = replace_if_updated(
-            id,
+        if let Some(stmt) = build_tables(
+            shape_record,
             &[&format!("ticket_{id}")],
-            &self.job_meta,
+            &shape_id,
             schema_prefix,
-            "_ticket_hash",
+            action,
             format!("{init_stmt}\n{trigger_stmts}\n{delete_stmt}"),
-        );
+        ) {
+            self.client.batch_execute(&stmt).await?;
+        }
 
         let summary_stmt = TicketSummaryInsertQuery(schema_prefix);
-
-        self.client.execute(&stmt, &[]).await?;
         self.client
             .execute_stmt(&summary_stmt, &[&self.job_meta.id])
             .await?;
-        Ok(())
+        Ok(action.try_into().expect("a decided shape action"))
     }
 
     /// Clears the ticket table.

@@ -1,4 +1,4 @@
-//! Tests pinning the rebuild a job's or dimension's shape change triggers in the Postgres backend.
+//! Tests for the table rebuilds triggered by a task's or dimension's shape change in Postgres.
 //!
 //! Each sequence initializes a table under one shape, populates it, then initializes the same id
 //! under a wider shape and asserts the table that comes back matches the new shape.
@@ -122,26 +122,21 @@ async fn ticket_table_is_rebuilt_when_a_job_gains_a_dimension() {
         (1, 0, 0)
     );
 
-    // The same job, widened. Its table is reported stale until the init rebuilds it.
+    // The same task, widened. The init rebuilds its table and reports the discard.
     assert_eq!(
         client
             .ticket(delta_over_i_j())
-            .shape()
+            .init()
             .await
-            .expect("wide shape"),
+            .expect("wide init"),
         TableShape::STALE
     );
-    client
-        .ticket(delta_over_i_j())
-        .init()
-        .await
-        .expect("wide init");
     assert_eq!(
         client
             .ticket(delta_over_i_j())
-            .shape()
+            .init()
             .await
-            .expect("wide shape after init"),
+            .expect("wide init again"),
         TableShape::CURRENT
     );
 
@@ -220,26 +215,21 @@ async fn resolution_table_is_rebuilt_when_a_dimension_gains_a_dependency() {
         .await
         .expect("narrow put");
 
-    // The same dimension, widened. Its table is reported stale until the init rebuilds it.
+    // The same dimension, widened. The init rebuilds its table and reports the discard.
     assert_eq!(
         client
             .resolution(dim_j_over_i())
-            .shape()
+            .init()
             .await
-            .expect("wide shape"),
+            .expect("wide init"),
         TableShape::STALE
     );
-    client
-        .resolution(dim_j_over_i())
-        .init()
-        .await
-        .expect("wide init");
     assert_eq!(
         client
             .resolution(dim_j_over_i())
-            .shape()
+            .init()
             .await
-            .expect("wide shape after init"),
+            .expect("wide init again"),
         TableShape::CURRENT
     );
 

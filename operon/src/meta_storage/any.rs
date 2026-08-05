@@ -228,11 +228,7 @@ pub enum AnyTicket<'a, const N: usize> {
 impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
     type Error = AnyBackendError;
 
-    async fn shape(&self) -> MetaResult<TableShape, AnyBackendError> {
-        map_lift_backend!(self, |ticket| ticket.shape().await)
-    }
-
-    async fn init(&self) -> MetaResult<(), AnyBackendError> {
+    async fn init(&self) -> MetaResult<TableShape, AnyBackendError> {
         map_lift_backend!(self, |ticket| ticket.init().await)
     }
 
@@ -301,11 +297,7 @@ pub enum AnyResolution<'a, const N: usize> {
 impl<const N: usize> MetaResolutionApi<N> for AnyResolution<'_, N> {
     type Error = AnyBackendError;
 
-    async fn shape(&self) -> MetaResult<TableShape, AnyBackendError> {
-        map_lift_backend!(self, |resolution| resolution.shape().await)
-    }
-
-    async fn init(&self) -> MetaResult<(), AnyBackendError> {
+    async fn init(&self) -> MetaResult<TableShape, AnyBackendError> {
         map_lift_backend!(self, |resolution| resolution.init().await)
     }
 

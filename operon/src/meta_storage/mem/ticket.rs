@@ -6,7 +6,8 @@ use crate::meta_storage::mem::error::{MemMetaError, MemResult};
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
+    DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, TableShape, Ticket,
+    TicketStatus,
 };
 
 /// A ticket's primary key: its coordinate, with unresolved dimensions left as `None`.
@@ -267,9 +268,9 @@ impl<const N: usize> MemTicketQueryBuilder<'_, N> {
 impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
     type Error = MemMetaError;
 
-    /// Initializes the ticket table.
-    async fn init(&self) -> MemResult<()> {
-        self.store.init_ticket_table(self.job_meta.id)
+    async fn init(&self) -> MemResult<TableShape> {
+        self.store.init_ticket_table(self.job_meta.id)?;
+        Ok(TableShape::CURRENT)
     }
 
     /// Clears the ticket table.

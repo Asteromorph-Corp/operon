@@ -6,7 +6,10 @@ use serde::de::DeserializeOwned;
 use crate::schema::{Entity, EntityMetadata};
 use crate::storage::psql::PsqlStorageResult;
 use crate::storage::psql::client::StorageClient;
-use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams, replace_if_updated};
+use crate::utils::{
+    SchemaPrefix, SchemaPrefixOwned, ShapeAction, ShapeRecord, SqlParams, build_tables,
+    hash_metadata,
+};
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
 impl<T> PsqlEntity for T where T: Serialize + DeserializeOwned + Send + Sync + 'static {}
@@ -140,14 +143,20 @@ pub trait EntityQueries: Send + Sync + 'static {
 
 impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<N, T> {
     fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String {
-        replace_if_updated(
-            self.id,
+        let record = ShapeRecord {
+            table: "_entity_hash",
+            column: "hash",
+            id: self.id,
+        };
+        build_tables(
+            record,
             &[self.id],
-            self,
+            &hash_metadata(self),
             schema,
-            "_entity_hash",
+            ShapeAction::Defer,
             InitEntityQuery(schema, *self),
         )
+        .expect("a deferred build always yields a statement")
     }
 
     fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String {

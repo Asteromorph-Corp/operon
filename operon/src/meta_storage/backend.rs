@@ -134,15 +134,13 @@ pub trait MetaTicketApi<const N: usize> {
     /// This builder's backend error type, matching its backend's [`MetaBackend::Error`].
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Whether the ticket table matches the shape of the job it was built under.
+    /// Initializes the ticket table for this task.
     ///
-    /// A [`STALE`](TableShape::STALE) table is rebuilt by [`init`](Self::init), which discards the
-    /// tickets in it.
-    /// Backends that keep no record of the shape should report [`CURRENT`](TableShape::CURRENT).
-    fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
-        async { Ok(TableShape::CURRENT) }
-    }
-    fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
+    /// Rebuilds the table when the task's shape has changed, discarding its tickets.
+    /// Reports [`STALE`](TableShape::STALE) when that happened, [`CURRENT`](TableShape::CURRENT)
+    /// otherwise.
+    /// Backends that keep no record of the shape always report [`CURRENT`](TableShape::CURRENT).
+    fn init(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send;
     fn clear(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
 
     fn get_all(
@@ -177,15 +175,13 @@ pub trait MetaResolutionApi<const N: usize> {
     /// This builder's backend error type, matching its backend's [`MetaBackend::Error`].
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Whether the resolution table matches the shape of the dimension it was built under.
+    /// Initializes the resolution table for this dimension.
     ///
-    /// A [`STALE`](TableShape::STALE) table is rebuilt by [`init`](Self::init), which discards the
-    /// resolutions in it.
-    /// Backends that keep no record of the shape should report [`CURRENT`](TableShape::CURRENT).
-    fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
-        async { Ok(TableShape::CURRENT) }
-    }
-    fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
+    /// Rebuilds the table when the dimension's shape has changed, discarding its resolutions.
+    /// Reports [`STALE`](TableShape::STALE) when that happened, [`CURRENT`](TableShape::CURRENT)
+    /// otherwise.
+    /// Backends that keep no record of the shape always report [`CURRENT`](TableShape::CURRENT).
+    fn init(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send;
     fn clear(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
 
     fn get(
