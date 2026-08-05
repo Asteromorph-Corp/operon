@@ -113,6 +113,15 @@ pub fn box_sql<T: SqlParam>(value: T) -> Box<dyn SqlParam> {
     Box::new(value)
 }
 
+/// Renders `values` as a quoted, comma-separated SQL list.
+pub fn sql_value_list<T: Display>(values: impl IntoIterator<Item = T>) -> String {
+    values
+        .into_iter()
+        .map(|value| format!("'{value}'"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Compacts metadata of any length into a shape ID.
 pub fn hash_metadata<T: Hash>(metadata: &T) -> String {
     let mut hasher = XxHash3_64::new();

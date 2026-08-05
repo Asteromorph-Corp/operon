@@ -4,20 +4,22 @@ use crate::schema::{RunFootprint, RunMetadata, RunState};
 use crate::storage::StorageError;
 use crate::storage::psql::PsqlStorageResult;
 use crate::storage::psql::client::StorageClient;
-use crate::utils::GLOBAL;
+use crate::utils::{GLOBAL, sql_value_list};
 
 impl StorageClient<'_> {
     /// Initializes the footprint table.
     pub async fn init_footprint(&self) -> PsqlStorageResult<()> {
         let schema_prefix = self.schema_prefix();
+        let running = RunState::Running;
+        let recorded = sql_value_list(RunState::RECORDED);
 
         let stmt = format!(
             "CREATE TABLE IF NOT EXISTS {schema_prefix}_footprint (
                 key TEXT PRIMARY KEY DEFAULT '{GLOBAL}' CHECK (key = '{GLOBAL}'),
                 run_id UUID NOT NULL UNIQUE,
                 updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                state TEXT NOT NULL DEFAULT 'running' CHECK (
-                    state IN ('running', 'stopped', 'completed', 'aborted')
+                state TEXT NOT NULL DEFAULT '{running}' CHECK (
+                    state IN ({recorded})
                 )
             )"
         );

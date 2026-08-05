@@ -71,6 +71,15 @@ impl RunMetadata {
     }
 }
 
+impl RunState {
+    /// The states a recorded run can be in.
+    pub(crate) const RECORDED: [Self; 4] =
+        [Self::Running, Self::Stopped, Self::Completed, Self::Aborted];
+
+    /// The states an ended execution can be in.
+    pub(crate) const ENDED: [Self; 3] = [Self::Stopped, Self::Completed, Self::Aborted];
+}
+
 impl Default for RunMetadata {
     fn default() -> Self {
         Self {

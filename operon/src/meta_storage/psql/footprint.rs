@@ -8,12 +8,15 @@ use crate::meta_storage::MetaStorageError;
 use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::psql::error::PsqlResult;
 use crate::schema::{RunFootprint, RunState};
-use crate::utils::GLOBAL;
+use crate::utils::{GLOBAL, sql_value_list};
 
 impl PsqlClient<'_> {
     /// Initializes the footprint table.
     pub async fn init_footprint(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
+        let running = RunState::Running;
+        let recorded = sql_value_list(RunState::RECORDED);
+        let ended = sql_value_list(RunState::ENDED);
 
         let stmt = format!(
             "CREATE TABLE IF NOT EXISTS {schema_prefix}runs (
@@ -22,8 +25,8 @@ impl PsqlClient<'_> {
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                 finished_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
                 updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                state TEXT NOT NULL DEFAULT 'running' CHECK (
-                    state IN ('running', 'stopped', 'completed', 'aborted')
+                state TEXT NOT NULL DEFAULT '{running}' CHECK (
+                    state IN ({recorded})
                 )
             );
 
@@ -33,7 +36,7 @@ impl PsqlClient<'_> {
                 started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                 ended_at TIMESTAMP WITH TIME ZONE,
                 end_reason TEXT CHECK (
-                    end_reason IN (NULL, 'stopped', 'completed', 'aborted')
+                    end_reason IN ({ended})
                 )
             );"
         );
@@ -74,10 +77,11 @@ impl PsqlClient<'_> {
         let run_id = footprint.metadata.run_id;
         let run_state = footprint.metadata.state.to_string();
         let updated_at = &footprint.at;
+        let completed = RunState::Completed;
 
         let stmt = format!(
             "INSERT INTO {schema_prefix}runs (key, run_id, state, updated_at, finished_at)
-            VALUES ($1, $2, $3, $4, CASE WHEN $3 IN ('completed') THEN $4 ELSE NULL::timestamptz END)
+            VALUES ($1, $2, $3, $4, CASE WHEN $3 = '{completed}' THEN $4 ELSE NULL::timestamptz END)
             ON CONFLICT (key) DO UPDATE SET
                 run_id = EXCLUDED.run_id,
                 state = EXCLUDED.state,
