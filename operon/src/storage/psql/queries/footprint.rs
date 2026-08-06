@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
+use chrono::{DateTime, Utc};
 use indoc::formatdoc;
+use uuid::Uuid;
 
 use crate::schema::{RunFootprint, RunMetadata, RunState};
 use crate::storage::StorageError;
@@ -43,11 +45,25 @@ impl StorageClient<'_> {
         Ok(ShapeAction::from_row(row.as_ref(), shape_id))
     }
 
+    /// The recorded run's ID and timestamp.
+    ///
+    /// Skips the `state` column, which an older version may have written in a form this one
+    /// cannot parse.
+    async fn recorded_run(&self) -> PsqlStorageResult<Option<(Uuid, DateTime<Utc>)>> {
+        let schema_prefix = self.schema_prefix();
+
+        let stmt = format!(
+            "SELECT run_id, updated_at FROM {schema_prefix}{FOOTPRINT_TABLE} WHERE key = $1"
+        );
+        let row = self.query_opt(&stmt, &[&GLOBAL]).await?;
+        Ok(row.map(|row| (row.get(0), row.get(1))))
+    }
+
     /// Initializes the footprint table.
     ///
-    /// Skips when the footprint table is already present and up to date.
-    /// Destructively rebuilds when the footprint table is present but disagrees with the current
-    /// version.
+    /// Skips when it is already up to date.
+    /// Rebuilds it when it disagrees with [`FOOTPRINT_VERSION`], carrying the recorded run over as
+    /// [`Aborted`](RunState::Aborted).
     pub async fn init_footprint(&self) -> PsqlStorageResult<()> {
         let schema_prefix = self.schema_prefix();
         let shape_id = FOOTPRINT_VERSION.to_string();
@@ -56,6 +72,10 @@ impl StorageClient<'_> {
         self.execute(&init_record, &[]).await?;
 
         let action = self.footprint_action(&shape_id).await?;
+        let carried = match action {
+            ShapeAction::Rebuild => self.recorded_run().await?,
+            _ => None,
+        };
         if action == ShapeAction::Rebuild {
             tracing::warn!(
                 "The last run was recorded under an incompatible version of Operon. \
@@ -72,6 +92,11 @@ impl StorageClient<'_> {
             init_footprint_query(schema_prefix),
         ) {
             self.batch_execute(&stmt).await?;
+        }
+
+        if let Some((run_id, at)) = carried {
+            let footprint = RunFootprint::at(run_id, RunState::Aborted, at);
+            self.put_footprint(&footprint).await?;
         }
         Ok(())
     }

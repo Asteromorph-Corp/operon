@@ -2,6 +2,7 @@
 
 use std::str::FromStr;
 
+use chrono::{DateTime, Utc};
 use indoc::formatdoc;
 use uuid::Uuid;
 
@@ -61,11 +62,24 @@ impl PsqlClient<'_> {
         Ok(ShapeAction::from_row(row.as_ref(), shape_id))
     }
 
+    /// The recorded run's ID and timestamp.
+    ///
+    /// Skips the `state` column, which an older version may have written in a form this one
+    /// cannot parse.
+    async fn recorded_run(&self) -> PsqlResult<Option<(Uuid, DateTime<Utc>)>> {
+        let schema_prefix = self.schema_prefix();
+
+        let stmt =
+            format!("SELECT run_id, updated_at FROM {schema_prefix}{RUNS_TABLE} WHERE key = $1");
+        let row = self.query_opt(&stmt, &[&GLOBAL]).await?;
+        Ok(row.map(|row| (row.get(0), row.get(1))))
+    }
+
     /// Initializes the footprint tables.
     ///
-    /// Skips when the footprint tables are already present and up to date.
-    /// Destructively rebuilds when the footprint tables are present but disagree with the current
-    /// version.
+    /// Skips when they are already up to date.
+    /// Rebuilds them when they disagree with [`FOOTPRINT_VERSION`], carrying the recorded run over
+    /// as [`Aborted`](RunState::Aborted) and dropping its execution history.
     pub async fn init_footprint(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
         let shape_id = FOOTPRINT_VERSION.to_string();
@@ -74,6 +88,10 @@ impl PsqlClient<'_> {
         self.execute(&init_record, &[]).await?;
 
         let action = self.footprint_action(&shape_id).await?;
+        let carried = match action {
+            ShapeAction::Rebuild => self.recorded_run().await?,
+            _ => None,
+        };
         if action == ShapeAction::Rebuild {
             tracing::warn!(
                 "The last run was recorded under an incompatible version of Operon. \
@@ -90,6 +108,11 @@ impl PsqlClient<'_> {
             init_footprint_query(schema_prefix),
         ) {
             self.batch_execute(&stmt).await?;
+        }
+
+        if let Some((run_id, at)) = carried {
+            let footprint = RunFootprint::at(run_id, RunState::Aborted, at);
+            self.upsert_run(&footprint).await?;
         }
         Ok(())
     }

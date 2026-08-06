@@ -12,11 +12,13 @@ use crate::schema::{TableShape, TicketStatus};
 /// The primary key for the run footprint table.
 pub(crate) const GLOBAL: &str = "global";
 
-/// The footprint's scheming version.
+/// The footprint tables' schema version.
 ///
 /// Whenever reading/writing the footprint changes, this is bumped to a new version.
 /// The footprint tables are dropped and rebuilt when the running version and the recorded version
 /// differ.
+///
+/// Every version stores the run's `run_id` and `updated_at`, which a rebuild carries over.
 pub(crate) const FOOTPRINT_VERSION: u32 = 1;
 
 /// An optional schema prefix with a `Display` impl.

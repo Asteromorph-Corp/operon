@@ -16,7 +16,7 @@ use uuid::Uuid;
 use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::tests::utils::psql_backend;
 use crate::meta_storage::{MetaBackend, MetaConnApi};
-use crate::schema::{RunFootprint, RunState};
+use crate::schema::{RunFootprint, RunMetadata, RunState};
 
 /// The schema the rebuild sequence owns outright.
 const REBUILD_SCHEMA: &str = "operon_rebuild_footprint";
@@ -106,16 +106,18 @@ async fn footprint_tables_are_rebuilt_when_they_predate_versioning() {
     assert_eq!(row_count(client, REBUILD_SCHEMA, "runs").await, 1);
     assert_eq!(row_count(client, REBUILD_SCHEMA, "run_executions").await, 1);
 
-    // The init rebuilds both tables, discarding the run and its execution history.
+    // The init rebuilds both tables, carrying the run over as aborted and discarding its
+    // execution history.
     client.init_footprint().await.expect("init_footprint");
-    assert_eq!(row_count(client, REBUILD_SCHEMA, "runs").await, 0);
     assert_eq!(row_count(client, REBUILD_SCHEMA, "run_executions").await, 0);
-    assert!(
+    assert_eq!(
         client
             .get_footprint()
             .await
             .expect("get_footprint after rebuild")
-            .is_none()
+            .expect("the run is still recorded")
+            .metadata,
+        RunMetadata::new(run_id, RunState::Aborted)
     );
 
     // A graceful stop is what the unversioned tables rejected.
@@ -156,6 +158,11 @@ async fn footprint_tables_are_rebuilt_when_the_recorded_version_differs() {
         .put_execution(footprint.metadata.run_id, Uuid::new_v4())
         .await
         .expect("record an execution");
+    let recorded = client
+        .get_footprint()
+        .await
+        .expect("get_footprint before the rebuild")
+        .expect("the run is recorded");
 
     // A release that bumped the version leaves the tables recorded under the old one.
     set_recorded_version(client, BUMPED_VERSION_SCHEMA, "0").await;
@@ -164,13 +171,17 @@ async fn footprint_tables_are_rebuilt_when_the_recorded_version_differs() {
         .await
         .expect("second init_footprint");
 
-    assert!(
-        client
-            .get_footprint()
-            .await
-            .expect("get_footprint after rebuild")
-            .is_none()
+    // The graceful stop no longer stands, but the run it belonged to is still offered for a check.
+    let rebuilt = client
+        .get_footprint()
+        .await
+        .expect("get_footprint after rebuild")
+        .expect("the run is still recorded");
+    assert_eq!(
+        rebuilt.metadata,
+        RunMetadata::new(footprint.metadata.run_id, RunState::Aborted)
     );
+    assert_eq!(rebuilt.at, recorded.at);
     assert_eq!(
         row_count(client, BUMPED_VERSION_SCHEMA, "run_executions").await,
         0
