@@ -359,7 +359,13 @@ pub mod fixtures {
     use std::fmt::Display;
     use std::path::{Path, PathBuf};
 
+    use pretty_assertions::assert_eq;
+
     use super::FOOTPRINT_VERSION;
+
+    /// The environment variable that makes a test record the current shape instead of comparing
+    /// against it.
+    const BLESS: &str = "BLESS_FOOTPRINT_SHAPE";
 
     #[derive(Debug, Clone, Copy)]
     pub enum FootprintStore {
@@ -378,17 +384,53 @@ pub mod fixtures {
         }
     }
 
-    /// Whitespace-stripped tokens of a SQL query for comparison in tests.
-    pub fn query_tokens(stmt: &str) -> Vec<&str> {
-        stmt.split_whitespace().collect()
+    /// Asserts that `stmt` matches the shape recorded for the current [`FOOTPRINT_VERSION`].
+    ///
+    /// Set `BLESS_FOOTPRINT_SHAPE` to record `stmt` for a [`FOOTPRINT_VERSION`] that has no
+    /// fixture yet.
+    /// A version that already has a fixture keeps it.
+    /// Changing the shape of a released version therefore needs a version bump, since schemas
+    /// built by that release still hold the old shape.
+    pub fn assert_footprint_shape(store: FootprintStore, stmt: &str) {
+        let path = fixture_path(FOOTPRINT_VERSION, store);
+        let blessing = std::env::var_os(BLESS).is_some();
+
+        let recorded = match std::fs::read_to_string(&path) {
+            Ok(recorded) => recorded,
+            Err(e) if blessing && e.kind() == std::io::ErrorKind::NotFound => {
+                return record(&path, stmt);
+            }
+            Err(e) => panic!(
+                "Could not read {}: {e}\nRun the tests with {BLESS}=1 to record it.",
+                path.display()
+            ),
+        };
+        assert_eq!(
+            tokens(stmt),
+            tokens(&recorded),
+            "The {store} footprint no longer matches the shape recorded for \
+             v{FOOTPRINT_VERSION}. Raise FOOTPRINT_VERSION to {next} and re-run the tests with \
+             {BLESS}=1 to record the new shape. If v{FOOTPRINT_VERSION} has not shipped, delete \
+             {} and re-run with {BLESS}=1 instead.",
+            path.display(),
+            next = FOOTPRINT_VERSION + 1,
+        );
     }
 
-    /// The current version of the footprint DDL as recorded in the fixtures.
-    pub fn footprint_shape(store: FootprintStore) -> String {
-        let path = fixture_path(FOOTPRINT_VERSION, store);
-        let shape = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("Could not read {}: {e}", path.display()));
-        shape.trim_end().to_owned()
+    /// Writes `stmt` into the fixture at `path`, creating its version directory.
+    fn record(path: &Path, stmt: &str) {
+        let dir = path
+            .parent()
+            .expect("the fixture sits in a version directory");
+        std::fs::create_dir_all(dir)
+            .unwrap_or_else(|e| panic!("Could not create {}: {e}", dir.display()));
+        std::fs::write(path, format!("{stmt}\n"))
+            .unwrap_or_else(|e| panic!("Could not write {}: {e}", path.display()));
+    }
+
+    /// A SQL statement split for whitespace-insensitive comparison.
+    fn tokens(stmt: &str) -> Vec<&str> {
+        stmt.split_whitespace().collect()
     }
 
     fn fixture_path(version: u32, store: FootprintStore) -> PathBuf {
@@ -400,6 +442,10 @@ pub mod fixtures {
 
     #[test]
     fn test_all_fixtures_present() {
+        if std::env::var_os(BLESS).is_some() {
+            return;
+        }
+
         for version in 1..=FOOTPRINT_VERSION {
             for store in FootprintStore::ALL {
                 let path = fixture_path(version, store);

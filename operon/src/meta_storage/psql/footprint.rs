@@ -203,19 +203,12 @@ impl PsqlClient<'_> {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
-
     use super::*;
-    use crate::utils::fixtures::{FootprintStore, footprint_shape, query_tokens};
+    use crate::utils::fixtures::{FootprintStore, assert_footprint_shape};
 
-    /// Asserts that the current footprint tables' DDL matches the fixture for the current
-    /// [`FOOTPRINT_VERSION`].
-    /// When this test fails due to an updated footprint shape, bump [`FOOTPRINT_VERSION`] and
-    /// record the new shape in the corresponding version's fixture.
     #[test]
     fn test_init_footprint_query() {
         let stmt = init_footprint_query(SchemaPrefix(Some("test_meta")));
-        let recorded = footprint_shape(FootprintStore::Meta);
-        assert_eq!(query_tokens(&stmt), query_tokens(&recorded));
+        assert_footprint_shape(FootprintStore::Meta, &stmt);
     }
 }
