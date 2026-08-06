@@ -21,6 +21,9 @@ const TICKET_SCHEMA: &str = "operon_rebuild_ticket";
 /// The schema the dimension sequence owns outright.
 const DIMENSION_SCHEMA: &str = "operon_rebuild_dimension";
 
+/// The schema the unrecorded-shape sequence owns outright.
+const UNRECORDED_SCHEMA: &str = "operon_rebuild_unrecorded";
+
 /// The job `delta`, over `i` alone.
 fn delta_over_i() -> JobMetadata<1> {
     JobMetadata {
@@ -262,4 +265,73 @@ async fn resolution_table_is_rebuilt_when_a_dimension_gains_a_dependency() {
         .expect("wide get after put")
         .expect("a resolution at i = 0");
     assert_eq!((resolution.coordinate, resolution.ub), ([0], 3));
+}
+
+#[tokio::test]
+async fn ticket_table_is_rebuilt_when_its_shape_is_unrecorded() {
+    let Some(psql) = psql_backend(UNRECORDED_SCHEMA) else {
+        eprintln!("skipping: POSTGRES_URI is not set, so there is no Postgres to build tables in");
+        return;
+    };
+
+    let conn = psql.scheduler_conn().await.expect("scheduler conn");
+    let client = conn.as_client();
+
+    drop_schema(client, UNRECORDED_SCHEMA).await;
+    client.init_schema().await.expect("init_schema");
+    client.init_ticket_hash().await.expect("init_ticket_hash");
+    client
+        .init_ticket_status_type()
+        .await
+        .expect("init_ticket_status_type");
+    client
+        .init_ticket_summary()
+        .await
+        .expect("init_ticket_summary");
+
+    client
+        .ticket(delta_over_i())
+        .init()
+        .await
+        .expect("recorded init");
+    client
+        .ticket(delta_over_i())
+        .put(Ticket::new(0).with_coordinate::<0>(0))
+        .await
+        .expect("recorded put");
+
+    // A release predating the shape record leaves its table standing with nothing vouching for it.
+    let stmt = format!("DELETE FROM {UNRECORDED_SCHEMA}._ticket_hash WHERE id = 'delta';");
+    client
+        .execute(&stmt, &[])
+        .await
+        .expect("drop the shape record");
+
+    // The init cannot trust the table it finds, so it rebuilds it under the shape it knows.
+    assert_eq!(
+        client
+            .ticket(delta_over_i())
+            .init()
+            .await
+            .expect("unrecorded init"),
+        TableShape::STALE
+    );
+    assert!(
+        client
+            .ticket(delta_over_i())
+            .get_all(TicketStatus::Waiting)
+            .await
+            .expect("unrecorded get_all")
+            .is_empty()
+    );
+
+    // The shape is recorded again, so a further init keeps what the rebuild left.
+    assert_eq!(
+        client
+            .ticket(delta_over_i())
+            .init()
+            .await
+            .expect("unrecorded init again"),
+        TableShape::CURRENT
+    );
 }

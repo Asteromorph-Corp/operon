@@ -5,8 +5,7 @@ use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
 use crate::schema::{DimensionMetadata, Resolution, TableShape};
 use crate::utils::{
-    SchemaPrefix, ShapeAction, ShapeRecord, SqlParams, build_tables, hash_metadata,
-    recorded_shape_query,
+    SchemaPrefix, ShapeAction, ShapeRecord, SqlParams, build_tables, hash_metadata, shape_query,
 };
 
 /// The pointer to the `id` dimension's shape ID.
@@ -53,17 +52,16 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         let id = self.dim_meta.id;
         let shape_record = dimension_shape_record(id);
         let shape_id = hash_metadata(&self.dim_meta);
+        let dimension_table = format!("dimension_{id}");
+        let tables = [dimension_table.as_str()];
 
-        let recorded_stmt = recorded_shape_query(shape_record, schema_prefix);
-        let recorded = self.client.query_opt(&recorded_stmt, &[]).await?;
-        let action = ShapeAction::new(
-            recorded.as_ref().map(|row| row.get(shape_record.column)),
-            &shape_id,
-        );
+        let shape_stmt = shape_query(shape_record, &tables, schema_prefix);
+        let row = self.client.query_opt(&shape_stmt, &[]).await?;
+        let action = ShapeAction::from_row(row.as_ref(), &shape_id);
 
         if let Some(stmt) = build_tables(
             shape_record,
-            &[&format!("dimension_{id}")],
+            &tables,
             &shape_id,
             schema_prefix,
             action,

@@ -10,15 +10,15 @@ use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::psql::error::PsqlResult;
 use crate::schema::{RunFootprint, RunState};
 use crate::utils::{
-    FOOTPRINT_VERSION, GLOBAL, SchemaPrefix, ShapeAction, ShapeRecord, build_tables,
-    recorded_shape_query, sql_value_list,
+    FOOTPRINT_VERSION, GLOBAL, SchemaPrefix, ShapeAction, ShapeRecord, build_tables, shape_query,
+    sql_value_list,
 };
 
 /// The pointer to the footprint tables' shape ID.
 const FOOTPRINT_RECORD: ShapeRecord<'static> = ShapeRecord {
     table: "_footprint_version",
     column: "version",
-    id: "runs",
+    id: RUNS_TABLE,
 };
 /// The table that records the footprint information.
 const RUNS_TABLE: &str = "runs";
@@ -58,27 +58,11 @@ fn init_footprint_query(schema_prefix: SchemaPrefix<'_>) -> String {
 impl PsqlClient<'_> {
     /// The action to take when building the footprint tables.
     ///
-    /// If the backend carries a footprint table but without a version,
-    /// we assume it predates footprint versioning and rebuild it.
+    /// Tables with no recorded version predate versioning, so they are rebuilt.
     async fn footprint_action(&self, shape_id: &str) -> PsqlResult<ShapeAction> {
-        let schema_prefix = self.schema_prefix();
-        let recorded_stmt = recorded_shape_query(FOOTPRINT_RECORD, schema_prefix);
-        let recorded = self.query_opt(&recorded_stmt, &[]).await?;
-        let action = ShapeAction::new(
-            recorded
-                .as_ref()
-                .map(|row| row.get(FOOTPRINT_RECORD.column)),
-            shape_id,
-        );
-
-        let present_stmt =
-            format!("SELECT 1 WHERE to_regclass('{schema_prefix}{RUNS_TABLE}') IS NOT NULL;");
-        let present = self.query_opt(&present_stmt, &[]).await?.is_some();
-
-        Ok(match action {
-            ShapeAction::Build if present => ShapeAction::Rebuild,
-            action => action,
-        })
+        let stmt = shape_query(FOOTPRINT_RECORD, &FOOTPRINT_TABLES, self.schema_prefix());
+        let row = self.query_opt(&stmt, &[]).await?;
+        Ok(ShapeAction::from_row(row.as_ref(), shape_id))
     }
 
     /// Initializes the footprint tables.

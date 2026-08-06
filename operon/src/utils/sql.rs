@@ -4,6 +4,7 @@ use std::num::TryFromIntError;
 
 use indoc::formatdoc;
 use postgres_types::ToSql;
+use tokio_postgres::Row;
 use twox_hash::XxHash3_64;
 
 use crate::schema::{TableShape, TicketStatus};
@@ -147,10 +148,31 @@ pub struct ShapeRecord<'a> {
     pub id: &'a str,
 }
 
-/// The query to find the shape ID that `record` points to.
-pub fn recorded_shape_query(record: ShapeRecord<'_>, schema_prefix: SchemaPrefix<'_>) -> String {
+/// The SQL condition for any of `tables` existing.
+fn tables_present(tables: &[&str], schema_prefix: SchemaPrefix<'_>) -> String {
+    tables
+        .iter()
+        .map(|table| format!("to_regclass('{schema_prefix}{table}') IS NOT NULL"))
+        .collect::<Vec<_>>()
+        .join(" OR ")
+}
+
+/// The query for the shape ID `record` points to and whether any of `tables` exists.
+///
+/// Returns one row, with the columns `shape_id` and `present`.
+pub fn shape_query(
+    record: ShapeRecord<'_>,
+    tables: &[&str],
+    schema_prefix: SchemaPrefix<'_>,
+) -> String {
     let ShapeRecord { table, column, id } = record;
-    format!("SELECT {column} FROM {schema_prefix}{table} WHERE id = '{id}';")
+    let present = tables_present(tables, schema_prefix);
+
+    formatdoc! {"
+        SELECT
+            (SELECT {column} FROM {schema_prefix}{table} WHERE id = '{id}') AS shape_id,
+            ({present}) AS present;"
+    }
 }
 
 /// What action to take when initializing a table group via [`build_tables`].
@@ -168,14 +190,22 @@ pub enum ShapeAction {
 }
 
 impl ShapeAction {
-    /// Finds the action to take based on the database-side shape ID `recorded` and the current
-    /// program's shape ID `shape_id`.
-    pub fn new(recorded: Option<&str>, shape_id: &str) -> Self {
-        match recorded {
-            Some(recorded) if recorded == shape_id => Self::Keep,
-            Some(_) => Self::Rebuild,
-            None => Self::Build,
+    /// The action to take, given what the database holds.
+    ///
+    /// A table that exists without a matching shape ID is rebuilt: nothing records its shape.
+    pub fn new(recorded: Option<&str>, present: bool, shape_id: &str) -> Self {
+        match (recorded, present) {
+            (_, false) => Self::Build,
+            (Some(recorded), _) if recorded == shape_id => Self::Keep,
+            _ => Self::Rebuild,
         }
+    }
+
+    /// [`ShapeAction::new`] over a [`shape_query`] row.
+    pub fn from_row(row: Option<&Row>, shape_id: &str) -> Self {
+        row.map_or(Self::Build, |row| {
+            Self::new(row.get("shape_id"), row.get("present"), shape_id)
+        })
     }
 }
 
@@ -206,8 +236,8 @@ impl TryFrom<ShapeAction> for TableShape {
 /// - [`Build`](`ShapeAction::Build`): Runs `init_query` and records `shape_id`.
 /// - [`Rebuild`](`ShapeAction::Rebuild`): Drops the tables in `tables`, runs `init_query`, and
 ///   records `shape_id`.
-/// - [`Defer`](`ShapeAction::Defer`): Checks `record` and compares with `shape_id` to choose
-///   between the above.
+/// - [`Defer`](`ShapeAction::Defer`): Chooses between the above in SQL, as [`ShapeAction::new`]
+///   does in Rust.
 pub fn build_tables(
     record: ShapeRecord<'_>,
     tables: &[&str],
@@ -225,6 +255,7 @@ pub fn build_tables(
         .collect::<Vec<_>>()
         .join(", ");
     let drop_tables = format!("DROP TABLE IF EXISTS {qualified};");
+    let present = tables_present(tables, schema_prefix);
     let record_shape = formatdoc! {"
         INSERT INTO {schema_prefix}{table} (id, {column})
         VALUES ('{id}', '{shape_id}')
@@ -245,11 +276,11 @@ pub fn build_tables(
                 FROM {schema_prefix}{table}
                 WHERE id = '{id}';
 
-                IF recorded IS NOT DISTINCT FROM '{shape_id}' THEN
+                IF recorded IS NOT DISTINCT FROM '{shape_id}' AND ({present}) THEN
                     RETURN;
                 END IF;
 
-                IF recorded IS NOT NULL THEN
+                IF ({present}) THEN
                     {drop_tables}
                 END IF;
 
@@ -336,11 +367,18 @@ mod tests {
     }
 
     #[rstest]
-    #[case::unrecorded(None, ShapeAction::Build)]
-    #[case::matching(Some("1"), ShapeAction::Keep)]
-    #[case::diverged(Some("2"), ShapeAction::Rebuild)]
-    fn test_shape_action_new(#[case] recorded: Option<&str>, #[case] expected: ShapeAction) {
-        assert_eq!(ShapeAction::new(recorded, "1"), expected);
+    #[case::unbuilt(None, false, ShapeAction::Build)]
+    #[case::unrecorded(None, true, ShapeAction::Rebuild)]
+    #[case::matching(Some("1"), true, ShapeAction::Keep)]
+    #[case::diverged(Some("2"), true, ShapeAction::Rebuild)]
+    #[case::matching_but_dropped(Some("1"), false, ShapeAction::Build)]
+    #[case::diverged_and_dropped(Some("2"), false, ShapeAction::Build)]
+    fn test_shape_action_new(
+        #[case] recorded: Option<&str>,
+        #[case] present: bool,
+        #[case] expected: ShapeAction,
+    ) {
+        assert_eq!(ShapeAction::new(recorded, present, "1"), expected);
     }
 
     #[rstest]

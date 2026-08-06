@@ -13,7 +13,7 @@ use crate::schema::{
 };
 use crate::utils::{
     SchemaPrefix, ShapeAction, ShapeRecord, SqlParams, box_sql, build_tables, hash_metadata,
-    recorded_shape_query,
+    shape_query,
 };
 
 /// The pointer to the `id` task's shape ID.
@@ -98,20 +98,19 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let id = self.job_meta.id;
         let shape_record = ticket_shape_record(id);
         let shape_id = hash_metadata(&self.job_meta);
+        let ticket_table = format!("ticket_{id}");
+        let tables = [ticket_table.as_str()];
 
-        let recorded_stmt = recorded_shape_query(shape_record, schema_prefix);
-        let recorded = self.client.query_opt(&recorded_stmt, &[]).await?;
-        let action = ShapeAction::new(
-            recorded.as_ref().map(|row| row.get(shape_record.column)),
-            &shape_id,
-        );
+        let shape_stmt = shape_query(shape_record, &tables, schema_prefix);
+        let row = self.client.query_opt(&shape_stmt, &[]).await?;
+        let action = ShapeAction::from_row(row.as_ref(), &shape_id);
 
         let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
         let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.job_meta);
         let delete_stmt = TicketSummaryDeleteQuery(schema_prefix, self.job_meta);
         if let Some(stmt) = build_tables(
             shape_record,
-            &[&format!("ticket_{id}")],
+            &tables,
             &shape_id,
             schema_prefix,
             action,
