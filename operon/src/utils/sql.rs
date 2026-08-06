@@ -25,7 +25,7 @@ pub(crate) const FOOTPRINT_VERSION: u32 = 1;
 #[derive(Debug, Clone, Copy)]
 pub struct SchemaPrefix<'a>(pub Option<&'a str>);
 
-/// An optional powned schema prefix with a `Display` impl.
+/// An optional owned schema prefix with a `Display` impl.
 #[derive(Debug, Clone)]
 pub struct SchemaPrefixOwned(pub Option<String>);
 
