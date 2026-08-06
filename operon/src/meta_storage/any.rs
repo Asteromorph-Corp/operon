@@ -180,7 +180,7 @@ impl MetaClientApi<AnyBackend> for AnyClient<'_> {
         map_lift_backend!(self, |client| client.init_ticket_summary().await)
     }
 
-    async fn init_footprint(&self) -> MetaResult<(), AnyBackendError> {
+    async fn init_footprint(&self) -> MetaResult<TableShape, AnyBackendError> {
         map_lift_backend!(self, |client| client.init_footprint().await)
     }
 

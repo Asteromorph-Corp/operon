@@ -108,7 +108,13 @@ pub trait MetaClientApi<MSto: MetaBackend>: Copy + Send + Sync {
 
     // --- Footprint ---
 
-    fn init_footprint(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
+    /// Initializes the footprint tables, returning their shape.
+    ///
+    /// Rebuilds them when the footprint's shape has changed, marking the run as aborted.
+    /// Reports [`STALE`](TableShape::STALE) when that happened, [`CURRENT`](TableShape::CURRENT)
+    /// otherwise.
+    /// Backends that keep no record of the shape always report [`CURRENT`](TableShape::CURRENT).
+    fn init_footprint(&self) -> impl Future<Output = MetaResult<TableShape, MSto::Error>> + Send;
     fn clear_footprint(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
     fn get_footprint(
         &self,

@@ -6,7 +6,7 @@ use crate::meta_storage::mem::error::MemResult;
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::mem::{MemMetaStorage, MemResolutionQueryBuilder, MemTicketQueryBuilder};
 use crate::meta_storage::{MetaClientApi, MetaConnApi, MetaTxApi};
-use crate::schema::{DimensionMetadata, JobMetadata, RunFootprint};
+use crate::schema::{DimensionMetadata, JobMetadata, RunFootprint, TableShape};
 
 /// A handle on the in-memory store.
 ///
@@ -98,8 +98,8 @@ impl MetaClientApi<MemMetaStorage> for MemClient<'_> {
 
     // --- Footprint ---
 
-    async fn init_footprint(&self) -> MemResult<()> {
-        Ok(())
+    async fn init_footprint(&self) -> MemResult<TableShape> {
+        Ok(TableShape::CURRENT)
     }
 
     async fn clear_footprint(&self) -> MemResult<()> {

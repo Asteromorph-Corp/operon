@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::meta_storage::MetaStorageError;
 use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::psql::error::PsqlResult;
-use crate::schema::{RunFootprint, RunState};
+use crate::schema::{RunFootprint, RunState, TableShape};
 use crate::utils::{
     FOOTPRINT_VERSION, GLOBAL, SchemaPrefix, ShapeAction, ShapeRecord, build_tables,
     footprint_record, init_shape_record_query, shape_query, sql_value_list,
@@ -80,7 +80,7 @@ impl PsqlClient<'_> {
     /// Skips when they are already up to date.
     /// Rebuilds them when they disagree with [`FOOTPRINT_VERSION`], carrying the recorded run over
     /// as [`Aborted`](RunState::Aborted) and dropping its execution history.
-    pub async fn init_footprint(&self) -> PsqlResult<()> {
+    pub async fn init_footprint(&self) -> PsqlResult<TableShape> {
         let schema_prefix = self.schema_prefix();
         let shape_id = FOOTPRINT_VERSION.to_string();
 
@@ -95,7 +95,7 @@ impl PsqlClient<'_> {
         if action == ShapeAction::Rebuild {
             tracing::warn!(
                 "The last run was recorded under an incompatible version of Operon. \
-                Progress from that run cannot be restored."
+                Progress from that run cannot be gracefully resumed."
             );
         }
 
@@ -114,7 +114,7 @@ impl PsqlClient<'_> {
             let footprint = RunFootprint::at(run_id, RunState::Aborted, at);
             self.upsert_run(&footprint).await?;
         }
-        Ok(())
+        Ok(action.try_into().expect("a decided shape action"))
     }
 
     /// Clears the footprint table.

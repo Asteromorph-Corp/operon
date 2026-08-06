@@ -76,13 +76,6 @@ impl StorageClient<'_> {
             ShapeAction::Rebuild => self.recorded_run().await?,
             _ => None,
         };
-        if action == ShapeAction::Rebuild {
-            tracing::warn!(
-                "The last run was recorded under an incompatible version of Operon. \
-                Progress from that run cannot be restored."
-            );
-        }
-
         if let Some(stmt) = build_tables(
             FOOTPRINT_RECORD,
             &[FOOTPRINT_TABLE],
