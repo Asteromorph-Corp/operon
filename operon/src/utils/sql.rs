@@ -148,6 +148,29 @@ pub struct ShapeRecord<'a> {
     pub id: &'a str,
 }
 
+/// The record holding a storage's footprint version, keyed by `id`.
+///
+/// Giving each storage a different `id` lets one schema hold both footprints.
+pub const fn footprint_record(id: &str) -> ShapeRecord<'_> {
+    ShapeRecord {
+        table: "_footprint_version",
+        column: "version",
+        id,
+    }
+}
+
+/// Creates the table `record` points at.
+pub fn init_shape_record_query(record: ShapeRecord<'_>, schema_prefix: SchemaPrefix<'_>) -> String {
+    let ShapeRecord { table, column, .. } = record;
+
+    formatdoc! {"
+        CREATE TABLE IF NOT EXISTS {schema_prefix}{table} (
+            id TEXT PRIMARY KEY,
+            {column} TEXT NOT NULL
+        );"
+    }
+}
+
 /// The SQL condition for any of `tables` existing.
 fn tables_present(tables: &[&str], schema_prefix: SchemaPrefix<'_>) -> String {
     tables
@@ -358,14 +381,6 @@ mod tests {
 
     use super::*;
 
-    fn footprint_record() -> ShapeRecord<'static> {
-        ShapeRecord {
-            table: "_footprint_version",
-            column: "version",
-            id: "runs",
-        }
-    }
-
     #[rstest]
     #[case::unbuilt(None, false, ShapeAction::Build)]
     #[case::unrecorded(None, true, ShapeAction::Rebuild)]
@@ -389,7 +404,7 @@ mod tests {
         #[case] drops: bool,
     ) {
         let stmt = build_tables(
-            footprint_record(),
+            footprint_record("runs"),
             &["run_executions", "runs"],
             "1",
             SchemaPrefix(Some("test_meta")),

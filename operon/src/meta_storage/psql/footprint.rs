@@ -10,16 +10,12 @@ use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::psql::error::PsqlResult;
 use crate::schema::{RunFootprint, RunState};
 use crate::utils::{
-    FOOTPRINT_VERSION, GLOBAL, SchemaPrefix, ShapeAction, ShapeRecord, build_tables, shape_query,
-    sql_value_list,
+    FOOTPRINT_VERSION, GLOBAL, SchemaPrefix, ShapeAction, ShapeRecord, build_tables,
+    footprint_record, init_shape_record_query, shape_query, sql_value_list,
 };
 
 /// The pointer to the footprint tables' shape ID.
-const FOOTPRINT_RECORD: ShapeRecord<'static> = ShapeRecord {
-    table: "_footprint_version",
-    column: "version",
-    id: RUNS_TABLE,
-};
+const FOOTPRINT_RECORD: ShapeRecord<'static> = footprint_record(RUNS_TABLE);
 /// The table that records the footprint information.
 const RUNS_TABLE: &str = "runs";
 /// All tables to be initialized for footprinting.
@@ -72,15 +68,9 @@ impl PsqlClient<'_> {
     /// version.
     pub async fn init_footprint(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
-        let ShapeRecord { table, column, .. } = FOOTPRINT_RECORD;
         let shape_id = FOOTPRINT_VERSION.to_string();
 
-        let init_record = formatdoc! {"
-            CREATE TABLE IF NOT EXISTS {schema_prefix}{table} (
-                id TEXT PRIMARY KEY,
-                {column} TEXT NOT NULL
-            );"
-        };
+        let init_record = init_shape_record_query(FOOTPRINT_RECORD, schema_prefix);
         self.execute(&init_record, &[]).await?;
 
         let action = self.footprint_action(&shape_id).await?;
