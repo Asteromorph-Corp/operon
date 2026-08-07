@@ -173,30 +173,67 @@ pub fn init_shape_record_query(record: ShapeRecord<'_>, schema_prefix: SchemaPre
     }
 }
 
-/// The SQL condition for any of `tables` existing.
-fn tables_present(tables: &[&str], schema_prefix: SchemaPrefix<'_>) -> String {
+/// The SQL conditions for each of `tables` existing, joined by `connective`.
+fn tables_present(tables: &[&str], schema_prefix: SchemaPrefix<'_>, connective: &str) -> String {
     tables
         .iter()
         .map(|table| format!("to_regclass('{schema_prefix}{table}') IS NOT NULL"))
         .collect::<Vec<_>>()
-        .join(" OR ")
+        .join(connective)
 }
 
-/// The query for the shape ID `record` points to and whether any of `tables` exists.
+/// The SQL condition for any of `tables` existing.
+fn any_table_present(tables: &[&str], schema_prefix: SchemaPrefix<'_>) -> String {
+    tables_present(tables, schema_prefix, " OR ")
+}
+
+/// The SQL condition for all of `tables` existing.
+fn all_tables_present(tables: &[&str], schema_prefix: SchemaPrefix<'_>) -> String {
+    tables_present(tables, schema_prefix, " AND ")
+}
+
+/// Which tables of a group exist in the database.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TablesPresent {
+    /// None of the tables exist.
+    None,
+    /// Some, but not all, of the tables exist.
+    Partial,
+    /// All of the tables exist.
+    All,
+}
+
+impl TablesPresent {
+    /// Reads the presence columns of a [`shape_query`] row.
+    fn from_row(row: &Row) -> Self {
+        let any: bool = row.get("any_present");
+        let all: bool = row.get("all_present");
+
+        match (any, all) {
+            (_, true) => Self::All,
+            (true, false) => Self::Partial,
+            (false, false) => Self::None,
+        }
+    }
+}
+
+/// The query for the shape ID `record` points to and which of `tables` exist.
 ///
-/// Returns one row, with the columns `shape_id` and `present`.
+/// Returns one row, with the columns `shape_id`, `any_present`, and `all_present`.
 pub fn shape_query(
     record: ShapeRecord<'_>,
     tables: &[&str],
     schema_prefix: SchemaPrefix<'_>,
 ) -> String {
     let ShapeRecord { table, column, id } = record;
-    let present = tables_present(tables, schema_prefix);
+    let any_present = any_table_present(tables, schema_prefix);
+    let all_present = all_tables_present(tables, schema_prefix);
 
     formatdoc! {"
         SELECT
             (SELECT {column} FROM {schema_prefix}{table} WHERE id = '{id}') AS shape_id,
-            ({present}) AS present;"
+            ({any_present}) AS any_present,
+            ({all_present}) AS all_present;"
     }
 }
 
@@ -217,11 +254,12 @@ pub enum ShapeAction {
 impl ShapeAction {
     /// The action to take, given what the database holds.
     ///
-    /// A table that exists without a matching shape ID is rebuilt: nothing records its shape.
-    pub fn new(recorded: Option<&str>, present: bool, shape_id: &str) -> Self {
+    /// A group is rebuilt when its recorded shape ID differs, or when only some of its tables
+    /// exist.
+    pub fn new(recorded: Option<&str>, present: TablesPresent, shape_id: &str) -> Self {
         match (recorded, present) {
-            (_, false) => Self::Build,
-            (Some(recorded), _) if recorded == shape_id => Self::Keep,
+            (_, TablesPresent::None) => Self::Build,
+            (Some(recorded), TablesPresent::All) if recorded == shape_id => Self::Keep,
             _ => Self::Rebuild,
         }
     }
@@ -229,7 +267,7 @@ impl ShapeAction {
     /// [`ShapeAction::new`] over a [`shape_query`] row.
     pub fn from_row(row: Option<&Row>, shape_id: &str) -> Self {
         row.map_or(Self::Build, |row| {
-            Self::new(row.get("shape_id"), row.get("present"), shape_id)
+            Self::new(row.get("shape_id"), TablesPresent::from_row(row), shape_id)
         })
     }
 }
@@ -280,7 +318,7 @@ pub fn build_tables(
         .collect::<Vec<_>>()
         .join(", ");
     let drop_tables = format!("DROP TABLE IF EXISTS {qualified};");
-    let present = tables_present(tables, schema_prefix);
+    let all_present = all_tables_present(tables, schema_prefix);
     let record_shape = formatdoc! {"
         INSERT INTO {schema_prefix}{table} (id, {column})
         VALUES ('{id}', '{shape_id}')
@@ -301,13 +339,11 @@ pub fn build_tables(
                 FROM {schema_prefix}{table}
                 WHERE id = '{id}';
 
-                IF recorded IS NOT DISTINCT FROM '{shape_id}' AND ({present}) THEN
+                IF recorded IS NOT DISTINCT FROM '{shape_id}' AND ({all_present}) THEN
                     RETURN;
                 END IF;
 
-                IF ({present}) THEN
-                    {drop_tables}
-                END IF;
+                {drop_tables}
 
                 {init_query}
 
@@ -384,15 +420,18 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[case::unbuilt(None, false, ShapeAction::Build)]
-    #[case::unrecorded(None, true, ShapeAction::Rebuild)]
-    #[case::matching(Some("1"), true, ShapeAction::Keep)]
-    #[case::diverged(Some("2"), true, ShapeAction::Rebuild)]
-    #[case::matching_but_dropped(Some("1"), false, ShapeAction::Build)]
-    #[case::diverged_and_dropped(Some("2"), false, ShapeAction::Build)]
+    #[case::unbuilt(None, TablesPresent::None, ShapeAction::Build)]
+    #[case::unrecorded(None, TablesPresent::All, ShapeAction::Rebuild)]
+    #[case::matching(Some("1"), TablesPresent::All, ShapeAction::Keep)]
+    #[case::diverged(Some("2"), TablesPresent::All, ShapeAction::Rebuild)]
+    #[case::matching_but_dropped(Some("1"), TablesPresent::None, ShapeAction::Build)]
+    #[case::diverged_and_dropped(Some("2"), TablesPresent::None, ShapeAction::Build)]
+    #[case::matching_but_partial(Some("1"), TablesPresent::Partial, ShapeAction::Rebuild)]
+    #[case::unrecorded_and_partial(None, TablesPresent::Partial, ShapeAction::Rebuild)]
+    #[case::diverged_and_partial(Some("2"), TablesPresent::Partial, ShapeAction::Rebuild)]
     fn test_shape_action_new(
         #[case] recorded: Option<&str>,
-        #[case] present: bool,
+        #[case] present: TablesPresent,
         #[case] expected: ShapeAction,
     ) {
         assert_eq!(ShapeAction::new(recorded, present, "1"), expected);

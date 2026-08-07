@@ -16,7 +16,7 @@ use uuid::Uuid;
 use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::tests::utils::psql_backend;
 use crate::meta_storage::{MetaBackend, MetaConnApi};
-use crate::schema::{RunFootprint, RunMetadata, RunState};
+use crate::schema::{RunFootprint, RunMetadata, RunState, TableShape};
 
 /// The schema the rebuild sequence owns outright.
 const REBUILD_SCHEMA: &str = "operon_rebuild_footprint";
@@ -26,6 +26,9 @@ const SAME_VERSION_SCHEMA: &str = "operon_rebuild_footprint_same";
 
 /// The schema the version-bump sequence owns outright.
 const BUMPED_VERSION_SCHEMA: &str = "operon_rebuild_footprint_bumped";
+
+/// The schema the partially-dropped sequence owns outright.
+const PARTIAL_SCHEMA: &str = "operon_rebuild_footprint_partial";
 
 /// Drops the schema the sequence owns, so it starts from nothing recorded.
 async fn drop_schema(client: PsqlClient<'_>, schema: &str) {
@@ -227,4 +230,56 @@ async fn footprint_tables_survive_an_init_at_the_same_version() {
         row_count(client, SAME_VERSION_SCHEMA, "run_executions").await,
         1
     );
+}
+
+#[tokio::test]
+async fn footprint_tables_are_rebuilt_when_only_some_of_them_stand() {
+    let Some(psql) = psql_backend(PARTIAL_SCHEMA) else {
+        eprintln!("skipping: POSTGRES_URI is not set, so there is no Postgres to build tables in");
+        return;
+    };
+
+    let conn = psql.scheduler_conn().await.expect("scheduler conn");
+    let client = conn.as_client();
+
+    drop_schema(client, PARTIAL_SCHEMA).await;
+    client.init_schema().await.expect("init_schema");
+    client.init_footprint().await.expect("first init_footprint");
+
+    let footprint = RunFootprint::new(Uuid::new_v4(), RunState::Stopped);
+    client.upsert_run(&footprint).await.expect("record a run");
+
+    let stmt = format!("DROP TABLE {PARTIAL_SCHEMA}.run_executions;");
+    client
+        .execute(&stmt, &[])
+        .await
+        .expect("drop run_executions");
+
+    assert_eq!(
+        client
+            .init_footprint()
+            .await
+            .expect("second init_footprint"),
+        TableShape::STALE
+    );
+    assert_eq!(
+        client
+            .get_footprint()
+            .await
+            .expect("get_footprint after rebuild")
+            .expect("the run is still recorded")
+            .metadata,
+        RunMetadata::new(footprint.metadata.run_id, RunState::Aborted)
+    );
+
+    let run_id = Uuid::new_v4();
+    client
+        .upsert_run(&RunFootprint::new(run_id, RunState::Running))
+        .await
+        .expect("record a run after the rebuild");
+    client
+        .put_execution(run_id, Uuid::new_v4())
+        .await
+        .expect("record an execution after the rebuild");
+    assert_eq!(row_count(client, PARTIAL_SCHEMA, "run_executions").await, 1);
 }
