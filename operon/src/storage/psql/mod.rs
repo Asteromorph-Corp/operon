@@ -5,6 +5,7 @@ mod queries;
 pub use queries::EntityQueries;
 
 mod client;
+pub use client::StorageClient;
 
 mod error;
 pub use error::PsqlStorageError;

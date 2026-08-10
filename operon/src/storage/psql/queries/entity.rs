@@ -1,14 +1,16 @@
+use async_trait::async_trait;
 use bytes::Bytes;
 use futures::SinkExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::schema::{Entity, EntityMetadata};
-use crate::storage::psql::PsqlStorageResult;
+use crate::storage::StorageResult;
 use crate::storage::psql::client::StorageClient;
+use crate::storage::psql::{PsqlStorageError, PsqlStorageResult};
 use crate::utils::{
     SchemaPrefix, SchemaPrefixOwned, ShapeAction, ShapeRecord, SqlParams, build_tables,
-    hash_metadata,
+    hash_metadata, shape_query,
 };
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
@@ -35,10 +37,7 @@ impl<'a> StorageClient<'a> {
 impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     /// Initializes the entity table.
     pub async fn init(&self) -> PsqlStorageResult<()> {
-        let schema_prefix = self.client.schema_prefix();
-        let stmt = self.entity_meta.init_stmt(schema_prefix);
-        self.client.execute(&stmt, &[]).await?;
-        Ok(())
+        self.entity_meta.init(&self.client).await
     }
 
     /// Clears the entity table.
@@ -136,35 +135,47 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 }
 
-/// The statements preparing and emptying one entity's table, erased of the entity's arity and type.
+/// Prepares and empties one entity's table, erased of the entity's arity and type.
 ///
-/// The generated storage holds these for every entity of a pipeline, so that its `init` and `clear`
-/// walk one collection.
+/// The generated storage implements this over every entity of a pipeline, so that its `init` and
+/// `clear` walk one collection.
+#[async_trait]
 pub trait EntityQueries: Send + Sync + 'static {
-    /// The statement creating this entity's table, rebuilding it when the recorded shape no longer
-    /// matches the entity.
-    fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String;
+    /// Creates this entity's table, rebuilding it when the recorded shape no longer matches the
+    /// entity.
+    async fn init(&self, client: &StorageClient<'_>) -> StorageResult<(), PsqlStorageError>;
 
     /// The statement discarding every row of this entity's table.
     fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String;
 }
 
+#[async_trait]
 impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<N, T> {
-    fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String {
+    async fn init(&self, client: &StorageClient<'_>) -> PsqlStorageResult<()> {
+        let schema_prefix = client.schema_prefix();
         let record = ShapeRecord {
             table: "_entity_hash",
             column: "hash",
             id: self.id,
         };
-        build_tables(
+        let tables = [self.id];
+        let shape_id = hash_metadata(self);
+
+        let shape_stmt = shape_query(record, &tables, schema_prefix);
+        let row = client.query_opt(&shape_stmt, &[]).await?;
+        let action = ShapeAction::from_row(row.as_ref(), &shape_id);
+
+        if let Some(stmt) = build_tables(
             record,
-            &[self.id],
-            &hash_metadata(self),
-            schema,
-            ShapeAction::Defer,
-            InitEntityQuery(schema, *self),
-        )
-        .expect("a deferred build always yields a statement")
+            &tables,
+            &shape_id,
+            schema_prefix,
+            action,
+            InitEntityQuery(schema_prefix, *self),
+        ) {
+            client.batch_execute(&stmt).await?;
+        }
+        Ok(())
     }
 
     fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String {

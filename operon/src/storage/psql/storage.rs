@@ -85,12 +85,11 @@ impl<T: EntityQueries> OperonStorage for PsqlStorage<T> {
     /// If the storage schema is specified, initialize the schema in the database.
     async fn init(&self) -> PsqlStorageResult<()> {
         let client = self.conn().await?;
-        let entities_init_stmt = self.entities_meta.init_stmt(self.schema_prefix());
 
         client.init_schema().await?;
         client.init_entity_hash().await?;
         client.init_footprint().await?;
-        client.batch_execute(&entities_init_stmt).await?;
+        self.entities_meta.init(&client).await?;
         Ok(())
     }
 

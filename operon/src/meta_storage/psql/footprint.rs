@@ -114,7 +114,7 @@ impl PsqlClient<'_> {
             let footprint = RunFootprint::at(run_id, RunState::Aborted, at);
             self.upsert_run(&footprint).await?;
         }
-        Ok(action.try_into().expect("a decided shape action"))
+        Ok(action.into())
     }
 
     /// Clears the footprint table.

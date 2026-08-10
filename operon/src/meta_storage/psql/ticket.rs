@@ -123,7 +123,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         self.client
             .execute_stmt(&summary_stmt, &[&self.task_meta.id])
             .await?;
-        Ok(action.try_into().expect("a decided shape action"))
+        Ok(action.into())
     }
 
     async fn clear(&self) -> PsqlResult<()> {

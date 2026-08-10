@@ -248,8 +248,6 @@ pub enum ShapeAction {
     Build,
     /// The tables carry a mismatching shape ID, and should be dropped before being built.
     Rebuild,
-    /// The decision is deferred to the [`build_tables`] statement.
-    Defer,
 }
 
 impl ShapeAction {
@@ -273,15 +271,11 @@ impl ShapeAction {
     }
 }
 
-impl TryFrom<ShapeAction> for TableShape {
-    /// The deferred action, which has no shape until the query runs.
-    type Error = ShapeAction;
-
-    fn try_from(action: ShapeAction) -> Result<Self, Self::Error> {
+impl From<ShapeAction> for TableShape {
+    fn from(action: ShapeAction) -> Self {
         match action {
-            ShapeAction::Rebuild => Ok(Self::STALE),
-            ShapeAction::Keep | ShapeAction::Build => Ok(Self::CURRENT),
-            ShapeAction::Defer => Err(action),
+            ShapeAction::Rebuild => Self::STALE,
+            ShapeAction::Keep | ShapeAction::Build => Self::CURRENT,
         }
     }
 }
@@ -300,8 +294,6 @@ impl TryFrom<ShapeAction> for TableShape {
 /// - [`Build`](`ShapeAction::Build`): Runs `init_query` and records `shape_id`.
 /// - [`Rebuild`](`ShapeAction::Rebuild`): Drops the tables in `tables`, runs `init_query`, and
 ///   records `shape_id`.
-/// - [`Defer`](`ShapeAction::Defer`): Chooses between the above in SQL, as [`ShapeAction::new`]
-///   does in Rust.
 pub fn build_tables(
     record: ShapeRecord<'_>,
     tables: &[&str],
@@ -319,7 +311,6 @@ pub fn build_tables(
         .collect::<Vec<_>>()
         .join(", ");
     let drop_tables = format!("DROP TABLE IF EXISTS {qualified};");
-    let all_present = all_tables_present(tables, schema_prefix);
     let record_shape = formatdoc! {"
         INSERT INTO {schema_prefix}{table} (id, {column})
         VALUES ('{id}', '{shape_id}')
@@ -330,28 +321,6 @@ pub fn build_tables(
         ShapeAction::Keep => None,
         ShapeAction::Build => Some(format!("{init_query}\n\n{record_shape}")),
         ShapeAction::Rebuild => Some(format!("{drop_tables}\n\n{init_query}\n\n{record_shape}")),
-        ShapeAction::Defer => Some(formatdoc! {"
-            DO $$
-            DECLARE
-                recorded TEXT;
-            BEGIN
-                SELECT {column}
-                INTO recorded
-                FROM {schema_prefix}{table}
-                WHERE id = '{id}';
-
-                IF recorded IS NOT DISTINCT FROM '{shape_id}' AND ({all_present}) THEN
-                    RETURN;
-                END IF;
-
-                {drop_tables}
-
-                {init_query}
-
-                {record_shape}
-            END
-            $$;"
-        }),
     }
 }
 

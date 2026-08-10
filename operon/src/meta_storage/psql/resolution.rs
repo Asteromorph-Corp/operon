@@ -69,7 +69,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         ) {
             self.client.batch_execute(&stmt).await?;
         }
-        Ok(action.try_into().expect("a decided shape action"))
+        Ok(action.into())
     }
 
     async fn clear(&self) -> PsqlResult<()> {
