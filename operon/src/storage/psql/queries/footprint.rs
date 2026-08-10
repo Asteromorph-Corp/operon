@@ -62,8 +62,8 @@ impl StorageClient<'_> {
     /// Initializes the footprint table.
     ///
     /// Skips when it is already up to date.
-    /// Rebuilds it when it disagrees with [`FOOTPRINT_VERSION`], carrying the recorded run over as
-    /// [`Aborted`](RunState::Aborted).
+    /// Rebuilds it when it disagrees with the running footprint version, carrying the recorded run
+    /// over as [`Aborted`](RunState::Aborted).
     pub async fn init_footprint(&self) -> PsqlStorageResult<()> {
         let schema_prefix = self.schema_prefix();
         let shape_id = FOOTPRINT_VERSION.to_string();

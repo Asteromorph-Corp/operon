@@ -108,11 +108,11 @@ pub trait MetaClientApi<MSto: MetaBackend>: Copy + Send + Sync {
     fn init_schema(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
 
     /// Prepares the record of the shape each task's tickets were built under, which
-    /// [`MetaTicketApi::shape`] reads.
+    /// [`MetaTicketApi::init`] reads.
     fn init_ticket_hash(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
 
     /// Prepares the record of the shape each dimension's resolutions were built under, which
-    /// [`MetaResolutionApi::shape`] reads.
+    /// [`MetaResolutionApi::init`] reads.
     fn init_dimension_hash(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
 
     /// Prepares the backend's representation of [`TicketStatus`].
