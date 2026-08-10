@@ -8,7 +8,7 @@ fn fn_scheduler_handler(all_configs: &AllConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let service_trait = service_trait_ident(&all_configs.service_id);
     let storage_trait = storage_trait_ident(&all_configs.service_id);
-    let specs = all_configs.jobs.keys().map(spec_ident);
+    let specs = all_configs.tasks.keys().map(spec_ident);
 
     parse_quote! {
         pub fn scheduler_handler<
@@ -24,9 +24,9 @@ fn fn_scheduler_handler(all_configs: &AllConfig) -> syn::ItemFn {
 }
 
 fn fn_link_dimension_ids(all_configs: &AllConfig) -> syn::ItemFn {
-    let defs = all_configs.jobs.values().filter_map(|job| {
-        let spawn_dim = job.spawn_dim.as_ref()?;
-        let doc = format!("Dimension spawned by `{}`", job.id);
+    let defs = all_configs.tasks.values().filter_map(|task| {
+        let spawn_dim = task.spawn_dim.as_ref()?;
+        let doc = format!("Dimension spawned by `{}`", task.id);
         let stmt: syn::Field = parse_quote! {
             #[doc = #doc]
             #spawn_dim: Dimension
@@ -34,14 +34,14 @@ fn fn_link_dimension_ids(all_configs: &AllConfig) -> syn::ItemFn {
         Some(stmt)
     });
     let refs = all_configs
-        .jobs
+        .tasks
         .values()
-        .flat_map(|job| job.dims.iter())
+        .flat_map(|task| task.dims.iter())
         .chain(
             all_configs
-                .jobs
+                .tasks
                 .values()
-                .flat_map(|job| job.from.iter().flat_map(|arg| arg.over.iter())),
+                .flat_map(|task| task.from.iter().flat_map(|arg| arg.over.iter())),
         );
 
     parse_quote! {

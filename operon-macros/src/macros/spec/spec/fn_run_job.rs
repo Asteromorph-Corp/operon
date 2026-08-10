@@ -6,7 +6,7 @@ use quote::{format_ident, quote};
 use syn::parse_quote;
 
 use crate::configs::{
-    DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg, JobConfig,
+    DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, TaskArg, TaskConfig,
 };
 use crate::utils::{
     batch_get_entity_ident, batch_put_entity_ident, clear_span, dimension_metadata_ident,
@@ -35,7 +35,7 @@ struct RequiredDim<'a> {
     /// The dimensions that this resolution is fetched over.
     ///
     /// Note that this is a subset of, but not identical to `config.depends_on`,
-    /// as dimensions not included here are already part of the job dimensions
+    /// as dimensions not included here are already part of the task dimensions
     /// so we need to only fetch the resolution for the specific value of that dimension.
     fetched_over: Vec<&'a syn::Ident>,
 }
@@ -65,7 +65,7 @@ impl<'a> RequiredDim<'a> {
 /// Returns dimensions whose resolution need to be fetched in order to check entity vector length
 /// for an argument.
 fn get_required_dims<'a>(
-    arg: &'a JobArg,
+    arg: &'a TaskArg,
     dimensions: &'a DimensionConfigMap,
 ) -> impl Iterator<Item = RequiredDim<'a>> {
     arg.over.iter().map(|dim| {
@@ -79,10 +79,10 @@ fn get_required_dims<'a>(
 /// Returns dimensions whose resolution need to be fetched in order to check entity vector length
 /// for all arguments.
 fn get_all_required_dims<'a>(
-    job: &'a JobConfig,
+    task: &'a TaskConfig,
     dimensions: &'a DimensionConfigMap,
 ) -> IndexSet<RequiredDim<'a>> {
-    job.from
+    task.from
         .iter()
         .flat_map(|arg| get_required_dims(arg, dimensions))
         .collect()
@@ -145,7 +145,7 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
     let get_ident = get_entity_ident(&arg_entity.id);
 
     // All arg dimension are passed to the get function
-    // These dimensions are expected to be present in the job struct
+    // These dimensions are expected to be present in the task struct
     let get_args = arg_entity.dims.iter().map(clear_span);
 
     let entity_name = arg_entity.id.to_string();
@@ -167,7 +167,7 @@ fn arg_def_single(arg_entity: &EntityConfig) -> syn::Stmt {
 
 /// Generates the code for defining a collected argument entity in the `run_job` function.
 fn arg_def_collected(
-    job: &JobConfig,
+    task: &TaskConfig,
     entity: &EntityConfig,
     over: &[syn::Ident],
     dimensions: &DimensionConfigMap,
@@ -177,7 +177,7 @@ fn arg_def_collected(
     let get_ident = batch_get_entity_ident(&entity.id, over);
 
     // Only arg dimensions that are not part of the `over` dimensions are passed to the get function
-    // These dimensions are expected to be present in the job struct
+    // These dimensions are expected to be present in the task struct
     let get_args = entity
         .dims
         .iter()
@@ -203,7 +203,7 @@ fn arg_def_collected(
                 let name = arg_dim.to_string();
                 if *arg_dim == dim {
                     quote! { (#name, #operon::error::DimState::Aggregated) }
-                } else if dim_config.depends_on.contains(arg_dim) || job.dims.contains(arg_dim) {
+                } else if dim_config.depends_on.contains(arg_dim) || task.dims.contains(arg_dim) {
                     let arg_dim = clear_span(arg_dim);
                     quote! { (#name, #operon::error::DimState::Value(#arg_dim)) }
                 } else {
@@ -239,7 +239,7 @@ fn arg_def_collected(
     }
 }
 
-/// Generates the `run_job` function for the implementation of the trait `JobSpec`.
+/// Generates the `run_job` function for the implementation of the trait `TaskSpec`.
 ///
 /// # Example
 /// ```rust,ignore
@@ -282,7 +282,7 @@ fn arg_def_collected(
 ///         .put(resolution)
 ///         .await?;
 ///     tx.as_client()
-///         .ticket(self.job_meta())
+///         .ticket(self.task_meta())
 ///         .mark_done(job)
 ///         .await?;
 ///     tx.commit().await?;
@@ -291,16 +291,16 @@ fn arg_def_collected(
 /// }
 /// ```
 pub(super) fn fn_run_job(
-    job: &JobConfig,
+    task: &TaskConfig,
     entities: &EntityConfigMap,
     dimensions: &DimensionConfigMap,
 ) -> syn::ImplItemFn {
     let operon = operon_ident();
 
-    let job_dim_set: IndexSet<&syn::Ident> = job.dims.iter().collect();
-    let required_dims = get_all_required_dims(job, dimensions);
+    let task_dim_set: IndexSet<&syn::Ident> = task.dims.iter().collect();
+    let required_dims = get_all_required_dims(task, dimensions);
 
-    let job_coord_vars = job_dim_set.iter().cloned().map(clear_span);
+    let task_coord_vars = task_dim_set.iter().cloned().map(clear_span);
     let resolution_defs = required_dims.iter().map(|dim| -> syn::Stmt {
         let res_map_var = resolution_map_ident(dim);
         let n = dim.fetched_over.len();
@@ -328,24 +328,24 @@ pub(super) fn fn_run_job(
         }
     });
 
-    let job_fn_name = clear_span(&job.id);
-    let args = job
+    let task_fn_name = clear_span(&task.id);
+    let args = task
         .from
         .iter()
         .map(|arg| entity_over_dim_ident(&arg.id, &arg.over));
-    let arg_defs = job.from.iter().map(|arg| -> syn::Stmt {
+    let arg_defs = task.from.iter().map(|arg| -> syn::Stmt {
         let entity = entities.get(&arg.id).expect("Entity not found in config");
         if arg.over.is_empty() {
             arg_def_single(entity)
         } else {
-            arg_def_collected(job, entity, &arg.over, dimensions)
+            arg_def_collected(task, entity, &arg.over, dimensions)
         }
     });
 
-    let result_ident = entity_over_dim_ident(&job.to, job.spawn_dim.as_slice());
-    let put_fn_name = match &job.spawn_dim {
-        Some(_) => batch_put_entity_ident(&job.to),
-        None => put_entity_ident(&job.to),
+    let result_ident = entity_over_dim_ident(&task.to, task.spawn_dim.as_slice());
+    let put_fn_name = match &task.spawn_dim {
+        Some(_) => batch_put_entity_ident(&task.to),
+        None => put_entity_ident(&task.to),
     };
 
     let entity: syn::Expr = parse_quote! {
@@ -354,13 +354,13 @@ pub(super) fn fn_run_job(
             value: #result_ident,
         }
     };
-    let resolution: syn::Expr = if job.spawn_dim.is_some() {
+    let resolution: syn::Expr = if task.spawn_dim.is_some() {
         parse_quote! { #operon::__private::Resolution::new(entity.value.len(), job.coordinate)  }
     } else {
         parse_quote! { () }
     };
 
-    let maybe_put_resolution: Option<syn::Stmt> = job.spawn_dim.is_some().then(|| {
+    let maybe_put_resolution: Option<syn::Stmt> = task.spawn_dim.is_some().then(|| {
         parse_quote! {
             tx.as_client().resolution(self.spawn_dim_meta()).put(resolution).await?;
         }
@@ -375,14 +375,14 @@ pub(super) fn fn_run_job(
             meta_storage: MSto,
             job: Self::Job,
         ) -> Result<Self::Resolution, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-            let [#(#job_coord_vars),*] = job.coordinate;
+            let [#(#task_coord_vars),*] = job.coordinate;
 
             #maybe_define_resolutions;
 
             #(#arg_defs)*
 
             let #result_ident = service
-                .#job_fn_name(#(#args),*)
+                .#task_fn_name(#(#args),*)
                 .await
                 .map_err(operon::error::SchedulerError::UserError)?;
             let entity = #entity;
@@ -393,7 +393,7 @@ pub(super) fn fn_run_job(
             let tx = conn.transaction().await?;
             #maybe_put_resolution;
             tx.as_client()
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .mark_done(job)
                 .await?;
             tx.commit().await?;
@@ -410,36 +410,38 @@ mod tests {
     use crate::test_utils::assert_item_eq;
     use crate::test_utils::complicated_pipeline::{
         all_dimensions as all_dimensions_complicated, all_entities as all_entities_complicated,
-        job_epsilon as job_multiple_over,
+        task_epsilon as task_multiple_over,
     };
-    use crate::test_utils::simple_pipeline::{all_dimensions, all_entities, job_beta, job_epsilon};
+    use crate::test_utils::simple_pipeline::{
+        all_dimensions, all_entities, task_beta, task_epsilon,
+    };
 
     #[rstest]
     #[case::simple(
         all_entities(),
         all_dimensions(),
-        job_beta(),
+        task_beta(),
         "spec/spec/fn_run_job.simple.rs"
     )]
     #[case::with_over(
         all_entities(),
         all_dimensions(),
-        job_epsilon(),
+        task_epsilon(),
         "spec/spec/fn_run_job.with_over.rs"
     )]
     #[case::multiple_over(
         all_entities_complicated(),
         all_dimensions_complicated(),
-        job_multiple_over(),
+        task_multiple_over(),
         "spec/spec/fn_run_job.multiple_over.rs"
     )]
     fn test_fn_run_job(
         #[case] all_entities: EntityConfigMap,
         #[case] all_dimensions: DimensionConfigMap,
-        #[case] job: JobConfig,
+        #[case] task: TaskConfig,
         #[case] fixture_path: &str,
     ) {
-        let item = fn_run_job(&job, &all_entities, &all_dimensions);
+        let item = fn_run_job(&task, &all_entities, &all_dimensions);
         assert_item_eq(&item, fixture_path);
     }
 }

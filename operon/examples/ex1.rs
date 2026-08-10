@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 // Entities must implement the following traits:
 // * `Clone`
 // * `Debug`
-// * Optionally, `Serialize` and `Deserialize` for database usage.
+// * `Serialize` and `Deserialize`, which the generated PostgreSQL storage asks for.
 
 // Strings already implement all the necessary traits,
 // so using a type alias of `String` is sufficient for our `Input` type.

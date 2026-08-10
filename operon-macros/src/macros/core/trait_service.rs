@@ -1,20 +1,20 @@
 use indoc::formatdoc;
 use syn::parse_quote;
 
-use crate::configs::{AllConfig, JobConfig};
+use crate::configs::{AllConfig, TaskConfig};
 use crate::macros::core::DocumentedFn;
 use crate::utils::{
     entity_over_dim_ident, job_enum_ident, operon_ident, resolution_enum_ident,
     service_trait_ident_spanned, ticket_enum_ident, to_type,
 };
 
-fn format_definition(job: &JobConfig) -> String {
-    let output_agg = job
+fn format_definition(task: &TaskConfig) -> String {
+    let output_agg = task
         .spawn_dim
         .as_ref()
         .map(|d| format!("<{d}>"))
         .unwrap_or_default();
-    let inputs = job
+    let inputs = task
         .from
         .iter()
         .map(|arg| {
@@ -28,22 +28,22 @@ fn format_definition(job: &JobConfig) -> String {
         })
         .collect::<Vec<_>>()
         .join(", ");
-    let repeat = if job.dims.is_empty() {
+    let repeat = if task.dims.is_empty() {
         String::new()
     } else {
-        let dims = job.dims.iter().map(|d| d.to_string()).collect::<Vec<_>>();
+        let dims = task.dims.iter().map(|d| d.to_string()).collect::<Vec<_>>();
         format!(" for {}", dims.join(", "))
     };
 
     format!(
         "{}{} = {}({}){}",
-        job.to, output_agg, job.id, inputs, repeat
+        task.to, output_agg, task.id, inputs, repeat
     )
 }
 
-fn format_signature(job: &JobConfig) -> String {
+fn format_signature(task: &TaskConfig) -> String {
     let args = std::iter::once("&self".to_owned())
-        .chain(job.from.iter().map(|arg| {
+        .chain(task.from.iter().map(|arg| {
             let arg_ident = entity_over_dim_ident(&arg.id, &arg.over);
             let arg_ty =
                 (0..arg.over.len()).fold(arg.id.to_string(), |acc, _| format!("Vec<{acc}>"));
@@ -51,14 +51,14 @@ fn format_signature(job: &JobConfig) -> String {
         }))
         .collect::<Vec<_>>()
         .join(", ");
-    let return_ty = job
+    let return_ty = task
         .spawn_dim
         .as_ref()
-        .map_or_else(|| job.to.to_string(), |_| format!("Vec<{}>", job.to));
+        .map_or_else(|| task.to.to_string(), |_| format!("Vec<{}>", task.to));
 
     format!(
         "async fn {}({}) -> Result<{}, Self::Error>",
-        job.id, args, return_ty
+        task.id, args, return_ty
     )
 }
 
@@ -67,9 +67,12 @@ fn format_signature(job: &JobConfig) -> String {
 /// # Example
 /// ```rust,ignore
 /// #[operon::__private::async_trait::async_trait]
-/// #[automatically_derived]
 /// pub trait CookingService:
-///     operon::OperonService<JobEnum = schema::JobEnum, ResolutionEnum = schema::ResolutionEnum>
+///     operon::OperonService<
+///         JobEnum = schema::JobEnum,
+///         ResolutionEnum = schema::ResolutionEnum,
+///         TicketEnum = schema::TicketEnum,
+///     >
 /// {
 ///     async fn alpha(&self) -> Result<Vec<A>, Self::Error>;
 ///     async fn beta(&self, a: A) -> Result<Vec<B>, Self::Error>;
@@ -86,12 +89,12 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let ticket_enum_ident = ticket_enum_ident();
     let svc_ident = service_trait_ident_spanned(&all_configs.service_id);
 
-    let (job_sigs, job_fns) = all_configs
-        .jobs
+    let (task_sigs, task_fns) = all_configs
+        .tasks
         .values()
-        .map(|job| -> DocumentedFn {
-            let fn_name = &job.id;
-            let args = job
+        .map(|task| -> DocumentedFn {
+            let fn_name = &task.id;
+            let args = task
                 .from
                 .iter()
                 .map(|arg| -> syn::FnArg {
@@ -101,16 +104,16 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
                     parse_quote! { #arg_ident: #arg_ty }
                 })
                 .collect::<Vec<_>>();
-            let return_ty: syn::Type = job.spawn_dim.as_ref().map_or_else(
-                || to_type(&job.to),
+            let return_ty: syn::Type = task.spawn_dim.as_ref().map_or_else(
+                || to_type(&task.to),
                 |_| {
-                    let unit_ty = to_type(&job.to);
+                    let unit_ty = to_type(&task.to);
                     parse_quote! { Vec<#unit_ty> }
                 },
             );
 
-            let def = format_definition(job);
-            let sig = format_signature(job);
+            let def = format_definition(task);
+            let sig = format_signature(task);
             let doc = formatdoc! {"
             ```rust,ignore
             {sig}
@@ -137,13 +140,16 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
 
         Each task method returns `Self::Error`, the service's error type.
         `#[derive(OperonService)]` defaults it to `operon::error::UserError`.
-        Select a concrete type with `#[operon(error = \"MyError\")]` on the derive.
+        Select a concrete type with `#[operon(error = MyError)]` on the derive.
+
+        The derive also takes `#[operon(defined_at = \"path\")]`, the module `define_operon!`
+        expanded in, and `#[operon(crate = \"path\")]`, the `operon` crate itself.
 
         # Methods
         ```rust,ignore
         {}
         ```",
-        job_sigs.join("\n")
+        task_sigs.join("\n")
     };
 
     parse_quote! {
@@ -154,7 +160,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
             ResolutionEnum = schema::#res_enum_ident,
             TicketEnum = schema::#ticket_enum_ident
         > {
-            #(#job_fns)*
+            #(#task_fns)*
         }
     }
 }

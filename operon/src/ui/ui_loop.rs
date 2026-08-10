@@ -37,15 +37,15 @@ Commands:
                         --fresh, --rebuild, and --redo are mutually exclusive.
         -f, --fresh         Start a fresh run, ignoring any existing data.
         -r, --rebuild       Rebuild the run from trusted data before starting.
-        -s, --skip <JOB_TYPE>[ ...]
-                            With --rebuild, do not rebuild the given 1 or more job(s).
-        -R, --redo <JOB_TYPE>[ ...]
+        -s, --skip <TASK>[ ...]
+                            With --rebuild, do not rebuild the given 1 or more task(s).
+        -R, --redo <TASK>[ ...]
                             Shorthand for --rebuild --skip <...>.
         -i, --redo-inconsistent-jobs
                             Rebuild the run even on a failed check,
-                            ignoring jobs with corrupt data and their downstream jobs.
+                            ignoring tasks with corrupt data and their downstream tasks.
                             Cannot be used with --fresh.
-                            Note that --redo <INCONSISTENT_JOBS> will NOT allow a rebuild
+                            Note that --redo <INCONSISTENT_TASKS> will NOT allow a rebuild
                             on a failed check without this flag.
     check [OPTIONS]     Check the consistency of the data from the last run.
         -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
@@ -58,13 +58,13 @@ Commands:
     quit [OPTIONS]      Stop all jobs and exit the UI. Defaults to graceful shutdown.
         -f, --force         Force quit.
         -n, --no-exit       Don't exit the UI.
-    pause [OPTIONS] [<JOB_TYPE>[ ...]]
+    pause [OPTIONS] [<TASK>[ ...]]
                         Pause executing new jobs.
-        -c, --cascade       Cascade the pause command to dependent jobs.
-    resume [<JOB_TYPE>[ ...]]
-                        Resume paused jobs.
+        -c, --cascade       Cascade the pause command to dependent tasks.
+    resume [<TASK>[ ...]]
+                        Resume paused tasks.
     help                Print this help message."#;
-static MAX_JOB_NAME_LEN: OnceLock<u16> = OnceLock::new();
+static MAX_TASK_NAME_LEN: OnceLock<u16> = OnceLock::new();
 
 /// `Drop`-guarded terminal wrapper.
 struct TerminalGuard<W: ::std::io::Write> {
@@ -139,11 +139,11 @@ impl UiLoop {
         }
     }
 
-    pub fn is_job(&self, job_name: &str) -> bool {
-        self.progresses.0.contains_key(job_name)
+    pub fn is_task(&self, task_name: &str) -> bool {
+        self.progresses.0.contains_key(task_name)
     }
 
-    /// Records the scheduler as gone and paints every job as errored.
+    /// Records the scheduler as gone and paints every task as errored.
     async fn mark_scheduler_lost(&mut self) {
         tracing::error!(
             "Operon's UI lost contact with the scheduler and cannot continue execution."
@@ -203,15 +203,15 @@ impl UiLoop {
         terminal.clear()?;
 
         let snapshot = self.progresses.snapshot().await;
-        MAX_JOB_NAME_LEN
+        MAX_TASK_NAME_LEN
             .set(
                 snapshot
                     .0
                     .keys()
                     .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
                     .max()
-                    .expect("At least one job name exists")
-                    .clamp(3, 20),
+                    .expect("At least one task name exists")
+                    .clamp(4, 20),
             )
             .ok();
 
@@ -253,9 +253,9 @@ impl UiLoop {
                     let width = terminal.size()?.width;
                     let verbose = width
                         >= VERBOSE_THRESHOLD
-                            + MAX_JOB_NAME_LEN
+                            + MAX_TASK_NAME_LEN
                                 .get()
-                                .ok_or(UiError::Other("Max job name length not set".to_string()))?;
+                                .ok_or(UiError::Other("Max task name length not set".to_string()))?;
                     self.logs.push(record, width, verbose);
                 }
                 _ = interval.tick() => self.draw(&mut terminal).await?,
@@ -368,29 +368,29 @@ impl UiLoop {
                 rebuild,
                 skip,
                 redo,
-                redo_inconsistent_jobs,
+                redo_inconsistent_tasks,
             } => {
                 let event_inner = if fresh {
                     RunEventInner::Fresh
                 } else if rebuild {
                     RunEventInner::Rebuild {
                         skip: skip.into_iter().collect(),
-                        redo_inconsistent_jobs,
+                        redo_inconsistent_tasks,
                     }
                 } else if !redo.is_empty() {
                     RunEventInner::Rebuild {
                         skip: redo.into_iter().collect(),
-                        redo_inconsistent_jobs,
+                        redo_inconsistent_tasks,
                     }
                 } else {
                     RunEventInner::Unspecified {
-                        redo_inconsistent_jobs,
+                        redo_inconsistent_tasks,
                     }
                 };
                 if let RunEventInner::Rebuild { skip, .. } = &event_inner
-                    && let Some(invalid_job) = skip.iter().find(|job| !self.is_job(job))
+                    && let Some(invalid_task) = skip.iter().find(|task| !self.is_task(task))
                 {
-                    tracing::error!("Unknown job name: {invalid_job}")
+                    tracing::error!("Unknown task name: {invalid_task}")
                 } else {
                     self.send_control(ControlEvent::Run(event_inner)).await
                 }
@@ -403,16 +403,16 @@ impl UiLoop {
             }
             Command::Exit => self.send_control(ControlEvent::Exit).await,
             Command::Pause { targets, cascade } => {
-                if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
-                    tracing::error!("Unknown job name: {invalid_job}")
+                if let Some(invalid_task) = targets.iter().find(|task| !self.is_task(task)) {
+                    tracing::error!("Unknown task name: {invalid_task}")
                 } else {
                     self.send_control(ControlEvent::Pause { targets, cascade })
                         .await
                 }
             }
             Command::Resume { targets } => {
-                if let Some(invalid_job) = targets.iter().find(|job| !self.is_job(job)) {
-                    tracing::error!("Unknown job name: {invalid_job}")
+                if let Some(invalid_task) = targets.iter().find(|task| !self.is_task(task)) {
+                    tracing::error!("Unknown task name: {invalid_task}")
                 } else {
                     self.send_control(ControlEvent::Resume { targets }).await
                 }
@@ -429,9 +429,9 @@ impl UiLoop {
 
     async fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<(), UiError> {
         let size = terminal.size()?;
-        let max_len = *MAX_JOB_NAME_LEN
+        let max_len = *MAX_TASK_NAME_LEN
             .get()
-            .ok_or(UiError::Other("Max job name length not set".to_string()))?;
+            .ok_or(UiError::Other("Max task name length not set".to_string()))?;
 
         let min_width = MIN_TERMINAL_WIDTH_THRESHOLD + max_len;
         if size.width < min_width || size.height < 10 {
@@ -560,9 +560,9 @@ impl UiLoop {
                         Span::raw(format!(
                             "{:width$}",
                             "",
-                            width = (max_len.saturating_sub(3)) as usize
+                            width = (max_len.saturating_sub(4)) as usize
                         )),
-                        Span::raw("job").underlined(),
+                        Span::raw("task").underlined(),
                         Span::raw("   "),
                         Span::raw("done").underlined(),
                         Span::raw(" "),
@@ -585,9 +585,9 @@ impl UiLoop {
                         Span::raw(format!(
                             "{:width$}",
                             "",
-                            width = (max_len.saturating_sub(3)) as usize
+                            width = (max_len.saturating_sub(4)) as usize
                         )),
-                        Span::raw("job").underlined(),
+                        Span::raw("task").underlined(),
                         Span::raw("   "),
                         Span::raw("done").underlined(),
                         Span::raw(" "),

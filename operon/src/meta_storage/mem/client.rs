@@ -6,7 +6,7 @@ use crate::meta_storage::mem::error::MemResult;
 use crate::meta_storage::mem::store::MemStore;
 use crate::meta_storage::mem::{MemMetaStorage, MemResolutionQueryBuilder, MemTicketQueryBuilder};
 use crate::meta_storage::{MetaClientApi, MetaConnApi, MetaTxApi};
-use crate::schema::{DimensionMetadata, JobMetadata, RunFootprint, TableShape};
+use crate::schema::{DimensionMetadata, RunFootprint, TableShape, TaskMetadata};
 
 /// A handle on the in-memory store.
 ///
@@ -61,8 +61,8 @@ impl MetaTxApi<MemMetaStorage> for MemTx<'_> {
 pub struct MemClient<'a>(&'a MemStore);
 
 impl MetaClientApi<MemMetaStorage> for MemClient<'_> {
-    fn ticket<const N: usize>(&self, job_meta: JobMetadata<N>) -> MemTicketQueryBuilder<'_, N> {
-        self.0.ticket(job_meta)
+    fn ticket<const N: usize>(&self, task_meta: TaskMetadata<N>) -> MemTicketQueryBuilder<'_, N> {
+        self.0.ticket(task_meta)
     }
 
     fn resolution<const N: usize>(

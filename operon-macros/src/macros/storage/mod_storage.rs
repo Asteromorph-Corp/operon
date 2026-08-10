@@ -17,7 +17,7 @@ pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
         impl_entities_queries(&all_configs.service_id, &all_configs.entities);
     let impl_service_storage = impl_service_storage(
         &all_configs.service_id,
-        &all_configs.jobs,
+        &all_configs.tasks,
         &all_configs.entities,
     );
 

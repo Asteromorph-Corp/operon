@@ -8,7 +8,7 @@ pub enum Direction {
     Descending,
 }
 
-/// The concurrency (pool size) specification for a job.
+/// The concurrency (pool size) specification for a task.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PoolSizeSpec {
     /// A fixed concurrency level, e.g. from `for(8)` or `#[operon(concurrency=8)]`.
@@ -18,28 +18,28 @@ pub enum PoolSizeSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct JobArg {
+pub struct TaskArg {
     pub id: syn::Ident,
     pub over: Vec<syn::Ident>,
 }
 
-/// An Operon job, which defines a transformation from one entity to another.
+/// An Operon task, which defines a transformation from one entity to another.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct JobConfig {
-    /// Unique identifier for the job.
+pub struct TaskConfig {
+    /// Unique identifier for the task.
     pub id: syn::Ident,
-    /// Entities this job operates on.
-    pub from: Vec<JobArg>,
-    /// Entities this job produces.
+    /// Entities this task operates on.
+    pub from: Vec<TaskArg>,
+    /// Entities this task produces.
     pub to: syn::Ident,
-    /// Dimensions this job repeat on.
+    /// Dimensions this task repeat on.
     pub dims: Vec<syn::Ident>,
-    /// Dimension this job spawns.
+    /// Dimension this task spawns.
     pub spawn_dim: Option<syn::Ident>,
-    /// The pool size specification for this job.
+    /// The pool size specification for this task.
     pub pool_size: PoolSizeSpec,
-    /// Priority ordering for the job queue. Empty means FIFO.
+    /// Priority ordering for the task queue. Empty means FIFO.
     pub priority: Vec<(syn::Ident, Direction)>,
 }
 
-pub type JobConfigMap = IndexMap<syn::Ident, JobConfig>;
+pub type TaskConfigMap = IndexMap<syn::Ident, TaskConfig>;

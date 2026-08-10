@@ -1,3 +1,3 @@
-fn all_upstream_jobs(&self) -> Vec<&'static str> {
+fn all_upstream_tasks(&self) -> Vec<&'static str> {
     vec!["alpha", "beta", "delta", "epsilon", "gamma"]
 }

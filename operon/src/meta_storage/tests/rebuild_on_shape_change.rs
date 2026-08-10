@@ -12,7 +12,7 @@ use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::tests::utils::psql_backend;
 use crate::meta_storage::{MetaBackend, MetaConnApi, MetaResolutionApi, MetaTicketApi};
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, Resolution, TableShape, Ticket, TicketStatus,
+    DimensionMetadata, Job, Resolution, TableShape, TaskMetadata, Ticket, TicketStatus,
 };
 
 /// The schema the ticket sequence owns outright.
@@ -24,9 +24,9 @@ const DIMENSION_SCHEMA: &str = "operon_rebuild_dimension";
 /// The schema the unrecorded-shape sequence owns outright.
 const UNRECORDED_SCHEMA: &str = "operon_rebuild_unrecorded";
 
-/// The job `delta`, over `i` alone.
-fn delta_over_i() -> JobMetadata<1> {
-    JobMetadata {
+/// The task `delta`, over `i` alone.
+fn delta_over_i() -> TaskMetadata<1> {
+    TaskMetadata {
         id: "delta",
         dims: ["i"],
         spawn_dim: None,
@@ -34,9 +34,9 @@ fn delta_over_i() -> JobMetadata<1> {
     }
 }
 
-/// The job `delta` again, widened to `i` and `j`.
-fn delta_over_i_j() -> JobMetadata<2> {
-    JobMetadata {
+/// The task `delta` again, widened to `i` and `j`.
+fn delta_over_i_j() -> TaskMetadata<2> {
+    TaskMetadata {
         id: "delta",
         dims: ["i", "j"],
         spawn_dim: None,

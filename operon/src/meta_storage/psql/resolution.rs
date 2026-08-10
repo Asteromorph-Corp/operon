@@ -72,7 +72,6 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         Ok(action.try_into().expect("a decided shape action"))
     }
 
-    /// Clears the resolution table.
     async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearResolutionQuery(schema_prefix, self.dim_meta);
@@ -80,7 +79,6 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         Ok(())
     }
 
-    /// Gets the resolution for the given primary key.
     async fn get(&self, coordinate: [usize; N]) -> PsqlResult<Option<Resolution<N>>> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetResolutionQuery(schema_prefix, self.dim_meta);
@@ -92,7 +90,6 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         Ok(Some(Resolution { coordinate, ub }))
     }
 
-    /// Puts the resolution into the table.
     async fn put(&self, resolution: Resolution<N>) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 
-use crate::schema::{Direction, Job, JobMetadata};
+use crate::schema::{Direction, Job, TaskMetadata};
 
 pub(super) trait JobQueue<T> {
     fn push(&mut self, item: T);
@@ -151,7 +151,7 @@ pub(super) enum AnyJobQueue<const N: usize> {
 }
 
 impl<const N: usize> AnyJobQueue<N> {
-    pub(super) fn from_meta(vec: Vec<Job<N>>, meta: &JobMetadata<N>) -> Self {
+    pub(super) fn from_meta(vec: Vec<Job<N>>, meta: &TaskMetadata<N>) -> Self {
         if meta.priority.is_empty() {
             Self::Deque(vec.into())
         } else {
@@ -196,7 +196,7 @@ impl<const N: usize> JobQueue<Job<N>> for AnyJobQueue<N> {
 #[cfg(test)]
 mod tests {
     use super::{AnyJobQueue, JobQueue, PriorityJobQueue};
-    use crate::schema::{Direction, Job, JobMetadata};
+    use crate::schema::{Direction, Job, TaskMetadata};
 
     fn job<const N: usize>(coords: [usize; N]) -> Job<N> {
         Job { coordinate: coords }
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn any_job_queue_dispatches_deque_for_empty_priority() {
-        let meta = JobMetadata {
+        let meta = TaskMetadata {
             id: "test",
             dims: ["i"],
             spawn_dim: None,
@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn any_job_queue_dispatches_priority_for_nonempty_priority() {
-        let meta = JobMetadata {
+        let meta = TaskMetadata {
             id: "test",
             dims: ["i"],
             spawn_dim: None,
