@@ -6,15 +6,15 @@ use syn::{Ident, LitInt, Token};
 use super::entity_decl::EntityDecl;
 use crate::configs::{Direction, PoolSizeSpec};
 
-/// Parsed contents of `#[operon(...)]` on a job declaration.
+/// Parsed contents of `#[operon(...)]` on a task declaration.
 #[derive(Debug, Default)]
-pub(super) struct OperonJobAttrs {
+pub(super) struct OperonTaskAttrs {
     pub(super) priority: Option<Vec<(Ident, Direction)>>,
     pub(super) concurrency: Option<PoolSizeSpec>,
 }
 
 #[derive(Debug)]
-pub(super) struct JobDecl {
+pub(super) struct TaskDecl {
     pub(super) spawned_entity: EntityDecl,
     pub(super) _eq_token: Token![=],
     pub(super) id: Ident,
@@ -25,16 +25,16 @@ pub(super) struct JobDecl {
     pub(super) pool: Option<LitInt>,
     pub(super) dims: Vec<Ident>,
     pub(super) _semi_token: Token![;],
-    pub(super) operon_attrs: OperonJobAttrs,
+    pub(super) operon_attrs: OperonTaskAttrs,
     pub(super) _span: proc_macro2::Span,
 }
-impl JobDecl {
+impl TaskDecl {
     fn validate(&self) -> syn::Result<()> {
         if self.spawned_entity.dims.len() > 1 {
             return Err(syn::Error::new(
                 self.spawned_entity._span,
                 format!(
-                    "Job '{}' can only spawn an entity with one dimension, found {} dimensions",
+                    "Task '{}' can only spawn an entity with one dimension, found {} dimensions",
                     self.id,
                     self.spawned_entity.dims.len()
                 ),
@@ -43,14 +43,17 @@ impl JobDecl {
         if self._for_token.is_none() && self.pool.is_some() {
             return Err(syn::Error::new(
                 self._span,
-                format!("Job '{}' has a pool specified but no 'for' clause", self.id),
+                format!(
+                    "Task '{}' has a pool specified but no 'for' clause",
+                    self.id
+                ),
             ));
         }
         if self._for_token.is_none() && !self.dims.is_empty() {
             return Err(syn::Error::new(
                 self._span,
                 format!(
-                    "Job '{}' has dimensions specified but no 'for' clause",
+                    "Task '{}' has dimensions specified but no 'for' clause",
                     self.id
                 ),
             ));
@@ -61,7 +64,7 @@ impl JobDecl {
             return Err(syn::Error::new(
                 for_token.span(),
                 format!(
-                    "Job '{}' has a 'for' clause but no dimensions are specified",
+                    "Task '{}' has a 'for' clause but no dimensions are specified",
                     self.id
                 ),
             ));
@@ -70,14 +73,14 @@ impl JobDecl {
             let Ok(pool_val) = pool.base10_parse::<usize>() else {
                 return Err(syn::Error::new(
                     pool.span(),
-                    format!("Job '{}' has an invalid pool value: '{}'", self.id, pool),
+                    format!("Task '{}' has an invalid pool value: '{}'", self.id, pool),
                 ));
             };
             if pool_val == 0 {
                 return Err(syn::Error::new(
                     pool.span(),
                     format!(
-                        "Job '{}' has a pool value of 0, which is not allowed",
+                        "Task '{}' has a pool value of 0, which is not allowed",
                         self.id
                     ),
                 ));
@@ -89,7 +92,7 @@ impl JobDecl {
                     return Err(syn::Error::new(
                         dim.span(),
                         format!(
-                            "Priority dimension '{}' is not in the dimension set of job '{}'",
+                            "Priority dimension '{}' is not in the dimension set of task '{}'",
                             dim, self.id
                         ),
                     ));
@@ -102,7 +105,7 @@ impl JobDecl {
                     return Err(syn::Error::new(
                         dim.span(),
                         format!(
-                            "Priority dimension '{}' appears more than once in job '{}'",
+                            "Priority dimension '{}' appears more than once in task '{}'",
                             dim, self.id
                         ),
                     ));
@@ -113,7 +116,7 @@ impl JobDecl {
             return Err(syn::Error::new(
                 self._span,
                 format!(
-                    "Job '{}' specifies concurrency via both 'for(N)' and '#[operon(...)]'; use only one",
+                    "Task '{}' specifies concurrency via both 'for(N)' and '#[operon(...)]'; use only one",
                     self.id
                 ),
             ));
@@ -121,11 +124,11 @@ impl JobDecl {
         Ok(())
     }
 }
-impl Parse for JobDecl {
+impl Parse for TaskDecl {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let start = input.span();
 
-        // Parse optional #[operon(...)] attribute before the job line.
+        // Parse optional #[operon(...)] attribute before the task line.
         let attrs = input.call(syn::Attribute::parse_outer)?;
         let operon_attrs = parse_operon_attrs(&attrs)?;
 
@@ -170,7 +173,7 @@ impl Parse for JobDecl {
         let semi_token: Token![;] = input.parse()?;
         let end = input.span();
         let _span = start.join(end).unwrap_or(start);
-        let job_decl = JobDecl {
+        let task_decl = TaskDecl {
             spawned_entity,
             _eq_token: eq_token,
             id,
@@ -184,20 +187,20 @@ impl Parse for JobDecl {
             operon_attrs,
             _span,
         };
-        job_decl.validate()?;
-        Ok(job_decl)
+        task_decl.validate()?;
+        Ok(task_decl)
     }
 }
 
-/// Parses `#[operon(...)]` attributes on a job declaration into [`OperonJobAttrs`].
+/// Parses `#[operon(...)]` attributes on a task declaration into [`OperonTaskAttrs`].
 /// Rejects non-`operon` attributes and unknown keys inside `#[operon(...)]`.
-fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
-    let mut result = OperonJobAttrs::default();
+fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonTaskAttrs> {
+    let mut result = OperonTaskAttrs::default();
     for attr in attrs {
         if !attr.path().is_ident("operon") {
             return Err(syn::Error::new_spanned(
                 attr,
-                "Unknown attribute on job declaration; only `#[operon(...)]` is supported",
+                "Unknown attribute on task declaration; only `#[operon(...)]` is supported",
             ));
         }
         attr.parse_nested_meta(|meta| {
@@ -271,7 +274,7 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonJobAttrs> {
                         Ok(0) => return Err(syn::Error::new(
                             ident.span(),
                             format!(
-                                "Environment variable `{var_name}` must not be zero for job concurrency"
+                                "Environment variable `{var_name}` must not be zero for task concurrency"
                             ),
                         )),
                         Ok(_) => {}
@@ -296,11 +299,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_job_decl_simple() {
-        let input = "Entity = JobName();";
-        let parsed: JobDecl = parse_str(input).expect("Failed to parse");
+    fn test_task_decl_simple() {
+        let input = "Entity = TaskName();";
+        let parsed: TaskDecl = parse_str(input).expect("Failed to parse");
         assert_eq!(parsed.spawned_entity.id.to_string(), "Entity");
-        assert_eq!(parsed.id.to_string(), "JobName");
+        assert_eq!(parsed.id.to_string(), "TaskName");
         assert!(parsed.args.is_empty());
         assert!(parsed._for_token.is_none());
         assert!(parsed.pool.is_none());
@@ -308,17 +311,17 @@ mod tests {
         assert!(parsed.operon_attrs.priority.is_none());
     }
     #[test]
-    fn test_job_decl_all() {
+    fn test_task_decl_all() {
         let beta = "B<j> = beta(A) for(8) i;";
         let gamma = "C<k> = gamma(A) for(8) i;";
         let delta = "D = delta(A, B, C) for(4) i, j, k;";
         let epsilon = "E = epsilon(B<j>, D<j>) for(4) i, k;";
         let zeta = "F = zeta(C<k>, E<k>) for i;";
-        let parsed_beta: JobDecl = parse_str(beta).expect("Failed to parse beta");
-        let parsed_gamma: JobDecl = parse_str(gamma).expect("Failed to parse gamma");
-        let parsed_delta: JobDecl = parse_str(delta).expect("Failed to parse delta");
-        let parsed_epsilon: JobDecl = parse_str(epsilon).expect("Failed to parse epsilon");
-        let parsed_zeta: JobDecl = parse_str(zeta).expect("Failed to parse zeta");
+        let parsed_beta: TaskDecl = parse_str(beta).expect("Failed to parse beta");
+        let parsed_gamma: TaskDecl = parse_str(gamma).expect("Failed to parse gamma");
+        let parsed_delta: TaskDecl = parse_str(delta).expect("Failed to parse delta");
+        let parsed_epsilon: TaskDecl = parse_str(epsilon).expect("Failed to parse epsilon");
+        let parsed_zeta: TaskDecl = parse_str(zeta).expect("Failed to parse zeta");
         assert_eq!(parsed_beta.id.to_string(), "beta");
         assert_eq!(parsed_beta.spawned_entity.id.to_string(), "B");
         assert_eq!(parsed_beta.spawned_entity.dims.len(), 1);
@@ -337,9 +340,9 @@ mod tests {
     }
 
     #[test]
-    fn test_job_decl_priority_valid_dims() {
+    fn test_task_decl_priority_valid_dims() {
         let input = "#[operon(ord=(-k, i))] E = epsilon(B<j>, D<j>) for(4) i, k;";
-        let parsed: JobDecl = parse_str(input).expect("Failed to parse");
+        let parsed: TaskDecl = parse_str(input).expect("Failed to parse");
         let priority = parsed
             .operon_attrs
             .priority
@@ -352,9 +355,9 @@ mod tests {
     }
 
     #[test]
-    fn test_job_decl_concurrency_literal() {
+    fn test_task_decl_concurrency_literal() {
         let input = "#[operon(concurrency=8)] E = epsilon(B<j>, D<j>) for i, k;";
-        let parsed: JobDecl = parse_str(input).expect("Failed to parse");
+        let parsed: TaskDecl = parse_str(input).expect("Failed to parse");
         assert_eq!(
             parsed.operon_attrs.concurrency,
             Some(PoolSizeSpec::Literal(8))
@@ -363,36 +366,36 @@ mod tests {
     }
 
     #[test]
-    fn test_job_decl_concurrency_env() {
-        let input = "#[operon(concurrency_env=JOB_CONCURRENCY)] E = epsilon(B<j>, D<j>) for i, k;";
-        let parsed: JobDecl = parse_str(input).expect("Failed to parse");
+    fn test_task_decl_concurrency_env() {
+        let input = "#[operon(concurrency_env=BETA_WORKERS)] E = epsilon(B<j>, D<j>) for i, k;";
+        let parsed: TaskDecl = parse_str(input).expect("Failed to parse");
         assert_eq!(
             parsed.operon_attrs.concurrency,
-            Some(PoolSizeSpec::Env("JOB_CONCURRENCY".to_string()))
+            Some(PoolSizeSpec::Env("BETA_WORKERS".to_string()))
         );
     }
 
     #[test]
-    fn test_job_decl_malformed() {
+    fn test_task_decl_malformed() {
         let malformed_inputs = [
-            "Entity = JobName() for i",                          // Missing semicolon
-            "Entity = JobName() for(8 i, j;",                    // Missing closing parenthesis
-            "Entity = JobName() for;",                           // Redundant for
-            "Entity<i, j> = JobName() for(8) i, j;",             // Too many dimensions
-            "Entity = JobName for(8) i;",                        // Missing argument parens
-            "Entity = JobName() for i, j k;",                    // Missing comma
-            "Entity = JobName() for(8) i, j, k; SomeExtraToken", // Extra token after semicolon
-            "#[operon(ord=(z))] E = job() for i;",               // Unknown priority dim
-            "#[operon(ord=(i, i))] E = job() for i;",            // Duplicate priority dim
-            "#[unknown] E = job() for i;",                       // Unknown attribute
-            "#[operon(unknown_key)] E = job() for i;",           // Unknown operon key
-            "#[operon(concurrency=0)] E = job() for i;",         // Zero concurrency
-            "#[operon(concurrency=8)] E = job() for(4) i;",      // Conflict with for(N)
+            "Entity = TaskName() for i",                          // Missing semicolon
+            "Entity = TaskName() for(8 i, j;",                    // Missing closing parenthesis
+            "Entity = TaskName() for;",                           // Redundant for
+            "Entity<i, j> = TaskName() for(8) i, j;",             // Too many dimensions
+            "Entity = TaskName for(8) i;",                        // Missing argument parens
+            "Entity = TaskName() for i, j k;",                    // Missing comma
+            "Entity = TaskName() for(8) i, j, k; SomeExtraToken", // Extra token after semicolon
+            "#[operon(ord=(z))] E = job() for i;",                // Unknown priority dim
+            "#[operon(ord=(i, i))] E = job() for i;",             // Duplicate priority dim
+            "#[unknown] E = job() for i;",                        // Unknown attribute
+            "#[operon(unknown_key)] E = job() for i;",            // Unknown operon key
+            "#[operon(concurrency=0)] E = job() for i;",          // Zero concurrency
+            "#[operon(concurrency=8)] E = job() for(4) i;",       // Conflict with for(N)
             "#[operon(concurrency=8)] #[operon(concurrency_env=X)] E = job() for i;", /* Duplicate concurrency */
         ];
         let results = malformed_inputs
             .into_iter()
-            .map(parse_str::<JobDecl>)
+            .map(parse_str::<TaskDecl>)
             .collect::<Vec<_>>();
         assert!(results.iter().all(|result| result.is_err()));
     }

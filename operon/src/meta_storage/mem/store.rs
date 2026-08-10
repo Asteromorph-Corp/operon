@@ -10,15 +10,13 @@ use crate::schema::RunFootprint;
 
 /// The in-memory metadata store.
 ///
-/// Ticket and resolution tables are keyed by job/dimension id. Their coordinates carry their arity
-/// at runtime, so one store holds tables spanning jobs of differing arity without a type parameter.
+/// Ticket and resolution tables are keyed by task/dimension id.
+/// Their coordinates carry their arity at runtime, so one store holds tables spanning tasks of
+/// differing arity without a type parameter.
 ///
 /// # Concurrency
 ///
-/// A table takes one lock over all of its rows, so writes to the same job serialize; only writes
-/// to different jobs proceed in parallel. Sharding a table is deferred until a profile of the
-/// rebuild in #64 shows the contention is worth it — that path drives every write from a single
-/// task, so it takes the lock uncontended.
+/// A table takes one lock over all of its rows, so writes to the same task serialize.
 #[derive(Default)]
 pub(super) struct MemStore {
     tickets: RwLock<HashMap<&'static str, Arc<TicketTable>>>,
@@ -35,18 +33,21 @@ struct Execution {
 }
 
 impl MemStore {
-    /// Registers a job's ticket table, keeping an existing one.
-    pub(super) fn init_ticket_table(&self, job_id: &'static str) -> MemResult<()> {
+    /// Registers a task's ticket table, keeping an existing one.
+    pub(super) fn init_ticket_table(&self, task_id: &'static str) -> MemResult<()> {
         self.tickets
             .write()?
-            .entry(job_id)
+            .entry(task_id)
             .or_insert_with(|| Arc::new(TicketTable::default()));
         Ok(())
     }
 
-    /// Returns a job's ticket table, if it has been registered.
-    pub(super) fn ticket_table(&self, job_id: &'static str) -> MemResult<Option<Arc<TicketTable>>> {
-        Ok(self.tickets.read()?.get(job_id).cloned())
+    /// Returns a task's ticket table, if it has been registered.
+    pub(super) fn ticket_table(
+        &self,
+        task_id: &'static str,
+    ) -> MemResult<Option<Arc<TicketTable>>> {
+        Ok(self.tickets.read()?.get(task_id).cloned())
     }
 
     /// Registers a dimension's resolution table, keeping an existing one.

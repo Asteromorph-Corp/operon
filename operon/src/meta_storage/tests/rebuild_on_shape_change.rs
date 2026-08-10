@@ -1,4 +1,4 @@
-//! Tests pinning the rebuild a job's or dimension's shape change triggers in the Postgres backend.
+//! Tests pinning the rebuild a task's or dimension's shape change triggers in the Postgres backend.
 //!
 //! Each sequence initializes a table under one shape, populates it, then initializes the same id
 //! under a wider shape and asserts the table that comes back matches the new shape.
@@ -12,7 +12,7 @@ use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::tests::utils::psql_backend;
 use crate::meta_storage::{MetaBackend, MetaConnApi, MetaResolutionApi, MetaTicketApi};
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, Resolution, TableShape, Ticket, TicketStatus,
+    DimensionMetadata, Job, Resolution, TableShape, TaskMetadata, Ticket, TicketStatus,
 };
 
 /// The schema the ticket sequence owns outright.
@@ -21,9 +21,9 @@ const TICKET_SCHEMA: &str = "operon_rebuild_ticket";
 /// The schema the dimension sequence owns outright.
 const DIMENSION_SCHEMA: &str = "operon_rebuild_dimension";
 
-/// The job `delta`, over `i` alone.
-fn delta_over_i() -> JobMetadata<1> {
-    JobMetadata {
+/// The task `delta`, over `i` alone.
+fn delta_over_i() -> TaskMetadata<1> {
+    TaskMetadata {
         id: "delta",
         dims: ["i"],
         spawn_dim: None,
@@ -31,9 +31,9 @@ fn delta_over_i() -> JobMetadata<1> {
     }
 }
 
-/// The job `delta` again, widened to `i` and `j`.
-fn delta_over_i_j() -> JobMetadata<2> {
-    JobMetadata {
+/// The task `delta` again, widened to `i` and `j`.
+fn delta_over_i_j() -> TaskMetadata<2> {
+    TaskMetadata {
         id: "delta",
         dims: ["i", "j"],
         spawn_dim: None,
@@ -122,7 +122,7 @@ async fn ticket_table_is_rebuilt_when_a_job_gains_a_dimension() {
         (1, 0, 0)
     );
 
-    // The same job, widened. Its table is reported stale until the init rebuilds it.
+    // The same task, widened. Its table is reported stale until the init rebuilds it.
     assert_eq!(
         client
             .ticket(delta_over_i_j())

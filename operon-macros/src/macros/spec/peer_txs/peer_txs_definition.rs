@@ -17,18 +17,18 @@ use crate::utils::{
 /// }
 /// ```
 pub fn peer_txs_definition(
-    job_id: &syn::Ident,
-    event_receiving_job_ids: &IndexSet<&syn::Ident>,
+    task_id: &syn::Ident,
+    event_receiving_task_ids: &IndexSet<&syn::Ident>,
 ) -> syn::ItemStruct {
     let operon = operon_ident();
-    let peer_txs_ident = peer_txs_ident(job_id);
+    let peer_txs_ident = peer_txs_ident(task_id);
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
     let ticket_enum_ident = ticket_enum_ident();
 
-    let senders = event_receiving_job_ids
+    let senders = event_receiving_task_ids
         .iter()
-        .map(|downstream_job_id| sender_ident(downstream_job_id));
+        .map(|downstream_task_id| sender_ident(downstream_task_id));
 
     parse_quote! {
         #[derive(Debug)]
@@ -53,13 +53,13 @@ mod tests {
         "spec/peer_txs/peer_txs_definition.rs"
     )]
     fn test_peer_txs_definition(
-        #[case] job_id: syn::Ident,
-        #[case] event_receiving_job_ids: Vec<syn::Ident>,
+        #[case] task_id: syn::Ident,
+        #[case] event_receiving_task_ids: Vec<syn::Ident>,
         #[case] fixture_path: &str,
     ) {
-        let event_receiving_job_ids = event_receiving_job_ids.iter().collect::<IndexSet<_>>();
+        let event_receiving_task_ids = event_receiving_task_ids.iter().collect::<IndexSet<_>>();
 
-        let item = peer_txs_definition(&job_id, &event_receiving_job_ids);
+        let item = peer_txs_definition(&task_id, &event_receiving_task_ids);
         assert_item_eq(&item, fixture_path);
     }
 }

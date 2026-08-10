@@ -10,25 +10,25 @@ use crate::scheduler::events::{
     IndividualControlEventSender, PeerEvent, PeerEventSenderMap, ServicePeerEventReceiver,
     ServicePeerEventSenderMap,
 };
-use crate::scheduler::{JobHandler, JobRebuilder, SchedulerError};
+use crate::scheduler::{SchedulerError, TaskHandler, TaskRebuilder};
 use crate::schema::{CheckMode, Progress, SharedProgressMap, TableShape};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
 pub struct SchedulerHandler<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> {
-    pub job_handlers: Vec<Box<dyn JobHandler<Svc, Sto, MSto>>>,
+    pub task_handlers: Vec<Box<dyn TaskHandler<Svc, Sto, MSto>>>,
 }
 
 /// Helper struct for `Scheduler::prepare_channel`
 ///
-/// An association of `JobManager` and event receiver channel
+/// An association of [`TaskHandler`] and event receiver channel
 pub(crate) struct HandlerWithRx<'a, Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub handler: &'a dyn JobHandler<Svc, Sto, MSto>,
+    pub handler: &'a dyn TaskHandler<Svc, Sto, MSto>,
     pub peer_rx: ServicePeerEventReceiver<Svc>,
 }
 
@@ -46,29 +46,28 @@ where
 /// A control channel to a single `IndividualScheduler`, returned by
 /// [`HandlersWithChannels::run_schedulers`].
 pub(crate) struct ControlChannel {
-    pub job_id: &'static str,
-    pub upstream_jobs: Vec<&'static str>,
+    pub task_id: &'static str,
+    pub upstream_tasks: Vec<&'static str>,
     pub tx: IndividualControlEventSender,
 }
 
 impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler<Svc, Sto, MSto> {
-    pub fn new(job_handlers: Vec<Box<dyn JobHandler<Svc, Sto, MSto>>>) -> Self {
-        Self { job_handlers }
+    pub fn new(task_handlers: Vec<Box<dyn TaskHandler<Svc, Sto, MSto>>>) -> Self {
+        Self { task_handlers }
     }
 
-    /// Eagerly resolve every handler's pool size, panicking immediately if an
-    /// environment variable is missing or invalid rather than waiting until
-    /// the user issues a `run` command.
+    /// Resolves every handler's pool size as the engine starts, so an environment variable that is
+    /// missing or invalid panics before the user reaches the `run` command.
     pub(crate) fn validate_pool_sizes(&self) {
-        for handler in &self.job_handlers {
+        for handler in &self.task_handlers {
             let _ = handler.pool_size();
         }
     }
 
-    pub(crate) fn job_ids(&self) -> Vec<&'static str> {
-        self.job_handlers
+    pub(crate) fn task_ids(&self) -> Vec<&'static str> {
+        self.task_handlers
             .iter()
-            .map(|job_handler| job_handler.job_id())
+            .map(|task_handler| task_handler.task_id())
             .collect()
     }
 
@@ -76,17 +75,17 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         &self,
         channel_size: usize,
     ) -> HandlersWithChannels<'_, Svc, Sto, MSto> {
-        let len = self.job_handlers.len();
+        let len = self.task_handlers.len();
 
         let mut schedules_with_rx = Vec::with_capacity(len);
         let mut peer_txs = HashMap::with_capacity(len);
 
-        self.job_handlers.iter().for_each(|job_handler| {
+        self.task_handlers.iter().for_each(|task_handler| {
             let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
                 PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
             >(channel_size);
-            peer_txs.insert(job_handler.job_id(), peer_tx);
-            schedules_with_rx.push(HandlerWithRx::new(job_handler.as_ref(), peer_rx));
+            peer_txs.insert(task_handler.task_id(), peer_tx);
+            schedules_with_rx.push(HandlerWithRx::new(task_handler.as_ref(), peer_rx));
         });
 
         HandlersWithChannels::new(schedules_with_rx, peer_txs)
@@ -94,7 +93,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
 
     /// Initializes every metadata table the run needs.
     ///
-    /// Returns [`STALE`](TableShape::STALE) if any job or dimension changed shape, discarding what
+    /// Returns [`STALE`](TableShape::STALE) if any task or dimension changed shape, discarding what
     /// its table held.
     pub(crate) async fn init_meta_storage(
         &self,
@@ -103,16 +102,16 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         client.init_schema().await?;
         client.init_dimension_hash().await?;
         client.init_ticket_hash().await?;
-        let resolution_is_stale = futures::stream::iter(&self.job_handlers)
-            .then(|job_handler| async { job_handler.init_resolution(client).await })
+        let resolution_is_stale = futures::stream::iter(&self.task_handlers)
+            .then(|task_handler| async { task_handler.init_resolution(client).await })
             .try_fold(false, |was_stale, shape| async move {
                 Ok(was_stale || shape.is_stale)
             })
             .await?;
         client.init_ticket_summary().await?;
         client.init_ticket_status_type().await?;
-        let ticket_is_stale = futures::stream::iter(&self.job_handlers)
-            .then(|job_handler| async { job_handler.init_tickets(client).await })
+        let ticket_is_stale = futures::stream::iter(&self.task_handlers)
+            .then(|task_handler| async { task_handler.init_tickets(client).await })
             .try_fold(false, |was_stale, shape| async move {
                 Ok(was_stale || shape.is_stale)
             })
@@ -125,7 +124,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
     }
 
     /// Run a check on the data consistency between the data storage and the metadata storage.
-    /// Return the list of jobs that are found to be inconsistent.
+    /// Return the list of tasks that are found to be inconsistent.
     ///
     /// This should be called only when the stale state is either `Abort`, `GracefulStop`, or
     /// `Complete`.
@@ -135,29 +134,29 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         client: MSto::Client<'_>,
         mode: CheckMode,
     ) -> Result<Vec<&'static str>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        let mut inconsistent_jobs = Vec::new();
-        for schedule in &self.job_handlers {
+        let mut inconsistent_tasks = Vec::new();
+        for schedule in &self.task_handlers {
             if !schedule.check_consistency(storage, client, mode).await? {
-                inconsistent_jobs.push(schedule.job_id());
+                inconsistent_tasks.push(schedule.task_id());
                 tracing::warn!(
-                    "Consistency check failed for job handler: {}",
-                    schedule.job_id()
+                    "Consistency check failed for task handler: {}",
+                    schedule.task_id()
                 );
             } else {
                 tracing::info!(
-                    "Consistency check passed for job handler: {}",
-                    schedule.job_id()
+                    "Consistency check passed for task handler: {}",
+                    schedule.task_id()
                 );
             }
         }
-        Ok(inconsistent_jobs)
+        Ok(inconsistent_tasks)
     }
 
     pub(crate) async fn clear_resolution(
         &self,
         client: MSto::Client<'_>,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        for spec in &self.job_handlers {
+        for spec in &self.task_handlers {
             spec.clear_resolution(client).await?;
         }
         Ok(())
@@ -167,7 +166,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         &self,
         client: MSto::Client<'_>,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        for schedule in &self.job_handlers {
+        for schedule in &self.task_handlers {
             schedule.clear_tickets(client).await?;
         }
         Ok(())
@@ -177,7 +176,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         &self,
         client: MSto::Client<'_>,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        for schedule in &self.job_handlers {
+        for schedule in &self.task_handlers {
             schedule.put_default_tickets(client).await?;
         }
         Ok(())
@@ -188,10 +187,10 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         progresses: &SharedProgressMap,
         client: MSto::Client<'_>,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-        for schedule in &self.job_handlers {
+        for schedule in &self.task_handlers {
             let (done, queued, waiting) = schedule.get_status(client).await?;
-            let Some(progress) = progresses.0.get(schedule.job_id()) else {
-                return Err(SchedulerError::missing_progress(schedule.job_id()));
+            let Some(progress) = progresses.0.get(schedule.task_id()) else {
+                return Err(SchedulerError::missing_progress(schedule.task_id()));
             };
             (*progress.write().await).update(done, queued, waiting);
         }
@@ -205,17 +204,17 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
         client: MSto::Client<'_>,
         skip: &HashSet<String>,
     ) -> Result<
-        Vec<Box<dyn JobRebuilder<Svc, Sto, MSto>>>,
+        Vec<Box<dyn TaskRebuilder<Svc, Sto, MSto>>>,
         SchedulerError<Svc::Error, Sto::Error, MSto::Error>,
     > {
-        futures::stream::iter(self.job_handlers.iter().filter(|handler| {
-            std::iter::once(handler.job_id())
-                .chain(handler.all_upstream_jobs())
-                .all(|job_id| !skip.contains(&job_id.to_string()))
+        futures::stream::iter(self.task_handlers.iter().filter(|handler| {
+            std::iter::once(handler.task_id())
+                .chain(handler.all_upstream_tasks())
+                .all(|task_id| !skip.contains(&task_id.to_string()))
         }))
         .then(|schedule| async {
-            let Some(progress) = progresses.0.get(schedule.job_id()) else {
-                return Err(SchedulerError::missing_progress(schedule.job_id()));
+            let Some(progress) = progresses.0.get(schedule.task_id()) else {
+                return Err(SchedulerError::missing_progress(schedule.task_id()));
             };
             schedule
                 .prepare_rebuild(storage, progress.clone(), client)
@@ -256,7 +255,7 @@ where
         for HandlerWithRx { handler, peer_rx } in self.handlers_with_rx {
             let progress = progresses
                 .0
-                .get(handler.job_id())
+                .get(handler.task_id())
                 .cloned()
                 .unwrap_or_else(|| Arc::new(RwLock::new(Progress::default())));
             let (ctrl_tx, ctrl_rx) = tokio::sync::mpsc::channel(64);
@@ -271,8 +270,8 @@ where
                 clean,
             ));
             channels.push(ControlChannel::new(
-                handler.job_id(),
-                handler.all_upstream_jobs(),
+                handler.task_id(),
+                handler.all_upstream_tasks(),
                 ctrl_tx,
             ));
         }
@@ -288,7 +287,7 @@ where
     MSto: MetaBackend,
 {
     pub fn new(
-        handler: &'a dyn JobHandler<Svc, Sto, MSto>,
+        handler: &'a dyn TaskHandler<Svc, Sto, MSto>,
         peer_rx: ServicePeerEventReceiver<Svc>,
     ) -> Self {
         Self { handler, peer_rx }
@@ -297,13 +296,13 @@ where
 
 impl ControlChannel {
     pub fn new(
-        job_id: &'static str,
-        upstream_jobs: Vec<&'static str>,
+        task_id: &'static str,
+        upstream_tasks: Vec<&'static str>,
         tx: IndividualControlEventSender,
     ) -> Self {
         Self {
-            job_id,
-            upstream_jobs,
+            task_id,
+            upstream_tasks,
             tx,
         }
     }

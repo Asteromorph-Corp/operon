@@ -2,7 +2,7 @@ use indoc::formatdoc;
 use quote::{format_ident, quote};
 use syn::parse_quote;
 
-use crate::configs::{AllConfig, EntityConfigMap, JobConfigMap};
+use crate::configs::{AllConfig, EntityConfigMap, TaskConfigMap};
 use crate::macros::core::DocumentedFn;
 use crate::utils::{
     batch_get_entity_ident, batch_put_entity_ident, clear_span, get_entity_ident, operon_ident,
@@ -82,7 +82,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> 
     })
 }
 
-/// A helper function to generate batch get functions for each job.
+/// A helper function to generate batch get functions for each task.
 ///
 /// # Example
 /// ```rust,ignore
@@ -109,12 +109,12 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> 
 /// }
 /// ```
 fn batch_gets(
-    jobs: &JobConfigMap,
+    tasks: &TaskConfigMap,
     entities: &EntityConfigMap,
 ) -> impl Iterator<Item = DocumentedFn> {
-    let mut targets = jobs
+    let mut targets = tasks
         .values()
-        .flat_map(|job| job.from.iter().filter(|arg| !arg.over.is_empty()))
+        .flat_map(|task| task.from.iter().filter(|arg| !arg.over.is_empty()))
         .collect::<Vec<_>>();
 
     targets.sort_by_key(|arg| (&arg.id, &arg.over));
@@ -192,7 +192,7 @@ fn batch_gets(
     })
 }
 
-/// A helper function to generate batch insert functions for each job.
+/// A helper function to generate batch insert functions for each task.
 ///
 /// # Example
 /// ```rust,ignore
@@ -217,18 +217,18 @@ fn batch_gets(
 ///     Ok(())
 /// }
 /// ```
-fn batch_inserts(jobs: &JobConfigMap) -> impl Iterator<Item = DocumentedFn> {
-    jobs.values().filter_map(|job| -> Option<DocumentedFn> {
+fn batch_inserts(tasks: &TaskConfigMap) -> impl Iterator<Item = DocumentedFn> {
+    tasks.values().filter_map(|task| -> Option<DocumentedFn> {
         let operon = operon_ident();
-        let fn_name = batch_put_entity_ident(&job.to);
-        let n = job.dims.len();
-        let ty = to_type(&job.to);
+        let fn_name = batch_put_entity_ident(&task.to);
+        let n = task.dims.len();
+        let ty = to_type(&task.to);
 
-        let put_fn_name = put_entity_ident(&job.to);
-        let coord_vars = job.dims.iter().map(clear_span).collect::<Vec<_>>();
-        let spawn_dim = clear_span(job.spawn_dim.as_ref()?);
+        let put_fn_name = put_entity_ident(&task.to);
+        let coord_vars = task.dims.iter().map(clear_span).collect::<Vec<_>>();
+        let spawn_dim = clear_span(task.spawn_dim.as_ref()?);
 
-        let entity_id = &job.to;
+        let entity_id = &task.to;
         let coordinate =
             format_coordinate(&[coord_vars.as_slice(), std::slice::from_ref(&spawn_dim)].concat());
         let sig = format!(
@@ -270,9 +270,9 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
     let (required_sigs, single_ops) =
         single_ops(&all_configs.entities).unzip::<_, _, Vec<_>, Vec<_>>();
     let (batch_get_sigs, batch_gets) =
-        batch_gets(&all_configs.jobs, &all_configs.entities).unzip::<_, _, Vec<_>, Vec<_>>();
+        batch_gets(&all_configs.tasks, &all_configs.entities).unzip::<_, _, Vec<_>, Vec<_>>();
     let (batch_insert_sigs, batch_inserts) =
-        batch_inserts(&all_configs.jobs).unzip::<_, _, Vec<_>, Vec<_>>();
+        batch_inserts(&all_configs.tasks).unzip::<_, _, Vec<_>, Vec<_>>();
 
     let mut sections = vec![formatdoc! {"
         Generated trait containing the entity accessors that should be implemented for use with Operon.
@@ -320,11 +320,11 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::configs::{EntityConfigMap, JobConfigMap};
+    use crate::configs::{EntityConfigMap, TaskConfigMap};
     use crate::test_utils::complicated_pipeline::{
-        all_entities as all_entities_complicated, all_jobs as all_jobs_complicated,
+        all_entities as all_entities_complicated, all_tasks as all_tasks_complicated,
     };
-    use crate::test_utils::simple_pipeline::{all_entities, all_jobs, simple_pipeline};
+    use crate::test_utils::simple_pipeline::{all_entities, all_tasks, simple_pipeline};
     use crate::test_utils::{assert_item_eq, assert_items_eq_in_trait};
 
     #[rstest]
@@ -336,26 +336,26 @@ mod tests {
     }
 
     #[rstest]
-    #[case::simple(all_jobs(), all_entities(), "core/storage_batch_gets.simple.rs")]
+    #[case::simple(all_tasks(), all_entities(), "core/storage_batch_gets.simple.rs")]
     #[case::multiple_over(
-        all_jobs_complicated(),
+        all_tasks_complicated(),
         all_entities_complicated(),
         "core/storage_batch_gets.multiple_over.rs"
     )]
     fn test_batch_gets(
-        #[case] all_jobs: JobConfigMap,
+        #[case] all_tasks: TaskConfigMap,
         #[case] all_entities: EntityConfigMap,
         #[case] fixture_path: &str,
     ) {
-        let item = batch_gets(&all_jobs, &all_entities)
+        let item = batch_gets(&all_tasks, &all_entities)
             .map(|(_, item)| item)
             .collect::<Vec<_>>();
         assert_items_eq_in_trait(&item, fixture_path);
     }
 
     #[rstest]
-    fn test_batch_inserts(all_jobs: JobConfigMap) {
-        let items = batch_inserts(&all_jobs)
+    fn test_batch_inserts(all_tasks: TaskConfigMap) {
+        let items = batch_inserts(&all_tasks)
             .map(|(_, item)| item)
             .collect::<Vec<_>>();
         assert_items_eq_in_trait(&items, "core/storage_batch_inserts.rs");

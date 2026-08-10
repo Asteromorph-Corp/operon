@@ -2,7 +2,10 @@
 ///
 /// Each task method returns `Self::Error`, the service's error type.
 /// `#[derive(OperonService)]` defaults it to `operon::error::UserError`.
-/// Select a concrete type with `#[operon(error = "MyError")]` on the derive.
+/// Select a concrete type with `#[operon(error = MyError)]` on the derive.
+///
+/// The derive also takes `#[operon(defined_at = "path")]`, the module `define_operon!`
+/// expanded in, and `#[operon(crate = "path")]`, the `operon` crate itself.
 ///
 /// # Methods
 /// ```rust,ignore

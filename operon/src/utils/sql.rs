@@ -46,6 +46,7 @@ impl std::fmt::Display for SchemaPrefixOwned {
 
 /// Values that can be used as sql parameter.
 pub(crate) trait SqlParam: ToSql + Display + Send + Sync + 'static {
+    /// Borrows the value as the trait object `tokio_postgres` takes its parameters as.
     fn as_param(&self) -> &(dyn ToSql + Sync + 'static);
 }
 

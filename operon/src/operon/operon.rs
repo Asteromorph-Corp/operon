@@ -82,7 +82,7 @@ where
 
         let handler = <(Svc, Sto) as ValidOperon<Svc, Sto>>::scheduler_handler::<MSto>();
 
-        let progresses = SharedProgressMap::from_jobs(&handler.job_ids());
+        let progresses = SharedProgressMap::from_tasks(&handler.task_ids());
 
         let scheduler = Scheduler::<Svc, Sto, MSto>::new(
             service,

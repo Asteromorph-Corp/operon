@@ -133,8 +133,16 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 }
 
+/// The statements preparing and emptying one entity's table, erased of the entity's arity and type.
+///
+/// The generated storage holds these for every entity of a pipeline, so that its `init` and `clear`
+/// walk one collection.
 pub trait EntityQueries: Send + Sync + 'static {
+    /// The statement creating this entity's table, rebuilding it when the recorded shape no longer
+    /// matches the entity.
     fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String;
+
+    /// The statement discarding every row of this entity's table.
     fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String;
 }
 
@@ -461,29 +469,6 @@ mod test {
         let stmt = PutEntityQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
-
-    // #[rstest]
-    // #[case::simple(
-    //     JobArg {
-    //         id: "d".to_string(),
-    //         over: vec!["j".to_string()],
-    //     },
-    //     entity_d(),
-    //     indoc! {"
-    //         SELECT value, j
-    //         FROM {schema_prefix}d
-    //         WHERE i = $1 AND k = $2
-    //         ORDER BY j"
-    //     },
-    // )]
-    // fn test_batch_get_query(
-    //     #[case] job_arg: JobArg,
-    //     #[case] entity: EntityConfig,
-    //     #[case] expected: &str,
-    // ) {
-    //     let stmt = BatchGetQuery(&job_arg, &entity).to_string();
-    //     assert_eq!(stmt, expected);
-    // }
 
     #[rstest]
     #[case::simple(

@@ -1,10 +1,10 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::TaskConfig;
 use crate::utils::{operon_ident, rebuilder_ident};
 
-/// Generates the `prepare_rebuild` function for the implementation of the trait `JobSpec`.
+/// Generates the `prepare_rebuild` function for the implementation of the trait `TaskSpec`.
 ///
 /// # Example
 /// ```rust,ignore
@@ -13,11 +13,11 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     storage: &Sto,
 ///     client: MSto::Client<'_>,
 ///     progress: operon::__private::SharedProgress,
-/// ) -> Result<Box<dyn operon::__private::JobRebuilder<Svc, Sto, MSto>>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+/// ) -> Result<Box<dyn operon::__private::TaskRebuilder<Svc, Sto, MSto>>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
 ///     use operon::__private::futures::{StreamExt, TryStreamExt};
 ///
 ///     let tickets = client
-///         .ticket(self.job_meta())
+///         .ticket(self.task_meta())
 ///         .get_all(operon::__private::TicketStatus::Done)
 ///         .await?;
 ///     let data = operon::__private::futures::stream::iter(tickets.into_iter().map(
@@ -44,20 +44,20 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///     .await?;
 ///
 ///     Ok(Box::new(BetaRebuilder {
-///         job_meta: self.job_meta(),
+///         task_meta: self.task_meta(),
 ///         spawn_dim_meta: self.spawn_dim_meta(),
 ///         data,
 ///         progress,
 ///     }))
 /// }
 /// ```
-pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
+pub(super) fn fn_prepare_rebuild(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
-    let rebuilder_ident = rebuilder_ident(&job.id);
+    let rebuilder_ident = rebuilder_ident(&task.id);
 
-    let resolve_fail_msg = format!("Failed to resolve a {} ticket", job.id);
+    let resolve_fail_msg = format!("Failed to resolve a {} ticket", task.id);
 
-    let resolution_expr: syn::Expr = match job.spawn_dim.as_ref() {
+    let resolution_expr: syn::Expr = match task.spawn_dim.as_ref() {
         Some(spawn_dim) => {
             let missing_resolution_msg = format!("No resolution found for {spawn_dim}_{{:?}}");
             parse_quote! {
@@ -73,7 +73,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
         }
         None => parse_quote! { () },
     };
-    let maybe_spawn_dim_meta = job.spawn_dim.is_some().then(|| {
+    let maybe_spawn_dim_meta = task.spawn_dim.is_some().then(|| {
         quote! { spawn_dim_meta: self.spawn_dim_meta(), }
     });
 
@@ -83,12 +83,12 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             storage: &Sto,
             progress: #operon::__private::SharedProgress,
             client: MSto::Client<'_>,
-        ) -> Result<Box<dyn #operon::__private::JobRebuilder<Svc, Sto, MSto>>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>
+        ) -> Result<Box<dyn #operon::__private::TaskRebuilder<Svc, Sto, MSto>>, #operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>
         {
             use #operon::__private::futures::{StreamExt, TryStreamExt};
 
             let tickets = client
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .get_all(#operon::__private::TicketStatus::Done)
                 .await?;
             let data = #operon::__private::futures::stream::iter(tickets.into_iter().map(
@@ -108,7 +108,7 @@ pub(super) fn fn_prepare_rebuild(job: &JobConfig) -> syn::ImplItemFn {
             .await?;
 
             Ok(Box::new(#rebuilder_ident {
-                job_meta: self.job_meta(),
+                task_meta: self.task_meta(),
                 #maybe_spawn_dim_meta
                 data,
                 progress,
@@ -123,12 +123,12 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::job_beta;
+    use crate::test_utils::simple_pipeline::task_beta;
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/spec/fn_prepare_rebuild.rs")]
-    fn test_fn_prepare_rebuild(#[case] job: JobConfig, #[case] fixture_path: &str) {
-        let item = fn_prepare_rebuild(&job);
+    #[case::simple(task_beta(), "spec/spec/fn_prepare_rebuild.rs")]
+    fn test_fn_prepare_rebuild(#[case] task: TaskConfig, #[case] fixture_path: &str) {
+        let item = fn_prepare_rebuild(&task);
         assert_item_eq(&item, fixture_path);
     }
 }

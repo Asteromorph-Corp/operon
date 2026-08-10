@@ -141,7 +141,7 @@ async fn run_job(
         .put(resolution)
         .await?;
     tx.as_client()
-        .ticket(self.job_meta())
+        .ticket(self.task_meta())
         .mark_done(job)
         .await?;
     tx.commit().await?;

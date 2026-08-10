@@ -98,7 +98,7 @@ async fn run_job(
     let tx = conn.transaction().await?;
 
     tx.as_client()
-        .ticket(self.job_meta())
+        .ticket(self.task_meta())
         .mark_done(job)
         .await?;
     tx.commit().await?;

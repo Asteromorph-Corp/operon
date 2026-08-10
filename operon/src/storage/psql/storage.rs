@@ -35,6 +35,7 @@ impl<T> PsqlStorage<T> {
 /// This lets [`PsqlStorageOptions::build`](crate::options::PsqlStorageOptions::build) be
 /// turbofished on the generated storage alias, e.g. `build::<PsqlCookingStorage>()`.
 pub trait FromPsqlStorageOptions: Sized {
+    /// Opens the connection pool `options` describes and builds the storage over it.
     fn from_options(options: PsqlStorageOptions) -> PsqlStorageResult<Self>;
 }
 
