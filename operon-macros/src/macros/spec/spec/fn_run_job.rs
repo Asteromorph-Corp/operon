@@ -384,7 +384,7 @@ pub(super) fn fn_run_job(
             let #result_ident = service
                 .#task_fn_name(#(#args),*)
                 .await
-                .map_err(operon::error::SchedulerError::UserError)?;
+                .map_err(#operon::error::SchedulerError::UserError)?;
             let entity = #entity;
             let resolution = #resolution;
 
