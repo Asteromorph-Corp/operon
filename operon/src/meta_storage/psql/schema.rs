@@ -1,19 +1,23 @@
 use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::psql::error::PsqlResult;
+use crate::meta_storage::psql::resolution::DIMENSION_SHAPES;
+use crate::meta_storage::psql::ticket::TICKET_SHAPES;
 use crate::utils::{
-    SchemaPrefix, ShapeAction, ShapeRecord, build_tables, hash_metadata, init_shape_record_query,
-    shape_query,
+    SchemaPrefix, ShapeAction, ShapeRecord, ShapeTable, build_tables, hash_metadata,
+    init_shape_table_query, shape_query,
 };
 
 /// The table holding the per-task ticket counters.
 const SUMMARY_TABLE: &str = "ticket_summary";
 
-/// The pointer to the ticket summary's shape ID.
-const SUMMARY_RECORD: ShapeRecord<'static> = ShapeRecord {
+/// The table recording the ticket summary's shape ID.
+const SUMMARY_SHAPES: ShapeTable<'static> = ShapeTable {
     table: "_ticket_summary_hash",
     column: "hash",
-    id: SUMMARY_TABLE,
 };
+
+/// The pointer to the ticket summary's shape ID.
+const SUMMARY_RECORD: ShapeRecord<'static> = SUMMARY_SHAPES.record(SUMMARY_TABLE);
 
 /// The DDL for the ticket summary table and the trigger function.
 fn init_summary_query(schema_prefix: SchemaPrefix<'_>) -> String {
@@ -89,26 +93,16 @@ impl PsqlClient<'_> {
         Ok(())
     }
 
+    /// Initializes the table recording each task's ticket shape.
     pub async fn init_ticket_hash(&self) -> PsqlResult<()> {
-        let schema_prefix = self.schema_prefix();
-        let stmt = format!(
-            "CREATE TABLE IF NOT EXISTS {schema_prefix}_ticket_hash (
-                id TEXT PRIMARY KEY,
-                hash TEXT NOT NULL
-            );"
-        );
+        let stmt = init_shape_table_query(TICKET_SHAPES, self.schema_prefix());
         self.execute(&stmt, &[]).await?;
         Ok(())
     }
 
+    /// Initializes the table recording each dimension's shape.
     pub async fn init_dimension_hash(&self) -> PsqlResult<()> {
-        let schema_prefix = self.schema_prefix();
-        let stmt = format!(
-            "CREATE TABLE IF NOT EXISTS {schema_prefix}_dimension_hash (
-                id TEXT PRIMARY KEY,
-                hash TEXT NOT NULL
-            );"
-        );
+        let stmt = init_shape_table_query(DIMENSION_SHAPES, self.schema_prefix());
         self.execute(&stmt, &[]).await?;
         Ok(())
     }
@@ -139,7 +133,7 @@ impl PsqlClient<'_> {
     pub async fn init_ticket_summary(&self) -> PsqlResult<()> {
         let schema_prefix = self.schema_prefix();
 
-        let init_record = init_shape_record_query(SUMMARY_RECORD, schema_prefix);
+        let init_record = init_shape_table_query(SUMMARY_SHAPES, schema_prefix);
         self.execute(&init_record, &[]).await?;
 
         let init_query = init_summary_query(schema_prefix);

@@ -12,18 +12,15 @@ use crate::schema::{
     TicketStatus,
 };
 use crate::utils::{
-    SchemaPrefix, ShapeAction, ShapeRecord, SqlParams, box_sql, build_tables, hash_metadata,
+    SchemaPrefix, ShapeAction, ShapeTable, SqlParams, box_sql, build_tables, hash_metadata,
     shape_query,
 };
 
-/// The pointer to the `id` task's shape ID.
-fn ticket_shape_record(id: &str) -> ShapeRecord<'_> {
-    ShapeRecord {
-        table: "_ticket_hash",
-        column: "hash",
-        id,
-    }
-}
+/// The table recording each task's shape ID, keyed by task ID.
+pub(crate) const TICKET_SHAPES: ShapeTable<'static> = ShapeTable {
+    table: "_ticket_hash",
+    column: "hash",
+};
 
 /// Postgres wire (de)serialization for [`Ticket`], alongside the query builders that use it.
 ///
@@ -96,7 +93,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     async fn init(&self) -> PsqlResult<TableShape> {
         let schema_prefix = self.client.schema_prefix();
         let id = self.task_meta.id;
-        let shape_record = ticket_shape_record(id);
+        let shape_record = TICKET_SHAPES.record(id);
         let shape_id = hash_metadata(&self.task_meta);
         let ticket_table = format!("ticket_{id}");
         let tables = [ticket_table.as_str()];

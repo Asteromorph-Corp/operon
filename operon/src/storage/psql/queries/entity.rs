@@ -9,8 +9,14 @@ use crate::storage::StorageResult;
 use crate::storage::psql::client::StorageClient;
 use crate::storage::psql::{PsqlStorageError, PsqlStorageResult};
 use crate::utils::{
-    SchemaPrefix, SchemaPrefixOwned, ShapeAction, ShapeRecord, SqlParams, build_tables,
+    SchemaPrefix, SchemaPrefixOwned, ShapeAction, ShapeTable, SqlParams, build_tables,
     hash_metadata, shape_query,
+};
+
+/// The table recording each entity's shape ID, keyed by entity ID.
+pub(crate) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
+    table: "_entity_hash",
+    column: "hash",
 };
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
@@ -142,11 +148,7 @@ pub trait EntityQueries: Send + Sync + 'static {
 impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<N, T> {
     async fn init(&self, client: &StorageClient<'_>) -> PsqlStorageResult<()> {
         let schema_prefix = client.schema_prefix();
-        let record = ShapeRecord {
-            table: "_entity_hash",
-            column: "hash",
-            id: self.id,
-        };
+        let record = ENTITY_SHAPES.record(self.id);
         let tables = [self.id];
         let shape_id = hash_metadata(self);
 
