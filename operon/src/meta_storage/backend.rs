@@ -176,6 +176,9 @@ pub trait MetaTicketApi<const N: usize> {
     /// Reports [`STALE`](TableShape::STALE) when that happened, [`CURRENT`](TableShape::CURRENT)
     /// otherwise.
     /// Backends that keep no record of the shape always report [`CURRENT`](TableShape::CURRENT).
+    ///
+    /// A following [`get_status`](Self::get_status) call should immediately be accurate regardless
+    /// of what happened to the ticket table.
     fn init(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send;
 
     /// Discards every ticket of this task, leaving what [`init`](Self::init) prepared in place.

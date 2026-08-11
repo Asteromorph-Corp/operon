@@ -120,9 +120,17 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         }
 
         let summary_stmt = TicketSummaryInsertQuery(schema_prefix);
-        self.client
+        let inserted_summary_rows = self
+            .client
             .execute_stmt(&summary_stmt, &[&self.task_meta.id])
             .await?;
+
+        // Ticket table was kept with live tickets, but the summary table was rebuilt.
+        if inserted_summary_rows > 0 && action == ShapeAction::Keep {
+            // This summary row was just zeroed out, so recount the tickets into it.
+            let resync_stmt = TicketSummaryResyncQuery(schema_prefix, self.task_meta);
+            self.client.execute_stmt(&resync_stmt, &[]).await?;
+        }
         Ok(action.into())
     }
 
@@ -336,10 +344,39 @@ impl<'a> std::fmt::Display for TicketSummaryInsertQuery<'a> {
 
         writeln!(
             f,
-            "INSERT INTO {schema}ticket_summary (job_id, waiting, queued, done)"
+            "INSERT INTO {schema}ticket_summary (task_id, waiting, queued, done)"
         )?;
         writeln!(f, "VALUES ($1, 0, 0, 0)")?;
-        write!(f, "ON CONFLICT (job_id) DO NOTHING;")
+        write!(f, "ON CONFLICT (task_id) DO NOTHING;")
+    }
+}
+
+/// Helper struct to generate the SQL query for recounting a task's ticket summary.
+struct TicketSummaryResyncQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
+
+impl<const N: usize> std::fmt::Display for TicketSummaryResyncQuery<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        writeln!(f, "UPDATE {schema}ticket_summary SET")?;
+        writeln!(f, "    waiting = counts.waiting,")?;
+        writeln!(f, "    queued = counts.queued,")?;
+        writeln!(f, "    done = counts.done")?;
+        writeln!(f, "FROM (")?;
+        writeln!(f, "    SELECT")?;
+        writeln!(
+            f,
+            "        COUNT(*) FILTER (WHERE status = 'waiting') AS waiting,"
+        )?;
+        writeln!(
+            f,
+            "        COUNT(*) FILTER (WHERE status = 'queued') AS queued,"
+        )?;
+        writeln!(f, "        COUNT(*) FILTER (WHERE status = 'done') AS done")?;
+        writeln!(f, "    FROM {schema}ticket_{id}")?;
+        writeln!(f, ") AS counts")?;
+        write!(f, "WHERE task_id = '{id}';")
     }
 }
 
@@ -356,7 +393,7 @@ impl<const N: usize> std::fmt::Display for TicketSummaryDeleteQuery<'_, N> {
 
         write!(
             f,
-            "DELETE FROM {schema}ticket_summary WHERE job_id = '{id}';"
+            "DELETE FROM {schema}ticket_summary WHERE task_id = '{id}';"
         )
     }
 }
@@ -616,7 +653,10 @@ impl<'a> std::fmt::Display for GetStatusQuery<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
 
-        write!(f, "SELECT * FROM {schema}ticket_summary WHERE job_id = $1;")
+        write!(
+            f,
+            "SELECT * FROM {schema}ticket_summary WHERE task_id = $1;"
+        )
     }
 }
 
@@ -687,9 +727,9 @@ mod tests {
     #[rstest]
     #[case::simple(
         indoc! {"
-            INSERT INTO test_meta.ticket_summary (job_id, waiting, queued, done)
+            INSERT INTO test_meta.ticket_summary (task_id, waiting, queued, done)
             VALUES ($1, 0, 0, 0)
-            ON CONFLICT (job_id) DO NOTHING;"
+            ON CONFLICT (task_id) DO NOTHING;"
         },
     )]
     fn test_ticket_summary_insert_query(
@@ -703,7 +743,34 @@ mod tests {
     #[rstest]
     #[case::simple(
         task_beta(),
-        "DELETE FROM test_meta.ticket_summary WHERE job_id = 'beta';"
+        indoc! {"
+            UPDATE test_meta.ticket_summary SET
+                waiting = counts.waiting,
+                queued = counts.queued,
+                done = counts.done
+            FROM (
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'waiting') AS waiting,
+                    COUNT(*) FILTER (WHERE status = 'queued') AS queued,
+                    COUNT(*) FILTER (WHERE status = 'done') AS done
+                FROM test_meta.ticket_beta
+            ) AS counts
+            WHERE task_id = 'beta';"
+        },
+    )]
+    fn test_ticket_summary_resync_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'static>,
+        #[case] task_meta: TaskMetadata<N>,
+        #[case] expected: &str,
+    ) {
+        let stmt = TicketSummaryResyncQuery(schema_prefix, task_meta).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(
+        task_beta(),
+        "DELETE FROM test_meta.ticket_summary WHERE task_id = 'beta';"
     )]
     fn test_ticket_summary_delete_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
@@ -847,7 +914,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case::simple("SELECT * FROM test_meta.ticket_summary WHERE job_id = $1;")]
+    #[case::simple("SELECT * FROM test_meta.ticket_summary WHERE task_id = $1;")]
     fn test_get_status_query(schema_prefix: SchemaPrefix<'static>, #[case] expected: &str) {
         let stmt = GetStatusQuery(schema_prefix).to_string();
         assert_eq!(stmt, expected);
