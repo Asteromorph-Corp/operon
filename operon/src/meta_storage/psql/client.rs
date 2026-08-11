@@ -104,15 +104,15 @@ pub enum PsqlClient<'a> {
 }
 
 impl PsqlClient<'_> {
-    impl_psql_client!(batch_execute(query: &str) -> ());
-    impl_psql_client!(execute(query: &str, params: &[&ToSql]) -> u64);
-    impl_psql_client!(query(query: &str, params: &[&ToSql]) -> Vec<tokio_postgres::Row>);
-    impl_psql_client!(query_opt(query: &str, params: &[&ToSql]) -> Option<tokio_postgres::Row>);
-    impl_psql_client!(
+    impl_psql_client! { batch_execute(query: &str) -> () }
+    impl_psql_client! { execute(query: &str, params: &[&ToSql]) -> u64 }
+    impl_psql_client! { query(query: &str, params: &[&ToSql]) -> Vec<tokio_postgres::Row> }
+    impl_psql_client! { query_opt(query: &str, params: &[&ToSql]) -> Option<tokio_postgres::Row> }
+    impl_psql_client! {
         copy_in<T, U>(query: &T) -> CopyInSink<U>
         where T: ?Sized + ToStatement + Send + Sync,
               U: Buf + 'static + Send + Sync
-    );
+    }
 
     pub async fn execute_stmt(&self, stmt: &impl Display, params: &[&ToSql]) -> PsqlResult<u64> {
         self.execute(&stmt.to_string(), params).await
