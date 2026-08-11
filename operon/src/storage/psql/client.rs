@@ -39,15 +39,15 @@ impl<'a> StorageClient<'a> {
         StorageClient { client, schema }
     }
 
-    impl_storage_client!(batch_execute(query: &str) -> ());
-    impl_storage_client!(execute(query: &str, params: &[&ToSql]) -> u64);
-    impl_storage_client!(query(query: &str, params: &[&ToSql]) -> Vec<tokio_postgres::Row>);
-    impl_storage_client!(query_opt(query: &str, params: &[&ToSql]) -> Option<tokio_postgres::Row>);
-    impl_storage_client!(
+    impl_storage_client! { batch_execute(query: &str) -> () }
+    impl_storage_client! { execute(query: &str, params: &[&ToSql]) -> u64 }
+    impl_storage_client! { query(query: &str, params: &[&ToSql]) -> Vec<tokio_postgres::Row> }
+    impl_storage_client! { query_opt(query: &str, params: &[&ToSql]) -> Option<tokio_postgres::Row> }
+    impl_storage_client! {
         copy_in<T, U>(query: &T) -> CopyInSink<U>
         where T: ?Sized + ToStatement + Send + Sync,
               U: Buf + 'static + Send + Sync
-    );
+    }
 
     pub async fn batch_execute_stmt(&self, stmt: &impl Display) -> PsqlStorageResult<()> {
         self.batch_execute(&stmt.to_string()).await
