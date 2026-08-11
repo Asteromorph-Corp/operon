@@ -108,11 +108,11 @@ pub trait MetaClientApi<MSto: MetaBackend>: Copy + Send + Sync {
     fn init_schema(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
 
     /// Prepares the record of the shape each task's tickets were built under, which
-    /// [`MetaTicketApi::shape`] reads.
+    /// [`MetaTicketApi::init`] reads.
     fn init_ticket_hash(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
 
     /// Prepares the record of the shape each dimension's resolutions were built under, which
-    /// [`MetaResolutionApi::shape`] reads.
+    /// [`MetaResolutionApi::init`] reads.
     fn init_dimension_hash(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
 
     /// Prepares the backend's representation of [`TicketStatus`].
@@ -123,8 +123,13 @@ pub trait MetaClientApi<MSto: MetaBackend>: Copy + Send + Sync {
 
     // --- Footprint ---
 
-    /// Prepares the records of runs and of their executions.
-    fn init_footprint(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
+    /// Initializes the footprint tables, returning their shape.
+    ///
+    /// Rebuilds them when the footprint's shape has changed, marking the run as aborted.
+    /// Reports [`STALE`](TableShape::STALE) when that happened, [`CURRENT`](TableShape::CURRENT)
+    /// otherwise.
+    /// Backends that keep no record of the shape always report [`CURRENT`](TableShape::CURRENT).
+    fn init_footprint(&self) -> impl Future<Output = MetaResult<TableShape, MSto::Error>> + Send;
 
     /// Discards the recorded run along with its executions.
     fn clear_footprint(&self) -> impl Future<Output = MetaResult<(), MSto::Error>> + Send;
@@ -165,21 +170,13 @@ pub trait MetaTicketApi<const N: usize> {
     /// This builder's backend error type, matching its backend's [`MetaBackend::Error`].
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Whether the ticket table matches the shape of the task it was built under.
+    /// Initializes the ticket table for this task.
     ///
-    /// A [`STALE`](TableShape::STALE) table is rebuilt by [`init`](Self::init), which discards the
-    /// tickets in it.
-    /// Backends that keep no record of the shape should report [`CURRENT`](TableShape::CURRENT).
-    fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
-        async { Ok(TableShape::CURRENT) }
-    }
-
-    /// Prepares this task's tickets, keeping the ones a previous run left behind.
-    ///
-    /// The scheduler calls this on every start.
-    /// Tickets held under a [`STALE`](TableShape::STALE) shape are discarded, since the task they
-    /// describe has changed shape.
-    fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
+    /// Rebuilds the table when the task's shape has changed, discarding its tickets.
+    /// Reports [`STALE`](TableShape::STALE) when that happened, [`CURRENT`](TableShape::CURRENT)
+    /// otherwise.
+    /// Backends that keep no record of the shape always report [`CURRENT`](TableShape::CURRENT).
+    fn init(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send;
 
     /// Discards every ticket of this task, leaving what [`init`](Self::init) prepared in place.
     fn clear(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
@@ -242,21 +239,13 @@ pub trait MetaResolutionApi<const N: usize> {
     /// This builder's backend error type, matching its backend's [`MetaBackend::Error`].
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Whether the resolution table matches the shape of the dimension it was built under.
+    /// Initializes the resolution table for this dimension.
     ///
-    /// A [`STALE`](TableShape::STALE) table is rebuilt by [`init`](Self::init), which discards the
-    /// resolutions in it.
-    /// Backends that keep no record of the shape should report [`CURRENT`](TableShape::CURRENT).
-    fn shape(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send {
-        async { Ok(TableShape::CURRENT) }
-    }
-
-    /// Prepares this dimension's resolutions, keeping the ones a previous run left behind.
-    ///
-    /// The scheduler calls this on every start.
-    /// Resolutions held under a [`STALE`](TableShape::STALE) shape are discarded, since the
-    /// dimension they describe has changed shape.
-    fn init(&self) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
+    /// Rebuilds the table when the dimension's shape has changed, discarding its resolutions.
+    /// Reports [`STALE`](TableShape::STALE) when that happened, [`CURRENT`](TableShape::CURRENT)
+    /// otherwise.
+    /// Backends that keep no record of the shape always report [`CURRENT`](TableShape::CURRENT).
+    fn init(&self) -> impl Future<Output = MetaResult<TableShape, Self::Error>> + Send;
 
     /// Discards every resolution of this dimension, leaving what [`init`](Self::init) prepared in
     /// place.

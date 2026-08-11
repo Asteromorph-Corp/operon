@@ -116,10 +116,10 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
                 Ok(was_stale || shape.is_stale)
             })
             .await?;
-        client.init_footprint().await?;
+        let footprint_is_stale = client.init_footprint().await?.is_stale;
 
         Ok(TableShape {
-            is_stale: resolution_is_stale || ticket_is_stale,
+            is_stale: resolution_is_stale || ticket_is_stale || footprint_is_stale,
         })
     }
 

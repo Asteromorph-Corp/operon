@@ -56,6 +56,8 @@ pub mod __private {
         SchedulerHandler, SpecWithMetadata, TaskHandler, TaskRebuilder, TaskSpec, ValidOperon,
     };
     pub use crate::schema::*;
-    pub use crate::storage::psql::{EntityQueries, FromPsqlStorageOptions, PsqlStorage};
+    pub use crate::storage::psql::{
+        EntityQueries, FromPsqlStorageOptions, PsqlStorage, StorageClient,
+    };
     pub use crate::utils::{SchemaPrefix, get_dop_coords, get_dop_tags};
 }

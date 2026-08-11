@@ -71,6 +71,15 @@ impl RunMetadata {
     }
 }
 
+impl RunState {
+    /// The states a recorded run can be in.
+    pub(crate) const RECORDED: [Self; 4] =
+        [Self::Running, Self::Stopped, Self::Completed, Self::Aborted];
+
+    /// The states an ended execution can be in.
+    pub(crate) const ENDED: [Self; 3] = [Self::Stopped, Self::Completed, Self::Aborted];
+}
+
 impl Default for RunMetadata {
     fn default() -> Self {
         Self {
@@ -85,7 +94,7 @@ impl std::fmt::Display for RunState {
         let state_str = match self {
             RunState::Fresh => "fresh",
             RunState::Running => "running",
-            RunState::Stopped => "paused",
+            RunState::Stopped => "stopped",
             RunState::Completed => "completed",
             RunState::Aborted => "aborted",
         };
@@ -101,7 +110,7 @@ impl FromStr for RunState {
             Ok(RunState::Fresh)
         } else if s.eq_ignore_ascii_case("running") {
             Ok(RunState::Running)
-        } else if s.eq_ignore_ascii_case("paused") {
+        } else if s.eq_ignore_ascii_case("stopped") {
             Ok(RunState::Stopped)
         } else if s.eq_ignore_ascii_case("completed") {
             Ok(RunState::Completed)
@@ -122,10 +131,15 @@ mod tests {
     #[rstest]
     #[case::fresh(RunState::Fresh)]
     #[case::running(RunState::Running)]
-    #[case::paused(RunState::Stopped)]
+    #[case::stopped(RunState::Stopped)]
     #[case::completed(RunState::Completed)]
     #[case::aborted(RunState::Aborted)]
     fn test_run_state_round_trip(#[case] state: RunState) {
         assert_eq!(RunState::from_str(&state.to_string()), Ok(state));
+    }
+
+    #[test]
+    fn test_parse_paused_is_rejected() {
+        assert_eq!(RunState::from_str("paused"), Err("paused".to_owned()));
     }
 }

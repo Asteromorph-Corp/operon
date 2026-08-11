@@ -10,7 +10,7 @@ use crate::meta_storage::psql::{
     PsqlMetaError, PsqlMetaStorage, PsqlResolutionQueryBuilder, PsqlTicketQueryBuilder,
 };
 use crate::meta_storage::{MetaClientApi, MetaConnApi, MetaTxApi};
-use crate::schema::{DimensionMetadata, RunFootprint, TaskMetadata};
+use crate::schema::{DimensionMetadata, RunFootprint, TableShape, TaskMetadata};
 use crate::utils::SchemaPrefix;
 
 macro_rules! impl_psql_client {
@@ -178,7 +178,7 @@ impl MetaClientApi<PsqlMetaStorage> for PsqlClient<'_> {
         PsqlClient::init_ticket_summary(self).await
     }
 
-    async fn init_footprint(&self) -> PsqlResult<()> {
+    async fn init_footprint(&self) -> PsqlResult<TableShape> {
         PsqlClient::init_footprint(self).await
     }
 

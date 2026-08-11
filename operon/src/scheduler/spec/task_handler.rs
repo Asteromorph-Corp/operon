@@ -155,15 +155,14 @@ where
         let id = spawn_dim_meta.id;
         let resolution = client.resolution(spawn_dim_meta);
 
-        let shape = resolution.shape().await?;
+        let shape = resolution.init().await?;
         if shape.is_stale {
             tracing::warn!(
-                "Dimension `{id}` changed shape, so its resolutions are discarded. \
+                "Dimension `{id}` changed shape, so its resolutions were discarded. \
                  A rebuild will discard progress of all jobs over `{id}`."
             );
         }
 
-        resolution.init().await?;
         Ok(shape)
     }
 
@@ -184,15 +183,14 @@ where
         let id = self.task_meta.id;
         let ticket = client.ticket(self.task_meta);
 
-        let shape = ticket.shape().await?;
+        let shape = ticket.init().await?;
         if shape.is_stale {
             tracing::warn!(
-                "Task `{id}` changed shape, so its tickets are discarded. \
+                "Task `{id}` changed shape, so its tickets were discarded. \
                  A rebuild will discard progress of all `{id}` and downstream jobs."
             );
         }
 
-        ticket.init().await?;
         Ok(shape)
     }
 

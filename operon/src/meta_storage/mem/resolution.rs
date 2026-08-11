@@ -5,7 +5,7 @@ use std::sync::RwLock;
 use crate::meta_storage::MetaResolutionApi;
 use crate::meta_storage::mem::error::{MemMetaError, MemResult};
 use crate::meta_storage::mem::store::MemStore;
-use crate::schema::{DimensionMetadata, Resolution};
+use crate::schema::{DimensionMetadata, Resolution, TableShape};
 
 /// One dimension's resolution table, mapping a coordinate to its upper bound.
 #[derive(Default)]
@@ -35,8 +35,9 @@ impl MemStore {
 impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
     type Error = MemMetaError;
 
-    async fn init(&self) -> MemResult<()> {
-        self.store.init_resolution_table(self.dim_meta.id)
+    async fn init(&self) -> MemResult<TableShape> {
+        self.store.init_resolution_table(self.dim_meta.id)?;
+        Ok(TableShape::CURRENT)
     }
 
     async fn clear(&self) -> MemResult<()> {
