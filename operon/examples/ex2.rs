@@ -167,16 +167,6 @@ impl OperonStorage for DashMapCookingStorage {
         Ok(())
     }
 
-    async fn clear(&self) -> StorageResult<(), Self::Error> {
-        self.a.clear();
-        self.b.clear();
-        self.c.clear();
-        self.d.clear();
-        self.e.clear();
-        self.f.clear();
-        Ok(())
-    }
-
     // The footprint operations stay at their defaults: they exist to resume a previous run, which
     // this storage cannot outlive.
 }

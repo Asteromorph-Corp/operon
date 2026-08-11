@@ -94,14 +94,6 @@ impl StorageClient<'_> {
         Ok(())
     }
 
-    /// Clears the footprint table.
-    pub async fn clear_footprint(&self) -> PsqlStorageResult<()> {
-        let schema_prefix = self.schema_prefix();
-        let stmt = format!("TRUNCATE TABLE {schema_prefix}_footprint");
-        self.execute(&stmt, &[]).await?;
-        Ok(())
-    }
-
     /// Gets a footprint value by key.
     pub async fn get_footprint(&self) -> PsqlStorageResult<Option<RunFootprint>> {
         let schema_prefix = self.schema_prefix();
