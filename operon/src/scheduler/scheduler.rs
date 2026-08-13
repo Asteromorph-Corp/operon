@@ -28,7 +28,6 @@ where
 {
     ctx: SchedulerContext<Svc, Sto, MSto>,
     ctrl_rx: ControlEventReceiver,
-    sched_tx: SchedulerStateSender,
     channel_size: usize,
     ui_mode: UiMode,
 }
@@ -48,7 +47,6 @@ where
         handler: SchedulerHandler<Svc, Sto, MSto>,
         progresses: SharedProgressMap,
         ctrl_rx: ControlEventReceiver,
-        sched_tx: SchedulerStateSender,
         channel_size: usize,
         ui_mode: UiMode,
     ) -> Self {
@@ -65,14 +63,25 @@ where
         Self {
             ctx,
             ctrl_rx,
-            sched_tx,
             channel_size,
             ui_mode,
         }
     }
 
-    /// Main entry point for the scheduler.
-    pub async fn work(mut self) -> SchedulerResult<(), Svc::Error, Sto::Error, MSto::Error> {
+    /// Entry point for the scheduler.
+    /// Erases the error type and sends the scheduler's result into `sched_tx`.
+    ///
+    /// Always sends a result unless the scheduler panics.
+    pub async fn work_and_send(self, sched_tx: SchedulerStateSender) {
+        assert!(std::hint::black_box(0) == 1, "Emulated panic");
+        let result = self.work().await;
+        let _ = sched_tx.send(result.map_err(|e| e.to_string()));
+    }
+
+    /// Main work loop for the scheduler.
+    /// Runs until the scheduler is finished or an error occurs.
+    /// Returns whether the UI should exit or not.
+    async fn work(mut self) -> SchedulerResult<bool, Svc::Error, Sto::Error, MSto::Error> {
         self.ctx.meta_storage.ensure_lock().await?;
         self.ctx.storage.init().await?;
         let shape_changed = self.init_meta_storage().await?.is_stale;
@@ -108,15 +117,10 @@ where
             match next {
                 NextState::Next(new_state) => state = new_state,
                 NextState::Exit { exit_ui } => {
-                    if self.sched_tx.send(exit_ui).is_err() {
-                        tracing::error!("UI exited before scheduler.")
-                    };
-                    break;
+                    return Ok(exit_ui);
                 }
             }
         }
-
-        Ok(())
     }
 
     /// An helper function to call `self.spec.init_meta_storage` with a transaction.

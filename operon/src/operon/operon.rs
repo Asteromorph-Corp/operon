@@ -11,6 +11,21 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiLoop;
 
+/// Asymmetric `try_join` helper where `future1` always runs to completion while `future2` may be
+/// canceled if `future1` returns an error.
+///
+/// If `future2` returns an error but `future1` returns its own error afterwards,
+/// then the error from `future1` is returned and the error from `future2` is discarded.
+async fn asymmetric_try_join<T, U, E>(
+    future1: impl Future<Output = Result<T, E>>,
+    future2: impl Future<Output = Result<U, E>>,
+) -> Result<(T, U), E> {
+    let future2 = async move { Ok::<Result<U, E>, E>(future2.await) };
+    let (t, u) = try_join(future1, future2).await?;
+    let u = u?;
+    Ok((t, u))
+}
+
 /// # Operon
 ///
 /// The interface for the Operon library.
@@ -91,26 +106,27 @@ where
             handler,
             progresses.clone(),
             ctrl_rx,
-            sched_tx,
             channel_size,
             ui_mode,
         );
         let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
-        let scheduler_handle = { ::tokio::spawn(async move { scheduler.work().await }) };
+        let scheduler_handle =
+            { ::tokio::spawn(async move { scheduler.work_and_send(sched_tx).await }) };
 
-        try_join(
+        // A UI error kills the scheduler,
+        // but the scheduler-handler join error (i.e., a scheduler panic)
+        // lets the UI continue to run and report the error.
+        //
+        // The UI's error will win even if the scheduler errors first.
+        asymmetric_try_join::<_, _, OperonError>(
             async {
                 ui_loop.run().await?;
-                Ok::<_, OperonError>(())
+                Ok(())
             },
             async {
-                // A panic (`JoinError`) is fatal (kills the UI);
-                // a scheduler error is reported to the UI and the UI keeps running.
-                if let Err(err) = scheduler_handle.await? {
-                    tracing::error!("Scheduler exited abnormally: {err}");
-                }
+                scheduler_handle.await?;
                 Ok(())
             },
         )
