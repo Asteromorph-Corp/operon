@@ -73,7 +73,6 @@ where
     ///
     /// Always sends a result unless the scheduler panics.
     pub async fn work_and_send(self, sched_tx: SchedulerStateSender) {
-        assert!(std::hint::black_box(0) == 1, "Emulated panic");
         let result = self.work().await;
         let _ = sched_tx.send(result.map_err(|e| e.to_string()));
     }
