@@ -143,7 +143,7 @@ where
                 "Consistency check failed for the following tasks:\n\
                 {inconsistent_tasks:?}\n\
                 You may proceed to overwrite the existing data with `run`, or alternatively,\n\
-                you may rebuild other tasks by specifying --redo-inconsistent-jobs.",
+                you may rebuild other tasks by specifying --redo-inconsistent-tasks.",
             );
         } else {
             match self.kind {

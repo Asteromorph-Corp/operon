@@ -41,7 +41,7 @@ Commands:
                             With --rebuild, do not rebuild the given 1 or more task(s).
         -R, --redo <TASK>[ ...]
                             Shorthand for --rebuild --skip <...>.
-        -i, --redo-inconsistent-jobs
+        -i, --redo-inconsistent-tasks
                             Rebuild the run even on a failed check,
                             ignoring tasks with corrupt data and their downstream tasks.
                             Cannot be used with --fresh.

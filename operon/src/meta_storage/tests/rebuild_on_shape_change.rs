@@ -1,7 +1,7 @@
-//! Tests for the table rebuilds triggered by a task's or dimension's shape change in Postgres.
+//! Tests for the table rebuilds triggered by a shape change in Postgres.
 //!
-//! Each sequence initializes a table under one shape, populates it, then initializes the same id
-//! under a wider shape and asserts the table that comes back matches the new shape.
+//! Each sequence initializes a table under one shape, populates it, then initializes it again under
+//! another shape and asserts the table that comes back matches the new shape.
 //! The assertions read `information_schema` and write through the new shape rather than comparing
 //! statement text, since a rebuild that names the wrong relation still generates well-formed SQL.
 //!
@@ -23,6 +23,9 @@ const DIMENSION_SCHEMA: &str = "operon_rebuild_dimension";
 
 /// The schema the unrecorded-shape sequence owns outright.
 const UNRECORDED_SCHEMA: &str = "operon_rebuild_unrecorded";
+
+/// The schema the ticket summary sequence owns outright.
+const SUMMARY_SCHEMA: &str = "operon_rebuild_summary";
 
 /// The task `delta`, over `i` alone.
 fn delta_over_i() -> TaskMetadata<1> {
@@ -79,7 +82,7 @@ async fn columns(client: PsqlClient<'_>, schema: &'static str, table: &'static s
 }
 
 #[tokio::test]
-async fn ticket_table_is_rebuilt_when_a_job_gains_a_dimension() {
+async fn ticket_table_is_rebuilt_when_a_task_gains_a_dimension() {
     let Some(psql) = psql_backend(TICKET_SCHEMA) else {
         eprintln!("skipping: POSTGRES_URI is not set, so there is no Postgres to build tables in");
         return;
@@ -265,6 +268,110 @@ async fn resolution_table_is_rebuilt_when_a_dimension_gains_a_dependency() {
         .expect("wide get after put")
         .expect("a resolution at i = 0");
     assert_eq!((resolution.coordinate, resolution.ub), ([0], 3));
+}
+
+#[tokio::test]
+async fn ticket_summary_is_rebuilt_when_its_shape_changes() {
+    let Some(psql) = psql_backend(SUMMARY_SCHEMA) else {
+        eprintln!("skipping: POSTGRES_URI is not set, so there is no Postgres to build tables in");
+        return;
+    };
+
+    let conn = psql.scheduler_conn().await.expect("scheduler conn");
+    let client = conn.as_client();
+
+    drop_schema(client, SUMMARY_SCHEMA).await;
+    client.init_schema().await.expect("init_schema");
+    client.init_ticket_hash().await.expect("init_ticket_hash");
+    client
+        .init_ticket_status_type()
+        .await
+        .expect("init_ticket_status_type");
+    client
+        .init_ticket_summary()
+        .await
+        .expect("first init_ticket_summary");
+
+    // A run over `i`, carried to one ticket the summary counts done and one it counts queued.
+    client
+        .ticket(delta_over_i())
+        .init()
+        .await
+        .expect("first init");
+    for coordinate in [0, 1] {
+        client
+            .ticket(delta_over_i())
+            .put(Ticket::new(0).with_coordinate::<0>(coordinate))
+            .await
+            .expect("put");
+    }
+    client
+        .ticket(delta_over_i())
+        .mark_done(Job { coordinate: [0] })
+        .await
+        .expect("mark_done");
+    assert_eq!(
+        client
+            .ticket(delta_over_i())
+            .get_status()
+            .await
+            .expect("status before the rebuild"),
+        (1, 1, 0)
+    );
+
+    // The summary as a release naming its key column after a job left it, vouched for by nothing.
+    let stmt = format!(
+        "ALTER TABLE {SUMMARY_SCHEMA}.ticket_summary RENAME COLUMN task_id TO job_id;
+         DELETE FROM {SUMMARY_SCHEMA}._ticket_summary_hash;"
+    );
+    client
+        .batch_execute(&stmt)
+        .await
+        .expect("spell the summary as the earlier release did");
+
+    // The init cannot trust the table it finds, so it rebuilds it under the shape it knows.
+    client
+        .init_ticket_summary()
+        .await
+        .expect("second init_ticket_summary");
+    assert_eq!(
+        columns(client, SUMMARY_SCHEMA, "ticket_summary").await,
+        ["task_id", "waiting", "queued", "done"]
+    );
+
+    // The tickets outlived the counters, so the init that keeps their table counts them again.
+    assert_eq!(
+        client
+            .ticket(delta_over_i())
+            .init()
+            .await
+            .expect("second init"),
+        TableShape::CURRENT
+    );
+    assert_eq!(
+        client
+            .ticket(delta_over_i())
+            .get_status()
+            .await
+            .expect("status after the rebuild"),
+        (1, 1, 0)
+    );
+
+    // The counters the rebuilt table holds move with the tickets, as the reinstated triggers keep
+    // them.
+    client
+        .ticket(delta_over_i())
+        .mark_done(Job { coordinate: [1] })
+        .await
+        .expect("mark_done after the rebuild");
+    assert_eq!(
+        client
+            .ticket(delta_over_i())
+            .get_status()
+            .await
+            .expect("status after the second mark_done"),
+        (2, 0, 0)
+    );
 }
 
 #[tokio::test]

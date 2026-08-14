@@ -22,8 +22,7 @@ pub enum Command {
         #[clap(short = 'R', long, conflicts_with_all = ["fresh", "rebuild", "skip"], num_args = 1..)]
         redo: Vec<String>,
         /// Rebuild the run while skipping inconsistent tasks.
-        // FIXME: the flag --redo-inconsistent-jobs needs to be updated at v0.6.0
-        #[clap(short = 'i', long = "redo-inconsistent-jobs", conflicts_with = "fresh")]
+        #[clap(short = 'i', long, conflicts_with = "fresh")]
         redo_inconsistent_tasks: bool,
     },
 
@@ -109,7 +108,7 @@ mod tests {
     #[case::run_rebuild("run --rebuild", Command::Run { fresh: false, rebuild: true, skip: vec![], redo: vec![], redo_inconsistent_tasks: false })]
     #[case::run_skip("run --rebuild --skip task1 task2", Command::Run { fresh: false, rebuild: true, skip: vec!["task1".to_owned(), "task2".to_owned()], redo: vec![], redo_inconsistent_tasks: false })]
     #[case::run_redo("run --redo task1 task2", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec!["task1".to_owned(), "task2".to_owned()], redo_inconsistent_tasks: false })]
-    #[case::run_redo_inconsistent("run --redo-inconsistent-jobs", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec![], redo_inconsistent_tasks: true })]
+    #[case::run_redo_inconsistent("run --redo-inconsistent-tasks", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec![], redo_inconsistent_tasks: true })]
     #[case::check_trust_all("check --mode trust-all", Command::Check { mode: CheckMode::TrustAll })]
     #[case::check_metadata_only("check --mode metadata-only", Command::Check { mode: CheckMode::MetadataOnly })]
     #[case::check_quick("check", Command::Check { mode: CheckMode::Quick })]
