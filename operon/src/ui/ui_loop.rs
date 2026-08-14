@@ -143,8 +143,11 @@ impl UiLoop {
         self.progresses.0.contains_key(task_name)
     }
 
-    /// Records the scheduler as gone and paints every task as errored.
+    /// Idempotently records the scheduler as gone and paints every task as errored.
     async fn mark_scheduler_lost(&mut self) {
+        if self.finished {
+            return;
+        }
         tracing::error!(
             "Operon's UI lost contact with the scheduler and cannot continue execution."
         );
@@ -227,18 +230,26 @@ impl UiLoop {
                 scheduler_exit = &mut self.sched_rx, if !self.finished => {
                     match scheduler_exit {
                         // Scheduler exited gracefully with a signal to exit the UI
-                        Ok(true) => break,
+                        Ok(Ok(true)) => break,
                         // Scheduler exited gracefully with a signal to continue the UI
-                        Ok(false) => self.finished = true,
-                        // Scheduler dropped the channel and early-returned
-                        Err(_) => self.mark_scheduler_lost().await,
+                        Ok(Ok(false)) => self.finished = true,
+                        // Scheduler exited with an error signal
+                        Ok(Err(err_msg)) => {
+                            tracing::error!("Operon's scheduler exited abnormally: {err_msg}");
+                            self.mark_scheduler_lost().await;
+                        }
+                        // Scheduler panicked and didn't send anything
+                        Err(_) => {
+                            tracing::error!("Operon's scheduler panicked.");
+                            self.mark_scheduler_lost().await
+                        },
                     }
                 }
 
                 evt = events.next() => {
                     let Some(evt) = evt else {
-                        // Stream closed, exit the UI.
-                        break;
+                        // Unreachable because `EventStream` never returns `None`
+                        return Err(UiError::Other("EventStream unexpectedly returned None".to_string()));
                     };
 
                     if let Some(command) = self.handle_event(evt?) {
@@ -279,9 +290,16 @@ impl UiLoop {
             tokio::select! {
                 scheduler_exit = &mut self.sched_rx, if !self.finished => {
                     match scheduler_exit {
-                        Ok(true) => break,
-                        Ok(false) => self.finished = true,
-                        Err(_) => self.mark_scheduler_lost().await,
+                        Ok(Ok(true)) => break,
+                        Ok(Ok(false)) => self.finished = true,
+                        Ok(Err(err_msg)) => {
+                            tracing::error!("Operon's scheduler exited abnormally: {err_msg}");
+                            self.mark_scheduler_lost().await;
+                        }
+                        Err(_) => {
+                            tracing::error!("Operon's scheduler panicked.");
+                            self.mark_scheduler_lost().await
+                        }
                     }
                 }
                 Ok(record) = self.log_rx.recv() => record.write_to_posix(&mut std::io::stdout(), &mut std::io::stderr())?,

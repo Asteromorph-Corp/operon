@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::error::Error;
 
 use async_trait::async_trait;
-use tokio::task::JoinHandle;
+use tokio_util::task::AbortOnDropHandle;
 
 use crate::scheduler::SchedulerError;
 use crate::scheduler::events::ControlEvent;
@@ -53,7 +53,7 @@ pub(super) trait SchedulerTransition: Send + Sync + 'static {
 
 pub(super) struct TransitionState<E> {
     warn_msg: Option<&'static str>,
-    handle: JoinHandle<Result<NextState<E>, E>>,
+    handle: AbortOnDropHandle<Result<NextState<E>, E>>,
     next: Option<NextState<E>>,
     events: VecDeque<ControlEvent>,
 }
@@ -61,7 +61,10 @@ pub(super) struct TransitionState<E> {
 impl<E: Error + Send + Sync + 'static> TransitionState<E> {
     pub fn new<T: SchedulerTransition<Error = E>>(transition: T) -> Self {
         let warn_msg = transition.warn_msg();
-        let handle = tokio::task::spawn(async move { transition.execute().await });
+        let handle =
+            AbortOnDropHandle::new(tokio::task::spawn(
+                async move { transition.execute().await },
+            ));
         Self {
             warn_msg,
             handle,
