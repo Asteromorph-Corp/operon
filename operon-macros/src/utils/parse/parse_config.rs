@@ -4,10 +4,10 @@ use indexmap::IndexMap;
 use syn::parse::{Parse, ParseBuffer};
 
 use super::config_decl::ConfigDecl;
-use super::job_decl::OperonJobAttrs;
+use super::task_decl::OperonTaskAttrs;
 use crate::configs::{
-    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, JobArg,
-    JobConfig, JobConfigMap, PoolSizeSpec,
+    AllConfig, DimensionConfig, DimensionConfigMap, EntityConfig, EntityConfigMap, PoolSizeSpec,
+    TaskArg, TaskConfig, TaskConfigMap,
 };
 
 fn validate_downwards_closed<'a>(
@@ -71,16 +71,16 @@ impl Parse for AllConfig {
         let service_id = config_decl.service_id;
         let mut dimensions: DimensionConfigMap = IndexMap::new();
         let mut entities: EntityConfigMap = IndexMap::new();
-        let mut jobs: JobConfigMap = IndexMap::new();
+        let mut tasks: TaskConfigMap = IndexMap::new();
 
-        for job in config_decl.jobs {
-            let new_entity = job.spawned_entity;
-            let args = job.args;
-            let OperonJobAttrs {
+        for task in config_decl.tasks {
+            let new_entity = task.spawned_entity;
+            let args = task.args;
+            let OperonTaskAttrs {
                 priority,
                 concurrency,
-            } = job.operon_attrs;
-            let pool_size = if let Some(ref lit) = job.pool {
+            } = task.operon_attrs;
+            let pool_size = if let Some(ref lit) = task.pool {
                 let val = lit.base10_parse::<usize>().map_err(|_| {
                     syn::Error::new(lit.span(), format!("Invalid pool value: '{lit}'"))
                 })?;
@@ -88,7 +88,7 @@ impl Parse for AllConfig {
             } else {
                 concurrency.unwrap_or(PoolSizeSpec::Literal(1))
             };
-            let dims = job.dims;
+            let dims = task.dims;
 
             // Deduplicate and verify
             // Constraint 1: Defining entity must not conflict with existing entities
@@ -107,11 +107,11 @@ impl Parse for AllConfig {
                     format!("Cannot define dimension '{new_dim}' again"),
                 ));
             }
-            // Constraint 3: Job name must be unique as a snake_case identifier
-            if jobs.contains_key(&job.id) {
+            // Constraint 3: Task name must be unique as a snake_case identifier
+            if tasks.contains_key(&task.id) {
                 return Err(syn::Error::new(
-                    job._span,
-                    format!("Job '{}' is already defined", job.id),
+                    task._span,
+                    format!("Task '{}' is already defined", task.id),
                 ));
             }
             // Constraint 4: Arguments must be already-defined, valid entities
@@ -179,24 +179,24 @@ impl Parse for AllConfig {
                 .into_iter()
                 .flatten()
                 .collect::<HashSet<_>>();
-            let job_dims: HashSet<&syn::Ident> = HashSet::from_iter(&dims);
+            let task_dims: HashSet<&syn::Ident> = HashSet::from_iter(&dims);
 
-            if job_dims != bigcup {
+            if task_dims != bigcup {
                 let expected = bigcup.iter().map(|d| d.to_string()).collect::<Vec<_>>();
                 let err_msg = if expected.is_empty() {
-                    format!("Job {} expected no dimensions", job.id)
+                    format!("Task {} expected no dimensions", task.id)
                 } else {
                     format!(
-                        "Job {} expected dimensions: {}",
-                        job.id,
+                        "Task {} expected dimensions: {}",
+                        task.id,
                         expected.join(", ")
                     )
                 };
-                return Err(syn::Error::new(job._span, err_msg));
+                return Err(syn::Error::new(task._span, err_msg));
             }
 
             if let Err(err) = validate_downwards_closed(&dims, &dimensions) {
-                return Err(syn::Error::new(job._span, err));
+                return Err(syn::Error::new(task._span, err));
             }
 
             // Add the new configs
@@ -217,11 +217,11 @@ impl Parse for AllConfig {
                 };
                 dimensions.insert(dim.clone(), new_dim_config);
             }
-            let job_config = JobConfig {
-                id: job.id.clone(),
+            let task_config = TaskConfig {
+                id: task.id.clone(),
                 from: args
                     .into_iter()
-                    .map(|e| JobArg {
+                    .map(|e| TaskArg {
                         id: e.id,
                         over: e.dims,
                     })
@@ -232,14 +232,14 @@ impl Parse for AllConfig {
                 pool_size,
                 priority: priority.unwrap_or_default(),
             };
-            jobs.insert(job.id, job_config);
+            tasks.insert(task.id, task_config);
         }
 
         Ok(AllConfig {
             service_id,
             dimensions,
             entities,
-            jobs,
+            tasks,
         })
     }
 }

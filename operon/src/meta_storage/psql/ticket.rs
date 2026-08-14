@@ -8,9 +8,19 @@ use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
 use crate::meta_storage::{MetaStorageError, MetaTicketApi};
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, OptionCoordinate, Resolution, Ticket, TicketStatus,
+    DimensionMetadata, Job, OptionCoordinate, Resolution, TableShape, TaskMetadata, Ticket,
+    TicketStatus,
 };
-use crate::utils::{SchemaPrefix, SqlParams, box_sql, replace_if_updated};
+use crate::utils::{
+    SchemaPrefix, ShapeAction, ShapeTable, SqlParams, box_sql, build_tables, hash_metadata,
+    shape_query,
+};
+
+/// The table recording each task's shape ID, keyed by task ID.
+pub(crate) const TICKET_SHAPES: ShapeTable<'static> = ShapeTable {
+    table: "_ticket_hash",
+    column: "hash",
+};
 
 /// Postgres wire (de)serialization for [`Ticket`], alongside the query builders that use it.
 ///
@@ -38,7 +48,7 @@ impl<const N: usize> Ticket<N> {
     }
 
     /// Materializes a ticket from a row of the ticket table.
-    fn from_row(meta: JobMetadata<N>, row: &Row) -> Result<Ticket<N>, TryFromIntError> {
+    fn from_row(meta: TaskMetadata<N>, row: &Row) -> Result<Ticket<N>, TryFromIntError> {
         let mut coordinate = [OptionCoordinate::none(); N];
         let mut i = 0;
 
@@ -61,18 +71,18 @@ impl<const N: usize> Ticket<N> {
 /// Helper struct for building SQL queries related to tickets.
 pub struct PsqlTicketQueryBuilder<'a, const N: usize> {
     client: &'a PsqlClient<'a>,
-    job_meta: JobMetadata<N>,
+    task_meta: TaskMetadata<N>,
 }
 
 impl<'a> PsqlClient<'a> {
-    /// Helper method to create a `PsqlTicketQueryBuilder` for a ticket of given job.
+    /// Helper method to create a `PsqlTicketQueryBuilder` for the tickets of a given task.
     pub fn ticket<const N: usize>(
         &'a self,
-        job_meta: JobMetadata<N>,
+        task_meta: TaskMetadata<N>,
     ) -> PsqlTicketQueryBuilder<'a, N> {
         PsqlTicketQueryBuilder {
             client: self,
-            job_meta,
+            task_meta,
         }
     }
 }
@@ -80,92 +90,101 @@ impl<'a> PsqlClient<'a> {
 impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     type Error = PsqlMetaError;
 
-    /// Initializes the ticket table.
-    async fn init(&self) -> PsqlResult<()> {
+    async fn init(&self) -> PsqlResult<TableShape> {
         let schema_prefix = self.client.schema_prefix();
+        let id = self.task_meta.id;
+        let shape_record = TICKET_SHAPES.record(id);
+        let shape_id = hash_metadata(&self.task_meta);
+        let ticket_table = format!("ticket_{id}");
+        let tables = [ticket_table.as_str()];
 
-        let init_stmt = InitTicketQuery(schema_prefix, self.job_meta);
-        let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.job_meta);
-        let stmt = replace_if_updated(
-            self.job_meta.id,
-            &self.job_meta,
+        let shape_stmt = shape_query(shape_record, &tables, schema_prefix);
+        let row = self.client.query_opt(&shape_stmt, &[]).await?;
+        let action = ShapeAction::from_row(row.as_ref(), &shape_id);
+
+        let init_stmt = InitTicketQuery(schema_prefix, self.task_meta);
+        let trigger_stmts = TicketSummaryTriggerQuery(schema_prefix, self.task_meta);
+        let delete_stmt = TicketSummaryDeleteQuery(schema_prefix, self.task_meta);
+        if let Some(stmt) = build_tables(
+            shape_record,
+            &tables,
+            &shape_id,
             schema_prefix,
-            "_ticket_hash",
-            format!("{init_stmt}\n{trigger_stmts}"),
-        );
+            action,
+            format!("{init_stmt}\n{trigger_stmts}\n{delete_stmt}"),
+        ) {
+            self.client.batch_execute(&stmt).await?;
+        }
 
         let summary_stmt = TicketSummaryInsertQuery(schema_prefix);
-
-        self.client.execute(&stmt, &[]).await?;
-        self.client
-            .execute_stmt(&summary_stmt, &[&self.job_meta.id])
+        let inserted_summary_rows = self
+            .client
+            .execute_stmt(&summary_stmt, &[&self.task_meta.id])
             .await?;
-        Ok(())
+
+        // Ticket table was kept with live tickets, but the summary table was rebuilt.
+        if inserted_summary_rows > 0 && action == ShapeAction::Keep {
+            // This summary row was just zeroed out, so recount the tickets into it.
+            let resync_stmt = TicketSummaryResyncQuery(schema_prefix, self.task_meta);
+            self.client.execute_stmt(&resync_stmt, &[]).await?;
+        }
+        Ok(action.into())
     }
 
-    /// Clears the ticket table.
     async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
-        let stmt = ClearTicketQuery(schema_prefix, self.job_meta);
+        let stmt = ClearTicketQuery(schema_prefix, self.task_meta);
         self.client.execute_stmt(&stmt, &[]).await?;
         Ok(())
     }
 
-    /// Gets all tickets with a given status.
     async fn get_all(&self, status: TicketStatus) -> PsqlResult<Vec<Ticket<N>>> {
         let schema_prefix = self.client.schema_prefix();
-        let stmt = GetAllTicketQuery(schema_prefix, self.job_meta);
+        let stmt = GetAllTicketQuery(schema_prefix, self.task_meta);
         let rows = self.client.query_stmt(&stmt, &[&status]).await?;
         let tickets = rows
             .iter()
-            .map(|row| Ticket::from_row(self.job_meta, row))
+            .map(|row| Ticket::from_row(self.task_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
 
-    /// Puts a ticket into the table.
     async fn put(&self, ticket: Ticket<N>) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
-        let stmt = PutTicketQuery(schema_prefix, self.job_meta);
+        let stmt = PutTicketQuery(schema_prefix, self.task_meta);
         let params = ticket.as_sql_params()?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 
-    /// Raises the `deps_done` count of eligible tickets by 1.
-    ///
-    /// Returns tickets that are newly `"queued"`.
     async fn raise_deps_done<const M: usize>(
         &self,
-        upstream_meta: JobMetadata<M>,
+        upstream_meta: TaskMetadata<M>,
         upstream_job: Job<M>,
         aggregate_dims: &[&'static str],
     ) -> PsqlResult<Vec<Ticket<N>>> {
         let schema = self.client.schema_prefix();
-        let stmt = RaiseDepsDoneQuery(schema, self.job_meta, upstream_meta, aggregate_dims);
+        let stmt = RaiseDepsDoneQuery(schema, self.task_meta, upstream_meta, aggregate_dims);
 
         let params = upstream_meta
             .dims
             .iter()
             .zip(upstream_job.coordinate)
-            .filter(|(d, _)| self.job_meta.dims.contains(d) && !aggregate_dims.contains(d))
+            .filter(|(d, _)| self.task_meta.dims.contains(d) && !aggregate_dims.contains(d))
             .map(|(_, c)| c);
         let params = SqlParams::from_usize(params)?;
 
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| Ticket::from_row(self.job_meta, row))
+            .map(|row| Ticket::from_row(self.task_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
 
-    /// Raises the `deps_quota` count of eligible tickets by resolution's `ub` minus 1.
-    ///
-    /// Returns tickets that are newly `"queued"`.
     async fn raise_deps_quota<const M: usize>(
         &self,
-        upstream_meta: JobMetadata<M>,
+        upstream_meta: TaskMetadata<M>,
         upstream_ticket: Ticket<M>,
         aggregate_dims: &[&'static str],
         ub: usize,
@@ -183,46 +202,43 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
                 Some((dim, coord.0?))
             })
             .unzip();
-        let stmt = RaiseDepsQuotaQuery(schema, self.job_meta, &cols);
+        let stmt = RaiseDepsQuotaQuery(schema, self.task_meta, &cols);
 
         let params = SqlParams::from_usize([ub].into_iter().chain(values))?;
 
         let rows = self.client.query_stmt(&stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| Ticket::from_row(self.job_meta, row))
+            .map(|row| Ticket::from_row(self.task_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(tickets)
     }
 
-    /// Explodes the ticket along a dimension at a given coordinate.
-    ///
-    /// Returns tickets affected.
     async fn explode<const M: usize, const IDX: usize>(
         &self,
         res_meta: DimensionMetadata<M>,
         res: Resolution<M>,
     ) -> PsqlResult<Vec<Ticket<N>>> {
         const { assert!(IDX < N) }
-        if self.job_meta.dims[IDX] != res_meta.id {
+        if self.task_meta.dims[IDX] != res_meta.id {
             tracing::warn!("Invalid resolution received for explosion.");
             return Ok(vec![]);
         }
 
         let schema_prefix = self.client.schema_prefix();
-        let pop_stmt = ExplodePopQuery(schema_prefix, self.job_meta, res_meta);
+        let pop_stmt = ExplodePopQuery(schema_prefix, self.task_meta, res_meta);
 
         let params = res_meta
             .deps
             .iter()
             .zip(res.coordinate)
-            .filter_map(|(d, c)| self.job_meta.dims.contains(d).then_some(c));
+            .filter_map(|(d, c)| self.task_meta.dims.contains(d).then_some(c));
         let params = SqlParams::from_usize(params)?;
 
         let rows = self.client.query_stmt(&pop_stmt, &params.borrow()).await?;
         let tickets = rows
             .iter()
-            .map(|row| Ticket::from_row(self.job_meta, row))
+            .map(|row| Ticket::from_row(self.task_meta, row))
             .collect::<Result<Vec<_>, _>>()?;
 
         if tickets
@@ -230,7 +246,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
             .any(|ticket| ticket.coordinate[IDX].is_some())
         {
             return Err(MetaStorageError::invalid_explosion(
-                self.job_meta.id,
+                self.task_meta.id,
                 res_meta.id,
             ));
         }
@@ -241,7 +257,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
             .map(|ticket| ticket.update_status())
             .collect::<Vec<_>>();
 
-        let copy_stmt = CopyInQuery(schema_prefix, self.job_meta);
+        let copy_stmt = CopyInQuery(schema_prefix, self.task_meta);
         let sink = self
             .client
             .copy_in::<_, Bytes>(&copy_stmt.to_string())
@@ -257,10 +273,9 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         Ok(tickets)
     }
 
-    /// Marks the ticket corresponding to a given job as done.
     async fn mark_done(&self, job: Job<N>) -> PsqlResult<()> {
         let schema = self.client.schema_prefix();
-        let stmt = MarkDoneQuery(schema, self.job_meta);
+        let stmt = MarkDoneQuery(schema, self.task_meta);
         let params = SqlParams::from_usize(job.coordinate)?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
@@ -270,9 +285,9 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetStatusQuery(schema_prefix);
 
-        let job_id = self.job_meta.id;
-        let Some(row) = self.client.query_opt_stmt(&stmt, &[&job_id]).await? else {
-            return Err(MetaStorageError::missing_ticket_summary(job_id));
+        let task_id = self.task_meta.id;
+        let Some(row) = self.client.query_opt_stmt(&stmt, &[&task_id]).await? else {
+            return Err(MetaStorageError::missing_ticket_summary(task_id));
         };
 
         let done: i64 = row.get("done");
@@ -283,7 +298,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
 }
 
 /// Helper struct to generate the SQL query for initializing a ticket table.
-struct InitTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+struct InitTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for InitTicketQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -326,15 +341,62 @@ impl<'a> std::fmt::Display for TicketSummaryInsertQuery<'a> {
 
         writeln!(
             f,
-            "INSERT INTO {schema}ticket_summary (job_id, waiting, queued, done)"
+            "INSERT INTO {schema}ticket_summary (task_id, waiting, queued, done)"
         )?;
         writeln!(f, "VALUES ($1, 0, 0, 0)")?;
-        write!(f, "ON CONFLICT (job_id) DO NOTHING;")
+        write!(f, "ON CONFLICT (task_id) DO NOTHING;")
+    }
+}
+
+/// Helper struct to generate the SQL query for recounting a task's ticket summary.
+struct TicketSummaryResyncQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
+
+impl<const N: usize> std::fmt::Display for TicketSummaryResyncQuery<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        writeln!(f, "UPDATE {schema}ticket_summary SET")?;
+        writeln!(f, "    waiting = counts.waiting,")?;
+        writeln!(f, "    queued = counts.queued,")?;
+        writeln!(f, "    done = counts.done")?;
+        writeln!(f, "FROM (")?;
+        writeln!(f, "    SELECT")?;
+        writeln!(
+            f,
+            "        COUNT(*) FILTER (WHERE status = 'waiting') AS waiting,"
+        )?;
+        writeln!(
+            f,
+            "        COUNT(*) FILTER (WHERE status = 'queued') AS queued,"
+        )?;
+        writeln!(f, "        COUNT(*) FILTER (WHERE status = 'done') AS done")?;
+        writeln!(f, "    FROM {schema}ticket_{id}")?;
+        writeln!(f, ") AS counts")?;
+        write!(f, "WHERE task_id = '{id}';")
+    }
+}
+
+/// Helper struct to generate the SQL query dropping a task's ticket summary row.
+///
+/// Leaves the row absent, exactly as it is for a task whose ticket table has never been
+/// initialized, so that the trailing `TicketSummaryInsertQuery` in `init` recreates it.
+struct TicketSummaryDeleteQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
+
+impl<const N: usize> std::fmt::Display for TicketSummaryDeleteQuery<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        write!(
+            f,
+            "DELETE FROM {schema}ticket_summary WHERE task_id = '{id}';"
+        )
     }
 }
 
 /// Helper struct to generate the SQL queries for ticket summary triggers.
-struct TicketSummaryTriggerQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+struct TicketSummaryTriggerQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -384,7 +446,7 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
 }
 
 /// Helper struct to generate the SQL query for clearing a ticket table.
-struct ClearTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+struct ClearTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for ClearTicketQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -395,8 +457,8 @@ impl<const N: usize> std::fmt::Display for ClearTicketQuery<'_, N> {
     }
 }
 
-/// Helper struct to generate the SQL query for getting all tickets for a given job.
-struct GetAllTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+/// Helper struct to generate the SQL query for getting all tickets of a given task.
+struct GetAllTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for GetAllTicketQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -407,8 +469,8 @@ impl<const N: usize> std::fmt::Display for GetAllTicketQuery<'_, N> {
     }
 }
 
-/// Helper struct to generate the SQL query for inserting tickets for a job.
-struct PutTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+/// Helper struct to generate the SQL query for inserting tickets for a task.
+struct PutTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for PutTicketQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -440,8 +502,8 @@ impl<const N: usize> std::fmt::Display for PutTicketQuery<'_, N> {
 /// Helper struct to generate the SQL query for raising `deps_done` count of tickets.
 struct RaiseDepsDoneQuery<'a, const N: usize, const M: usize>(
     SchemaPrefix<'a>,
-    JobMetadata<N>,
-    JobMetadata<M>,
+    TaskMetadata<N>,
+    TaskMetadata<M>,
     &'a [&'static str],
 );
 
@@ -479,7 +541,7 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsDoneQuery<'_
 }
 
 /// Helper struct to generate the SQL query for raising `deps_done` count of tickets.
-struct RaiseDepsQuotaQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>, &'a [&'a str]);
+struct RaiseDepsQuotaQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>, &'a [&'a str]);
 
 impl<const N: usize> std::fmt::Display for RaiseDepsQuotaQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -511,16 +573,16 @@ impl<const N: usize> std::fmt::Display for RaiseDepsQuotaQuery<'_, N> {
 /// A helper struct to generate the SQL query for popping tickets to be exploded.
 struct ExplodePopQuery<'a, const N: usize, const M: usize>(
     SchemaPrefix<'a>,
-    JobMetadata<N>,
+    TaskMetadata<N>,
     DimensionMetadata<M>,
 );
 
 impl<const N: usize, const M: usize> std::fmt::Display for ExplodePopQuery<'_, N, M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
-        let job_id = self.1.id;
+        let task_id = self.1.id;
 
-        writeln!(f, "DELETE FROM {schema}ticket_{job_id}")?;
+        writeln!(f, "DELETE FROM {schema}ticket_{task_id}")?;
         for (idx, dep) in self
             .2
             .deps
@@ -540,7 +602,7 @@ impl<const N: usize, const M: usize> std::fmt::Display for ExplodePopQuery<'_, N
 }
 
 /// A helper struct to generate the SQL query for copying tickets into the database.
-struct CopyInQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+struct CopyInQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -559,8 +621,8 @@ impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
     }
 }
 
-/// An helper struct to generate the SQL query for marking a ticket as done for a given job.
-struct MarkDoneQuery<'a, const N: usize>(SchemaPrefix<'a>, JobMetadata<N>);
+/// A helper struct to generate the SQL query for marking the ticket of a given job as done.
+struct MarkDoneQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for MarkDoneQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -581,14 +643,17 @@ impl<const N: usize> std::fmt::Display for MarkDoneQuery<'_, N> {
     }
 }
 
-/// An helper struct to generate the SQL query for fetching the job status.
+/// A helper struct to generate the SQL query for fetching a task's ticket counts.
 struct GetStatusQuery<'a>(SchemaPrefix<'a>);
 
 impl<'a> std::fmt::Display for GetStatusQuery<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
 
-        write!(f, "SELECT * FROM {schema}ticket_summary WHERE job_id = $1;")
+        write!(
+            f,
+            "SELECT * FROM {schema}ticket_summary WHERE task_id = $1;"
+        )
     }
 }
 
@@ -599,10 +664,10 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use super::*;
-    use crate::schema::JobMetadata;
+    use crate::schema::TaskMetadata;
 
-    fn job_alpha() -> JobMetadata<0> {
-        JobMetadata {
+    fn task_alpha() -> TaskMetadata<0> {
+        TaskMetadata {
             id: "alpha",
             spawn_dim: Some("i"),
             dims: [],
@@ -610,8 +675,8 @@ mod tests {
         }
     }
 
-    fn job_beta() -> JobMetadata<1> {
-        JobMetadata {
+    fn task_beta() -> TaskMetadata<1> {
+        TaskMetadata {
             id: "beta",
             spawn_dim: Some("j"),
             dims: ["i"],
@@ -626,7 +691,7 @@ mod tests {
 
     #[rstest]
     #[case::empty(
-        job_alpha(),
+        task_alpha(),
         indoc! {"
             CREATE TABLE IF NOT EXISTS test_meta.ticket_alpha (
                 deps_done BIGINT NOT NULL,
@@ -636,7 +701,7 @@ mod tests {
         }
     )]
     #[case::simple(
-        job_beta(),
+        task_beta(),
         indoc! {"
             CREATE TABLE IF NOT EXISTS test_meta.ticket_beta (
                 i BIGINT,
@@ -649,19 +714,19 @@ mod tests {
     )]
     fn test_init_ticket_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] job: JobMetadata<N>,
+        #[case] task_meta: TaskMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = InitTicketQuery(schema_prefix, job).to_string();
+        let stmt = InitTicketQuery(schema_prefix, task_meta).to_string();
         assert_eq!(stmt, expected);
     }
 
     #[rstest]
     #[case::simple(
         indoc! {"
-            INSERT INTO test_meta.ticket_summary (job_id, waiting, queued, done)
+            INSERT INTO test_meta.ticket_summary (task_id, waiting, queued, done)
             VALUES ($1, 0, 0, 0)
-            ON CONFLICT (job_id) DO NOTHING;"
+            ON CONFLICT (task_id) DO NOTHING;"
         },
     )]
     fn test_ticket_summary_insert_query(
@@ -674,7 +739,48 @@ mod tests {
 
     #[rstest]
     #[case::simple(
-        job_beta(),
+        task_beta(),
+        indoc! {"
+            UPDATE test_meta.ticket_summary SET
+                waiting = counts.waiting,
+                queued = counts.queued,
+                done = counts.done
+            FROM (
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'waiting') AS waiting,
+                    COUNT(*) FILTER (WHERE status = 'queued') AS queued,
+                    COUNT(*) FILTER (WHERE status = 'done') AS done
+                FROM test_meta.ticket_beta
+            ) AS counts
+            WHERE task_id = 'beta';"
+        },
+    )]
+    fn test_ticket_summary_resync_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'static>,
+        #[case] task_meta: TaskMetadata<N>,
+        #[case] expected: &str,
+    ) {
+        let stmt = TicketSummaryResyncQuery(schema_prefix, task_meta).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(
+        task_beta(),
+        "DELETE FROM test_meta.ticket_summary WHERE task_id = 'beta';"
+    )]
+    fn test_ticket_summary_delete_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'static>,
+        #[case] task_meta: TaskMetadata<N>,
+        #[case] expected: &str,
+    ) {
+        let stmt = TicketSummaryDeleteQuery(schema_prefix, task_meta).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(
+        task_beta(),
         indoc! {"
             CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
                 AFTER INSERT ON test_meta.ticket_beta
@@ -704,38 +810,38 @@ mod tests {
     )]
     fn test_ticket_summary_trigger_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] job: JobMetadata<N>,
+        #[case] task_meta: TaskMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = TicketSummaryTriggerQuery(schema_prefix, job).to_string();
+        let stmt = TicketSummaryTriggerQuery(schema_prefix, task_meta).to_string();
         assert_eq!(stmt, expected);
     }
 
     #[rstest]
-    #[case::simple(job_beta(), "TRUNCATE TABLE test_meta.ticket_beta;")]
+    #[case::simple(task_beta(), "TRUNCATE TABLE test_meta.ticket_beta;")]
     fn test_clear_ticket_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] job: JobMetadata<N>,
+        #[case] task_meta: TaskMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = ClearTicketQuery(schema_prefix, job).to_string();
+        let stmt = ClearTicketQuery(schema_prefix, task_meta).to_string();
         assert_eq!(stmt, expected);
     }
 
     #[rstest]
-    #[case::simple(job_beta(), "SELECT * FROM test_meta.ticket_beta WHERE status = $1;")]
+    #[case::simple(task_beta(), "SELECT * FROM test_meta.ticket_beta WHERE status = $1;")]
     fn test_get_all_ticket_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] job: JobMetadata<N>,
+        #[case] task_meta: TaskMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = GetAllTicketQuery(schema_prefix, job).to_string();
+        let stmt = GetAllTicketQuery(schema_prefix, task_meta).to_string();
         assert_eq!(stmt, expected);
     }
 
     #[rstest]
     #[case::empty(
-        job_alpha(),
+        task_alpha(),
         indoc! {"
             INSERT INTO test_meta.ticket_alpha (deps_done, deps_quota, status)
             VALUES ($1, $2, $3)
@@ -743,7 +849,7 @@ mod tests {
         }
     )]
     #[case::simple(
-        job_beta(),
+        task_beta(),
         indoc! {"
             INSERT INTO test_meta.ticket_beta (i, deps_done, deps_quota, status)
             VALUES ($1, $2, $3, $4)
@@ -752,15 +858,15 @@ mod tests {
     )]
     fn test_put_ticket_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] job: JobMetadata<N>,
+        #[case] task_meta: TaskMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = PutTicketQuery(schema_prefix, job).to_string();
+        let stmt = PutTicketQuery(schema_prefix, task_meta).to_string();
         assert_eq!(stmt, expected);
     }
 
     #[rstest]
-    #[case::simple(job_beta(), job_alpha(), &[], indoc! { "
+    #[case::simple(task_beta(), task_alpha(), &[], indoc! { "
         WITH updated AS (
             UPDATE test_meta.ticket_beta
             SET
@@ -779,32 +885,33 @@ mod tests {
     })]
     fn test_raise_deps_done_query<const N: usize, const M: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] job: JobMetadata<N>,
-        #[case] upstream_job: JobMetadata<M>,
+        #[case] task_meta: TaskMetadata<N>,
+        #[case] upstream_meta: TaskMetadata<M>,
         #[case] aggregate_dims: &[&'static str],
         #[case] expected: &str,
     ) {
-        let stmt = RaiseDepsDoneQuery(schema_prefix, job, upstream_job, aggregate_dims).to_string();
+        let stmt =
+            RaiseDepsDoneQuery(schema_prefix, task_meta, upstream_meta, aggregate_dims).to_string();
         assert_eq!(stmt, expected);
     }
 
     #[rstest]
-    #[case::empty(job_alpha(), "UPDATE test_meta.ticket_alpha SET status = 'done';")]
+    #[case::empty(task_alpha(), "UPDATE test_meta.ticket_alpha SET status = 'done';")]
     #[case::simple(
-        job_beta(),
+        task_beta(),
         "UPDATE test_meta.ticket_beta SET status = 'done' WHERE i = $1;"
     )]
     fn test_mark_done_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
-        #[case] job: JobMetadata<N>,
+        #[case] task_meta: TaskMetadata<N>,
         #[case] expected: &str,
     ) {
-        let stmt = MarkDoneQuery(schema_prefix, job).to_string();
+        let stmt = MarkDoneQuery(schema_prefix, task_meta).to_string();
         assert_eq!(stmt, expected);
     }
 
     #[rstest]
-    #[case::simple("SELECT * FROM test_meta.ticket_summary WHERE job_id = $1;")]
+    #[case::simple("SELECT * FROM test_meta.ticket_summary WHERE task_id = $1;")]
     fn test_get_status_query(schema_prefix: SchemaPrefix<'static>, #[case] expected: &str) {
         let stmt = GetStatusQuery(schema_prefix).to_string();
         assert_eq!(stmt, expected);

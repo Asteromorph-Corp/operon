@@ -8,14 +8,14 @@ async fn on_receive_resolution(
     match resolution {
         schema::ResolutionEnum::I(res) => {
             let affected = client
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .explode::<_, 0usize>(metadata::dimension_i_meta(), res)
                 .await?;
             for ticket in affected {}
         }
         schema::ResolutionEnum::J(res) => {
             let affected = client
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .explode::<_, 1usize>(metadata::dimension_j_meta(), res)
                 .await?;
             for ticket in affected {
@@ -45,7 +45,7 @@ async fn on_receive_resolution(
         }
         schema::ResolutionEnum::K(res) => {
             let affected = client
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .explode::<_, 2usize>(metadata::dimension_k_meta(), res)
                 .await?;
             for ticket in affected {}

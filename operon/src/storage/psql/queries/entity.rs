@@ -1,12 +1,23 @@
+use async_trait::async_trait;
 use bytes::Bytes;
 use futures::SinkExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::schema::{Entity, EntityMetadata};
-use crate::storage::psql::PsqlStorageResult;
+use crate::storage::StorageResult;
 use crate::storage::psql::client::StorageClient;
-use crate::utils::{SchemaPrefix, SchemaPrefixOwned, SqlParams, replace_if_updated};
+use crate::storage::psql::{PsqlStorageError, PsqlStorageResult};
+use crate::utils::{
+    SchemaPrefix, SchemaPrefixOwned, ShapeAction, ShapeTable, SqlParams, build_tables,
+    hash_metadata, shape_query,
+};
+
+/// The table recording each entity's shape ID, keyed by entity ID.
+pub(crate) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
+    table: "_entity_hash",
+    column: "hash",
+};
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
 impl<T> PsqlEntity for T where T: Serialize + DeserializeOwned + Send + Sync + 'static {}
@@ -32,18 +43,7 @@ impl<'a> StorageClient<'a> {
 impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     /// Initializes the entity table.
     pub async fn init(&self) -> PsqlStorageResult<()> {
-        let schema_prefix = self.client.schema_prefix();
-        let stmt = self.entity_meta.init_stmt(schema_prefix);
-        self.client.execute(&stmt, &[]).await?;
-        Ok(())
-    }
-
-    /// Clears the entity table.
-    pub async fn clear(&self) -> PsqlStorageResult<()> {
-        let schema_prefix = self.client.schema_prefix();
-        let stmt = self.entity_meta.clear_stmt(schema_prefix);
-        self.client.execute_stmt(&stmt, &[]).await?;
-        Ok(())
+        self.entity_meta.init(&self.client).await
     }
 
     /// Gets the entity for the given primary key.
@@ -133,24 +133,40 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 }
 
+/// Prepares one entity's table, erased of the entity's arity and type.
+///
+/// The generated storage implements this over every entity of a pipeline, so that its `init` walks
+/// one collection.
+#[async_trait]
 pub trait EntityQueries: Send + Sync + 'static {
-    fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String;
-    fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String;
+    /// Creates this entity's table, rebuilding it when the recorded shape no longer matches the
+    /// entity.
+    async fn init(&self, client: &StorageClient<'_>) -> StorageResult<(), PsqlStorageError>;
 }
 
+#[async_trait]
 impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<N, T> {
-    fn init_stmt(&self, schema: SchemaPrefix<'_>) -> String {
-        replace_if_updated(
-            self.id,
-            self,
-            schema,
-            "_entity_hash",
-            InitEntityQuery(schema, *self),
-        )
-    }
+    async fn init(&self, client: &StorageClient<'_>) -> PsqlStorageResult<()> {
+        let schema_prefix = client.schema_prefix();
+        let record = ENTITY_SHAPES.record(self.id);
+        let tables = [self.id];
+        let shape_id = hash_metadata(self);
 
-    fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String {
-        ClearEntityQuery(schema, *self).to_string()
+        let shape_stmt = shape_query(record, &tables, schema_prefix);
+        let row = client.query_opt(&shape_stmt, &[]).await?;
+        let action = ShapeAction::from_row(row.as_ref(), &shape_id);
+
+        if let Some(stmt) = build_tables(
+            record,
+            &tables,
+            &shape_id,
+            schema_prefix,
+            action,
+            InitEntityQuery(schema_prefix, *self),
+        ) {
+            client.batch_execute(&stmt).await?;
+        }
+        Ok(())
     }
 }
 
@@ -183,18 +199,6 @@ impl<const N: usize, T> std::fmt::Display for InitEntityQuery<'_, N, T> {
         }
 
         write!(f, ");")
-    }
-}
-
-/// A helper struct to generate SQL query for clearing a entity table.
-struct ClearEntityQuery<'a, const N: usize, T>(SchemaPrefix<'a>, EntityMetadata<N, T>);
-
-impl<const N: usize, T> std::fmt::Display for ClearEntityQuery<'_, N, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let schema = self.0;
-        let id = self.1.id;
-
-        write!(f, "TRUNCATE TABLE {schema}{id};")
     }
 }
 
@@ -419,17 +423,6 @@ mod test {
     }
 
     #[rstest]
-    #[case(entity_a(), "TRUNCATE TABLE test_meta.a;")]
-    fn test_clear_entity_query<const N: usize>(
-        schema_prefix: SchemaPrefix<'_>,
-        #[case] metadata: EntityMetadata<N, ()>,
-        #[case] expected: &str,
-    ) {
-        let stmt = ClearEntityQuery(schema_prefix, metadata).to_string();
-        assert_eq!(stmt, expected);
-    }
-
-    #[rstest]
     #[case(entity_a(), "SELECT value FROM test_meta.a;")]
     #[case(entity_b(), "SELECT value FROM test_meta.b WHERE i = $1;")]
     fn test_get_entity_query<const N: usize>(
@@ -460,29 +453,6 @@ mod test {
         let stmt = PutEntityQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
-
-    // #[rstest]
-    // #[case::simple(
-    //     JobArg {
-    //         id: "d".to_string(),
-    //         over: vec!["j".to_string()],
-    //     },
-    //     entity_d(),
-    //     indoc! {"
-    //         SELECT value, j
-    //         FROM {schema_prefix}d
-    //         WHERE i = $1 AND k = $2
-    //         ORDER BY j"
-    //     },
-    // )]
-    // fn test_batch_get_query(
-    //     #[case] job_arg: JobArg,
-    //     #[case] entity: EntityConfig,
-    //     #[case] expected: &str,
-    // ) {
-    //     let stmt = BatchGetQuery(&job_arg, &entity).to_string();
-    //     assert_eq!(stmt, expected);
-    // }
 
     #[rstest]
     #[case::simple(

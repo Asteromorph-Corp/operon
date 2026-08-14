@@ -3,9 +3,6 @@ use crate::scheduler::SchedulerOptions;
 use crate::ui::{UiMode, UiOptions};
 
 /// Surface-level settings for a run: UI mode, internal channel sizing, and logging.
-///
-/// The metadata backend is no longer part of these options; build it separately and pass it to
-/// [`Operon::new`](crate::Operon::new).
 pub struct OperonOptions {
     // UI options
     pub(crate) ui_mode: UiMode,

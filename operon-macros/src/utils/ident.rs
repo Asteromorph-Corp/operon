@@ -35,8 +35,8 @@ pub fn sql_storage_ident(service_id: &syn::Ident) -> syn::Ident {
     format_ident!("Psql{}Storage", service_id.to_string().to_pascal_case())
 }
 
-pub fn job_metadata_ident(job_id: &syn::Ident) -> syn::Ident {
-    format_ident!("job_{}_meta", job_id.to_string().to_snake_case())
+pub fn task_metadata_ident(task_id: &syn::Ident) -> syn::Ident {
+    format_ident!("task_{}_meta", task_id.to_string().to_snake_case())
 }
 
 pub fn dimension_metadata_ident(dimension_id: &syn::Ident) -> syn::Ident {
@@ -85,20 +85,20 @@ pub fn entity_over_dim_ident(entity_id: &syn::Ident, over: &[syn::Ident]) -> syn
     )
 }
 
-pub fn sender_ident(job_id: &syn::Ident) -> syn::Ident {
-    format_ident!("to_{}", job_id.to_string().to_snake_case())
+pub fn sender_ident(task_id: &syn::Ident) -> syn::Ident {
+    format_ident!("to_{}", task_id.to_string().to_snake_case())
 }
 
-pub fn spec_ident(job_id: &syn::Ident) -> syn::Ident {
-    format_ident!("{}Spec", job_id.to_string().to_pascal_case())
+pub fn spec_ident(task_id: &syn::Ident) -> syn::Ident {
+    format_ident!("{}Spec", task_id.to_string().to_pascal_case())
 }
 
-pub fn rebuilder_ident(job_id: &syn::Ident) -> syn::Ident {
-    format_ident!("{}Rebuilder", job_id.to_string().to_pascal_case())
+pub fn rebuilder_ident(task_id: &syn::Ident) -> syn::Ident {
+    format_ident!("{}Rebuilder", task_id.to_string().to_pascal_case())
 }
 
-pub fn peer_txs_ident(job_id: &syn::Ident) -> syn::Ident {
-    format_ident!("{}PeerTxs", job_id.to_string().to_pascal_case())
+pub fn peer_txs_ident(task_id: &syn::Ident) -> syn::Ident {
+    format_ident!("{}PeerTxs", task_id.to_string().to_pascal_case())
 }
 
 pub fn resolution_enum_ident() -> syn::Ident {
@@ -113,8 +113,8 @@ pub fn ticket_enum_ident() -> syn::Ident {
     format_ident!("TicketEnum")
 }
 
-pub fn job_id_ident(job_id: &syn::Ident) -> syn::Ident {
-    format_ident!("{}_ID", job_id.to_string().to_shouty_snake_case())
+pub fn task_id_ident(task_id: &syn::Ident) -> syn::Ident {
+    format_ident!("{}_ID", task_id.to_string().to_shouty_snake_case())
 }
 
 pub fn to_pascal_case(id: &syn::Ident) -> syn::Ident {

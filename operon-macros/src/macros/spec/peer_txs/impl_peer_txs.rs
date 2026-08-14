@@ -2,11 +2,11 @@ use indexmap::IndexSet;
 use syn::parse_quote;
 
 use crate::utils::{
-    job_enum_ident, job_id_ident, operon_ident, peer_txs_ident, resolution_enum_ident,
-    sender_ident, ticket_enum_ident,
+    job_enum_ident, operon_ident, peer_txs_ident, resolution_enum_ident, sender_ident,
+    task_id_ident, ticket_enum_ident,
 };
 
-/// Generates an implementation of `PeerEventSenders` for a job's peer event senders.
+/// Generates an implementation of `PeerEventSenders` for a task's peer event senders.
 ///
 /// # Example
 /// ```rust,ignore
@@ -19,10 +19,10 @@ use crate::utils::{
 ///         BetaPeerTxs {
 ///             to_delta: senders
 ///                 .remove(metadata::DELTA_ID)
-///                 .unwrap_or_else(|| panic!("No sender for job `{}` found", metadata::DELTA_ID)),
+///                 .unwrap_or_else(|| panic!("No sender for task `{}` found", metadata::DELTA_ID)),
 ///             to_epsilon: senders
 ///                 .remove(metadata::EPSILON_ID)
-///                 .unwrap_or_else(|| panic!("No sender for job `{}` found", metadata::EPSILON_ID)),
+///                 .unwrap_or_else(|| panic!("No sender for task `{}` found", metadata::EPSILON_ID)),
 ///         }
 ///     }
 ///
@@ -33,29 +33,29 @@ use crate::utils::{
 /// }
 /// ```
 pub fn impl_peer_txs(
-    job_id: &syn::Ident,
-    event_receiving_job_ids: &IndexSet<&syn::Ident>,
+    task_id: &syn::Ident,
+    event_receiving_task_ids: &IndexSet<&syn::Ident>,
 ) -> syn::ItemImpl {
     let operon = operon_ident();
-    let peer_txs_ident = peer_txs_ident(job_id);
+    let peer_txs_ident = peer_txs_ident(task_id);
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
     let ticket_enum_ident = ticket_enum_ident();
 
-    let sender_value = event_receiving_job_ids
-        .iter()
-        .map(|downstream_job_id| -> syn::FieldValue {
-            let sender_ident = sender_ident(downstream_job_id);
-            let downstream_job_id_ident = job_id_ident(downstream_job_id);
+    let sender_value = event_receiving_task_ids.iter().map(
+        |downstream_task_id| -> syn::FieldValue {
+            let sender_ident = sender_ident(downstream_task_id);
+            let downstream_task_id_ident = task_id_ident(downstream_task_id);
 
             parse_quote! {
                 #sender_ident: senders
-                    .remove(metadata::#downstream_job_id_ident)
+                    .remove(metadata::#downstream_task_id_ident)
                     .unwrap_or_else(|| {
-                        panic!("No sender for job `{}` found", metadata::#downstream_job_id_ident)
+                        panic!("No sender for task `{}` found", metadata::#downstream_task_id_ident)
                     })
             }
-        });
+        },
+    );
 
     parse_quote! {
         #[#operon::__private::async_trait::async_trait]
@@ -91,12 +91,12 @@ mod tests {
         "spec/peer_txs/impl_peer_txs.rs"
     )]
     fn test_impl_peer_event_senders(
-        #[case] job_id: syn::Ident,
-        #[case] event_receiving_job_ids: Vec<syn::Ident>,
+        #[case] task_id: syn::Ident,
+        #[case] event_receiving_task_ids: Vec<syn::Ident>,
         #[case] fixture_path: &str,
     ) {
-        let event_receiving_job_ids = event_receiving_job_ids.iter().collect::<IndexSet<_>>();
-        let item = impl_peer_txs(&job_id, &event_receiving_job_ids);
+        let event_receiving_task_ids = event_receiving_task_ids.iter().collect::<IndexSet<_>>();
+        let item = impl_peer_txs(&task_id, &event_receiving_task_ids);
         assert_item_eq(&item, fixture_path);
     }
 }

@@ -10,12 +10,14 @@ mod storage;
 mod ui;
 mod utils;
 
+pub use chrono::{DateTime, Utc};
 pub use meta_storage::{AnyBackend, MemMetaStorage, PsqlMetaStorage};
 pub use operon::Operon;
 pub use operon_macros::define_operon;
-pub use schema::{Direction, Entity};
+pub use schema::{Direction, Entity, RunFootprint, RunMetadata, RunState};
 pub use service::OperonService;
 pub use storage::OperonStorage;
+pub use uuid::Uuid;
 
 pub mod error {
     pub use crate::meta_storage::{AnyBackendError, MemMetaError, MetaStorageError, PsqlMetaError};
@@ -50,10 +52,12 @@ pub mod __private {
         MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi, MetaTxApi,
     };
     pub use crate::scheduler::{
-        JobHandler, JobRebuilder, JobSpec, PeerEvent, PeerEventSender, PeerEventSenderMap,
-        PeerEventSenders, REBUILD_CONCURRENCY, SchedulerHandler, SpecWithMetadata, ValidOperon,
+        PeerEvent, PeerEventSender, PeerEventSenderMap, PeerEventSenders, REBUILD_CONCURRENCY,
+        SchedulerHandler, SpecWithMetadata, TaskHandler, TaskRebuilder, TaskSpec, ValidOperon,
     };
     pub use crate::schema::*;
-    pub use crate::storage::psql::{EntityQueries, FromPsqlStorageOptions, PsqlStorage};
+    pub use crate::storage::psql::{
+        EntityQueries, FromPsqlStorageOptions, PsqlStorage, StorageClient,
+    };
     pub use crate::utils::{SchemaPrefix, get_dop_coords, get_dop_tags};
 }

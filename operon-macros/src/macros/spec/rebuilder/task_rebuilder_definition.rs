@@ -1,18 +1,18 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::TaskConfig;
 use crate::macros::spec::resolution_type::resolution_type;
 use crate::operon_ident;
 use crate::utils::rebuilder_ident;
 
-/// Generates a struct definition for a job rebuilder.
+/// Generates a struct definition for a task rebuilder.
 ///
 /// # Example
 /// ```rust,ignore
 /// #[derive(Debug)]
 /// pub struct BetaRebuilder {
-///     job_meta: operon::__private::JobMetadata<1usize>,
+///     task_meta: operon::__private::TaskMetadata<1usize>,
 ///     spawn_dim_meta: operon::__private::DimensionMetadata<1usize>,
 ///     data: Vec<(
 ///         operon::__private::Job<1usize>,
@@ -21,20 +21,20 @@ use crate::utils::rebuilder_ident;
 ///     progress: operon::__private::SharedProgress,
 /// }
 /// ```
-pub fn job_rebuilder_definition(job: &JobConfig) -> syn::ItemStruct {
+pub fn task_rebuilder_definition(task: &TaskConfig) -> syn::ItemStruct {
     let operon = operon_ident();
-    let rebuilder_ident = rebuilder_ident(&job.id);
-    let resolution_type = resolution_type(job);
-    let n = job.dims.len();
+    let rebuilder_ident = rebuilder_ident(&task.id);
+    let resolution_type = resolution_type(task);
+    let n = task.dims.len();
 
-    let maybe_spawn_dim_meta = job.spawn_dim.is_some().then(|| {
+    let maybe_spawn_dim_meta = task.spawn_dim.is_some().then(|| {
         quote! { spawn_dim_meta: #operon::__private::DimensionMetadata<#n>, }
     });
 
     parse_quote! {
         #[derive(Debug)]
         pub struct #rebuilder_ident {
-            job_meta: #operon::__private::JobMetadata<#n>,
+            task_meta: #operon::__private::TaskMetadata<#n>,
             #maybe_spawn_dim_meta
             data: Vec<(#operon::__private::Job<#n>, #resolution_type)>,
             progress: #operon::__private::SharedProgress,
@@ -48,12 +48,12 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::job_beta;
+    use crate::test_utils::simple_pipeline::task_beta;
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/rebuilder/job_rebuilder_definition.rs")]
-    fn test_job_rebuilder_definition(#[case] job: JobConfig, #[case] fixture_path: &str) {
-        let item = job_rebuilder_definition(&job);
+    #[case::simple(task_beta(), "spec/rebuilder/task_rebuilder_definition.rs")]
+    fn test_task_rebuilder_definition(#[case] task: TaskConfig, #[case] fixture_path: &str) {
+        let item = task_rebuilder_definition(&task);
         assert_item_eq(&item, fixture_path);
     }
 }

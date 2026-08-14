@@ -5,7 +5,7 @@ use std::sync::RwLock;
 use crate::meta_storage::MetaResolutionApi;
 use crate::meta_storage::mem::error::{MemMetaError, MemResult};
 use crate::meta_storage::mem::store::MemStore;
-use crate::schema::{DimensionMetadata, Resolution};
+use crate::schema::{DimensionMetadata, Resolution, TableShape};
 
 /// One dimension's resolution table, mapping a coordinate to its upper bound.
 #[derive(Default)]
@@ -35,12 +35,11 @@ impl MemStore {
 impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
     type Error = MemMetaError;
 
-    /// Initializes the resolution table.
-    async fn init(&self) -> MemResult<()> {
-        self.store.init_resolution_table(self.dim_meta.id)
+    async fn init(&self) -> MemResult<TableShape> {
+        self.store.init_resolution_table(self.dim_meta.id)?;
+        Ok(TableShape::CURRENT)
     }
 
-    /// Clears the resolution table.
     async fn clear(&self) -> MemResult<()> {
         if let Some(table) = self.store.resolution_table(self.dim_meta.id)? {
             table.rows.write()?.clear();
@@ -48,7 +47,6 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
         Ok(())
     }
 
-    /// Gets the resolution for the given primary key.
     async fn get(&self, coordinate: [usize; N]) -> MemResult<Option<Resolution<N>>> {
         let Some(table) = self.store.resolution_table(self.dim_meta.id)? else {
             return Ok(None);
@@ -59,8 +57,6 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
             .map(|&ub| Resolution { coordinate, ub }))
     }
 
-    /// Puts the resolution into the table, leaving an existing one at the same coordinate
-    /// untouched.
     async fn put(&self, resolution: Resolution<N>) -> MemResult<()> {
         let Some(table) = self.store.resolution_table(self.dim_meta.id)? else {
             return Ok(());

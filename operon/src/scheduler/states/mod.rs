@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::error::Error;
 
 use async_trait::async_trait;
-use tokio::task::JoinHandle;
+use tokio_util::task::AbortOnDropHandle;
 
 use crate::scheduler::SchedulerError;
 use crate::scheduler::events::ControlEvent;
@@ -26,6 +26,16 @@ pub(super) enum NextState<E> {
 pub(super) trait SchedulerState: Send + Sync {
     type Error: Error + Send + Sync + 'static;
 
+    /// Resolves once the state has progressed on its own, without a control event.
+    ///
+    /// States that only ever move on a control event should never resolve.
+    /// The scheduler loop races this against incoming control events, so implementations must be
+    /// cancel-safe.
+    async fn wait_progress(&mut self) -> Result<(), Self::Error> {
+        std::future::pending().await
+    }
+
+    /// Advances the state after [`SchedulerState::wait_progress`] has resolved.
     async fn handle_progress(self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error>;
 
     async fn handle_control_event(
@@ -43,17 +53,22 @@ pub(super) trait SchedulerTransition: Send + Sync + 'static {
 
 pub(super) struct TransitionState<E> {
     warn_msg: Option<&'static str>,
-    handle: JoinHandle<Result<NextState<E>, E>>,
+    handle: AbortOnDropHandle<Result<NextState<E>, E>>,
+    next: Option<NextState<E>>,
     events: VecDeque<ControlEvent>,
 }
 
 impl<E: Error + Send + Sync + 'static> TransitionState<E> {
     pub fn new<T: SchedulerTransition<Error = E>>(transition: T) -> Self {
         let warn_msg = transition.warn_msg();
-        let handle = tokio::task::spawn(async move { transition.execute().await });
+        let handle =
+            AbortOnDropHandle::new(tokio::task::spawn(
+                async move { transition.execute().await },
+            ));
         Self {
             warn_msg,
             handle,
+            next: None,
             events: VecDeque::new(),
         }
     }
@@ -68,20 +83,32 @@ where
 {
     type Error = SchedulerError<UErr, SErr, MErr>;
 
-    async fn handle_progress(mut self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
-        if self.handle.is_finished() {
-            let mut next = self.handle.await.map_err(SchedulerError::from).flatten()?;
-            while let Some(evt) = self.events.pop_front() {
-                match next {
-                    NextState::Next(state) => {
-                        next = state.handle_control_event(evt).await?;
-                    }
-                    NextState::Exit { exit_ui } => return Ok(NextState::Exit { exit_ui }),
-                }
-            }
-            return Ok(next);
+    async fn wait_progress(&mut self) -> Result<(), Self::Error> {
+        if self.next.is_none() {
+            let next = (&mut self.handle)
+                .await
+                .map_err(SchedulerError::from)
+                .flatten()?;
+            self.next = Some(next);
         }
-        Ok(NextState::Next(self))
+        Ok(())
+    }
+
+    async fn handle_progress(mut self: Box<Self>) -> Result<NextState<Self::Error>, Self::Error> {
+        let Some(mut next) = self.next.take() else {
+            return Ok(NextState::Next(self));
+        };
+
+        while let Some(evt) = self.events.pop_front() {
+            match next {
+                NextState::Next(state) => {
+                    next = state.handle_control_event(evt).await?;
+                }
+                NextState::Exit { exit_ui } => return Ok(NextState::Exit { exit_ui }),
+            }
+        }
+
+        Ok(next)
     }
 
     async fn handle_control_event(

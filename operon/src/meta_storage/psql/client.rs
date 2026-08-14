@@ -10,7 +10,7 @@ use crate::meta_storage::psql::{
     PsqlMetaError, PsqlMetaStorage, PsqlResolutionQueryBuilder, PsqlTicketQueryBuilder,
 };
 use crate::meta_storage::{MetaClientApi, MetaConnApi, MetaTxApi};
-use crate::schema::{DimensionMetadata, JobMetadata, RunFootprint};
+use crate::schema::{DimensionMetadata, RunFootprint, TableShape, TaskMetadata};
 use crate::utils::SchemaPrefix;
 
 macro_rules! impl_psql_client {
@@ -104,15 +104,15 @@ pub enum PsqlClient<'a> {
 }
 
 impl PsqlClient<'_> {
-    impl_psql_client!(batch_execute(query: &str) -> ());
-    impl_psql_client!(execute(query: &str, params: &[&ToSql]) -> u64);
-    impl_psql_client!(query(query: &str, params: &[&ToSql]) -> Vec<tokio_postgres::Row>);
-    impl_psql_client!(query_opt(query: &str, params: &[&ToSql]) -> Option<tokio_postgres::Row>);
-    impl_psql_client!(
+    impl_psql_client! { batch_execute(query: &str) -> () }
+    impl_psql_client! { execute(query: &str, params: &[&ToSql]) -> u64 }
+    impl_psql_client! { query(query: &str, params: &[&ToSql]) -> Vec<tokio_postgres::Row> }
+    impl_psql_client! { query_opt(query: &str, params: &[&ToSql]) -> Option<tokio_postgres::Row> }
+    impl_psql_client! {
         copy_in<T, U>(query: &T) -> CopyInSink<U>
         where T: ?Sized + ToStatement + Send + Sync,
               U: Buf + 'static + Send + Sync
-    );
+    }
 
     pub async fn execute_stmt(&self, stmt: &impl Display, params: &[&ToSql]) -> PsqlResult<u64> {
         self.execute(&stmt.to_string(), params).await
@@ -147,8 +147,8 @@ impl PsqlClient<'_> {
 }
 
 impl MetaClientApi<PsqlMetaStorage> for PsqlClient<'_> {
-    fn ticket<const N: usize>(&self, job_meta: JobMetadata<N>) -> PsqlTicketQueryBuilder<'_, N> {
-        PsqlClient::ticket(self, job_meta)
+    fn ticket<const N: usize>(&self, task_meta: TaskMetadata<N>) -> PsqlTicketQueryBuilder<'_, N> {
+        PsqlClient::ticket(self, task_meta)
     }
 
     fn resolution<const N: usize>(
@@ -178,7 +178,7 @@ impl MetaClientApi<PsqlMetaStorage> for PsqlClient<'_> {
         PsqlClient::init_ticket_summary(self).await
     }
 
-    async fn init_footprint(&self) -> PsqlResult<()> {
+    async fn init_footprint(&self) -> PsqlResult<TableShape> {
         PsqlClient::init_footprint(self).await
     }
 

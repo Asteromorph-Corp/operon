@@ -31,8 +31,8 @@ pub fn define_operon(input: TokenStream) -> TokenStream {
 ///
 /// # Attributes
 ///
-/// - `#[operon(error = "MyError")]`: the service's error type `Self::Error` (default
-///   `::operon::error::UserError`)
+/// - `#[operon(error = MyError)]`: the service's error type `Self::Error`, written as a type
+///   (default `::operon::error::UserError`)
 /// - `#[operon(defined_at = "path")]`: path to where `define_operon!` was invoked (default `self`)
 /// - `#[operon(crate = "path")]`: path to the `operon` crate (default `::operon`)
 #[proc_macro_derive(OperonService, attributes(operon))]
@@ -58,11 +58,11 @@ pub fn derive_operon_service(input: TokenStream) -> TokenStream {
         }
 
         #[automatically_derived]
-        impl<Sto: #definition::__misc::StorageTrait> operon::__private::ValidOperon<#service, Sto>
+        impl<Sto: #definition::__misc::StorageTrait> #operon::__private::ValidOperon<#service, Sto>
             for (#service, Sto)
         {
-            fn scheduler_handler<MSto: operon::__private::MetaBackend>()
-            -> operon::__private::SchedulerHandler<#service, Sto, MSto> {
+            fn scheduler_handler<MSto: #operon::__private::MetaBackend>()
+            -> #operon::__private::SchedulerHandler<#service, Sto, MSto> {
                 #definition::__misc::scheduler_handler::<#service, Sto, MSto>()
             }
         }

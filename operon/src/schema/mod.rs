@@ -14,16 +14,19 @@ pub(crate) use resolution::ResolutionLike;
 pub use resolution::{Resolution, ResolutionEnum};
 
 mod metadata;
-pub use metadata::{DimensionMetadata, Direction, EntityMetadata, JobMetadata};
+pub use metadata::{DimensionMetadata, Direction, EntityMetadata, TaskMetadata};
 
 mod option_coordinate;
 pub use option_coordinate::OptionCoordinate;
 
 mod run_metadata;
-pub(crate) use run_metadata::{RunFootprint, RunMetadata, RunState};
+pub use run_metadata::{RunFootprint, RunMetadata, RunState};
 
 mod progress;
 pub use progress::{Progress, SharedProgress, SharedProgressMap, TaskState};
 
 mod check_mode;
 pub use check_mode::CheckMode;
+
+mod table_shape;
+pub use table_shape::TableShape;

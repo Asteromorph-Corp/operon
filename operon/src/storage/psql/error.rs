@@ -41,14 +41,14 @@ macro_rules! from_backend {
     )*};
 }
 
-from_backend!(
+from_backend! {
     tokio_postgres::Error,
     deadpool_postgres::PoolError,
     deadpool_postgres::BuildError,
     serde_json::Error,
     csv::Error,
     std::io::Error,
-);
+}
 
 impl From<csv::IntoInnerError<csv::Writer<Vec<u8>>>> for StorageError<PsqlStorageError> {
     fn from(err: csv::IntoInnerError<csv::Writer<Vec<u8>>>) -> Self {

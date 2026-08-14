@@ -35,6 +35,7 @@ impl<T> PsqlStorage<T> {
 /// This lets [`PsqlStorageOptions::build`](crate::options::PsqlStorageOptions::build) be
 /// turbofished on the generated storage alias, e.g. `build::<PsqlCookingStorage>()`.
 pub trait FromPsqlStorageOptions: Sized {
+    /// Opens the connection pool `options` describes and builds the storage over it.
     fn from_options(options: PsqlStorageOptions) -> PsqlStorageResult<Self>;
 }
 
@@ -84,21 +85,11 @@ impl<T: EntityQueries> OperonStorage for PsqlStorage<T> {
     /// If the storage schema is specified, initialize the schema in the database.
     async fn init(&self) -> PsqlStorageResult<()> {
         let client = self.conn().await?;
-        let entities_init_stmt = self.entities_meta.init_stmt(self.schema_prefix());
 
         client.init_schema().await?;
         client.init_entity_hash().await?;
         client.init_footprint().await?;
-        client.batch_execute(&entities_init_stmt).await?;
-        Ok(())
-    }
-
-    async fn clear(&self) -> PsqlStorageResult<()> {
-        let client = self.conn().await?;
-        let entities_clear_stmt = self.entities_meta.clear_stmt(self.schema_prefix());
-
-        client.clear_footprint().await?;
-        client.batch_execute(&entities_clear_stmt).await?;
+        self.entities_meta.init(&client).await?;
         Ok(())
     }
 
@@ -110,10 +101,5 @@ impl<T: EntityQueries> OperonStorage for PsqlStorage<T> {
     async fn put_footprint(&self, footprint: &RunFootprint) -> PsqlStorageResult<()> {
         let client = self.conn().await?;
         client.put_footprint(footprint).await
-    }
-
-    async fn clear_footprint(&self) -> PsqlStorageResult<()> {
-        let client = self.conn().await?;
-        client.clear_footprint().await
     }
 }

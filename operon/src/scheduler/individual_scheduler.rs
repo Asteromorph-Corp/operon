@@ -11,14 +11,14 @@ use crate::scheduler::events::{
     PeerEventSenders, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
 use crate::scheduler::queue::{AnyJobQueue, JobQueue};
-use crate::scheduler::{JobSpec, SchedulerError, SpecWithMetadata};
-use crate::schema::{Job, JobMetadata, SharedProgress, TaskState, Ticket, TicketStatus};
+use crate::scheduler::{SchedulerError, SpecWithMetadata, TaskSpec};
+use crate::schema::{Job, SharedProgress, TaskMetadata, TaskState, Ticket, TicketStatus};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
 /// # IndividualScheduler
 ///
-/// IndividualScheduler is a scheduler for a single job type.
+/// IndividualScheduler is a scheduler for a single task.
 /// It is responsible for:
 ///
 /// * Keeping track of the tickets that are ready to run,
@@ -26,41 +26,41 @@ use crate::storage::OperonStorage;
 /// * Picking up job results and sending out `Event` messages, and
 /// * Updating waiting tickets from `Event` messages.
 ///
-/// The result a spawned worker task reports back to its individual scheduler.
+/// The result a spawned worker reports back to its individual scheduler.
 type WorkerResult<J, R, UErr, SErr, MErr> =
     Result<InternalEvent<J, R, UErr, SErr, MErr>, SchedulerError<UErr, SErr, MErr>>;
 
-/// The set of worker tasks an individual scheduler is currently awaiting.
+/// The set of workers an individual scheduler is currently awaiting.
 type WorkerHandles<J, R, UErr, SErr, MErr> = JoinSet<WorkerResult<J, R, UErr, SErr, MErr>>;
 
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Svc, Sto, JS, MSto, const N: usize>
+pub struct IndividualScheduler<Svc, Sto, TS, MSto, const N: usize>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
-    JS: JobSpec<Svc, Sto, MSto>,
+    TS: TaskSpec<Svc, Sto, MSto>,
 {
-    pub spec: JS,
-    pub meta: JobMetadata<N>,
+    pub spec: TS,
+    pub meta: TaskMetadata<N>,
     pub service: Arc<Svc>,
     pub storage: Arc<Sto>,
     pub meta_storage: MSto,
     pub pool: Arc<Semaphore>,
     pub progress: SharedProgress,
     pub state: TaskState,
-    pub handles: WorkerHandles<Job<N>, JS::Resolution, Svc::Error, Sto::Error, MSto::Error>,
+    pub handles: WorkerHandles<Job<N>, TS::Resolution, Svc::Error, Sto::Error, MSto::Error>,
 }
 
-impl<Svc, Sto, JS, MSto, const N: usize> IndividualScheduler<Svc, Sto, JS, MSto, N>
+impl<Svc, Sto, TS, MSto, const N: usize> IndividualScheduler<Svc, Sto, TS, MSto, N>
 where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
-    JS: JobSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
+    TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
 {
     pub fn new(
-        spec: SpecWithMetadata<Svc, Sto, JS, N>,
+        spec: SpecWithMetadata<Svc, Sto, TS, N>,
         service: Arc<Svc>,
         storage: Arc<Sto>,
         meta_storage: MSto,
@@ -69,7 +69,7 @@ where
     ) -> Self {
         Self {
             spec: spec.spec,
-            meta: spec.job_meta,
+            meta: spec.task_meta,
             storage,
             service,
             meta_storage,
@@ -121,7 +121,7 @@ where
     async fn on_event_ready_jobs(
         &mut self,
         event: PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
-        peer_txs: &JS::PeerEventSenders,
+        peer_txs: &TS::PeerEventSenders,
     ) -> Result<Vec<Job<N>>, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         let mut conn = self.meta_storage.scheduler_conn().await?;
         let tx = conn.transaction().await?;
@@ -163,7 +163,7 @@ where
         all_ready
     }
 
-    /// Drive the scheduler until every ticket of this job type is finished
+    /// Drive the scheduler until every ticket of this task is finished
     /// **and** the broadcast channel has closed.
     ///
     /// Usually called by the top-level `Scheduler::run` with `tokio::spawn`.
@@ -174,28 +174,26 @@ where
         ctrl_rx: IndividualControlEventReceiver,
         clean: bool,
     ) {
-        // Create an internal channel for `InternalEvent`s.
-        let peer_txs = JS::PeerEventSenders::gather_from(peer_tx_map);
+        let peer_txs = TS::PeerEventSenders::gather_from(peer_tx_map);
 
         let Ok(initial_tickets) = self.initial_ready_tickets().await else {
             self.set_state(TaskState::Error).await;
             return;
         };
 
-        // Check if the initial data is valid, it can only be done if the job is not clean.
+        // Check if the initial data is valid, it can only be done if the task is not clean.
         if !clean && !self.check_initial_data(&initial_tickets) {
             self.set_state(TaskState::Error).await;
             return;
         }
 
-        // Update the UI state before entering the loop.
         if let Err(e) = self.update_progress().await {
             tracing::error!("Failed to update UI state after initial data processing: {e}");
             self.set_state(TaskState::Error).await;
             return;
         }
 
-        // Early return if the scheduler is already finished (e.g. the last run completed this job).
+        // Early return if the scheduler already finished (e.g. the last run completed this task).
         if self.state == TaskState::Finished {
             tracing::debug!(
                 "Scheduler for `{}` exited due to being finished from the start.",
@@ -229,7 +227,6 @@ where
             }
         }
 
-        // Update the UI state one last time.
         if let Err(e) = self.update_progress().await {
             tracing::error!("Failed to update UI state after scheduler run: {e}");
             self.set_state(TaskState::Error).await;
@@ -239,7 +236,7 @@ where
     async fn run_internal(
         &mut self,
         initial_tickets: Vec<Ticket<N>>,
-        peer_txs: &JS::PeerEventSenders,
+        peer_txs: &TS::PeerEventSenders,
         mut peer_rx: ServicePeerEventReceiver<Svc>,
         mut ctrl_rx: IndividualControlEventReceiver,
     ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
@@ -303,19 +300,15 @@ where
                     self.update_progress().await?;
                     match int_event {
                         InternalEvent::JobSuccess(job, resolution) => {
-                            // Trace the job success
                             tracing::trace!(
                                 "{} received internal event: JobSuccess({job:?}, {resolution:?}).",
                                 self.meta.id
                             );
 
-                            // Broadcast the job result events
                             self.spec.send_on_finish(peer_txs, job, resolution).await?;
                         }
                         InternalEvent::JobFailure(job, e) => {
-                            // Log the error
                             tracing::error!("Job {job:?} failed: {e}");
-                            // Return the error to the top-level scheduler
                             return Err(e);
                         }
                     }
@@ -325,7 +318,6 @@ where
                 event = peer_rx.recv(), if !got_all_peer_events => {
                     match event {
                         Some(evt) => {
-                            // Trace the peer event
                             tracing::trace!(
                                 "{} received peer event: {evt:?}; \
                                 Peer channel has {} events left.",
@@ -352,7 +344,7 @@ where
                 => {
                     let permit = permit?;
                     let job = ready_jobs.pop().ok_or(SchedulerError::other("Ready to run queue is empty"))?;
-                    let job_id = self.meta.id;
+                    let task_id = self.meta.id;
                     let spec = self.spec.clone();
                     let storage = self.storage.clone();
                     let service = self.service.clone();
@@ -360,21 +352,18 @@ where
 
                     // Move the permit into the task so it is released on drop.
                     self.handles.spawn(async move {
-                        // Trace the job start.
-                        tracing::trace!("Running job {job:?} in `{job_id}` scheduler.");
+                        tracing::trace!("Running job {job:?} in `{task_id}` scheduler.");
                         let _permit = permit;
                         match spec.run_job(&*service, &*storage, meta_storage, job).await {
                             Ok(resolution) => {
-                                // Alert the results to the scheduler
                                 tracing::trace!(
-                                    "{job_id} worker exited with: JobSuccess({job:?}, {resolution:?}).",
+                                    "{task_id} worker exited with: JobSuccess({job:?}, {resolution:?}).",
                                 );
                                 Ok(InternalEvent::JobSuccess(job, resolution))
                             }
                             Err(e) => {
-                                // Alert the error to the scheduler
                                 tracing::trace!(
-                                    "{job_id} worker exited with: JobFailure({job:?}, {e:?});",
+                                    "{task_id} worker exited with: JobFailure({job:?}, {e:?});",
                                 );
                                 Ok(InternalEvent::JobFailure(job, e))
                             }

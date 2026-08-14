@@ -3,8 +3,16 @@ use std::num::TryFromIntError;
 use crate::meta_storage::MetaResolutionApi;
 use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
-use crate::schema::{DimensionMetadata, Resolution};
-use crate::utils::{SchemaPrefix, SqlParams, replace_if_updated};
+use crate::schema::{DimensionMetadata, Resolution, TableShape};
+use crate::utils::{
+    SchemaPrefix, ShapeAction, ShapeTable, SqlParams, build_tables, hash_metadata, shape_query,
+};
+
+/// The table recording each dimension's shape ID, keyed by dimension ID.
+pub(crate) const DIMENSION_SHAPES: ShapeTable<'static> = ShapeTable {
+    table: "_dimension_hash",
+    column: "hash",
+};
 
 /// Postgres wire serialization for [`Resolution`], alongside the query builders that use it.
 impl<const N: usize> Resolution<N> {
@@ -36,22 +44,31 @@ impl<'a> PsqlClient<'a> {
 impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> {
     type Error = PsqlMetaError;
 
-    /// Initializes the resolution table.
-    async fn init(&self) -> PsqlResult<()> {
+    async fn init(&self) -> PsqlResult<TableShape> {
         let schema_prefix = self.client.schema_prefix();
+        let id = self.dim_meta.id;
+        let shape_record = DIMENSION_SHAPES.record(id);
+        let shape_id = hash_metadata(&self.dim_meta);
+        let dimension_table = format!("dimension_{id}");
+        let tables = [dimension_table.as_str()];
 
-        let stmt = replace_if_updated(
-            self.dim_meta.id,
-            &self.dim_meta,
+        let shape_stmt = shape_query(shape_record, &tables, schema_prefix);
+        let row = self.client.query_opt(&shape_stmt, &[]).await?;
+        let action = ShapeAction::from_row(row.as_ref(), &shape_id);
+
+        if let Some(stmt) = build_tables(
+            shape_record,
+            &tables,
+            &shape_id,
             schema_prefix,
-            "_dimension_hash",
+            action,
             InitResolutionQuery(schema_prefix, self.dim_meta),
-        );
-        self.client.execute(&stmt, &[]).await?;
-        Ok(())
+        ) {
+            self.client.batch_execute(&stmt).await?;
+        }
+        Ok(action.into())
     }
 
-    /// Clears the resolution table.
     async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearResolutionQuery(schema_prefix, self.dim_meta);
@@ -59,7 +76,6 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         Ok(())
     }
 
-    /// Gets the resolution for the given primary key.
     async fn get(&self, coordinate: [usize; N]) -> PsqlResult<Option<Resolution<N>>> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = GetResolutionQuery(schema_prefix, self.dim_meta);
@@ -71,7 +87,6 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         Ok(Some(Resolution { coordinate, ub }))
     }
 
-    /// Puts the resolution into the table.
     async fn put(&self, resolution: Resolution<N>) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);

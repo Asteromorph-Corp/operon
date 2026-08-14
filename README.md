@@ -1,7 +1,7 @@
 # Operon
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](https://arxiv.org/abs/2511.16080)
-[![Kellnr](https://img.shields.io/badge/kellnr-v0.5.0-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
+[![Kellnr](https://img.shields.io/badge/kellnr-v0.6.0-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-yellow.svg)](LICENSE-MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.91+-lightgray.svg)](https://blog.rust-lang.org/2025/10/30/Rust-1.91.0/)
 
@@ -54,8 +54,9 @@ You will need the following to run Operon:
 - [Kellnr](https://kellnr.spacer.im/) access to download the Operon crate
   - Alternatively, you can clone this repository and use the local path as described in the [Installation](#installation) section.
 - An async runtime configured via [`tokio`](https://crates.io/crates/tokio)
-- A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later)
+- A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later), to use the PostgreSQL backends
   - You will need a full [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access the database.
+  - A pipeline can also run without a database, keeping everything in process. See [Running Operon](#running-operon).
 
 ## Quick Start
 
@@ -65,40 +66,50 @@ If you want to try out Operon, you can clone the repository and run the provided
 git clone https://github.com/Asteromorph-Corp/operon
 cd operon
 # Make sure the URI points to a running PostgreSQL database.
-POSTGRES_URI=<your_postgres_uri> cargo run --release --example ex1
+export POSTGRES_URI=<your_postgres_uri>
+cargo run --release --example ex1
 ```
 
 We recommend reading the source code of [ex1](operon/examples/ex1.rs) to get a hang of how everything works.
+
+If you do not have a database at hand, [ex5](operon/examples/ex5.rs) runs a whole pipeline in memory and needs nothing but `cargo run --release --example ex5`.
 
 ## Key Features
 
 ### Running DAG-Defined Tasks
 
-Operon's primary use case is best described as _a known pipeline of an unknown number of tasks_.
-It executes these tasks in parallel until all possible tasks have completed.
+Operon's primary use case is best described as _a known pipeline of an unknown number of jobs_.
+It executes these jobs in parallel until all possible jobs have completed.
 
-Here, a _task_ is a discrete unit of work that runs in parallel, where each task's outputs ([_entities_](#defining-entities)) can serve as inputs for other tasks.
+Here, a _task_ is one kind of work the pipeline does, and a _job_ is one execution of a task.
+A task's outputs ([_entities_](#defining-entities)) can serve as inputs for other tasks.
 Tasks and their dependencies must be predefined, forming a directed acyclic graph (DAG).
 This DAG's validity is checked at macro-expansion time.
+How many jobs each task runs, on the other hand, is discovered as the run proceeds.
 
 ### Multiplexing
 
-Tasks in Operon are _multiplex_, meaning that one task may produce multiple entities of the same type (as a Rust `Vec`).
-From another perspective, allowing multiplexing means that a task of a single type may be run multiple times, each using different input entities.
-In this sense, a single node in the DAG represents a unique task _type_ that can be run repeatedly, where the number of individual tasks of that type cannot be known until upstream tasks produce the necessary entities.
-Due to this, the number of tasks are quantified using an abstraction called _named dimensions_ instead of a simple count.
+Tasks in Operon are _multiplex_, meaning that one job may produce multiple entities of the same type (as a Rust `Vec`).
+From another perspective, allowing multiplexing means that a single task may run many jobs, each using different input entities.
+In this sense, Operon's DAG could also be viewed as a dynamic graph of _jobs_ that evolves as the run progresses.
+
+The number of jobs a task runs cannot be known until upstream tasks produce the necessary entities.
+Due to this, the number of jobs is quantified using an abstraction called _named dimensions_ instead of a simple count.
 
 ### Incremental Scheduling
 
 Operon utilizes incremental scheduling, which means the scheduler never needs to know the entire task graph up front, saving memory and startup time.
-As an event-driven system, each individual task runner is only aware of the tasks it can execute immediately, enabling efficient resource usage and pooling.
+As an event-driven system, each individual task runner is only aware of the jobs it can execute immediately, enabling efficient resource usage and pooling.
 
 ### Transactional Backend
 
-Operon currently uses a PostgreSQL database as its backend for managing metadata.
-The transactional design allows for atomic updates to task states, and by extension, reliable recovery from failures.
+Operon keeps two kinds of state: the _metadata_ that drives scheduling and recovery, and the _entity data_ that tasks produce and consume.
+Both are backed by a PostgreSQL implementation that ships with the engine.
+Its transactional design allows for atomic updates to job states, and by extension, reliable recovery from failures.
 
-As a tradeoff, Operon often requires heavy database access, which may become a bottleneck for systems with high-throughput workloads.
+As a tradeoff, the PostgreSQL backend often requires heavy database access, which may become a bottleneck for systems with high-throughput workloads.
+Both halves are swappable: an in-memory metadata backend ships alongside the PostgreSQL one, and the entity storage is an interface you may implement over any store you like.
+A run kept entirely in memory gives up recovery in exchange for dropping the database.
 
 ### Interactive UI & Workflow Control
 
@@ -107,8 +118,10 @@ Users can track task progress, browse past logs, and interact with the workflow 
 
 ### Per-Task Parallelism
 
-Operon supports per-task parallelism, meaning that each task type maintains its own thread pool.
+Operon supports per-task parallelism, meaning that each task maintains its own thread pool for the jobs it runs.
 This is particularly useful for tasks that benefit from internal parallel execution or must adhere to external concurrency limits (e.g., database connections or API rate limits).
+The pipeline definition sizes each pool, and may also fix the order in which a task's jobs are picked up.
+See [the `define_operon!` documentation](docs/define_operon_dsl.md).
 
 ## Usage
 
@@ -119,7 +132,7 @@ Add Operon to your project's dependencies by including the following in your `Ca
 
 ```toml
 [dependencies]
-operon = { version = "0.5.0", registry = "kellnr" }
+operon = { version = "0.6.0", registry = "kellnr" }
 ```
 
 Alternatively, clone this repository:
@@ -139,8 +152,8 @@ operon = { path = "~/operon/operon" }
 ### Defining Entities
 
 _Entities_ are typed values that are produced and consumed by tasks in Operon.
-Any valid Rust type with a `PascalCase` name can be used as an entity, given that it implements the `Debug` and `Clone` traits.
-For persistent database use, it is also recommended that the type implements `serde::Serialize` and `serde::Deserialize`.
+Any valid Rust type with a `PascalCase` name can be used as an entity, given that it implements `Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static`.
+The serde bounds hold even for a pipeline that never touches a database, since the PostgreSQL storage is generated for every pipeline.
 An example of entity declarations is as follows:
 
 ```rust
@@ -213,8 +226,7 @@ Invoking the `define_operon!` macro brings several utilities into scope:
 - a `schema` module that contains the metadata of the pipeline;
 - a `{PipelineName}Service` trait that provides the parsed tasks [you would need to implement](#implementing-the-service);
 - a `{PipelineName}Storage` trait that exposes [the storage interface](#implementing-the-storage-optional) for the entities;
-- a `Psql{PipelineName}Storage` struct that serves as a default implementation of the storage interface using PostgreSQL;
-- a helper `{pipeline_name}_handler()` function for [launching the engine](#running-operon) later.
+- a `Psql{PipelineName}Storage` struct that serves as a default implementation of the storage interface using PostgreSQL.
 
 The pipeline must follow a few rules that are enforced at macro-expansion time:
 
@@ -234,12 +246,28 @@ The pipeline must follow a few rules that are enforced at macro-expansion time:
   The range of `word_no` is unknown until the coordinate of `input_no` is fixed, so we cannot implicitly iterate over `word_no` while collapsing `input_no`.
 
 We provide brief diagnostics for violations of these rules.
+
+A task may additionally carry an `#[operon(...)]` attribute that sizes its worker pool or fixes the order its jobs run in:
+
+```rust
+operon::define_operon! {
+    splitter = {
+        Input<input_no> = get_inputs();
+        #[operon(concurrency = 8, ord = (-input_no))]
+        Intermediate<word_no> = get_words(Input) for input_no;
+        Output<char_no> = get_chars(Intermediate) for input_no, word_no;
+    }
+}
+```
+
+Here `get_words` gets a pool of 8 workers and takes its jobs in descending `input_no`, so the last input is split first.
+
 If you need further information, refer to the [`define_operon!` documentation](docs/define_operon_dsl.md) and the [technical report](https://arxiv.org/abs/2511.16080) for more details on the system.
 
 ### Implementing the Service
 
 The pipeline definition serves as a blueprint for the tasks that will be executed — now you would need to implement the actual logic of these tasks.
-This is done by providing an `impl` for the `{PipelineName}Service` trait that was generated by the `define_operon!` macro.
+This is done by deriving `OperonService` on a type of your own and providing an `impl` for the `{PipelineName}Service` trait that was generated by the `define_operon!` macro.
 Continuing with the previous example, you would implement the `splitter` pipeline as follows:
 
 ```rust
@@ -248,34 +276,26 @@ Continuing with the previous example, you would implement the `splitter` pipelin
 use async_trait::async_trait;
 use operon::OperonService;
 
+#[derive(OperonService)]
+#[operon(error = std::convert::Infallible)]
 struct MySplitterService;
-impl OperonService for MySplitterService {
-    type JobEnum = schema::JobEnum;
-    type ResolutionEnum = schema::ResolutionEnum;
-}
 
 #[async_trait]
 impl SplitterService for MySplitterService {
-    async fn get_inputs(&self) -> Result<Vec<Input>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_inputs(&self) -> Result<Vec<Input>, Self::Error> {
         Ok(vec![
             Input::from("Good morning"),
             Input::from("Bonjour"),
             Input::from("Buenos días"),
         ])
     }
-    async fn get_words(
-        &self,
-        input: Input,
-    ) -> Result<Vec<Intermediate>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_words(&self, input: Input) -> Result<Vec<Intermediate>, Self::Error> {
         Ok(input
             .split_whitespace()
             .map(|s| Intermediate(s.to_string()))
             .collect())
     }
-    async fn get_chars(
-        &self,
-        intermediate: Intermediate,
-    ) -> Result<Vec<Output>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_chars(&self, intermediate: Intermediate) -> Result<Vec<Output>, Self::Error> {
         Ok(intermediate.0.chars().map(Output).collect())
     }
 }
@@ -283,10 +303,17 @@ impl SplitterService for MySplitterService {
 
 The exact signature of each task function is parsed from the pipeline definition, and will be provided in a docstring of the generated `{PipelineName}Service` trait.
 
+A task's methods report failure as `Self::Error`, which defaults to a boxed `std::error::Error`.
+You can name a concrete error type instead with `#[operon(error = MyError)]` on the derive.
+In the above example, we wrote `#[operon(error = std::convert::Infallible)]` because the service is infallible.
+A job that returns an error puts its own task into an error state and reports it to the UI.
+The run keeps going elsewhere and ends as aborted, leaving what did complete available to a later recovery.
+
 ### Implementing the Storage (Optional)
 
 The Operon engine assumes all entities are accessible through a storage interface — we call this interface the `{PipelineName}Storage` trait.
-We provide a struct `Psql{PipelineName}Storage` that already implements this trait using PostgreSQL, which you build from `PsqlStorageOptions` — turbofish the storage alias to select your pipeline:
+We provide a struct `Psql{PipelineName}Storage` that already implements this trait using PostgreSQL, which you build from `PsqlStorageOptions`.
+The `build` method needs to be told which storage it is building, either by a turbofish or by annotating the binding.
 
 ```rust
 // In operon/examples/ex1.rs (slightly modified):
@@ -303,11 +330,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 ```
 
-You may also choose to implement your own storage interface by providing an `impl` for the `{PipelineName}Storage` trait.
-Analogous to the service implementation, signatures of the functions you need to implement are parsed from the pipeline definition and will be provided in a docstring of the generated `{PipelineName}Storage` trait.
+You may also choose to implement your own storage by providing an `impl` for two traits `OperonStorage` and `{PipelineName}Storage`.
+
+The `OperonStorage` half covers the pipeline-independent interface: namely, the error type, the backend's lifecycle, and footprint operations.
+The generated half asks for a `get`/`put` pair per entity type and provides default implementations for batch operations.
+The batch operations will, by default, iterate over the `get`/`put` methods you provide, but you may override them if your backend supports more efficient bulk operations.
+Analogous to the service implementation, signatures of the functions you need to implement are parsed from the pipeline definition.
+The signatures will be provided in a generated docstring on the `{PipelineName}Storage` trait.
 
 Having an alternative storage backend may be useful if you want to use a different database or have a quick in-memory storage for testing purposes.
-However, note that the engine will not provide recoverability if the storage is volatile or you do not implement certain methods in the trait.
+For a concrete example, [ex5](operon/examples/ex5.rs) implements one over `DashMap`.
+However, note that the engine will not provide recoverability if the storage is volatile or you leave the footprint methods of `OperonStorage` at their defaults.
 
 ### Running Operon
 
@@ -318,7 +351,7 @@ Surface-level run settings (UI mode, logging) live in a separate `OperonOptions`
 // In operon/examples/ex1.rs (slightly modified):
 
 use operon::options::{PsqlMetaStorageOptions, PsqlStorageOptions};
-use operon::{Operon, PsqlMetaStorage};
+use operon::Operon;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -345,6 +378,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 The `.run()` method will start the Operon engine that will execute the defined pipeline using the provided service and storage implementations.
 If the execution is successful, the results will be stored in the storage, and you can retrieve them using the storage interface after the `.run().await?` call.
 
+The metadata backend is a separate choice from where the entities live.
+Swapping `PsqlMetaStorageOptions` for `MemMetaStorageOptions` keeps the metadata in process, so a run needs no database at all once the entity storage is also database-free:
+
+```rust
+use operon::options::MemMetaStorageOptions;
+
+let meta = MemMetaStorageOptions::new().build();
+```
+
+If you use an in-memory metadata backend, the metadata will be dropped at the end of the run, which amounts to opting out of recoverability.
+To defer the choice to runtime, build the backend through `MetaBackendOptions` instead, which resolves either backend into a single `AnyBackend` type:
+
+```rust
+use operon::AnyBackend;
+use operon::options::MetaBackendOptions;
+
+let meta: AnyBackend = match std::env::var("POSTGRES_URI") {
+    Ok(uri) => MetaBackendOptions::psql(uri),
+    Err(_) => MetaBackendOptions::mem(),
+}
+.build()?;
+```
+
 #### Operon TUI
 
 When run in Interactive mode (`.with_ui_mode(UiMode::Interactive)` in `OperonOptions`, which is the default behavior), the Operon engine takes over the terminal and launches a text user interface (TUI).
@@ -367,15 +423,15 @@ Commands:
                         --fresh, --rebuild, and --redo are mutually exclusive.
         -f, --fresh         Start a fresh run, ignoring any existing data.
         -r, --rebuild       Rebuild the run from trusted data before starting.
-        -s, --skip <JOB_TYPE>[ ...]
-                            With --rebuild, do not rebuild the given 1 or more job(s).
-        -R, --redo <JOB_TYPE>[ ...]
+        -s, --skip <TASK>[ ...]
+                            With --rebuild, do not rebuild the given 1 or more task(s).
+        -R, --redo <TASK>[ ...]
                             Shorthand for --rebuild --skip <...>.
-        -i, --redo-inconsistent-jobs
+        -i, --redo-inconsistent-tasks
                             Rebuild the run even on a failed check,
-                            ignoring jobs with corrupt data and their downstream jobs.
+                            ignoring tasks with corrupt data and their downstream tasks.
                             Cannot be used with --fresh.
-                            Note that --redo <INCONSISTENT_JOBS> will NOT allow a rebuild
+                            Note that --redo <INCONSISTENT_TASKS> will NOT allow a rebuild
                             on a failed check without this flag.
     check [OPTIONS]     Check the consistency of the data from the last run.
         -m, --mode [MODE]   Mode of the consistency check. Defaults to "quick". Options:
@@ -388,11 +444,11 @@ Commands:
     quit [OPTIONS]      Stop all jobs and exit the UI. Defaults to graceful shutdown.
         -f, --force         Force quit.
         -n, --no-exit       Don't exit the UI.
-    pause [OPTIONS] [<JOB_TYPE>[ ...]]
+    pause [OPTIONS] [<TASK>[ ...]]
                         Pause executing new jobs.
-        -c, --cascade       Cascade the pause command to dependent jobs.
-    resume [<JOB_TYPE>[ ...]]
-                        Resume paused jobs.
+        -c, --cascade       Cascade the pause command to dependent tasks.
+    resume [<TASK>[ ...]]
+                        Resume paused tasks.
     help                Print this help message.
 ```
 

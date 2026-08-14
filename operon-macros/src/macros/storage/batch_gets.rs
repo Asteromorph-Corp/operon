@@ -1,7 +1,7 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::{EntityConfigMap, JobConfigMap};
+use crate::configs::{EntityConfigMap, TaskConfigMap};
 use crate::utils::{
     batch_get_entity_ident, clear_span, operon_ident, to_lit_str, to_snake_case, to_type,
 };
@@ -30,12 +30,12 @@ use crate::utils::{
 /// }
 /// ```
 pub fn batch_gets(
-    jobs: &JobConfigMap,
+    tasks: &TaskConfigMap,
     entities: &EntityConfigMap,
 ) -> impl Iterator<Item = syn::TraitItemFn> {
-    let mut targets = jobs
+    let mut targets = tasks
         .values()
-        .flat_map(|job| job.from.iter().filter(|arg| !arg.over.is_empty()))
+        .flat_map(|task| task.from.iter().filter(|arg| !arg.over.is_empty()))
         .collect::<Vec<_>>();
 
     targets.sort_by_key(|arg| (&arg.id, &arg.over));
@@ -102,11 +102,11 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_items_eq_in_trait;
-    use crate::test_utils::simple_pipeline::{all_entities, all_jobs};
+    use crate::test_utils::simple_pipeline::{all_entities, all_tasks};
 
     #[rstest]
-    fn test_batch_gets(all_jobs: JobConfigMap, all_entities: EntityConfigMap) {
-        let items = batch_gets(&all_jobs, &all_entities).collect::<Vec<_>>();
+    fn test_batch_gets(all_tasks: TaskConfigMap, all_entities: EntityConfigMap) {
+        let items = batch_gets(&all_tasks, &all_entities).collect::<Vec<_>>();
         assert_items_eq_in_trait(&items, "storage/batch_gets.rs");
     }
 }

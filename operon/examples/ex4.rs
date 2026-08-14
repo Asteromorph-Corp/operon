@@ -11,7 +11,7 @@
 //
 //   Sensor  --aggregate-->  Summary  --report-->  Report
 //
-// Each job demonstrates a different logging facade to show how they all appear in the UI.
+// Each task demonstrates a different logging facade to show how they all appear in the UI.
 //
 // To run:
 //   POSTGRES_URI=<database_uri> cargo run --release --example ex4

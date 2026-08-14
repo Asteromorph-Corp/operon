@@ -20,7 +20,8 @@ use crate::meta_storage::{
     MetaTicketApi, MetaTxApi,
 };
 use crate::schema::{
-    DimensionMetadata, Job, JobMetadata, Resolution, RunFootprint, Ticket, TicketStatus,
+    DimensionMetadata, Job, Resolution, RunFootprint, TableShape, TaskMetadata, Ticket,
+    TicketStatus,
 };
 
 /// Maps an operation over the backend variant and lifts the error.
@@ -152,8 +153,8 @@ pub enum AnyClient<'a> {
 }
 
 impl MetaClientApi<AnyBackend> for AnyClient<'_> {
-    fn ticket<const N: usize>(&self, job_meta: JobMetadata<N>) -> AnyTicket<'_, N> {
-        map_backend!(self, |client| client.ticket(job_meta) => AnyTicket)
+    fn ticket<const N: usize>(&self, task_meta: TaskMetadata<N>) -> AnyTicket<'_, N> {
+        map_backend!(self, |client| client.ticket(task_meta) => AnyTicket)
     }
 
     fn resolution<const N: usize>(&self, dim_meta: DimensionMetadata<N>) -> AnyResolution<'_, N> {
@@ -180,7 +181,7 @@ impl MetaClientApi<AnyBackend> for AnyClient<'_> {
         map_lift_backend!(self, |client| client.init_ticket_summary().await)
     }
 
-    async fn init_footprint(&self) -> MetaResult<(), AnyBackendError> {
+    async fn init_footprint(&self) -> MetaResult<TableShape, AnyBackendError> {
         map_lift_backend!(self, |client| client.init_footprint().await)
     }
 
@@ -228,7 +229,7 @@ pub enum AnyTicket<'a, const N: usize> {
 impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
     type Error = AnyBackendError;
 
-    async fn init(&self) -> MetaResult<(), AnyBackendError> {
+    async fn init(&self) -> MetaResult<TableShape, AnyBackendError> {
         map_lift_backend!(self, |ticket| ticket.init().await)
     }
 
@@ -246,7 +247,7 @@ impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
 
     async fn raise_deps_done<const M: usize>(
         &self,
-        upstream_meta: JobMetadata<M>,
+        upstream_meta: TaskMetadata<M>,
         upstream_job: Job<M>,
         aggregate_dims: &[&'static str],
     ) -> MetaResult<Vec<Ticket<N>>, AnyBackendError> {
@@ -259,7 +260,7 @@ impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
 
     async fn raise_deps_quota<const M: usize>(
         &self,
-        upstream_meta: JobMetadata<M>,
+        upstream_meta: TaskMetadata<M>,
         upstream_ticket: Ticket<M>,
         aggregate_dims: &[&'static str],
         ub: usize,
@@ -297,7 +298,7 @@ pub enum AnyResolution<'a, const N: usize> {
 impl<const N: usize> MetaResolutionApi<N> for AnyResolution<'_, N> {
     type Error = AnyBackendError;
 
-    async fn init(&self) -> MetaResult<(), AnyBackendError> {
+    async fn init(&self) -> MetaResult<TableShape, AnyBackendError> {
         map_lift_backend!(self, |resolution| resolution.init().await)
     }
 

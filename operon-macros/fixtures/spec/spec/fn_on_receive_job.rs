@@ -6,13 +6,13 @@ async fn on_receive_job(
 ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
     match job {
         schema::JobEnum::Beta(job) => Ok([client
-            .ticket(self.job_meta())
-            .raise_deps_done(metadata::job_beta_meta(), job, &["j"])
+            .ticket(self.task_meta())
+            .raise_deps_done(metadata::task_beta_meta(), job, &["j"])
             .await?]
         .concat()),
         schema::JobEnum::Delta(job) => Ok([client
-            .ticket(self.job_meta())
-            .raise_deps_done(metadata::job_delta_meta(), job, &["j"])
+            .ticket(self.task_meta())
+            .raise_deps_done(metadata::task_delta_meta(), job, &["j"])
             .await?]
         .concat()),
         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(

@@ -27,7 +27,7 @@ pub enum SchedulerError<UErr, SErr, MErr> {
     PeerEventSendFailed,
     #[error("Irrelevant {0} event received in `{1}` scheduler")]
     InvalidPeerEventReceived(&'static str, &'static str),
-    #[error("Missing progress entry for job: {0}")]
+    #[error("Missing progress entry for task: {0}")]
     MissingProgressEntry(String),
     #[error("Other error: {0}")]
     Other(String),

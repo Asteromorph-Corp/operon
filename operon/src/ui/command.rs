@@ -15,15 +15,15 @@ pub enum Command {
         /// Rebuild the run from trusted data before starting.
         #[clap(short, long, conflicts_with_all = ["fresh", "redo"])]
         rebuild: bool,
-        /// Do not rebuild the given jobs when `--rebuild` is specified.
+        /// Do not rebuild the given tasks when `--rebuild` is specified.
         #[clap(short, long, requires = "rebuild", num_args = 1..)]
         skip: Vec<String>,
         /// Shorthand for `--rebuild --skip <...>`.
         #[clap(short = 'R', long, conflicts_with_all = ["fresh", "rebuild", "skip"], num_args = 1..)]
         redo: Vec<String>,
-        /// Rebuild the run while skipping inconsistent jobs.
+        /// Rebuild the run while skipping inconsistent tasks.
         #[clap(short = 'i', long, conflicts_with = "fresh")]
-        redo_inconsistent_jobs: bool,
+        redo_inconsistent_tasks: bool,
     },
 
     /// Check the consistency of the data from the last run.
@@ -48,22 +48,22 @@ pub enum Command {
         no_exit: bool,
     },
 
-    /// Pause jobs.
+    /// Pause tasks.
     Pause {
-        /// Target job(s) to pause.
-        /// If not specified, pauses all jobs.
+        /// Target task(s) to pause.
+        /// If not specified, pauses all tasks.
         #[clap()]
         targets: Vec<String>,
         /// Whether to cascade down the pause command
-        /// to all dependent jobs.
+        /// to all dependent tasks.
         #[clap(short, long)]
         cascade: bool,
     },
 
-    /// Resume jobs.
+    /// Resume tasks.
     Resume {
-        /// Target job(s) to resume.
-        /// If not specified, resumes all jobs.
+        /// Target task(s) to resume.
+        /// If not specified, resumes all tasks.
         #[clap()]
         targets: Vec<String>,
     },
@@ -104,11 +104,11 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[case::run_fresh("run --fresh", Command::Run { fresh: true, rebuild: false, skip: vec![], redo: vec![], redo_inconsistent_jobs: false })]
-    #[case::run_rebuild("run --rebuild", Command::Run { fresh: false, rebuild: true, skip: vec![], redo: vec![], redo_inconsistent_jobs: false })]
-    #[case::run_skip("run --rebuild --skip job1 job2", Command::Run { fresh: false, rebuild: true, skip: vec!["job1".to_owned(), "job2".to_owned()], redo: vec![], redo_inconsistent_jobs: false })]
-    #[case::run_redo("run --redo job1 job2", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec!["job1".to_owned(), "job2".to_owned()], redo_inconsistent_jobs: false })]
-    #[case::run_redo_inconsistent("run --redo-inconsistent-jobs", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec![], redo_inconsistent_jobs: true })]
+    #[case::run_fresh("run --fresh", Command::Run { fresh: true, rebuild: false, skip: vec![], redo: vec![], redo_inconsistent_tasks: false })]
+    #[case::run_rebuild("run --rebuild", Command::Run { fresh: false, rebuild: true, skip: vec![], redo: vec![], redo_inconsistent_tasks: false })]
+    #[case::run_skip("run --rebuild --skip task1 task2", Command::Run { fresh: false, rebuild: true, skip: vec!["task1".to_owned(), "task2".to_owned()], redo: vec![], redo_inconsistent_tasks: false })]
+    #[case::run_redo("run --redo task1 task2", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec!["task1".to_owned(), "task2".to_owned()], redo_inconsistent_tasks: false })]
+    #[case::run_redo_inconsistent("run --redo-inconsistent-tasks", Command::Run { fresh: false, rebuild: false, skip: vec![], redo: vec![], redo_inconsistent_tasks: true })]
     #[case::check_trust_all("check --mode trust-all", Command::Check { mode: CheckMode::TrustAll })]
     #[case::check_metadata_only("check --mode metadata-only", Command::Check { mode: CheckMode::MetadataOnly })]
     #[case::check_quick("check", Command::Check { mode: CheckMode::Quick })]
@@ -116,9 +116,9 @@ mod tests {
     #[case::quit_force("quit --force", Command::Quit { force: true, no_exit: false })]
     #[case::quit_no_exit("quit --no-exit", Command::Quit { force: false, no_exit: true })]
     #[case::pause_all("pause", Command::Pause { targets: vec![], cascade: false })]
-    #[case::pause_specific("pause job1 job2 --cascade", Command::Pause { targets: vec!["job1".to_owned(), "job2".to_owned()], cascade: true })]
+    #[case::pause_specific("pause task1 task2 --cascade", Command::Pause { targets: vec!["task1".to_owned(), "task2".to_owned()], cascade: true })]
     #[case::resume_all("resume", Command::Resume { targets: vec![] })]
-    #[case::resume_specific("resume job1 job2", Command::Resume { targets: vec!["job1".to_owned(), "job2".to_owned()] })]
+    #[case::resume_specific("resume task1 task2", Command::Resume { targets: vec!["task1".to_owned(), "task2".to_owned()] })]
     #[case::exit("exit", Command::Exit)]
     #[case::clear("clear", Command::Clear)]
     #[case::help("help", Command::Help)]

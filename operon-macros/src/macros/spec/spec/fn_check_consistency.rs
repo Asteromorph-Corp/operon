@@ -1,10 +1,10 @@
 use quote::quote;
 use syn::parse_quote;
 
-use crate::configs::JobConfig;
+use crate::configs::TaskConfig;
 use crate::utils::{clear_span, get_entity_ident, operon_ident};
 
-/// Generates the `check_consistency` function for the implementation of the trait `JobSpec`.
+/// Generates the `check_consistency` function for the implementation of the trait `TaskSpec`.
 ///
 /// # Example
 /// ```rust,ignore
@@ -19,10 +19,10 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///     }
 ///
 ///     let tickets = client
-///         .ticket(self.job_meta())
+///         .ticket(self.task_meta())
 ///         .get_all(operon::__private::TicketStatus::Done)
 ///         .await?;
-///     // Pull the "done" epsilon jobs from the metadata storage...
+///     // Pull the "done" epsilon tasks from the metadata storage...
 ///     let Some(coordinates) = tickets
 ///         .iter()
 ///         .map(|ticket| ticket.resolve().map(|job| job.coordinate))
@@ -55,24 +55,24 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///     Ok(true)
 /// }
 /// ```
-pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
+pub(super) fn fn_check_consistency(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
 
-    let field_vars = job.dims.iter().map(clear_span).collect::<Vec<_>>();
-    let get_fn_name = get_entity_ident(&job.to);
+    let field_vars = task.dims.iter().map(clear_span).collect::<Vec<_>>();
+    let get_fn_name = get_entity_ident(&task.to);
 
     let corrupt_msg = format!(
         "Some `{}` tickets are corrupt in the metadata storage.",
-        job.id
+        task.id
     );
-    let missing_entity_msg = format!("Data storage does not hold `{}_{{:?}}`.", job.to);
+    let missing_entity_msg = format!("Data storage does not hold `{}_{{:?}}`.", task.to);
 
-    let check_res_and_entity = match job.spawn_dim.as_ref() {
+    let check_res_and_entity = match task.spawn_dim.as_ref() {
         Some(spawn_dim) => {
             let spawn_dim = clear_span(spawn_dim);
             let missing_res_msg = format!(
                 "No `{}` resolution found for `{}_{{:?}}` in the metadata storage.",
-                spawn_dim, job.id,
+                spawn_dim, task.id,
             );
 
             quote! {
@@ -142,7 +142,7 @@ pub(super) fn fn_check_consistency(job: &JobConfig) -> syn::ImplItemFn {
             }
 
             let tickets = client
-                .ticket(self.job_meta())
+                .ticket(self.task_meta())
                 .get_all(#operon::__private::TicketStatus::Done)
                 .await?;
             let Some(coordinates) = tickets
@@ -166,13 +166,13 @@ mod tests {
 
     use super::*;
     use crate::test_utils::assert_item_eq;
-    use crate::test_utils::simple_pipeline::{job_beta, job_epsilon};
+    use crate::test_utils::simple_pipeline::{task_beta, task_epsilon};
 
     #[rstest]
-    #[case::simple(job_beta(), "spec/spec/fn_check_consistency.simple.rs")]
-    #[case::no_spawn_dim(job_epsilon(), "spec/spec/fn_check_consistency.no_spawn_dim.rs")]
-    fn test_fn_check_consistency(#[case] job: JobConfig, #[case] fixture_path: &str) {
-        let item = fn_check_consistency(&job);
+    #[case::simple(task_beta(), "spec/spec/fn_check_consistency.simple.rs")]
+    #[case::no_spawn_dim(task_epsilon(), "spec/spec/fn_check_consistency.no_spawn_dim.rs")]
+    fn test_fn_check_consistency(#[case] task: TaskConfig, #[case] fixture_path: &str) {
+        let item = fn_check_consistency(&task);
         assert_item_eq(&item, fixture_path)
     }
 }
