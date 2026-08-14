@@ -5,17 +5,14 @@ use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
 use crate::schema::{DimensionMetadata, Resolution, TableShape};
 use crate::utils::{
-    SchemaPrefix, ShapeAction, ShapeRecord, SqlParams, build_tables, hash_metadata, shape_query,
+    SchemaPrefix, ShapeAction, ShapeTable, SqlParams, build_tables, hash_metadata, shape_query,
 };
 
-/// The pointer to the `id` dimension's shape ID.
-fn dimension_shape_record(id: &str) -> ShapeRecord<'_> {
-    ShapeRecord {
-        table: "_dimension_hash",
-        column: "hash",
-        id,
-    }
-}
+/// The table recording each dimension's shape ID, keyed by dimension ID.
+pub(crate) const DIMENSION_SHAPES: ShapeTable<'static> = ShapeTable {
+    table: "_dimension_hash",
+    column: "hash",
+};
 
 /// Postgres wire serialization for [`Resolution`], alongside the query builders that use it.
 impl<const N: usize> Resolution<N> {
@@ -50,7 +47,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
     async fn init(&self) -> PsqlResult<TableShape> {
         let schema_prefix = self.client.schema_prefix();
         let id = self.dim_meta.id;
-        let shape_record = dimension_shape_record(id);
+        let shape_record = DIMENSION_SHAPES.record(id);
         let shape_id = hash_metadata(&self.dim_meta);
         let dimension_table = format!("dimension_{id}");
         let tables = [dimension_table.as_str()];

@@ -140,31 +140,46 @@ pub fn hash_metadata<T: Hash>(metadata: &T) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// The specification to find a shape ID in the database.
+/// The table the shape IDs are recorded in.
 #[derive(Debug, Clone, Copy)]
-pub struct ShapeRecord<'a> {
+pub struct ShapeTable<'a> {
     /// The table the shape IDs are recorded in.
     pub table: &'a str,
     /// The column a shape ID is held in.
     pub column: &'a str,
+}
+
+impl<'a> ShapeTable<'a> {
+    /// The row of this table holding `id`'s shape ID.
+    pub const fn record(self, id: &'a str) -> ShapeRecord<'a> {
+        ShapeRecord { table: self, id }
+    }
+}
+
+/// The specification to find a shape ID in the database.
+#[derive(Debug, Clone, Copy)]
+pub struct ShapeRecord<'a> {
+    /// The table the shape ID is recorded in.
+    pub table: ShapeTable<'a>,
     /// The primary key value to match in `WHERE id = {id}`.
     pub id: &'a str,
 }
 
-/// The record holding a storage's footprint version, keyed by `id`.
+/// The table holding each storage's footprint version.
 ///
-/// Giving each storage a different `id` lets one schema hold both footprints.
-pub const fn footprint_record(id: &str) -> ShapeRecord<'_> {
-    ShapeRecord {
-        table: "_footprint_version",
-        column: "version",
-        id,
-    }
-}
+/// Giving each storage a different [`record`](ShapeTable::record) lets one schema hold both
+/// footprints.
+pub const FOOTPRINT_SHAPES: ShapeTable<'static> = ShapeTable {
+    table: "_footprint_version",
+    column: "version",
+};
 
-/// Creates the table `record` points at.
-pub fn init_shape_record_query(record: ShapeRecord<'_>, schema_prefix: SchemaPrefix<'_>) -> String {
-    let ShapeRecord { table, column, .. } = record;
+/// Creates the table shape IDs are recorded in.
+pub fn init_shape_table_query(
+    shape_table: ShapeTable<'_>,
+    schema_prefix: SchemaPrefix<'_>,
+) -> String {
+    let ShapeTable { table, column } = shape_table;
 
     formatdoc! {"
         CREATE TABLE IF NOT EXISTS {schema_prefix}{table} (
@@ -226,7 +241,10 @@ pub fn shape_query(
     tables: &[&str],
     schema_prefix: SchemaPrefix<'_>,
 ) -> String {
-    let ShapeRecord { table, column, id } = record;
+    let ShapeRecord {
+        table: ShapeTable { table, column },
+        id,
+    } = record;
     let any_present = any_table_present(tables, schema_prefix);
     let all_present = all_tables_present(tables, schema_prefix);
 
@@ -302,7 +320,10 @@ pub fn build_tables(
     action: ShapeAction,
     init_query: impl Display,
 ) -> Option<String> {
-    let ShapeRecord { table, column, id } = record;
+    let ShapeRecord {
+        table: ShapeTable { table, column },
+        id,
+    } = record;
 
     // Cross-referencing tables should be dropped in a single statement.
     let qualified = tables
@@ -461,7 +482,7 @@ mod tests {
         #[case] drops: bool,
     ) {
         let stmt = build_tables(
-            footprint_record("runs"),
+            FOOTPRINT_SHAPES.record("runs"),
             &["run_executions", "runs"],
             "1",
             SchemaPrefix(Some("test_meta")),

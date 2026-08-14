@@ -11,12 +11,12 @@ use crate::meta_storage::psql::PsqlClient;
 use crate::meta_storage::psql::error::PsqlResult;
 use crate::schema::{RunFootprint, RunState, TableShape};
 use crate::utils::{
-    FOOTPRINT_VERSION, GLOBAL, SchemaPrefix, ShapeAction, ShapeRecord, build_tables,
-    footprint_record, init_shape_record_query, shape_query, sql_value_list,
+    FOOTPRINT_SHAPES, FOOTPRINT_VERSION, GLOBAL, SchemaPrefix, ShapeAction, ShapeRecord,
+    build_tables, init_shape_table_query, shape_query, sql_value_list,
 };
 
 /// The pointer to the footprint tables' shape ID.
-const FOOTPRINT_RECORD: ShapeRecord<'static> = footprint_record(RUNS_TABLE);
+const FOOTPRINT_RECORD: ShapeRecord<'static> = FOOTPRINT_SHAPES.record(RUNS_TABLE);
 /// The table that records the footprint information.
 const RUNS_TABLE: &str = "runs";
 /// All tables to be initialized for footprinting.
@@ -84,7 +84,7 @@ impl PsqlClient<'_> {
         let schema_prefix = self.schema_prefix();
         let shape_id = FOOTPRINT_VERSION.to_string();
 
-        let init_record = init_shape_record_query(FOOTPRINT_RECORD, schema_prefix);
+        let init_record = init_shape_table_query(FOOTPRINT_SHAPES, schema_prefix);
         self.execute(&init_record, &[]).await?;
 
         let action = self.footprint_action(&shape_id).await?;
