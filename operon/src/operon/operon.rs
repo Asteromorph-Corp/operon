@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use futures::future::try_join;
+use tokio_util::task::AbortOnDropHandle;
 
 use crate::logger::UiBroadcastLayer;
 use crate::meta_storage::MetaBackend;
@@ -112,8 +113,9 @@ where
         let ui_loop = UiLoop::new(progresses, log_rx, ctrl_tx, sched_rx, ui_options);
 
         // Spawn the scheduler thread
-        let scheduler_handle =
-            { ::tokio::spawn(async move { scheduler.work_and_send(sched_tx).await }) };
+        let scheduler_handle = AbortOnDropHandle::new(::tokio::spawn(async move {
+            scheduler.work_and_send(sched_tx).await
+        }));
 
         // A UI error kills the scheduler,
         // but the scheduler-handler join error (i.e., a scheduler panic)
