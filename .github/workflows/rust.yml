@@ -23,7 +23,7 @@ env:
 jobs:
   fmt:
     name: fmt
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       # Optional, uncomment if disk space pressure is observed.
       # - name: Free disk space
@@ -60,7 +60,7 @@ jobs:
 
   doc:
     name: doc / ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: fmt
     strategy:
       fail-fast: false
@@ -117,7 +117,7 @@ jobs:
 
   test:
     name: test / ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     services:
       postgres:
         image: postgres:18
@@ -203,7 +203,7 @@ jobs:
 
   get-msrv:
     name: Get MSRV
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       msrv: ${{ steps.msrv.outputs.value }}
     steps:
@@ -217,7 +217,7 @@ jobs:
 
   msrv:
     name: MSRV / ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [fmt, get-msrv]
     if: needs.get-msrv.outputs.msrv != ''
 
@@ -279,7 +279,7 @@ jobs:
 
   minimal-versions:
     name: Minimal versions / ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: fmt
 
     strategy:
