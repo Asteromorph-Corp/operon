@@ -22,9 +22,9 @@ use crate::storage::StorageResult;
 /// [`Uuid`](crate::Uuid), [`DateTime`](crate::DateTime), and [`Utc`](crate::Utc) are re-exported
 /// from the `uuid` and `chrono` crates for construction of the footprint.
 ///
-/// The three footprint methods default to no-ops, and a backend that does not implement them will
-/// have recovery disabled.
-/// Implement all three to resume a gracefully stopped run instead of recomputing it.
+/// Both footprint methods default to no-ops, and a backend that does not implement them will have
+/// recovery disabled.
+/// Implement both to resume a gracefully stopped run instead of recomputing it.
 #[async_trait]
 pub trait OperonStorage: Send + Sync + 'static {
     /// This storage backend's own error type, surfaced through
@@ -38,10 +38,6 @@ pub trait OperonStorage: Send + Sync + 'static {
     /// already initialized.
     async fn init(&self) -> StorageResult<(), Self::Error>;
 
-    /// Empties the backend, discarding every stored entity along with the run footprint while
-    /// leaving the structures [`init`](Self::init) created in place.
-    async fn clear(&self) -> StorageResult<(), Self::Error>;
-
     /// Reads the footprint of the run that last wrote to this backend, or `None` if there is none.
     async fn get_footprint(&self) -> StorageResult<Option<RunFootprint>, Self::Error> {
         Ok(None)
@@ -49,11 +45,6 @@ pub trait OperonStorage: Send + Sync + 'static {
 
     /// Records `footprint` as this backend's view of the current run, replacing any earlier one.
     async fn put_footprint(&self, _footprint: &RunFootprint) -> StorageResult<(), Self::Error> {
-        Ok(())
-    }
-
-    /// Drops the recorded footprint, so that the next run starts from scratch.
-    async fn clear_footprint(&self) -> StorageResult<(), Self::Error> {
         Ok(())
     }
 }

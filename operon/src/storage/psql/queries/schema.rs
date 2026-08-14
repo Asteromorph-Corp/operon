@@ -1,5 +1,7 @@
 use crate::storage::psql::PsqlStorageResult;
 use crate::storage::psql::client::StorageClient;
+use crate::storage::psql::queries::entity::ENTITY_SHAPES;
+use crate::utils::init_shape_table_query;
 
 impl<'a> StorageClient<'a> {
     /// Initializes the data storage schema, if specified.
@@ -12,16 +14,9 @@ impl<'a> StorageClient<'a> {
         Ok(())
     }
 
-    /// Initializes the entity hash table.
+    /// Initializes the table recording each entity's shape.
     pub async fn init_entity_hash(&self) -> PsqlStorageResult<()> {
-        let schema = self.schema_prefix();
-
-        let create_table = format!(
-            "CREATE TABLE IF NOT EXISTS {schema}_entity_hash (
-                id TEXT PRIMARY KEY,
-                hash TEXT NOT NULL
-            )",
-        );
+        let create_table = init_shape_table_query(ENTITY_SHAPES, self.schema_prefix());
         self.execute(&create_table, &[]).await?;
         Ok(())
     }

@@ -15,15 +15,13 @@ pub enum MetaStorageError<MErr> {
     IntegerConversionError(#[from] TryFromIntError),
     #[error("Invalid run state: {0}")]
     InvalidRunState(String),
-    // FIXME: the `job` fields of the two variants below hold a task id and need to be renamed at
-    // v0.6.0, which breaks callers that match on them by name.
-    #[error("Invalid explosion: Called `explode({dim})` on `{job}`, but `{dim}` was resolved.")]
+    #[error("Invalid explosion: Called `explode({dim})` on `{task}`, but `{dim}` was resolved.")]
     InvalidExplosion {
-        job: &'static str,
+        task: &'static str,
         dim: &'static str,
     },
-    #[error("Missing ticket summary for task '{job}'")]
-    MissingTicketSummary { job: &'static str },
+    #[error("Missing ticket summary for task '{task}'")]
+    MissingTicketSummary { task: &'static str },
     #[error("Missing resolution for dimension `{dim}[{}]`", fmt_deps(.deps))]
     MissingResolution {
         dim: &'static str,
@@ -51,11 +49,11 @@ fn fmt_deps(deps: &[(&'static str, usize)]) -> String {
 
 impl<MErr> MetaStorageError<MErr> {
     pub fn invalid_explosion(task: &'static str, dim: &'static str) -> Self {
-        Self::InvalidExplosion { job: task, dim }
+        Self::InvalidExplosion { task, dim }
     }
 
     pub fn missing_ticket_summary(task: &'static str) -> Self {
-        Self::MissingTicketSummary { job: task }
+        Self::MissingTicketSummary { task }
     }
 
     /// Remaps the backend error, passing the domain variants through unchanged.
@@ -63,8 +61,10 @@ impl<MErr> MetaStorageError<MErr> {
         match self {
             Self::IntegerConversionError(e) => MetaStorageError::IntegerConversionError(e),
             Self::InvalidRunState(s) => MetaStorageError::InvalidRunState(s),
-            Self::InvalidExplosion { job, dim } => MetaStorageError::InvalidExplosion { job, dim },
-            Self::MissingTicketSummary { job } => MetaStorageError::MissingTicketSummary { job },
+            Self::InvalidExplosion { task, dim } => {
+                MetaStorageError::InvalidExplosion { task, dim }
+            }
+            Self::MissingTicketSummary { task } => MetaStorageError::MissingTicketSummary { task },
             Self::MissingResolution { dim, deps } => {
                 MetaStorageError::MissingResolution { dim, deps }
             }

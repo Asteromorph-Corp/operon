@@ -9,8 +9,14 @@ use crate::storage::StorageResult;
 use crate::storage::psql::client::StorageClient;
 use crate::storage::psql::{PsqlStorageError, PsqlStorageResult};
 use crate::utils::{
-    SchemaPrefix, SchemaPrefixOwned, ShapeAction, ShapeRecord, SqlParams, build_tables,
+    SchemaPrefix, SchemaPrefixOwned, ShapeAction, ShapeTable, SqlParams, build_tables,
     hash_metadata, shape_query,
+};
+
+/// The table recording each entity's shape ID, keyed by entity ID.
+pub(crate) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
+    table: "_entity_hash",
+    column: "hash",
 };
 
 pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
@@ -38,14 +44,6 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     /// Initializes the entity table.
     pub async fn init(&self) -> PsqlStorageResult<()> {
         self.entity_meta.init(&self.client).await
-    }
-
-    /// Clears the entity table.
-    pub async fn clear(&self) -> PsqlStorageResult<()> {
-        let schema_prefix = self.client.schema_prefix();
-        let stmt = self.entity_meta.clear_stmt(schema_prefix);
-        self.client.execute_stmt(&stmt, &[]).await?;
-        Ok(())
     }
 
     /// Gets the entity for the given primary key.
@@ -135,29 +133,22 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 }
 
-/// Prepares and empties one entity's table, erased of the entity's arity and type.
+/// Prepares one entity's table, erased of the entity's arity and type.
 ///
-/// The generated storage implements this over every entity of a pipeline, so that its `init` and
-/// `clear` walk one collection.
+/// The generated storage implements this over every entity of a pipeline, so that its `init` walks
+/// one collection.
 #[async_trait]
 pub trait EntityQueries: Send + Sync + 'static {
     /// Creates this entity's table, rebuilding it when the recorded shape no longer matches the
     /// entity.
     async fn init(&self, client: &StorageClient<'_>) -> StorageResult<(), PsqlStorageError>;
-
-    /// The statement discarding every row of this entity's table.
-    fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String;
 }
 
 #[async_trait]
 impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<N, T> {
     async fn init(&self, client: &StorageClient<'_>) -> PsqlStorageResult<()> {
         let schema_prefix = client.schema_prefix();
-        let record = ShapeRecord {
-            table: "_entity_hash",
-            column: "hash",
-            id: self.id,
-        };
+        let record = ENTITY_SHAPES.record(self.id);
         let tables = [self.id];
         let shape_id = hash_metadata(self);
 
@@ -176,10 +167,6 @@ impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<
             client.batch_execute(&stmt).await?;
         }
         Ok(())
-    }
-
-    fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String {
-        ClearEntityQuery(schema, *self).to_string()
     }
 }
 
@@ -212,18 +199,6 @@ impl<const N: usize, T> std::fmt::Display for InitEntityQuery<'_, N, T> {
         }
 
         write!(f, ");")
-    }
-}
-
-/// A helper struct to generate SQL query for clearing a entity table.
-struct ClearEntityQuery<'a, const N: usize, T>(SchemaPrefix<'a>, EntityMetadata<N, T>);
-
-impl<const N: usize, T> std::fmt::Display for ClearEntityQuery<'_, N, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let schema = self.0;
-        let id = self.1.id;
-
-        write!(f, "TRUNCATE TABLE {schema}{id};")
     }
 }
 
@@ -444,17 +419,6 @@ mod test {
         #[case] expected: &str,
     ) {
         let stmt = InitEntityQuery(schema_prefix, metadata).to_string();
-        assert_eq!(stmt, expected);
-    }
-
-    #[rstest]
-    #[case(entity_a(), "TRUNCATE TABLE test_meta.a;")]
-    fn test_clear_entity_query<const N: usize>(
-        schema_prefix: SchemaPrefix<'_>,
-        #[case] metadata: EntityMetadata<N, ()>,
-        #[case] expected: &str,
-    ) {
-        let stmt = ClearEntityQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
 

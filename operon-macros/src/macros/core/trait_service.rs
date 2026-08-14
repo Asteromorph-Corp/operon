@@ -139,7 +139,7 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
         Generated trait containing task methods that should be implemented for use with Operon.
 
         Each task method returns `Self::Error`, the service's error type.
-        `#[derive(OperonService)]` defaults it to `operon::error::UserError`.
+        `#[derive(OperonService)]` defaults it to `{operon}::error::UserError`.
         Select a concrete type with `#[operon(error = MyError)]` on the derive.
 
         The derive also takes `#[operon(defined_at = \"path\")]`, the module `define_operon!`

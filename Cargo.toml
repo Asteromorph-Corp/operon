@@ -1,5 +1,6 @@
 [workspace]
-members = ["operon", "operon-macros"]
+members = ["operon", "operon-macros", "tests/*"]
+default-members = ["operon", "operon-macros"]
 resolver = "2"
 
 [workspace.package]

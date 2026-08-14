@@ -20,6 +20,7 @@ use crate::utils::{get_entity_ident, put_entity_ident, to_snake_case, to_type};
 /// }
 /// ```
 fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
+    let operon = operon_ident();
     let get_fn_name = get_entity_ident(&entity.id);
 
     let n = entity.dims.len();
@@ -27,7 +28,7 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let id = to_snake_case(&entity.id);
 
     parse_quote! {
-        async fn #get_fn_name(&self, coordinate: [usize; #n]) -> operon::error::StorageResult<Option<#ty>, Self::Error> {
+        async fn #get_fn_name(&self, coordinate: [usize; #n]) -> #operon::error::StorageResult<Option<#ty>, Self::Error> {
             self
                 .conn()
                 .await?
@@ -62,7 +63,7 @@ fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let ty = to_type(&entity.id);
 
     parse_quote! {
-        async fn #put_fn_name(&self, entity: #operon::Entity<#n, #ty>) -> operon::error::StorageResult<(), Self::Error> {
+        async fn #put_fn_name(&self, entity: #operon::Entity<#n, #ty>) -> #operon::error::StorageResult<(), Self::Error> {
             self
                 .conn()
                 .await?
