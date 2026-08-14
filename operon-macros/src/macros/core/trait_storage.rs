@@ -277,9 +277,9 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
     let mut sections = vec![formatdoc! {"
         Generated trait containing the entity accessors that should be implemented for use with Operon.
 
-        Implement it alongside `operon::OperonStorage`, which covers the backend's lifecycle and its run footprint.
+        Implement it alongside `{operon}::OperonStorage`, which covers the backend's lifecycle and its run footprint.
         That implementation declares the `Self::Error` these methods report failure as.
-        A coordinate addresses one entity across the pipeline's dimensions, and `operon::Entity` pairs a coordinate with the value stored there.
+        A coordinate addresses one entity across the pipeline's dimensions, and `{operon}::Entity` pairs a coordinate with the value stored there.
 
         # Required methods
         ```rust,ignore

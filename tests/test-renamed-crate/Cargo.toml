@@ -1,0 +1,14 @@
+[package]
+name = "test-renamed-crate"
+description = "Compiles a pipeline under names other than `operon`."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+async-trait = "0.1.80"
+my_operon = { package = "operon", path = "../../operon" }
