@@ -80,14 +80,6 @@ impl OperonStorage for DashMapStorage {
         Ok(())
     }
 
-    async fn clear(&self) -> StorageResult<(), Self::Error> {
-        self.documents.clear();
-        self.words.clear();
-        self.characters.clear();
-        self.counts.clear();
-        Ok(())
-    }
-
     // The footprint operations stay at their defaults: they exist to resume a previous run, which
     // this storage cannot outlive.
 }

@@ -93,15 +93,6 @@ impl<T: EntityQueries> OperonStorage for PsqlStorage<T> {
         Ok(())
     }
 
-    async fn clear(&self) -> PsqlStorageResult<()> {
-        let client = self.conn().await?;
-        let entities_clear_stmt = self.entities_meta.clear_stmt(self.schema_prefix());
-
-        client.clear_footprint().await?;
-        client.batch_execute(&entities_clear_stmt).await?;
-        Ok(())
-    }
-
     async fn get_footprint(&self) -> PsqlStorageResult<Option<RunFootprint>> {
         let client = self.conn().await?;
         client.get_footprint().await
@@ -110,10 +101,5 @@ impl<T: EntityQueries> OperonStorage for PsqlStorage<T> {
     async fn put_footprint(&self, footprint: &RunFootprint) -> PsqlStorageResult<()> {
         let client = self.conn().await?;
         client.put_footprint(footprint).await
-    }
-
-    async fn clear_footprint(&self) -> PsqlStorageResult<()> {
-        let client = self.conn().await?;
-        client.clear_footprint().await
     }
 }

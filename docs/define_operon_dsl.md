@@ -374,8 +374,8 @@ Override them wherever the backend can serve a whole range in one query.
 The values a `get_all_*` returns must be ordered by the dimensions it iterates over.
 
 The pipeline-independent half of a storage backend is the `operon::OperonStorage` trait, which every implementation of the generated trait must also implement.
-It declares the `Self::Error` these methods report failure as, prepares and clears the backend, and reads and writes the run footprint that lets a later run resume this one.
-The three footprint methods default to no-ops, and a backend that leaves them alone has recovery disabled.
+It declares the `Self::Error` these methods report failure as, prepares the backend, and reads and writes the run footprint that lets a later run resume this one.
+Both footprint methods default to no-ops, and a backend that leaves them alone has recovery disabled.
 
 The `Psql{PipelineName}Storage` struct implementing both traits using the PostgreSQL backend will also be generated, serving as the default storage.
 

@@ -12,12 +12,4 @@ impl operon::__private::EntityQueries for CookingEntities {
         self.f.init(client).await?;
         Ok(())
     }
-    fn clear_stmt(&self, schema: operon::__private::SchemaPrefix<'_>) -> String {
-        let tables = [
-            self.a.id, self.b.id, self.c.id, self.d.id, self.e.id, self.f.id,
-        ]
-        .map(|t| format!("{schema}{t}"))
-        .join(",");
-        format!("TRUNCATE TABLE {tables};")
-    }
 }

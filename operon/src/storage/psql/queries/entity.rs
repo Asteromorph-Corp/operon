@@ -40,14 +40,6 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         self.entity_meta.init(&self.client).await
     }
 
-    /// Clears the entity table.
-    pub async fn clear(&self) -> PsqlStorageResult<()> {
-        let schema_prefix = self.client.schema_prefix();
-        let stmt = self.entity_meta.clear_stmt(schema_prefix);
-        self.client.execute_stmt(&stmt, &[]).await?;
-        Ok(())
-    }
-
     /// Gets the entity for the given primary key.
     pub async fn get(&self, coordinate: [usize; N]) -> PsqlStorageResult<Option<T>> {
         let schema_prefix = self.client.schema_prefix();
@@ -135,18 +127,15 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     }
 }
 
-/// Prepares and empties one entity's table, erased of the entity's arity and type.
+/// Prepares one entity's table, erased of the entity's arity and type.
 ///
-/// The generated storage implements this over every entity of a pipeline, so that its `init` and
-/// `clear` walk one collection.
+/// The generated storage implements this over every entity of a pipeline, so that its `init` walks
+/// one collection.
 #[async_trait]
 pub trait EntityQueries: Send + Sync + 'static {
     /// Creates this entity's table, rebuilding it when the recorded shape no longer matches the
     /// entity.
     async fn init(&self, client: &StorageClient<'_>) -> StorageResult<(), PsqlStorageError>;
-
-    /// The statement discarding every row of this entity's table.
-    fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String;
 }
 
 #[async_trait]
@@ -176,10 +165,6 @@ impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<
             client.batch_execute(&stmt).await?;
         }
         Ok(())
-    }
-
-    fn clear_stmt(&self, schema: SchemaPrefix<'_>) -> String {
-        ClearEntityQuery(schema, *self).to_string()
     }
 }
 
@@ -212,18 +197,6 @@ impl<const N: usize, T> std::fmt::Display for InitEntityQuery<'_, N, T> {
         }
 
         write!(f, ");")
-    }
-}
-
-/// A helper struct to generate SQL query for clearing a entity table.
-struct ClearEntityQuery<'a, const N: usize, T>(SchemaPrefix<'a>, EntityMetadata<N, T>);
-
-impl<const N: usize, T> std::fmt::Display for ClearEntityQuery<'_, N, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let schema = self.0;
-        let id = self.1.id;
-
-        write!(f, "TRUNCATE TABLE {schema}{id};")
     }
 }
 
@@ -444,17 +417,6 @@ mod test {
         #[case] expected: &str,
     ) {
         let stmt = InitEntityQuery(schema_prefix, metadata).to_string();
-        assert_eq!(stmt, expected);
-    }
-
-    #[rstest]
-    #[case(entity_a(), "TRUNCATE TABLE test_meta.a;")]
-    fn test_clear_entity_query<const N: usize>(
-        schema_prefix: SchemaPrefix<'_>,
-        #[case] metadata: EntityMetadata<N, ()>,
-        #[case] expected: &str,
-    ) {
-        let stmt = ClearEntityQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
 
