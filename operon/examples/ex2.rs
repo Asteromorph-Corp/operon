@@ -1,13 +1,9 @@
-use std::convert::Infallible;
-
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use dashmap::DashMap;
-use operon::error::StorageResult;
 use operon::options::{
     MemMetaStorageOptions, OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions, UiMode,
 };
-use operon::{Entity, Operon, OperonService, OperonStorage, define_operon};
+use operon::{Operon, OperonService, define_operon};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -144,90 +140,6 @@ impl CookingService for ExampleService {
     }
 }
 
-/// An entity storage holding one `DashMap` per entity, keyed by the entity's coordinate.
-///
-/// `define_operon!` generates the `CookingStorage` trait, which asks for a `get`/`put` pair per
-/// entity; the batched accessors it also declares come with default implementations built on those.
-/// That trait plus [`OperonStorage`] is everything a storage backend has to provide.
-#[derive(Default)]
-pub struct DashMapCookingStorage {
-    a: DashMap<[usize; 1], A>,
-    b: DashMap<[usize; 2], B>,
-    c: DashMap<[usize; 2], C>,
-    d: DashMap<[usize; 3], D>,
-    e: DashMap<[usize; 2], E>,
-    f: DashMap<[usize; 1], F>,
-}
-
-#[async_trait]
-impl OperonStorage for DashMapCookingStorage {
-    type Error = Infallible;
-
-    async fn init(&self) -> StorageResult<(), Self::Error> {
-        Ok(())
-    }
-
-    // The footprint operations stay at their defaults: they exist to resume a previous run, which
-    // this storage cannot outlive.
-}
-
-#[async_trait]
-impl CookingStorage for DashMapCookingStorage {
-    async fn get_a(&self, coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error> {
-        Ok(self.a.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_a(&self, entity: Entity<1, A>) -> StorageResult<(), Self::Error> {
-        self.a.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-
-    async fn get_b(&self, coordinate: [usize; 2]) -> StorageResult<Option<B>, Self::Error> {
-        Ok(self.b.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_b(&self, entity: Entity<2, B>) -> StorageResult<(), Self::Error> {
-        self.b.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-
-    async fn get_c(&self, coordinate: [usize; 2]) -> StorageResult<Option<C>, Self::Error> {
-        Ok(self.c.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_c(&self, entity: Entity<2, C>) -> StorageResult<(), Self::Error> {
-        self.c.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-
-    async fn get_d(&self, coordinate: [usize; 3]) -> StorageResult<Option<D>, Self::Error> {
-        Ok(self.d.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_d(&self, entity: Entity<3, D>) -> StorageResult<(), Self::Error> {
-        self.d.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-
-    async fn get_e(&self, coordinate: [usize; 2]) -> StorageResult<Option<E>, Self::Error> {
-        Ok(self.e.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_e(&self, entity: Entity<2, E>) -> StorageResult<(), Self::Error> {
-        self.e.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-
-    async fn get_f(&self, coordinate: [usize; 1]) -> StorageResult<Option<F>, Self::Error> {
-        Ok(self.f.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_f(&self, entity: Entity<1, F>) -> StorageResult<(), Self::Error> {
-        self.f.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-}
-
 /// Runs the `cooking` pipeline on a storage backend chosen at startup;
 /// defaults to `psql` if no backend is specified.
 #[derive(Parser)]
@@ -272,7 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     match backend {
         Backend::Mem => {
             let meta = MemMetaStorageOptions::new().build();
-            let storage = DashMapCookingStorage::default();
+            let storage = MemCookingStorage::default();
             Operon::new(service, storage, meta)
                 .with_options(operon_options)
                 .run()
