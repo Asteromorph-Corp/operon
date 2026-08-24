@@ -45,6 +45,7 @@ pub mod options {
 #[doc(hidden)]
 pub mod __private {
     pub use async_trait;
+    pub use dashmap;
     pub use futures;
     pub use tracing;
 

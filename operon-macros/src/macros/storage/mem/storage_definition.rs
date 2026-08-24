@@ -1,0 +1,56 @@
+use syn::parse_quote;
+
+use crate::configs::EntityConfigMap;
+use crate::operon_ident;
+use crate::utils::{mem_storage_ident, to_snake_case, to_type};
+
+/// Generates the entities struct to be used as a generic parameter for the `PsqlStorage`.
+///
+/// # Example
+/// ```rust,ignore
+/// pub struct MemCookingStorage {
+///     a: operon::__private::dashmap::DashMap<[usize; 1usize], A>,
+///     b: operon::__private::dashmap::DashMap<[usize; 2usize], B>,
+///     c: operon::__private::dashmap::DashMap<[usize; 2usize], C>,
+///     d: operon::__private::dashmap::DashMap<[usize; 3usize], D>,
+///     e: operon::__private::dashmap::DashMap<[usize; 2usize], E>,
+///     f: operon::__private::dashmap::DashMap<[usize; 1usize], F>,
+/// }
+/// ```
+pub(super) fn storage_definition(
+    service_id: &syn::Ident,
+    entities: &EntityConfigMap,
+) -> syn::ItemStruct {
+    let operon = operon_ident();
+    let mem_storage_ident = mem_storage_ident(service_id);
+    let fields = entities.values().map(|entity| -> syn::Field {
+        let field_ident = to_snake_case(&entity.id);
+        let n = entity.dims.len();
+        let ty = to_type(&entity.id);
+        let meta_ty: syn::Type = parse_quote! {
+            #operon::__private::dashmap::DashMap<[usize; #n], #ty>
+        };
+        parse_quote! { #field_ident: #meta_ty }
+    });
+
+    parse_quote! {
+        pub struct #mem_storage_ident {
+            #(#fields,)*
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+    use crate::test_utils::assert_item_eq;
+    use crate::test_utils::simple_pipeline::{all_entities, service_id};
+
+    #[rstest]
+    fn test_entities_definition(service_id: syn::Ident, all_entities: EntityConfigMap) {
+        let item = storage_definition(&service_id, &all_entities);
+        assert_item_eq(&item, "storage/mem/storage_definition.rs");
+    }
+}

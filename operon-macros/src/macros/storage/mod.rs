@@ -1,3 +1,4 @@
+mod mem;
 mod psql;
 
 mod entities_definition;

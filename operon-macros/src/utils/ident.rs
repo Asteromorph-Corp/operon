@@ -35,6 +35,10 @@ pub fn sql_storage_ident(service_id: &syn::Ident) -> syn::Ident {
     format_ident!("Psql{}Storage", service_id.to_string().to_pascal_case())
 }
 
+pub fn mem_storage_ident(service_id: &syn::Ident) -> syn::Ident {
+    format_ident!("Mem{}Storage", &service_id.to_string().to_pascal_case())
+}
+
 pub fn task_metadata_ident(task_id: &syn::Ident) -> syn::Ident {
     format_ident!("task_{}_meta", task_id.to_string().to_snake_case())
 }
