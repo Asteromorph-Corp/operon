@@ -20,6 +20,8 @@ pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
 
             #mod_mem
             #mod_psql
+            // TODO: re-export for backwards compatibility, remove in future breaking version bump
+            pub use psql::*;
 
             #entities_definition
             #impl_entities_default
