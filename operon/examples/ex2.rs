@@ -257,9 +257,12 @@ enum Backend {
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cli = Cli::parse();
     let service = ExampleService;
-    let backend = cli.backend.unwrap_or(Backend::Psql {
-        uri: std::env::var("POSTGRES_URI")?,
-    });
+    let backend = match cli.backend {
+        Some(backend) => backend,
+        None => Backend::Psql {
+            uri: std::env::var("POSTGRES_URI")?,
+        },
+    };
     let operon_options = OperonOptions::new().with_ui_mode(if cli.headless {
         UiMode::Headless
     } else {
