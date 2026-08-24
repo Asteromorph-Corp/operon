@@ -3,6 +3,7 @@ use syn::parse_quote;
 use crate::configs::AllConfig;
 use crate::macros::storage::entities_definition::entities_definition;
 use crate::macros::storage::impl_entities_default::impl_entities_default;
+use crate::macros::storage::mem::mod_mem;
 use crate::macros::storage::psql::mod_psql;
 
 pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
@@ -10,12 +11,14 @@ pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
     let impl_entities_default =
         impl_entities_default(&all_configs.service_id, &all_configs.entities);
 
+    let mod_mem = mod_mem(all_configs);
     let mod_psql = mod_psql(all_configs);
 
     parse_quote! {
         mod storage {
             use super::*;
 
+            #mod_mem
             #mod_psql
 
             #entities_definition
