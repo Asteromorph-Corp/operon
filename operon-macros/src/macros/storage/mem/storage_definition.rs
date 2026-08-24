@@ -30,7 +30,7 @@ pub(super) fn storage_definition(
         let meta_ty: syn::Type = parse_quote! {
             #operon::__private::dashmap::DashMap<[usize; #n], #ty>
         };
-        parse_quote! { #field_ident: #meta_ty }
+        parse_quote! { pub #field_ident: #meta_ty }
     });
 
     parse_quote! {
