@@ -300,6 +300,30 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         Ok(())
     }
 
+    async fn dump(&self) -> MemResult<Vec<Ticket<N>>> {
+        let Some(table) = self.table()? else {
+            return Ok(Vec::new());
+        };
+        let rows = table.rows.read()?;
+        let tickets = rows
+            .map
+            .iter()
+            .map(|(key, row)| Self::ticket_of(key, row))
+            .collect::<Vec<_>>();
+        Ok(tickets)
+    }
+
+    async fn hydrate(&self, tickets: Vec<Ticket<N>>) -> MemResult<()> {
+        let table = self.require_table()?;
+        let mut rows = table.rows.write()?;
+        rows.clear();
+        for ticket in &tickets {
+            let (key, row) = Self::split(ticket);
+            rows.insert_new(key, row);
+        }
+        Ok(())
+    }
+
     async fn raise_deps_done<const M: usize>(
         &self,
         upstream_meta: TaskMetadata<M>,

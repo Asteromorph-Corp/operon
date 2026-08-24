@@ -1,5 +1,9 @@
 use std::num::TryFromIntError;
 
+use bytes::Bytes;
+use futures::SinkExt;
+use tokio_postgres::Row;
+
 use crate::meta_storage::MetaResolutionApi;
 use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
@@ -20,6 +24,25 @@ impl<const N: usize> Resolution<N> {
     fn as_sql_params(&self) -> Result<SqlParams, TryFromIntError> {
         SqlParams::from_usize(self.coordinate.into_iter().chain([self.ub]))
     }
+
+    /// Serializes a resolution into a `COPY ... FROM STDIN` CSV row.
+    fn to_copy_string(self) -> Result<String, TryFromIntError> {
+        Ok(self.as_sql_params()?.to_copy_string())
+    }
+
+    /// Materializes a resolution from a row of the resolution table.
+    fn from_row(meta: DimensionMetadata<N>, row: &Row) -> Result<Resolution<N>, TryFromIntError> {
+        let mut coordinate = [0usize; N];
+        let mut i = 0;
+
+        while i < N {
+            coordinate[i] = usize::try_from(row.get::<_, i64>(meta.deps[i]))?;
+            i += 1;
+        }
+
+        let ub = usize::try_from(row.get::<_, i64>("ub"))?;
+        Ok(Resolution { coordinate, ub })
+    }
 }
 
 /// Helper struct for building SQL queries related to resolutions.
@@ -38,6 +61,29 @@ impl<'a> PsqlClient<'a> {
             client: self,
             dim_meta,
         }
+    }
+}
+
+impl<const N: usize> PsqlResolutionQueryBuilder<'_, N> {
+    /// Streams `tickets` into this dimension's resolution table over `COPY ... FROM STDIN`.
+    async fn copy_in(&self, resolutions: Vec<Resolution<N>>) -> PsqlResult<()> {
+        if resolutions.is_empty() {
+            return Ok(());
+        }
+
+        let copy_stmt = CopyInQuery(self.client.schema_prefix(), self.dim_meta);
+        let sink = self
+            .client
+            .copy_in::<_, Bytes>(&copy_stmt.to_string())
+            .await?;
+        let mut sink = Box::pin(sink);
+        for resolution in resolutions {
+            sink.feed(resolution.to_copy_string()?.into())
+                .await
+                .map_err(PsqlMetaError::from)?;
+        }
+        sink.close().await.map_err(PsqlMetaError::from)?;
+        Ok(())
     }
 }
 
@@ -92,6 +138,26 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
         let params = resolution.as_sql_params()?;
         self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        Ok(())
+    }
+
+    async fn dump(&self) -> PsqlResult<Vec<Resolution<N>>> {
+        let schema_prefix = self.client.schema_prefix();
+        let stmt = DumpResolutionQuery(schema_prefix, self.dim_meta);
+        let rows = self.client.query_stmt(&stmt, &[]).await?;
+        let resolutions = rows
+            .iter()
+            .map(|row| Resolution::from_row(self.dim_meta, row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(resolutions)
+    }
+
+    async fn hydrate(&self, resolutions: Vec<Resolution<N>>) -> PsqlResult<()> {
+        self.clear().await?;
+        if resolutions.is_empty() {
+            return Ok(());
+        }
+        self.copy_in(resolutions).await?;
         Ok(())
     }
 }
@@ -153,6 +219,35 @@ impl<const N: usize> std::fmt::Display for GetResolutionQuery<'_, N> {
             write!(f, " {} = ${}", dim, idx + 1)?;
         }
         write!(f, ";")
+    }
+}
+
+/// Helper struct to generate the SQL query for getting every resolution of a dimension.
+struct DumpResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
+
+impl<const N: usize> std::fmt::Display for DumpResolutionQuery<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        write!(f, "SELECT * FROM {schema}dimension_{id};")
+    }
+}
+
+/// A helper struct to generate the SQL query for copying resolutions into the database.
+struct CopyInQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
+
+impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+        let deps = self.1.deps;
+
+        write!(f, "COPY {schema}dimension_{id} (")?;
+        for dep in deps {
+            write!(f, "{dep}, ")?;
+        }
+        write!(f, "ub) FROM STDIN WITH (FORMAT csv);")
     }
 }
 
@@ -251,6 +346,36 @@ mod tests {
         #[case] expected: &str,
     ) {
         let stmt = GetResolutionQuery(schema_prefix, metadata).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(dimension_i(), "SELECT * FROM test_meta.dimension_i;")]
+    #[case::with_dependency(dimension_j(), "SELECT * FROM test_meta.dimension_j;")]
+    fn test_dump_resolution_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'static>,
+        #[case] metadata: DimensionMetadata<N>,
+        #[case] expected: &str,
+    ) {
+        let stmt = DumpResolutionQuery(schema_prefix, metadata).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(
+        dimension_i(),
+        "COPY test_meta.dimension_i (ub) FROM STDIN WITH (FORMAT csv);"
+    )]
+    #[case::with_dependency(
+        dimension_j(),
+        "COPY test_meta.dimension_j (i, ub) FROM STDIN WITH (FORMAT csv);"
+    )]
+    fn test_copy_in_resolution_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'static>,
+        #[case] metadata: DimensionMetadata<N>,
+        #[case] expected: &str,
+    ) {
+        let stmt = CopyInQuery(schema_prefix, metadata).to_string();
         assert_eq!(stmt, expected);
     }
 
