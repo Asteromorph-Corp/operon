@@ -107,6 +107,6 @@ mod tests {
     #[rstest]
     fn test_batch_gets(all_tasks: TaskConfigMap, all_entities: EntityConfigMap) {
         let items = batch_gets(&all_tasks, &all_entities).collect::<Vec<_>>();
-        assert_items_eq_in_trait(&items, "storage/batch_gets.rs");
+        assert_items_eq_in_trait(&items, "storage/psql/batch_gets.rs");
     }
 }

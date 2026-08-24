@@ -89,14 +89,14 @@ mod tests {
     use crate::test_utils::simple_pipeline::entity_b;
 
     #[rstest]
-    #[case::simple(entity_b(), "storage/single_get.rs")]
+    #[case::simple(entity_b(), "storage/psql/single_get.rs")]
     fn test_single_get(#[case] entity: EntityConfig, #[case] fixture_path: &str) {
         let item = single_get(&entity);
         assert_item_eq(&item, fixture_path);
     }
 
     #[rstest]
-    #[case::simple(entity_b(), "storage/single_put.rs")]
+    #[case::simple(entity_b(), "storage/psql/single_put.rs")]
     fn test_single_put(#[case] entity: EntityConfig, #[case] fixture_path: &str) {
         let item = single_put(&entity);
         assert_item_eq(&item, fixture_path);

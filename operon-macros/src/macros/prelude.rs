@@ -11,7 +11,7 @@ pub fn prelude(all_configs: &AllConfig) -> syn::ItemMod {
     parse_quote! {
         mod prelude {
             pub use super::traits::{#service_trait, #storage_trait};
-            pub use super::storage::{#sql_storage};
+            pub use super::storage::psql::{#sql_storage};
         }
     }
 }

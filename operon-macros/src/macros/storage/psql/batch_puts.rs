@@ -53,6 +53,6 @@ mod tests {
     #[rstest]
     fn test_batch_puts(all_tasks: TaskConfigMap) {
         let items = batch_puts(&all_tasks).collect::<Vec<_>>();
-        assert_items_eq_in_trait(&items, "storage/batch_puts.rs");
+        assert_items_eq_in_trait(&items, "storage/psql/batch_puts.rs");
     }
 }
