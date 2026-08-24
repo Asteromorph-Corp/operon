@@ -34,6 +34,7 @@ pub(super) fn storage_definition(
     });
 
     parse_quote! {
+        #[derive(Default)]
         pub struct #mem_storage_ident {
             #(#fields,)*
         }

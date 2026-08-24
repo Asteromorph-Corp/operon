@@ -1,3 +1,4 @@
+#[derive(Default)]
 pub struct MemCookingStorage {
     a: operon::__private::dashmap::DashMap<[usize; 1usize], A>,
     b: operon::__private::dashmap::DashMap<[usize; 2usize], B>,
