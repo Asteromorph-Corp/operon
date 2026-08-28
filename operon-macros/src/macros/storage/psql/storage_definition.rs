@@ -29,6 +29,6 @@ mod tests {
     #[rstest]
     fn test_storage_definition(service_id: syn::Ident) {
         let item = storage_definition(&service_id);
-        assert_item_eq(&item, "storage/storage_definition.rs");
+        assert_item_eq(&item, "storage/psql/storage_definition.rs");
     }
 }

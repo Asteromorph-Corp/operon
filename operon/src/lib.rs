@@ -34,7 +34,9 @@ pub mod options {
     };
     pub use crate::operon::OperonOptions;
     #[allow(deprecated)]
-    pub use crate::storage::{PsqlStorageOptions, StorageOptions};
+    pub use crate::storage::StorageOptions;
+    pub use crate::storage::mem::MemStorageOptions;
+    pub use crate::storage::psql::PsqlStorageOptions;
     pub use crate::ui::UiMode;
 
     /// A logging level, type alias for `tracing::Level`
@@ -45,6 +47,7 @@ pub mod options {
 #[doc(hidden)]
 pub mod __private {
     pub use async_trait;
+    pub use dashmap;
     pub use futures;
     pub use tracing;
 

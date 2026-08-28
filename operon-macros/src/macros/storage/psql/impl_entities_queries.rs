@@ -54,6 +54,6 @@ mod tests {
     #[rstest]
     fn test_impl_entities_default(service_id: syn::Ident, all_entities: EntityConfigMap) {
         let item = impl_entities_queries(&service_id, &all_entities);
-        assert_item_eq(&item, "storage/impl_entities_queries.rs");
+        assert_item_eq(&item, "storage/psql/impl_entities_queries.rs");
     }
 }

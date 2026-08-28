@@ -1,17 +1,14 @@
 // # Operon Example 5: Fully in-memory
 //
 // Runs a pipeline with no database at all: the metadata goes to the in-memory backend, selected
-// with `MetaBackendOptions::mem()`, and the entity data to the `DashMapStorage` below. Nothing
+// with `MetaBackendOptions::mem()`, and the entity data to the in-memory storage. Nothing
 // survives the process. See ex1 for an introduction to Operon itself.
 
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use dashmap::DashMap;
-use operon::error::StorageResult;
-use operon::options::{MemMetaStorageOptions, OperonOptions, UiMode};
-use operon::{Entity, MemMetaStorage, Operon, OperonService, OperonStorage, define_operon};
+use operon::options::{MemMetaStorageOptions, MemStorageOptions, OperonOptions, UiMode};
+use operon::{MemMetaStorage, Operon, OperonService, define_operon};
 
 type A = String;
 type B = String;
@@ -59,70 +56,6 @@ impl FanoutService for WordCounter {
     }
 }
 
-/// An entity storage holding one `DashMap` per entity, keyed by the entity's coordinate.
-///
-/// `define_operon!` generates the `FanoutStorage` trait, which asks for a `get`/`put` pair per
-/// entity; the batched accessors it also declares come with default implementations built on those.
-/// That trait plus [`OperonStorage`] is everything a storage backend has to provide.
-#[derive(Default)]
-struct DashMapStorage {
-    documents: DashMap<[usize; 1], A>,
-    words: DashMap<[usize; 2], B>,
-    characters: DashMap<[usize; 2], C>,
-    counts: DashMap<[usize; 3], D>,
-}
-
-#[async_trait]
-impl OperonStorage for DashMapStorage {
-    type Error = Infallible;
-
-    async fn init(&self) -> StorageResult<(), Self::Error> {
-        Ok(())
-    }
-
-    // The footprint operations stay at their defaults: they exist to resume a previous run, which
-    // this storage cannot outlive.
-}
-
-#[async_trait]
-impl FanoutStorage for DashMapStorage {
-    async fn get_a(&self, coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error> {
-        Ok(self.documents.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_a(&self, entity: Entity<1, A>) -> StorageResult<(), Self::Error> {
-        self.documents.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-
-    async fn get_b(&self, coordinate: [usize; 2]) -> StorageResult<Option<B>, Self::Error> {
-        Ok(self.words.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_b(&self, entity: Entity<2, B>) -> StorageResult<(), Self::Error> {
-        self.words.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-
-    async fn get_c(&self, coordinate: [usize; 2]) -> StorageResult<Option<C>, Self::Error> {
-        Ok(self.characters.get(&coordinate).map(|entry| entry.clone()))
-    }
-
-    async fn put_c(&self, entity: Entity<2, C>) -> StorageResult<(), Self::Error> {
-        self.characters.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-
-    async fn get_d(&self, coordinate: [usize; 3]) -> StorageResult<Option<D>, Self::Error> {
-        Ok(self.counts.get(&coordinate).map(|entry| *entry))
-    }
-
-    async fn put_d(&self, entity: Entity<3, D>) -> StorageResult<(), Self::Error> {
-        self.counts.insert(entity.coordinate, entity.value);
-        Ok(())
-    }
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Headless mode starts the run immediately and exits once it finishes, so this example needs
@@ -130,26 +63,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let operon_options = OperonOptions::new().with_ui_mode(UiMode::Headless);
 
     let meta = MemMetaStorageOptions::new().build();
-    let storage = Arc::new(DashMapStorage::default());
-    let operon: Operon<WordCounter, DashMapStorage, MemMetaStorage> =
+    let storage = Arc::new(MemStorageOptions::new().build());
+    let operon: Operon<WordCounter, MemFanoutStorage, MemMetaStorage> =
         Operon::new(WordCounter, storage.clone(), meta).with_options(operon_options);
 
     operon.run().await?;
 
-    println!("Counted over {} documents.", storage.documents.len());
-    for document in storage.documents.iter() {
+    println!("Counted over {} documents.", storage.a.len());
+    for document in &storage.a {
         let [i] = *document.key();
         println!("\n{:?}", document.value());
 
-        for word in storage.words.iter().filter(|word| word.key()[0] == i) {
+        for word in storage.b.iter().filter(|word| word.key()[0] == i) {
             let [_, j] = *word.key();
             let occurrences = storage
-                .characters
+                .c
                 .iter()
                 .filter(|character| character.key()[0] == i)
                 .filter_map(|character| {
                     let [_, k] = *character.key();
-                    let count = *storage.counts.get(&[i, j, k])?;
+                    let count = *storage.d.get(&[i, j, k])?;
                     (count > 0).then(|| format!("{}x{}", character.value(), count))
                 })
                 .collect::<Vec<_>>();
