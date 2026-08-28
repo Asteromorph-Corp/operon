@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use operon::options::{
-    MemMetaStorageOptions, OperonOptions, PsqlMetaStorageOptions, PsqlStorageOptions, UiMode,
+    MemMetaStorageOptions, MemStorageOptions, OperonOptions, PsqlMetaStorageOptions,
+    PsqlStorageOptions, UiMode,
 };
 use operon::{Operon, OperonService, define_operon};
 use rand::Rng;
@@ -184,7 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     match backend {
         Backend::Mem => {
             let meta = MemMetaStorageOptions::new().build();
-            let storage = MemCookingStorage::default();
+            let storage = MemStorageOptions::new().build();
             Operon::new(service, storage, meta)
                 .with_options(operon_options)
                 .run()

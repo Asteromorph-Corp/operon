@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use operon::options::{MemMetaStorageOptions, OperonOptions, UiMode};
+use operon::options::{MemMetaStorageOptions, MemStorageOptions, OperonOptions, UiMode};
 use operon::{MemMetaStorage, Operon, OperonService, define_operon};
 
 type A = String;
@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let operon_options = OperonOptions::new().with_ui_mode(UiMode::Headless);
 
     let meta = MemMetaStorageOptions::new().build();
-    let storage = Arc::new(MemFanoutStorage::default());
+    let storage = Arc::new(MemStorageOptions::new().build());
     let operon: Operon<WordCounter, MemFanoutStorage, MemMetaStorage> =
         Operon::new(WordCounter, storage.clone(), meta).with_options(operon_options);
 
