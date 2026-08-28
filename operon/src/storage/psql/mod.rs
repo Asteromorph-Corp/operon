@@ -4,6 +4,9 @@ pub use storage::{FromPsqlStorageOptions, PsqlStorage};
 mod queries;
 pub use queries::EntityQueries;
 
+mod options;
+pub use options::PsqlStorageOptions;
+
 mod client;
 pub use client::StorageClient;
 
