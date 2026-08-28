@@ -1,7 +1,7 @@
 // # Operon Example 5: Fully in-memory
 //
 // Runs a pipeline with no database at all: the metadata goes to the in-memory backend, selected
-// with `MetaBackendOptions::mem()`, and the entity data to the `DashMapStorage` below. Nothing
+// with `MetaBackendOptions::mem()`, and the entity data to the in-memory storage. Nothing
 // survives the process. See ex1 for an introduction to Operon itself.
 
 use std::sync::Arc;
