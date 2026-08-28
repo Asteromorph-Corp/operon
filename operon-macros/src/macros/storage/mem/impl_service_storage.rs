@@ -51,7 +51,7 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
 
     parse_quote! {
         async fn #get_fn_name(&self, coordinate: [usize; #n]) -> #operon::error::StorageResult<Option<#ty>, Self::Error> {
-            let #id = self.#id.get(&coordinate).map(|entry| entry.clone());
+            let #id = self.#id.get(&coordinate).as_deref().cloned();
             Ok(#id)
         }
     }
