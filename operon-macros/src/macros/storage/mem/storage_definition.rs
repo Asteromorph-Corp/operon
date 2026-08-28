@@ -4,7 +4,7 @@ use crate::configs::EntityConfigMap;
 use crate::operon_ident;
 use crate::utils::{mem_storage_ident, to_snake_case, to_type};
 
-/// Generates the entities struct to be used as a generic parameter for the `PsqlStorage`.
+/// Generates the in-memory storage struct.
 ///
 /// # Example
 /// ```rust,ignore
