@@ -7,7 +7,10 @@ use crate::utils::{
     to_type,
 };
 
-pub fn impl_service_storage(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemImpl {
+pub(super) fn impl_service_storage(
+    service_id: &syn::Ident,
+    entities: &EntityConfigMap,
+) -> syn::ItemImpl {
     let operon = operon_ident();
     let mem_storage_ident = mem_storage_ident(service_id);
     let storage_ident = storage_trait_ident(service_id);
