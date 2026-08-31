@@ -5,6 +5,7 @@ use futures::{StreamExt, TryStreamExt};
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
+use crate::MemMetaStorage;
 use crate::meta_storage::{MemClient, MetaBackend, MetaClientApi};
 use crate::scheduler::events::{
     IndividualControlEventSender, PeerEvent, PeerEventSenderMap, ServicePeerEventReceiver,
@@ -221,6 +222,16 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
             schedule.dump_mem(src, dst).await?;
         }
         Ok(())
+    }
+
+    /// Converts the scheduler handler to an in-memory version.
+    pub(crate) fn to_mem(&self) -> SchedulerHandler<Svc, Sto, MemMetaStorage> {
+        let task_handlers = self
+            .task_handlers
+            .iter()
+            .map(|handler| handler.to_mem())
+            .collect();
+        SchedulerHandler { task_handlers }
     }
 
     pub(crate) async fn prepare_rebuilders(

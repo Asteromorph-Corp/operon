@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::MemMetaStorage;
 use crate::meta_storage::{
     MemClient, MetaBackend, MetaClientApi, MetaResolutionApi, MetaTicketApi,
 };
@@ -16,6 +17,17 @@ use crate::schema::{CheckMode, Job, SharedProgress, TableShape, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
+/// Rebuilds a task's handler against the in-memory backend, for the scratch store a staged
+/// rebuild replays into.
+pub trait ToMemHandler<Svc, Sto>: Send + Sync + 'static
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    /// Converts the task handler to an in-memory version.
+    fn to_mem(&self) -> Box<dyn TaskHandler<Svc, Sto, MemMetaStorage>>;
+}
+
 #[async_trait]
 /// The dyn-compatible face of one task's [`TaskSpec`], carrying the arity `N` as a type parameter
 /// would not.
@@ -23,7 +35,7 @@ use crate::storage::OperonStorage;
 /// Implemented for every [`SpecWithMetadata`], so that the scheduler holds the tasks of a pipeline
 /// in one collection despite their differing arities.
 /// It is what the scheduler prepares a task's metadata and starts its individual scheduler through.
-pub trait TaskHandler<Svc, Sto, MSto>: Send + Sync + 'static
+pub trait TaskHandler<Svc, Sto, MSto>: ToMemHandler<Svc, Sto> + Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -142,6 +154,17 @@ where
     ) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 }
 
+impl<Svc, Sto, TS, const N: usize> ToMemHandler<Svc, Sto> for SpecWithMetadata<Svc, Sto, TS, N>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    TS: TaskSpec<Svc, Sto, MemMetaStorage, Job = Job<N>, Ticket = Ticket<N>>,
+{
+    fn to_mem(&self) -> Box<dyn TaskHandler<Svc, Sto, MemMetaStorage>> {
+        Box::new(SpecWithMetadata::new(self.spec.clone(), self.task_meta))
+    }
+}
+
 #[async_trait]
 impl<Svc, Sto, TS, MSto, const N: usize> TaskHandler<Svc, Sto, MSto>
     for SpecWithMetadata<Svc, Sto, TS, N>
@@ -149,7 +172,8 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
-    TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>> + Clone,
+    TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
+    Self: ToMemHandler<Svc, Sto>,
 {
     fn task_id(&self) -> &'static str {
         self.task_meta.id
