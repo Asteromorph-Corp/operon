@@ -2,7 +2,7 @@ use thiserror::Error;
 use tokio::sync::AcquireError;
 use tokio::task::JoinError;
 
-use crate::meta_storage::MetaStorageError;
+use crate::meta_storage::{MemMetaError, MetaStorageError};
 use crate::storage::StorageError;
 
 /// The scheduler's error, generic over the service's error type `UErr`
@@ -40,6 +40,29 @@ impl<UErr, SErr, MErr> SchedulerError<UErr, SErr, MErr> {
 
     pub(crate) fn other(msg: impl Into<String>) -> Self {
         Self::Other(msg.into())
+    }
+
+    /// Re-flavors an error raised against the in-memory backend a rebuild is staged on.
+    pub(crate) fn from_mem(err: SchedulerError<UErr, SErr, MemMetaError>) -> Self {
+        match err {
+            SchedulerError::UserError(e) => Self::UserError(e),
+            SchedulerError::Storage(e) => Self::Storage(e),
+            SchedulerError::MetaStorage(e) => Self::from_mem_meta(e),
+            SchedulerError::JoinFailed(e) => Self::JoinFailed(e),
+            SchedulerError::SemaphoreAcquireFailed => Self::SemaphoreAcquireFailed,
+            SchedulerError::ControlEventReceiveFailed => Self::ControlEventReceiveFailed,
+            SchedulerError::PeerEventSendFailed => Self::PeerEventSendFailed,
+            SchedulerError::InvalidPeerEventReceived(event, task) => {
+                Self::InvalidPeerEventReceived(event, task)
+            }
+            SchedulerError::MissingProgressEntry(task) => Self::MissingProgressEntry(task),
+            SchedulerError::Other(msg) => Self::Other(msg),
+        }
+    }
+
+    /// [`from_mem`](Self::from_mem) for a metadata error raised by that same backend.
+    pub(crate) fn from_mem_meta(err: MetaStorageError<MemMetaError>) -> Self {
+        Self::MetaStorage(err.during_rebuild())
     }
 }
 

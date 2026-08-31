@@ -2,6 +2,8 @@ use std::num::TryFromIntError;
 
 use thiserror::Error as ThisError;
 
+use crate::meta_storage::MemMetaError;
+
 /// A metadata result over a backend error `MErr`.
 pub(crate) type MetaResult<T, MErr> = Result<T, MetaStorageError<MErr>>;
 
@@ -38,6 +40,8 @@ pub enum MetaStorageError<MErr> {
     LockLost(String),
     #[error(transparent)]
     Backend(MErr),
+    #[error("Error from scratch in-memory store used during rebuild: {0}")]
+    RebuildBackend(MemMetaError),
 }
 
 fn fmt_deps(deps: &[(&'static str, usize)]) -> String {
@@ -56,8 +60,11 @@ impl<MErr> MetaStorageError<MErr> {
         Self::MissingTicketSummary { task }
     }
 
-    /// Remaps the backend error, passing the domain variants through unchanged.
-    pub(crate) fn map_backend<U>(self, f: impl FnOnce(MErr) -> U) -> MetaStorageError<U> {
+    /// Re-types an error from the scratch in-memory store used during rebuild.
+    pub(crate) fn and_then_backend<U>(
+        self,
+        f: impl FnOnce(MErr) -> MetaStorageError<U>,
+    ) -> MetaStorageError<U> {
         match self {
             Self::IntegerConversionError(e) => MetaStorageError::IntegerConversionError(e),
             Self::InvalidRunState(s) => MetaStorageError::InvalidRunState(s),
@@ -69,9 +76,22 @@ impl<MErr> MetaStorageError<MErr> {
                 MetaStorageError::MissingResolution { dim, deps }
             }
             Self::Internal(s) => MetaStorageError::Internal(s),
+            Self::RebuildBackend(e) => MetaStorageError::RebuildBackend(e),
             Self::SchemaLocked(s) => MetaStorageError::SchemaLocked(s),
             Self::LockLost(s) => MetaStorageError::LockLost(s),
-            Self::Backend(e) => MetaStorageError::Backend(f(e)),
+            Self::Backend(e) => f(e),
         }
+    }
+
+    /// Remaps the backend error, passing the domain variants through unchanged.
+    pub(crate) fn map_backend<U>(self, f: impl FnOnce(MErr) -> U) -> MetaStorageError<U> {
+        self.and_then_backend(|e| MetaStorageError::Backend(f(e)))
+    }
+}
+
+impl MetaStorageError<MemMetaError> {
+    /// Re-types an error from the scratch in-memory store used during rebuild.
+    pub(crate) fn during_rebuild<U>(self) -> MetaStorageError<U> {
+        self.and_then_backend(MetaStorageError::RebuildBackend)
     }
 }
