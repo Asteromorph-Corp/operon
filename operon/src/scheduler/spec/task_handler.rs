@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::meta_storage::{MetaBackend, MetaClientApi, MetaResolutionApi, MetaTicketApi};
+use crate::meta_storage::{
+    MemClient, MetaBackend, MetaClientApi, MetaResolutionApi, MetaTicketApi,
+};
 use crate::scheduler::events::{
     IndividualControlEventReceiver, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
@@ -96,6 +98,22 @@ where
         client: MSto::Client<'_>,
         mode: CheckMode,
     ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
+
+    /// Hydrates the scratch in-memory database using the metadata storage.
+    async fn hydrate_mem(
+        &self,
+        src: MSto::Client<'_>,
+        dst: MemClient<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
+
+    /// Dumps the metadata from scratch in-memory database to the metadata storage.
+    ///
+    /// Existing data in the metadata storage is discarded.
+    async fn dump_mem(
+        &self,
+        src: MemClient<'_>,
+        dst: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
     /// Prepare this task's [`TaskRebuilder`] for the given storage and metadata client by fetching
     /// the necessary data.
@@ -226,6 +244,52 @@ where
         mode: CheckMode,
     ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         self.spec.check_consistency(storage, client, mode).await
+    }
+
+    async fn hydrate_mem(
+        &self,
+        src: MSto::Client<'_>,
+        dst: MemClient<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        let tickets = src.ticket(self.task_meta).dump().await?;
+        dst.ticket(self.task_meta)
+            .hydrate(tickets)
+            .await
+            .map_err(SchedulerError::from_mem_meta)?;
+
+        if let Some(spawn_dim_meta) = self.task_meta.spawn_dim_meta() {
+            let resolutions = src.resolution(spawn_dim_meta).dump().await?;
+            dst.resolution(spawn_dim_meta)
+                .hydrate(resolutions)
+                .await
+                .map_err(SchedulerError::from_mem_meta)?;
+        }
+
+        Ok(())
+    }
+
+    async fn dump_mem(
+        &self,
+        src: MemClient<'_>,
+        dst: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        let tickets = src
+            .ticket(self.task_meta)
+            .dump()
+            .await
+            .map_err(SchedulerError::from_mem_meta)?;
+        dst.ticket(self.task_meta).hydrate(tickets).await?;
+
+        if let Some(spawn_dim_meta) = self.task_meta.spawn_dim_meta() {
+            let resolutions = src
+                .resolution(spawn_dim_meta)
+                .dump()
+                .await
+                .map_err(SchedulerError::from_mem_meta)?;
+            dst.resolution(spawn_dim_meta).hydrate(resolutions).await?;
+        }
+
+        Ok(())
     }
 
     async fn prepare_rebuild(

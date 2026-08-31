@@ -5,7 +5,7 @@ use futures::{StreamExt, TryStreamExt};
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
-use crate::meta_storage::{MetaBackend, MetaClientApi};
+use crate::meta_storage::{MemClient, MetaBackend, MetaClientApi};
 use crate::scheduler::events::{
     IndividualControlEventSender, PeerEvent, PeerEventSenderMap, ServicePeerEventReceiver,
     ServicePeerEventSenderMap,
@@ -193,6 +193,32 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
                 return Err(SchedulerError::missing_progress(schedule.task_id()));
             };
             (*progress.write().await).update(done, queued, waiting);
+        }
+        Ok(())
+    }
+
+    /// Hydrates the scratch in-memory database using the metadata storage.
+    pub(crate) async fn hydrate_mem(
+        &self,
+        src: MSto::Client<'_>,
+        dst: MemClient<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        for schedule in &self.task_handlers {
+            schedule.hydrate_mem(src, dst).await?;
+        }
+        Ok(())
+    }
+
+    /// Dumps the metadata from scratch in-memory database to the metadata storage.
+    ///
+    /// Existing data in the metadata storage is discarded.
+    pub(crate) async fn dump_mem(
+        &self,
+        src: MemClient<'_>,
+        dst: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        for schedule in &self.task_handlers {
+            schedule.dump_mem(src, dst).await?;
         }
         Ok(())
     }
