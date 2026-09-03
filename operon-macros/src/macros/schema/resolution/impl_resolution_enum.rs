@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::utils::{operon_ident, resolution_enum_ident};
 
-/// Generates an implementation of the `ResolutionEnum` trait for a given resolution enum.
+/// Generates an implementation of the `ResolutionEnum` trait for the resolution enum type.
 ///
 /// # Example
 /// ```rust,ignore

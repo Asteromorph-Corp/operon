@@ -4,7 +4,7 @@ use syn::parse_quote;
 use crate::configs::TaskConfig;
 use crate::utils::{clear_span, get_entity_ident, operon_ident};
 
-/// Generates the `check_consistency` function for the implementation of the trait `TaskSpec`.
+/// Generates the `check_consistency` function for a task.
 ///
 /// # Example
 /// ```rust,ignore

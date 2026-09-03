@@ -4,7 +4,7 @@ use crate::configs::TaskConfigMap;
 use crate::operon_ident;
 use crate::utils::{job_enum_ident, to_pascal_case};
 
-/// Generates an enum representing the job of any task in the task configuration map.
+/// Generates an enum representing a job of any task in the pipeline.
 ///
 /// # Example
 /// ```rust,ignore

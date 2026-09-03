@@ -4,7 +4,7 @@ use crate::configs::EntityConfigMap;
 use crate::operon_ident;
 use crate::utils::{entities_ident, to_snake_case};
 
-/// Generates the implementation of `EntityQueries` trait for the entity struct.
+/// Generates an implementation of `EntityQueries` trait for the entities struct.
 ///
 /// # Example
 /// ```rust,ignore

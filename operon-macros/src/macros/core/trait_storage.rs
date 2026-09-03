@@ -262,7 +262,7 @@ fn batch_inserts(tasks: &TaskConfigMap) -> impl Iterator<Item = DocumentedFn> {
     })
 }
 
-/// Generates a trait for the storage required for the service.
+/// Generates the storage trait for the pipeline.
 pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
     let operon = operon_ident();
     let storage_ident = storage_trait_ident(&all_configs.service_id);

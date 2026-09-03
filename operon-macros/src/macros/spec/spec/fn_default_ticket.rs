@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::configs::TaskConfig;
 use crate::operon_ident;
 
-/// Generates the `default_ticket` function for the implementation of the trait `TaskSpec`.
+/// Generates the `default_ticket` function for a task.
 ///
 /// # Example
 /// ```rust,ignore

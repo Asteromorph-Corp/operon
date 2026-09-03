@@ -4,7 +4,7 @@ use crate::configs::{EntityConfig, EntityConfigMap};
 use crate::operon_ident;
 use crate::utils::{get_entity_ident, put_entity_ident, to_snake_case, to_type};
 
-/// Generates a get function for the implementation of the storage trait.
+/// Generates a psql get function for an entity.
 ///
 /// # Example
 /// ```rust,ignore
@@ -30,7 +30,7 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     }
 }
 
-/// Generates a put function for the implementation of the storage trait.
+/// Generates a psql put function for an entity.
 ///
 /// # Example
 /// ```rust,ignore

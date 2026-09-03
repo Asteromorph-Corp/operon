@@ -6,7 +6,7 @@ use crate::utils::{
     ticket_enum_ident,
 };
 
-/// Generates a struct definition for peer event senders.
+/// Generates the peer event senders struct for a task.
 ///
 /// # Example
 /// ```rust,ignore

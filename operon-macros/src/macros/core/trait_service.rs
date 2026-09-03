@@ -62,7 +62,7 @@ fn format_signature(task: &TaskConfig) -> String {
     )
 }
 
-/// Generates a trait for the service based on the provided AllConfig.
+/// Generates the service trait.
 ///
 /// # Example
 /// ```rust,ignore

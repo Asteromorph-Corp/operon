@@ -3,8 +3,7 @@ use syn::parse_quote;
 use crate::operon_ident;
 use crate::utils::{mem_storage_ident, mem_storage_options_ext_ident};
 
-/// Generates the implementation of the options extension trait for
-/// `operon::options::MemStorageOptions`.
+/// Generates an implementation of the options extension trait for `MemStorageOptions`.
 ///
 /// # Example
 /// ```rust,ignore

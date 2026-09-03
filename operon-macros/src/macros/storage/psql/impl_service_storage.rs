@@ -6,6 +6,7 @@ use crate::macros::storage::psql::batch_puts::batch_puts;
 use crate::macros::storage::psql::single_ops::single_ops;
 use crate::utils::{operon_ident, sql_storage_ident, storage_trait_ident};
 
+/// Generates an implementation of the storage trait for the psql storage.
 pub(super) fn impl_service_storage(
     service_id: &syn::Ident,
     tasks: &TaskConfigMap,

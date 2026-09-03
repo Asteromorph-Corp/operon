@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::configs::EntityConfigMap;
 use crate::utils::{entities_ident, entity_metadata_ident, to_snake_case};
 
-/// Generates the implementation of `Default` trait for the entities struct.
+/// Generates an implementation of `Default` trait for the entities struct.
 ///
 /// # Example
 /// ```rust,ignore

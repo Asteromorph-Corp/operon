@@ -5,7 +5,7 @@ use syn::parse_quote;
 use crate::configs::TaskConfig;
 use crate::utils::{job_enum_ident, operon_ident, task_metadata_ident, to_lit_str, to_pascal_case};
 
-/// Generates the `on_receive_job` function for the implementation of the trait `TaskSpec`.
+/// Generates the `on_receive_job` function for a task.
 ///
 /// # Example
 /// ```rust,ignore

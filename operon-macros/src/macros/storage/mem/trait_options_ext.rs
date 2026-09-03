@@ -2,11 +2,7 @@ use syn::parse_quote;
 
 use crate::utils::{mem_storage_ident, mem_storage_options_ext_ident};
 
-/// Generates the extension trait that builds the in-memory storage from
-/// `operon::options::MemStorageOptions`.
-///
-/// The options type lives in the `operon` crate, so the `build` constructor has to be attached
-/// through a trait defined next to the generated storage.
+/// Generates the extension trait to build the in-memory storage from `MemStorageOptions`.
 ///
 /// # Example
 /// ```rust,ignore

@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::utils::{job_enum_ident, operon_ident};
 
-/// Generates an implementation of the `JobEnum` trait for the `JobEnum` type.
+/// Generates an implementation of the `JobEnum` trait for the job enum type.
 ///
 /// # Example
 /// ```rust,ignore

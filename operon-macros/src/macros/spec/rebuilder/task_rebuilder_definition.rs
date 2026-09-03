@@ -6,7 +6,7 @@ use crate::macros::spec::resolution_type::resolution_type;
 use crate::operon_ident;
 use crate::utils::rebuilder_ident;
 
-/// Generates a struct definition for a task rebuilder.
+/// Generates the task rebuilder struct for a task.
 ///
 /// # Example
 /// ```rust,ignore

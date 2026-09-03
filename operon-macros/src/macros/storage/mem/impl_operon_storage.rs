@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::operon_ident;
 use crate::utils::mem_storage_ident;
 
-/// Generates an implementation of the `OperonStorage` trait for a given service ID.
+/// Generates an implementation of the `OperonStorage` trait for the in-memory struct.
 ///
 /// # Example
 /// ```rust,ignore

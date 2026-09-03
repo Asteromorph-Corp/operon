@@ -7,7 +7,7 @@ use crate::utils::{
     operon_ident, task_metadata_ident, ticket_enum_ident, to_lit_str, to_pascal_case,
 };
 
-/// Generates the `on_receive_explosion` function for the implementation of the trait `TaskSpec`.
+/// Generates the `on_receive_explosion` function for a task.
 ///
 /// # Example
 /// ```rust,ignore

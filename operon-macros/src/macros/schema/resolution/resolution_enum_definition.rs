@@ -4,7 +4,7 @@ use crate::configs::DimensionConfigMap;
 use crate::operon_ident;
 use crate::utils::{resolution_enum_ident, to_pascal_case};
 
-/// Generates an enum representing the resolution of any dimension.
+/// Generates an enum representing a resolution of any dimension in the pipeline.
 ///
 /// # Example
 /// ```rust,ignore

@@ -5,7 +5,7 @@ use syn::parse_quote;
 use crate::configs::TaskConfig;
 use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_case};
 
-/// Generates the `send_on_finish` function for the implementation of the trait `TaskSpec`.
+/// Generates the `send_on_finish` function for a task.
 ///
 /// # Example
 /// ```rust,ignore

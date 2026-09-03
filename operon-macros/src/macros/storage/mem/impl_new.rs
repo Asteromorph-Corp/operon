@@ -3,7 +3,7 @@ use syn::parse_quote;
 use crate::operon_ident;
 use crate::utils::mem_storage_ident;
 
-/// Generates the `new` function for the `MemCookingStorage` struct.
+/// Generates an implementation of the `new` function for the in-memory storage struct.
 ///
 /// # Example
 /// ```rust,ignore

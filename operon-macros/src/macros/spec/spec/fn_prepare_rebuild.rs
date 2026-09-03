@@ -4,7 +4,7 @@ use syn::parse_quote;
 use crate::configs::TaskConfig;
 use crate::utils::{operon_ident, rebuilder_ident};
 
-/// Generates the `prepare_rebuild` function for the implementation of the trait `TaskSpec`.
+/// Generates the `prepare_rebuild` function for a task.
 ///
 /// # Example
 /// ```rust,ignore

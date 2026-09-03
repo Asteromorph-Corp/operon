@@ -2,7 +2,7 @@ use syn::parse_quote;
 
 use crate::utils::{operon_ident, ticket_enum_ident};
 
-/// Generates an implementation of the `JobEnum` trait for the `JobEnum` type.
+/// Generates an implementation of the `TicketEnum` trait for the ticket enum type.
 ///
 /// # Example
 /// ```rust,ignore

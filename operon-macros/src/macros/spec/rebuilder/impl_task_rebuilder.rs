@@ -6,7 +6,7 @@ use crate::configs::{TaskConfig, TaskConfigMap};
 use crate::dependency_analysis::get_direct_downstream_tasks;
 use crate::utils::{operon_ident, rebuilder_ident, task_metadata_ident, to_lit_str};
 
-/// Generates the implementation of the `TaskRebuilder` trait for a given task.
+/// Generates an implementation of the `TaskRebuilder` trait for a task's rebuilder.
 ///
 /// # Example
 /// ```rust,ignore

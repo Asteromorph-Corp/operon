@@ -6,6 +6,7 @@ use crate::utils::{
     storage_trait_ident,
 };
 
+/// Generates the `prelude` module with items to be exported directly.
 pub fn prelude(all_configs: &AllConfig) -> syn::ItemMod {
     let service_trait = service_trait_ident(&all_configs.service_id);
     let storage_trait = storage_trait_ident(&all_configs.service_id);

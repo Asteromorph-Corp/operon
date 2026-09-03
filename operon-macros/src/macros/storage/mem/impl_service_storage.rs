@@ -7,6 +7,7 @@ use crate::utils::{
     to_type,
 };
 
+/// Generates an implementation of the storage trait for the in-memory storage struct.
 pub(super) fn impl_service_storage(
     service_id: &syn::Ident,
     entities: &EntityConfigMap,
@@ -32,7 +33,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::ImplItemF
         .flat_map(|entity| [single_get(entity), single_put(entity)])
 }
 
-/// Generates a get function for the implementation of the storage trait.
+/// Generates an in-memory get function for an entity.
 ///
 /// # Example
 /// ```rust,ignore
@@ -54,7 +55,7 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     }
 }
 
-/// Generates a put function for the implementation of the storage trait.
+/// Generates an in-memory put function for an entity.
 ///
 /// # Example
 /// ```rust,ignore

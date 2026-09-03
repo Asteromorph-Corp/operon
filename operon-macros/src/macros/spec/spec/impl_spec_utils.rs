@@ -6,7 +6,7 @@ use crate::utils::{
     task_metadata_ident,
 };
 
-/// Generates the implementation of utility function for a spec struct of given task.
+/// Generates an implementation of utility functions for a task spec.
 ///
 /// # Example
 /// ```rust,ignore
