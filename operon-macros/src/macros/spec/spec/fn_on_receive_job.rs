@@ -9,7 +9,7 @@ use crate::utils::{job_enum_ident, operon_ident, task_metadata_ident, to_lit_str
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_on_receive_job.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_on_receive_job.rs"))]
 /// ```
 pub(super) fn fn_on_receive_job(
     task: &TaskConfig,

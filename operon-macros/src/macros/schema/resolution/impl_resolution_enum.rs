@@ -6,7 +6,7 @@ use crate::utils::{operon_ident, resolution_enum_ident};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/resolution/impl_resolution_enum.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/resolution/impl_resolution_enum.rs"))]
 /// ```
 pub fn impl_resolution_enum() -> syn::ItemImpl {
     let operon = operon_ident();

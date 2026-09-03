@@ -8,7 +8,7 @@ use crate::utils::{get_entity_ident, put_entity_ident, to_snake_case, to_type};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/single_get.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/single_get.rs"))]
 /// ```
 fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
@@ -34,7 +34,7 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/single_put.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/single_put.rs"))]
 /// ```
 fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();

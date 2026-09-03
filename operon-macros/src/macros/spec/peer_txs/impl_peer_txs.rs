@@ -10,7 +10,7 @@ use crate::utils::{
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/peer_txs/impl_peer_txs.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/peer_txs/impl_peer_txs.rs"))]
 /// ```
 pub fn impl_peer_txs(
     task_id: &syn::Ident,

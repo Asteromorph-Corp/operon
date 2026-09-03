@@ -8,7 +8,7 @@ use crate::utils::{job_enum_ident, to_pascal_case};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/job/job_enum_definition.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/job/job_enum_definition.rs"))]
 /// ```
 pub fn job_enum_definition(tasks: &TaskConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();

@@ -8,7 +8,7 @@ use crate::utils::{clear_span, get_entity_ident, operon_ident};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_check_consistency.simple.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_check_consistency.simple.rs"))]
 /// ```
 pub(super) fn fn_check_consistency(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();

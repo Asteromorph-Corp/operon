@@ -9,7 +9,7 @@ use crate::utils::{operon_ident, resolution_enum_ident, sender_ident, to_pascal_
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_send_on_finish.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_send_on_finish.rs"))]
 /// ```
 pub(super) fn fn_send_on_finish(
     task: &TaskConfig,

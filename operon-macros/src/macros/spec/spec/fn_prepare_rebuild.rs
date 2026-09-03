@@ -8,7 +8,7 @@ use crate::utils::{operon_ident, rebuilder_ident};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_prepare_rebuild.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_prepare_rebuild.rs"))]
 /// ```
 pub(super) fn fn_prepare_rebuild(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();

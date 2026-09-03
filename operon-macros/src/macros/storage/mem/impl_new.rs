@@ -7,7 +7,7 @@ use crate::utils::mem_storage_ident;
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/impl_new.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/impl_new.rs"))]
 /// ```
 pub(super) fn impl_new(service_id: &syn::Ident) -> syn::ItemImpl {
     let operon = operon_ident();

@@ -11,7 +11,7 @@ use crate::utils::{
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_on_receive_explosion.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_on_receive_explosion.rs"))]
 /// ```
 pub(super) fn fn_on_receive_explosion(
     task: &TaskConfig,

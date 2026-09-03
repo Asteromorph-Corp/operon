@@ -7,7 +7,7 @@ use crate::utils::{mem_storage_ident, mem_storage_options_ext_ident};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/impl_options_ext.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/impl_options_ext.rs"))]
 /// ```
 pub(super) fn impl_options_ext(service_id: &syn::Ident) -> syn::ItemImpl {
     let operon = operon_ident();

@@ -8,7 +8,7 @@ use crate::utils::{entities_ident, to_snake_case, to_type};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/entities_definition.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/entities_definition.rs"))]
 /// ```
 pub fn entities_definition(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemStruct {
     let operon = operon_ident();

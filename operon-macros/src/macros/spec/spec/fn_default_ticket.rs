@@ -7,7 +7,7 @@ use crate::operon_ident;
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_default_ticket.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_default_ticket.rs"))]
 /// ```
 pub fn fn_default_ticket(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();

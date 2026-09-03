@@ -10,7 +10,7 @@ use crate::utils::rebuilder_ident;
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/rebuilder/task_rebuilder_definition.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/rebuilder/task_rebuilder_definition.rs"))]
 /// ```
 pub fn task_rebuilder_definition(task: &TaskConfig) -> syn::ItemStruct {
     let operon = operon_ident();

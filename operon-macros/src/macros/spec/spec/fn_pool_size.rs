@@ -6,7 +6,7 @@ use crate::configs::{PoolSizeSpec, TaskConfig};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_pool_size.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_pool_size.rs"))]
 /// ```
 pub(super) fn fn_pool_size(task: &TaskConfig) -> syn::ImplItemFn {
     match &task.pool_size {

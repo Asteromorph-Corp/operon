@@ -10,7 +10,7 @@ use crate::utils::{operon_ident, rebuilder_ident, task_metadata_ident, to_lit_st
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/rebuilder/impl_task_rebuilder.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/rebuilder/impl_task_rebuilder.rs"))]
 /// ```
 pub fn impl_task_rebuilder(
     task: &TaskConfig,

@@ -10,7 +10,7 @@ use crate::utils::{
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/impl_spec_utils.simple.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/impl_spec_utils.simple.rs"))]
 /// ```
 pub fn impl_spec_utils(service_id: &syn::Ident, task: &TaskConfig) -> syn::ItemImpl {
     let operon = operon_ident();

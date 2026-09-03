@@ -6,7 +6,7 @@ use crate::utils::{operon_ident, ticket_enum_ident};
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/ticket/impl_ticket_enum.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/ticket/impl_ticket_enum.rs"))]
 /// ```
 pub fn impl_ticket_enum() -> syn::ItemImpl {
     let operon = operon_ident();

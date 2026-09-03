@@ -243,7 +243,7 @@ fn arg_def_collected(
 ///
 /// # Example
 /// ```rust,ignore
-#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_run_job.simple.rs") )]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_run_job.simple.rs"))]
 /// ```
 pub(super) fn fn_run_job(
     task: &TaskConfig,
