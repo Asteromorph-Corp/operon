@@ -153,8 +153,8 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     };
 
     parse_quote! {
-        #[#operon::__private::async_trait::async_trait]
         #[doc = #doc_comment]
+        #[#operon::__private::async_trait::async_trait]
         pub trait #svc_ident: #operon::OperonService<
             JobEnum = schema::#job_enum_ident,
             ResolutionEnum = schema::#res_enum_ident,
@@ -175,8 +175,7 @@ mod tests {
 
     #[rstest]
     fn test_trait_service(all_config: AllConfig) {
-        let mut result = trait_service(&all_config);
-        result.attrs.retain(|attr| attr.path().is_ident("doc"));
+        let result = trait_service(&all_config);
         assert_item_eq(&result, "core/service.rs");
     }
 }

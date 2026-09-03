@@ -33,6 +33,7 @@
 /// async fn put_all_b(&self, entity: Entity<1, Vec<B>>) -> StorageResult<(), Self::Error>
 /// async fn put_all_c(&self, entity: Entity<1, Vec<C>>) -> StorageResult<(), Self::Error>
 /// ```
+#[operon::__private::async_trait::async_trait]
 pub trait CookingStorage: operon::OperonStorage {
     /// ```rust,ignore
     /// async fn get_a(&self, coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error>

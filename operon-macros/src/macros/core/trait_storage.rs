@@ -305,8 +305,8 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
     let doc_comment = sections.join("\n\n");
 
     parse_quote! {
-        #[#operon::__private::async_trait::async_trait]
         #[doc = #doc_comment]
+        #[#operon::__private::async_trait::async_trait]
         pub trait #storage_ident: #operon::OperonStorage {
             #(#single_ops)*
             #(#batch_gets)*
@@ -363,8 +363,7 @@ mod tests {
 
     #[rstest]
     fn test_trait_storage(simple_pipeline: AllConfig) {
-        let mut result = trait_storage(&simple_pipeline);
-        result.attrs.retain(|attr| attr.path().is_ident("doc"));
+        let result = trait_storage(&simple_pipeline);
         assert_item_eq(&result, "core/storage.rs");
     }
 }
