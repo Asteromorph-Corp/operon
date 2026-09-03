@@ -6,8 +6,7 @@ use crate::utils::spec_ident;
 ///
 /// # Example
 /// ```rust,ignore
-/// #[derive(Debug, Clone, Copy)]
-/// pub struct BetaSpec;
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/task_spec_definition.rs") )]
 /// ```
 pub fn task_spec_definition(task_id: &syn::Ident) -> syn::ItemStruct {
     let spec_ident = spec_ident(task_id);

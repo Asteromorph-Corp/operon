@@ -66,21 +66,7 @@ fn format_signature(task: &TaskConfig) -> String {
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::__private::async_trait::async_trait]
-/// pub trait CookingService:
-///     operon::OperonService<
-///         JobEnum = schema::JobEnum,
-///         ResolutionEnum = schema::ResolutionEnum,
-///         TicketEnum = schema::TicketEnum,
-///     >
-/// {
-///     async fn alpha(&self) -> Result<Vec<A>, Self::Error>;
-///     async fn beta(&self, a: A) -> Result<Vec<B>, Self::Error>;
-///     async fn gamma(&self, a: A) -> Result<Vec<C>, Self::Error>;
-///     async fn delta(&self, a: A, b: B, c: C) -> Result<D, Self::Error>;
-///     async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, Self::Error>;
-///     async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, Self::Error>;
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/service.rs"))]
 /// ```
 pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let operon = operon_ident();

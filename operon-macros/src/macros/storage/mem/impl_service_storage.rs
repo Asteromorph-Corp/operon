@@ -36,13 +36,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::ImplItemF
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn get_b(
-///     &self,
-///     coordinate: [usize; 2usize],
-/// ) -> operon::error::StorageResult<Option<B>, Self::Error> {
-///     let b = self.b.get(&coordinate).as_deref().cloned();
-///     Ok(b)
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/single_get.rs") )]
 /// ```
 fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
@@ -64,13 +58,7 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn put_b(
-///     &self,
-///     entity: operon::Entity<2usize, B>,
-/// ) -> operon::error::StorageResult<(), Self::Error> {
-///     self.b.insert(entity.coordinate, entity.value);
-///     Ok(())
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/single_put.rs") )]
 /// ```
 fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();

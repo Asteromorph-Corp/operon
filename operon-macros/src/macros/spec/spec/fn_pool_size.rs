@@ -4,23 +4,9 @@ use crate::configs::{PoolSizeSpec, TaskConfig};
 
 /// Generates the `pool_size` function for the implementation of the trait `TaskSpec`.
 ///
-/// # Example (literal)
+/// # Example
 /// ```rust,ignore
-/// fn pool_size(&self) -> usize {
-///     8usize
-/// }
-/// ```
-///
-/// # Example (env var)
-/// ```rust,ignore
-/// fn pool_size(&self) -> usize {
-///     let v = ::std::env::var("BETA_WORKERS")
-///         .expect("Environment variable `BETA_WORKERS` not set for task concurrency")
-///         .parse::<usize>()
-///         .expect("Environment variable `BETA_WORKERS` is not a valid concurrency value");
-///     assert!(v != 0, "Environment variable `BETA_WORKERS` must not be zero for task concurrency");
-///     v
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_pool_size.rs") )]
 /// ```
 pub(super) fn fn_pool_size(task: &TaskConfig) -> syn::ImplItemFn {
     match &task.pool_size {

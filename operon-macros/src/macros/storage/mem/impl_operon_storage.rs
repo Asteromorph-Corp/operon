@@ -7,14 +7,7 @@ use crate::utils::mem_storage_ident;
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::__private::async_trait::async_trait]
-/// impl operon::OperonStorage for MemCookingStorage {
-///     type Error = std::convert::Infallible;
-///
-///     async fn init(&self) -> operon::error::StorageResult<(), Self::Error> {
-///         Ok(())
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/impl_operon_storage.rs") )]
 /// ```
 pub(super) fn impl_operon_storage(service_id: &syn::Ident) -> syn::ItemImpl {
     let operon = operon_ident();

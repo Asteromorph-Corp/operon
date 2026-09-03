@@ -10,16 +10,7 @@ use crate::utils::rebuilder_ident;
 ///
 /// # Example
 /// ```rust,ignore
-/// #[derive(Debug)]
-/// pub struct BetaRebuilder {
-///     task_meta: operon::__private::TaskMetadata<1usize>,
-///     spawn_dim_meta: operon::__private::DimensionMetadata<1usize>,
-///     data: Vec<(
-///         operon::__private::Job<1usize>,
-///         operon::__private::Resolution<1usize>,
-///     )>,
-///     progress: operon::__private::SharedProgress,
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/rebuilder/task_rebuilder_definition.rs") )]
 /// ```
 pub fn task_rebuilder_definition(task: &TaskConfig) -> syn::ItemStruct {
     let operon = operon_ident();

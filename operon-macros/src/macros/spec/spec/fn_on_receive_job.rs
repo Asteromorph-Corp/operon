@@ -9,28 +9,7 @@ use crate::utils::{job_enum_ident, operon_ident, task_metadata_ident, to_lit_str
 ///
 /// # Example
 /// ```rust,ignore
-/// #[allow(unused_variables, clippy::match_single_binding)]
-/// async fn on_receive_job(
-///     &self,
-///     client: MSto::Client<'_>,
-///     job: schema::JobEnum,
-/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-///     match job {
-///         schema::JobEnum::Beta(job) => Ok([client
-///             .ticket(self.task_meta())
-///             .raise_deps_done(metadata::task_beta_meta(), job, &["j"])
-///             .await?]
-///         .concat()),
-///         schema::JobEnum::Delta(job) => Ok([client
-///             .ticket(self.task_meta())
-///             .raise_deps_done(metadata::task_delta_meta(), job, &["j"])
-///             .await?]
-///         .concat()),
-///         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
-///             "job", "epsilon",
-///         )),
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_on_receive_job.rs") )]
 /// ```
 pub(super) fn fn_on_receive_job(
     task: &TaskConfig,

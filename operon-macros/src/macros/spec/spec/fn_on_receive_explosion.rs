@@ -11,23 +11,7 @@ use crate::utils::{
 ///
 /// # Example
 /// ```rust,ignore
-/// #[allow(unused_variables, clippy::match_single_binding)]
-/// async fn on_receive_explosion(
-///     &self,
-///     client: MSto::Client<'_>,
-///     resolution: schema::ResolutionEnum,
-/// ) -> Result<Vec<Self::Ticket>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-///     match resolution {
-///         schema::ResolutionEnum::J(res) => Ok(client
-///             .ticket(self.task_meta())
-///             .raise_deps_quota(metadata::dimension_j_meta(), res)
-///             .await?),
-///         _ => Err(operon::error::SchedulerError::InvalidPeerEventReceived(
-///             "explosion",
-///             "epsilon",
-///         )),
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_on_receive_explosion.rs") )]
 /// ```
 pub(super) fn fn_on_receive_explosion(
     task: &TaskConfig,

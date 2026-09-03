@@ -8,12 +8,7 @@ use crate::utils::{resolution_enum_ident, to_pascal_case};
 ///
 /// # Example
 /// ```rust,ignore
-/// #[derive(Debug, Clone)]
-/// pub enum ResolutionEnum {
-///     I(operon::__private::Resolution<0usize>),
-///     J(operon::__private::Resolution<1usize>),
-///     K(operon::__private::Resolution<1usize>),
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/resolution/resolution_enum_definition.rs") )]
 /// ```
 pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();

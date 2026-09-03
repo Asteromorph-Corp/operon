@@ -10,9 +10,7 @@ use crate::utils::{mem_storage_ident, mem_storage_options_ext_ident};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub trait MemCookingStorageOptionsExt {
-///     fn build(self) -> MemCookingStorage;
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/trait_options_ext.rs") )]
 /// ```
 pub(super) fn trait_options_ext(service_id: &syn::Ident) -> syn::ItemTrait {
     let mem_storage_ident = mem_storage_ident(service_id);

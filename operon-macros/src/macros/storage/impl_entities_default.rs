@@ -7,18 +7,7 @@ use crate::utils::{entities_ident, entity_metadata_ident, to_snake_case};
 ///
 /// # Example
 /// ```rust,ignore
-/// impl Default for CookingEntities {
-///     fn default() -> Self {
-///         CookingEntities {
-///             a: metadata::entity_a_meta(),
-///             b: metadata::entity_b_meta(),
-///             c: metadata::entity_c_meta(),
-///             d: metadata::entity_d_meta(),
-///             e: metadata::entity_e_meta(),
-///             f: metadata::entity_f_meta(),
-///         }
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/impl_entities_default.rs") )]
 /// ```
 pub fn impl_entities_default(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemImpl {
     let entities_ident = entities_ident(service_id);

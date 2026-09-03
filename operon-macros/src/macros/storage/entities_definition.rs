@@ -8,14 +8,7 @@ use crate::utils::{entities_ident, to_snake_case, to_type};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub struct CookingEntities {
-///     a: operon::__private::EntityMetadata<1usize, A>,
-///     b: operon::__private::EntityMetadata<2usize, B>,
-///     c: operon::__private::EntityMetadata<2usize, C>,
-///     d: operon::__private::EntityMetadata<3usize, D>,
-///     e: operon::__private::EntityMetadata<2usize, E>,
-///     f: operon::__private::EntityMetadata<1usize, F>,
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/entities_definition.rs") )]
 /// ```
 pub fn entities_definition(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemStruct {
     let operon = operon_ident();
