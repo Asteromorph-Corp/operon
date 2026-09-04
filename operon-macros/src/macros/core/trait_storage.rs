@@ -320,22 +320,55 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::configs::{EntityConfigMap, TaskConfigMap};
+    use crate::configs::{EntityConfigMap, PoolSizeSpec, TaskArg, TaskConfig, TaskConfigMap};
     use crate::test_utils::complicated_pipeline::{
         all_entities as all_entities_complicated, all_tasks as all_tasks_complicated,
     };
-    use crate::test_utils::simple_pipeline::{all_entities, all_tasks, simple_pipeline};
+    use crate::test_utils::simple_pipeline::{
+        all_entities, all_tasks, entity_a, entity_b, simple_pipeline, task_alpha,
+    };
     use crate::test_utils::{assert_item_eq, assert_items_eq_in_trait};
 
-    #[rstest]
-    fn test_single_ops(all_entities: EntityConfigMap) {
-        let items = single_ops(&all_entities)
-            .map(|(_, item)| item)
-            .collect::<Vec<_>>();
-        assert_items_eq_in_trait(&items, "core/storage_single_ops.rs");
+    /// ```rs
+    /// define_operon! {
+    ///     service = {
+    ///         B<j> = beta(A<i>) for i;
+    ///     }
+    /// }
+    fn task_beta_agg() -> TaskConfig {
+        TaskConfig {
+            id: format_ident!("beta"),
+            from: vec![TaskArg {
+                id: format_ident!("A"),
+                over: vec![format_ident!("i")],
+            }],
+            to: format_ident!("B"),
+            dims: vec![format_ident!("i")],
+            spawn_dim: Some(format_ident!("j")),
+            pool_size: PoolSizeSpec::Literal(8),
+            priority: vec![],
+        }
     }
 
     #[rstest]
+    #[case::single(EntityConfigMap::from_iter([(format_ident!("a"), entity_a())]), "core/storage_single_ops.single.rs")]
+    #[case::all(all_entities(), "core/storage_single_ops.all.rs")]
+    fn test_single_ops(#[case] entities: EntityConfigMap, #[case] fixture_path: &str) {
+        let items = single_ops(&entities)
+            .map(|(_, item)| item)
+            .collect::<Vec<_>>();
+        assert_items_eq_in_trait(&items, fixture_path);
+    }
+
+    #[rstest]
+    #[case::single(
+        TaskConfigMap::from_iter([(format_ident!("beta"), task_beta_agg())]),
+        EntityConfigMap::from_iter([
+            (format_ident!("A"), entity_a()),
+            (format_ident!("B"), entity_b())
+        ]),
+        "core/storage_batch_gets.single.rs"
+    )]
     #[case::simple(all_tasks(), all_entities(), "core/storage_batch_gets.simple.rs")]
     #[case::multiple_over(
         all_tasks_complicated(),
@@ -354,11 +387,13 @@ mod tests {
     }
 
     #[rstest]
-    fn test_batch_inserts(all_tasks: TaskConfigMap) {
-        let items = batch_inserts(&all_tasks)
+    #[case::single(TaskConfigMap::from_iter([(format_ident!("alpha"), task_alpha())]), "core/storage_batch_inserts.single.rs")]
+    #[case::all(all_tasks(), "core/storage_batch_inserts.all.rs")]
+    fn test_batch_inserts(#[case] tasks: TaskConfigMap, #[case] fixture_path: &str) {
+        let items = batch_inserts(&tasks)
             .map(|(_, item)| item)
             .collect::<Vec<_>>();
-        assert_items_eq_in_trait(&items, "core/storage_batch_inserts.rs");
+        assert_items_eq_in_trait(&items, fixture_path);
     }
 
     #[rstest]
