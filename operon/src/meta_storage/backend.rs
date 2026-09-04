@@ -196,7 +196,7 @@ pub trait MetaTicketApi<const N: usize> {
     /// Reads every ticket of this task.
     fn dump(&self) -> impl Future<Output = MetaResult<Vec<Ticket<N>>, Self::Error>> + Send;
 
-    /// Hydrates the ticket of this task with `tickets`.
+    /// Hydrates the tickets of this task with `tickets`.
     ///
     /// Existing tickets are discarded.
     fn hydrate(
