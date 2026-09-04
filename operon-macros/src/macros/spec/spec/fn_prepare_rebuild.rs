@@ -4,52 +4,11 @@ use syn::parse_quote;
 use crate::configs::TaskConfig;
 use crate::utils::{operon_ident, rebuilder_ident};
 
-/// Generates the `prepare_rebuild` function for the implementation of the trait `TaskSpec`.
+/// Generates the `prepare_rebuild` function for a task.
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn prepare_rebuild(
-///     &self,
-///     storage: &Sto,
-///     client: MSto::Client<'_>,
-///     progress: operon::__private::SharedProgress,
-/// ) -> Result<Box<dyn operon::__private::TaskRebuilder<Svc, Sto, MSto>>, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-///     use operon::__private::futures::{StreamExt, TryStreamExt};
-///
-///     let tickets = client
-///         .ticket(self.task_meta())
-///         .get_all(operon::__private::TicketStatus::Done)
-///         .await?;
-///     let data = operon::__private::futures::stream::iter(tickets.into_iter().map(
-///         |ticket| async move {
-///             let job = ticket.resolve().ok_or_else(|| {
-///                 operon::error::SchedulerError::Other("Failed to resolve a beta ticket".into())
-///             })?;
-///             let resolution = client
-///                 .resolution(self.spawn_dim_meta())
-///                 .get(job.coordinate)
-///                 .await?
-///                 .ok_or_else(|| {
-///                     operon::error::SchedulerError::Other(format!(
-///                         "No resolution found for j_{:?}",
-///                         job.coordinate
-///                     ))
-///                 })?;
-///
-///             Ok::<_, operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>>((job, resolution))
-///         },
-///     ))
-///     .buffered(operon::__private::REBUILD_CONCURRENCY)
-///     .try_collect::<Vec<_>>()
-///     .await?;
-///
-///     Ok(Box::new(BetaRebuilder {
-///         task_meta: self.task_meta(),
-///         spawn_dim_meta: self.spawn_dim_meta(),
-///         data,
-///         progress,
-///     }))
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_prepare_rebuild.rs"))]
 /// ```
 pub(super) fn fn_prepare_rebuild(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();

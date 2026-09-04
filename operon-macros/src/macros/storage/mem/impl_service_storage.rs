@@ -7,6 +7,7 @@ use crate::utils::{
     to_type,
 };
 
+/// Generates an implementation of the storage trait for the in-memory storage struct.
 pub(super) fn impl_service_storage(
     service_id: &syn::Ident,
     entities: &EntityConfigMap,
@@ -32,17 +33,11 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::ImplItemF
         .flat_map(|entity| [single_get(entity), single_put(entity)])
 }
 
-/// Generates a get function for the implementation of the storage trait.
+/// Generates an in-memory get function for an entity.
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn get_b(
-///     &self,
-///     coordinate: [usize; 2usize],
-/// ) -> operon::error::StorageResult<Option<B>, Self::Error> {
-///     let b = self.b.get(&coordinate).as_deref().cloned();
-///     Ok(b)
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/single_get.rs"))]
 /// ```
 fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
@@ -60,17 +55,11 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     }
 }
 
-/// Generates a put function for the implementation of the storage trait.
+/// Generates an in-memory put function for an entity.
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn put_b(
-///     &self,
-///     entity: operon::Entity<2usize, B>,
-/// ) -> operon::error::StorageResult<(), Self::Error> {
-///     self.b.insert(entity.coordinate, entity.value);
-///     Ok(())
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/single_put.rs"))]
 /// ```
 fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();

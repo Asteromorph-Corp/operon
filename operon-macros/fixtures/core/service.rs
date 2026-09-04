@@ -16,6 +16,7 @@
 /// async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, Self::Error>
 /// async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, Self::Error>
 /// ```
+#[operon::__private::async_trait::async_trait]
 pub trait CookingService:
     operon::OperonService<
         JobEnum = schema::JobEnum,

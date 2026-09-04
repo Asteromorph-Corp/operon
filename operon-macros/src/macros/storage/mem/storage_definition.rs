@@ -8,14 +8,7 @@ use crate::utils::{mem_storage_ident, to_snake_case, to_type};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub struct MemCookingStorage {
-///     a: operon::__private::dashmap::DashMap<[usize; 1usize], A>,
-///     b: operon::__private::dashmap::DashMap<[usize; 2usize], B>,
-///     c: operon::__private::dashmap::DashMap<[usize; 2usize], C>,
-///     d: operon::__private::dashmap::DashMap<[usize; 3usize], D>,
-///     e: operon::__private::dashmap::DashMap<[usize; 2usize], E>,
-///     f: operon::__private::dashmap::DashMap<[usize; 1usize], F>,
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/storage_definition.rs"))]
 /// ```
 pub(super) fn storage_definition(
     service_id: &syn::Ident,

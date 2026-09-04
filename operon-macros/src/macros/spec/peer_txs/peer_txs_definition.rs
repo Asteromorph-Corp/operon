@@ -6,15 +6,11 @@ use crate::utils::{
     ticket_enum_ident,
 };
 
-/// Generates a struct definition for peer event senders.
+/// Generates the peer event senders struct for a task.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[derive(Debug)]
-/// pub struct BetaPeerTxs {
-///     pub to_delta: operon::__private::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
-///     pub to_epsilon: operon::__private::PeerEventSender<schema::JobEnum, schema::ResolutionEnum>,
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/peer_txs/peer_txs_definition.rs"))]
 /// ```
 pub fn peer_txs_definition(
     task_id: &syn::Ident,

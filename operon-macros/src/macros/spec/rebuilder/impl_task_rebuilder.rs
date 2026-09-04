@@ -6,91 +6,11 @@ use crate::configs::{TaskConfig, TaskConfigMap};
 use crate::dependency_analysis::get_direct_downstream_tasks;
 use crate::utils::{operon_ident, rebuilder_ident, task_metadata_ident, to_lit_str};
 
-/// Generates the implementation of the `TaskRebuilder` trait for a given task.
+/// Generates an implementation of the `TaskRebuilder` trait for a task's rebuilder.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::__private::async_trait::async_trait]
-/// #[automatically_derived]
-/// impl<Svc: operon::OperonService, Sto: operon::OperonStorage, MSto: operon::__private::MetaBackend>
-///     operon::__private::TaskRebuilder<Svc, Sto, MSto> for BetaRebuilder
-/// {
-///     async fn rebuild(
-///         &self,
-///         client: MSto::Client<'_>,
-///     ) -> Result<(), operon::error::SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
-///         use operon::__private::futures::{StreamExt, TryStreamExt};
-///         let ready_tickets = client
-///             .ticket(self.task_meta)
-///             .get_all(operon::__private::TicketStatus::Queued)
-///             .await?
-///             .into_iter()
-///             .map(|ticket| match ticket.resolve() {
-///                 Some(job) => Ok(job.coordinate),
-///                 None => Err(operon::error::SchedulerError::Other(
-///                     "Failed to resolve a beta ticket".into(),
-///                 )),
-///             })
-///             .collect::<Result<std::collections::HashSet<_>, _>>()?;
-///
-///         let (ready_data, invalid_data): (Vec<_>, Vec<_>) = self
-///             .data
-///             .iter()
-///             .cloned()
-///             .partition(|(job, _)| ready_tickets.contains(&job.coordinate));
-///         let invalid_tickets = invalid_data
-///             .into_iter()
-///             .map(|(job, _)| job)
-///             .collect::<Vec<_>>();
-///
-///         operon::__private::futures::stream::iter(ready_data.into_iter().map(
-///             |(job, resolution)| async move {
-///                 client
-///                     .resolution(self.spawn_dim_meta)
-///                     .put(resolution)
-///                     .await?;
-///                 client.ticket(self.task_meta).mark_done(job).await?;
-///
-///                 let affected = client
-///                     .ticket(metadata::task_delta_meta())
-///                     .explode::<_, 1usize>(self.spawn_dim_meta, resolution)
-///                     .await?;
-///                 for ticket in affected {
-///                     client
-///                         .ticket(metadata::task_epsilon_meta())
-///                         .raise_deps_quota(
-///                             metadata::task_delta_meta(),
-///                             ticket,
-///                             &["j"],
-///                             resolution.ub,
-///                         )
-///                         .await?;
-///                 }
-///                 client
-///                     .ticket(metadata::task_delta_meta())
-///                     .raise_deps_done(self.task_meta, job, &[])
-///                     .await?;
-///                 client
-///                     .ticket(metadata::task_epsilon_meta())
-///                     .raise_deps_done(self.task_meta, job, &["j"])
-///                     .await?;
-///
-///                 let (done, queued, waiting) =
-///                     client.ticket(self.task_meta).get_status().await?;
-///                 (*self.progress.write().await).update(done, queued, waiting);
-///
-///                 Ok::<_, operon::error::SchedulerError>(())
-///             },
-///         ))
-///         .buffer_unordered(operon::__private::REBUILD_CONCURRENCY)
-///         .try_collect::<Vec<_>>()
-///         .await?;
-///
-///         // ... warn about `invalid_tickets` ...
-///
-///         Ok(())
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/rebuilder/impl_task_rebuilder.rs"))]
 /// ```
 pub fn impl_task_rebuilder(
     task: &TaskConfig,

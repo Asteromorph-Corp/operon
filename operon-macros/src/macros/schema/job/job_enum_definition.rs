@@ -4,19 +4,11 @@ use crate::configs::TaskConfigMap;
 use crate::operon_ident;
 use crate::utils::{job_enum_ident, to_pascal_case};
 
-/// Generates an enum representing the job of any task in the task configuration map.
+/// Generates an enum representing a job of any task in the pipeline.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[derive(Debug, Clone)]
-/// pub enum JobEnum {
-///     Alpha(operon::__private::Job<0usize>),
-///     Beta(operon::__private::Job<1usize>),
-///     Gamma(operon::__private::Job<1usize>),
-///     Delta(operon::__private::Job<3usize>),
-///     Epsilon(operon::__private::Job<2usize>),
-///     Zeta(operon::__private::Job<1usize>),
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/job/job_enum_definition.rs"))]
 /// ```
 pub fn job_enum_definition(tasks: &TaskConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();

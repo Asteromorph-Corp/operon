@@ -4,25 +4,11 @@ use crate::configs::EntityConfigMap;
 use crate::operon_ident;
 use crate::utils::{entities_ident, to_snake_case};
 
-/// Generates the implementation of `EntityQueries` trait for the entity struct.
+/// Generates an implementation of `EntityQueries` trait for the entities struct.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::__private::async_trait::async_trait]
-/// impl operon::__private::EntityQueries for CookingEntities {
-///     async fn init(
-///         &self,
-///         client: &operon::__private::StorageClient<'_>,
-///     ) -> operon::error::StorageResult<(), operon::error::PsqlStorageError> {
-///         self.a.init(client).await?;
-///         self.b.init(client).await?;
-///         self.c.init(client).await?;
-///         self.d.init(client).await?;
-///         self.e.init(client).await?;
-///         self.f.init(client).await?;
-///         Ok(())
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/impl_entities_queries.rs"))]
 /// ```
 pub fn impl_entities_queries(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemImpl {
     let operon = operon_ident();

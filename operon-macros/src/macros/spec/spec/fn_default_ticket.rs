@@ -3,13 +3,11 @@ use syn::parse_quote;
 use crate::configs::TaskConfig;
 use crate::operon_ident;
 
-/// Generates the `default_ticket` function for the implementation of the trait `TaskSpec`.
+/// Generates the `default_ticket` function for a task.
 ///
 /// # Example
 /// ```rust,ignore
-/// fn default_ticket(&self) -> operon::__private::Ticket<1usize> {
-///     operon::__private::Ticket::new(1usize)
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_default_ticket.rs"))]
 /// ```
 pub fn fn_default_ticket(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();

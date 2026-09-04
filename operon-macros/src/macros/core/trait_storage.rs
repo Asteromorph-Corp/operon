@@ -23,23 +23,7 @@ fn format_dims(dims: &[syn::Ident]) -> String {
 ///
 /// # Example
 /// ```rust,ignore
-/// /// ```rust,ignore
-/// /// async fn get_a(&self, coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error>
-/// /// ```
-/// /// Reads the `A` stored at `[i]`, or `None` if that coordinate holds nothing.
-/// async fn get_a(
-///     &self,
-///     coordinate: [usize; 1usize],
-/// ) -> operon::error::StorageResult<Option<A>, Self::Error>;
-///
-/// /// ```rust,ignore
-/// /// async fn put_a(&self, entity: Entity<1, A>) -> StorageResult<(), Self::Error>
-/// /// ```
-/// /// Writes the given `A` at its own coordinate `[i]`, replacing whatever is stored there.
-/// async fn put_a(
-///     &self,
-///     entity: operon::Entity<1usize, A>,
-/// ) -> operon::error::StorageResult<(), Self::Error>;
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/storage_single_ops.single.rs"))]
 /// ```
 fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> {
     entities.values().flat_map(|entity| -> [DocumentedFn; 2] {
@@ -86,27 +70,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> 
 ///
 /// # Example
 /// ```rust,ignore
-/// /// ```rust,ignore
-/// /// async fn get_all_b_j(&self, coordinate: [usize; 1]) -> StorageResult<Vec<B>, Self::Error>
-/// /// ```
-/// /// Reads every `B` stored at `[i, j]` over `j`, counting that dimension up from `0` and
-/// /// stopping at the first coordinate that holds nothing.
-/// /// Defaults to walking `get_b` one entity at a time.
-/// async fn get_all_b_j(
-///     &self,
-///     [i]: [usize; 1usize],
-/// ) -> operon::error::StorageResult<Vec<B>, Self::Error> {
-///     let final_results = {
-///         let mut results_0 = Vec::new();
-///         let mut j = 0usize;
-///         while let Some(value) = self.get_b([i, j]).await? {
-///             results_0.push(value);
-///             j += 1;
-///         }
-///         (!results_0.is_empty()).then_some(results_0)
-///     };
-///     Ok(final_results.unwrap_or_default())
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/storage_batch_gets.single.rs"))]
 /// ```
 fn batch_gets(
     tasks: &TaskConfigMap,
@@ -196,26 +160,7 @@ fn batch_gets(
 ///
 /// # Example
 /// ```rust,ignore
-/// /// ```rust,ignore
-/// /// async fn put_all_a(&self, entity: Entity<0, Vec<A>>) -> StorageResult<(), Self::Error>
-/// /// ```
-/// /// Writes a whole run of `A` at `[i]`, taking `i` from each value's position in
-/// /// `entity.value`.
-/// /// Defaults to walking `put_a` one entity at a time.
-/// async fn put_all_a(
-///     &self,
-///     entity: operon::Entity<0usize, Vec<A>>,
-/// ) -> operon::error::StorageResult<(), Self::Error> {
-///     let [] = entity.coordinate;
-///     for (i, value) in entity.value.into_iter().enumerate() {
-///         let entity_single = operon::Entity {
-///             coordinate: [i],
-///             value,
-///         };
-///         self.put_a(entity_single).await?;
-///     }
-///     Ok(())
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/storage_batch_inserts.single.rs"))]
 /// ```
 fn batch_inserts(tasks: &TaskConfigMap) -> impl Iterator<Item = DocumentedFn> {
     tasks.values().filter_map(|task| -> Option<DocumentedFn> {
@@ -262,7 +207,7 @@ fn batch_inserts(tasks: &TaskConfigMap) -> impl Iterator<Item = DocumentedFn> {
     })
 }
 
-/// Generates a trait for the storage required for the service.
+/// Generates the storage trait for the pipeline.
 pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
     let operon = operon_ident();
     let storage_ident = storage_trait_ident(&all_configs.service_id);
@@ -305,8 +250,8 @@ pub fn trait_storage(all_configs: &AllConfig) -> syn::ItemTrait {
     let doc_comment = sections.join("\n\n");
 
     parse_quote! {
-        #[#operon::__private::async_trait::async_trait]
         #[doc = #doc_comment]
+        #[#operon::__private::async_trait::async_trait]
         pub trait #storage_ident: #operon::OperonStorage {
             #(#single_ops)*
             #(#batch_gets)*
@@ -320,22 +265,55 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::configs::{EntityConfigMap, TaskConfigMap};
+    use crate::configs::{EntityConfigMap, PoolSizeSpec, TaskArg, TaskConfig, TaskConfigMap};
     use crate::test_utils::complicated_pipeline::{
         all_entities as all_entities_complicated, all_tasks as all_tasks_complicated,
     };
-    use crate::test_utils::simple_pipeline::{all_entities, all_tasks, simple_pipeline};
+    use crate::test_utils::simple_pipeline::{
+        all_entities, all_tasks, entity_a, entity_b, simple_pipeline, task_alpha,
+    };
     use crate::test_utils::{assert_item_eq, assert_items_eq_in_trait};
 
-    #[rstest]
-    fn test_single_ops(all_entities: EntityConfigMap) {
-        let items = single_ops(&all_entities)
-            .map(|(_, item)| item)
-            .collect::<Vec<_>>();
-        assert_items_eq_in_trait(&items, "core/storage_single_ops.rs");
+    /// ```rs
+    /// define_operon! {
+    ///     service = {
+    ///         B<j> = beta(A<i>) for i;
+    ///     }
+    /// }
+    fn task_beta_agg() -> TaskConfig {
+        TaskConfig {
+            id: format_ident!("beta"),
+            from: vec![TaskArg {
+                id: format_ident!("A"),
+                over: vec![format_ident!("i")],
+            }],
+            to: format_ident!("B"),
+            dims: vec![format_ident!("i")],
+            spawn_dim: Some(format_ident!("j")),
+            pool_size: PoolSizeSpec::Literal(8),
+            priority: vec![],
+        }
     }
 
     #[rstest]
+    #[case::single(EntityConfigMap::from_iter([(format_ident!("a"), entity_a())]), "core/storage_single_ops.single.rs")]
+    #[case::all(all_entities(), "core/storage_single_ops.all.rs")]
+    fn test_single_ops(#[case] entities: EntityConfigMap, #[case] fixture_path: &str) {
+        let items = single_ops(&entities)
+            .map(|(_, item)| item)
+            .collect::<Vec<_>>();
+        assert_items_eq_in_trait(&items, fixture_path);
+    }
+
+    #[rstest]
+    #[case::single(
+        TaskConfigMap::from_iter([(format_ident!("beta"), task_beta_agg())]),
+        EntityConfigMap::from_iter([
+            (format_ident!("A"), entity_a()),
+            (format_ident!("B"), entity_b())
+        ]),
+        "core/storage_batch_gets.single.rs"
+    )]
     #[case::simple(all_tasks(), all_entities(), "core/storage_batch_gets.simple.rs")]
     #[case::multiple_over(
         all_tasks_complicated(),
@@ -354,17 +332,18 @@ mod tests {
     }
 
     #[rstest]
-    fn test_batch_inserts(all_tasks: TaskConfigMap) {
-        let items = batch_inserts(&all_tasks)
+    #[case::single(TaskConfigMap::from_iter([(format_ident!("alpha"), task_alpha())]), "core/storage_batch_inserts.single.rs")]
+    #[case::all(all_tasks(), "core/storage_batch_inserts.all.rs")]
+    fn test_batch_inserts(#[case] tasks: TaskConfigMap, #[case] fixture_path: &str) {
+        let items = batch_inserts(&tasks)
             .map(|(_, item)| item)
             .collect::<Vec<_>>();
-        assert_items_eq_in_trait(&items, "core/storage_batch_inserts.rs");
+        assert_items_eq_in_trait(&items, fixture_path);
     }
 
     #[rstest]
     fn test_trait_storage(simple_pipeline: AllConfig) {
-        let mut result = trait_storage(&simple_pipeline);
-        result.attrs.retain(|attr| attr.path().is_ident("doc"));
+        let result = trait_storage(&simple_pipeline);
         assert_item_eq(&result, "core/storage.rs");
     }
 }

@@ -6,7 +6,7 @@ use crate::utils::{entities_ident, operon_ident, sql_storage_ident};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub type PsqlCookingStorage = operon::__private::PsqlStorage<CookingEntities>;
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/storage_definition.rs"))]
 /// ```
 pub(super) fn storage_definition(service_id: &syn::Ident) -> syn::ItemType {
     let operon = operon_ident();

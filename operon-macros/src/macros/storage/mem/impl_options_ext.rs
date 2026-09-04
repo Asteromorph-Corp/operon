@@ -3,16 +3,11 @@ use syn::parse_quote;
 use crate::operon_ident;
 use crate::utils::{mem_storage_ident, mem_storage_options_ext_ident};
 
-/// Generates the implementation of the options extension trait for
-/// `operon::options::MemStorageOptions`.
+/// Generates an implementation of the options extension trait for `MemStorageOptions`.
 ///
 /// # Example
 /// ```rust,ignore
-/// impl MemCookingStorageOptionsExt for operon::options::MemStorageOptions {
-///     fn build(self) -> MemCookingStorage {
-///         MemCookingStorage::from(self)
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/impl_options_ext.rs"))]
 /// ```
 pub(super) fn impl_options_ext(service_id: &syn::Ident) -> syn::ItemImpl {
     let operon = operon_ident();

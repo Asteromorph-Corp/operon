@@ -4,20 +4,11 @@ use crate::configs::TaskConfigMap;
 use crate::operon_ident;
 use crate::utils::{ticket_enum_ident, to_pascal_case};
 
-/// Generates an enum representing the ticket of any task in the task configuration map.
+/// Generates an enum representing a ticket for any task in the pipeline.
 ///
 /// # Example
 /// ```rust,ignore
-/// /// An enum representing the ticket of any task.
-/// #[derive(Debug, Clone)]
-/// pub enum TicketEnum {
-///     Alpha(operon::__private::Ticket<0usize>),
-///     Beta(operon::__private::Ticket<1usize>),
-///     Gamma(operon::__private::Ticket<1usize>),
-///     Delta(operon::__private::Ticket<3usize>),
-///     Epsilon(operon::__private::Ticket<2usize>),
-///     Zeta(operon::__private::Ticket<1usize>),
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/ticket/ticket_enum_definition.rs"))]
 /// ```
 pub fn ticket_enum_definition(tasks: &TaskConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();

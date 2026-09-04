@@ -2,17 +2,11 @@ use syn::parse_quote;
 
 use crate::utils::{mem_storage_ident, mem_storage_options_ext_ident};
 
-/// Generates the extension trait that builds the in-memory storage from
-/// `operon::options::MemStorageOptions`.
-///
-/// The options type lives in the `operon` crate, so the `build` constructor has to be attached
-/// through a trait defined next to the generated storage.
+/// Generates the extension trait to build the in-memory storage from `MemStorageOptions`.
 ///
 /// # Example
 /// ```rust,ignore
-/// pub trait MemCookingStorageOptionsExt {
-///     fn build(self) -> MemCookingStorage;
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/mem/trait_options_ext.rs"))]
 /// ```
 pub(super) fn trait_options_ext(service_id: &syn::Ident) -> syn::ItemTrait {
     let mem_storage_ident = mem_storage_ident(service_id);

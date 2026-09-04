@@ -10,7 +10,7 @@ use crate::utils::{
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn get_all_b_over_j(
+/// async fn get_all_b_j(
 ///     &self,
 ///     [i]: [usize; 1usize],
 /// ) -> operon::error::StorageResult<Vec<B>, Self::Error> {
@@ -23,7 +23,7 @@ use crate::utils::{
 ///
 ///     let mut result: Vec<B> = Default::default();
 ///     for entity in entities {
-///         result.push(entity);
+///         result.push(entity.value);
 ///     }
 ///
 ///     Ok(result)
