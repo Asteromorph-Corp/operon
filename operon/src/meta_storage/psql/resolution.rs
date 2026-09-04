@@ -154,9 +154,6 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
 
     async fn hydrate(&self, resolutions: Vec<Resolution<N>>) -> PsqlResult<()> {
         self.clear().await?;
-        if resolutions.is_empty() {
-            return Ok(());
-        }
         self.copy_in(resolutions).await?;
         Ok(())
     }
