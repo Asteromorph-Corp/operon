@@ -41,28 +41,27 @@ impl<UErr, SErr, MErr> SchedulerError<UErr, SErr, MErr> {
     pub(crate) fn other(msg: impl Into<String>) -> Self {
         Self::Other(msg.into())
     }
+}
 
-    /// Re-flavors an error raised against the in-memory backend a rebuild is staged on.
-    pub(crate) fn from_mem(err: SchedulerError<UErr, SErr, MemMetaError>) -> Self {
-        match err {
-            SchedulerError::UserError(e) => Self::UserError(e),
-            SchedulerError::Storage(e) => Self::Storage(e),
-            SchedulerError::MetaStorage(e) => Self::from_mem_meta(e),
-            SchedulerError::JoinFailed(e) => Self::JoinFailed(e),
-            SchedulerError::SemaphoreAcquireFailed => Self::SemaphoreAcquireFailed,
-            SchedulerError::ControlEventReceiveFailed => Self::ControlEventReceiveFailed,
-            SchedulerError::PeerEventSendFailed => Self::PeerEventSendFailed,
+impl<UErr, SErr> SchedulerError<UErr, SErr, MemMetaError> {
+    /// Re-types an error from the scratch in-memory store used during rebuild.
+    pub(crate) fn during_rebuild<MErr>(self) -> SchedulerError<UErr, SErr, MErr> {
+        match self {
+            SchedulerError::UserError(e) => SchedulerError::UserError(e),
+            SchedulerError::Storage(e) => SchedulerError::Storage(e),
+            SchedulerError::MetaStorage(e) => SchedulerError::MetaStorage(e.during_rebuild()),
+            SchedulerError::JoinFailed(e) => SchedulerError::JoinFailed(e),
+            SchedulerError::SemaphoreAcquireFailed => SchedulerError::SemaphoreAcquireFailed,
+            SchedulerError::ControlEventReceiveFailed => SchedulerError::ControlEventReceiveFailed,
+            SchedulerError::PeerEventSendFailed => SchedulerError::PeerEventSendFailed,
             SchedulerError::InvalidPeerEventReceived(event, task) => {
-                Self::InvalidPeerEventReceived(event, task)
+                SchedulerError::InvalidPeerEventReceived(event, task)
             }
-            SchedulerError::MissingProgressEntry(task) => Self::MissingProgressEntry(task),
-            SchedulerError::Other(msg) => Self::Other(msg),
+            SchedulerError::MissingProgressEntry(task) => {
+                SchedulerError::MissingProgressEntry(task)
+            }
+            SchedulerError::Other(msg) => SchedulerError::Other(msg),
         }
-    }
-
-    /// [`from_mem`](Self::from_mem) for a metadata error raised by that same backend.
-    pub(crate) fn from_mem_meta(err: MetaStorageError<MemMetaError>) -> Self {
-        Self::MetaStorage(err.during_rebuild())
     }
 }
 

@@ -279,14 +279,14 @@ where
         dst.ticket(self.task_meta)
             .hydrate(tickets)
             .await
-            .map_err(SchedulerError::from_mem_meta)?;
+            .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
 
         if let Some(spawn_dim_meta) = self.task_meta.spawn_dim_meta() {
             let resolutions = src.resolution(spawn_dim_meta).dump().await?;
             dst.resolution(spawn_dim_meta)
                 .hydrate(resolutions)
                 .await
-                .map_err(SchedulerError::from_mem_meta)?;
+                .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
         }
 
         Ok(())
@@ -301,7 +301,7 @@ where
             .ticket(self.task_meta)
             .dump()
             .await
-            .map_err(SchedulerError::from_mem_meta)?;
+            .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
         dst.ticket(self.task_meta).hydrate(tickets).await?;
 
         if let Some(spawn_dim_meta) = self.task_meta.spawn_dim_meta() {
@@ -309,7 +309,7 @@ where
                 .resolution(spawn_dim_meta)
                 .dump()
                 .await
-                .map_err(SchedulerError::from_mem_meta)?;
+                .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
             dst.resolution(spawn_dim_meta).hydrate(resolutions).await?;
         }
 
