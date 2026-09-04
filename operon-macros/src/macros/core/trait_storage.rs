@@ -23,23 +23,7 @@ fn format_dims(dims: &[syn::Ident]) -> String {
 ///
 /// # Example
 /// ```rust,ignore
-/// /// ```rust,ignore
-/// /// async fn get_a(&self, coordinate: [usize; 1]) -> StorageResult<Option<A>, Self::Error>
-/// /// ```
-/// /// Reads the `A` stored at `[i]`, or `None` if that coordinate holds nothing.
-/// async fn get_a(
-///     &self,
-///     coordinate: [usize; 1usize],
-/// ) -> operon::error::StorageResult<Option<A>, Self::Error>;
-///
-/// /// ```rust,ignore
-/// /// async fn put_a(&self, entity: Entity<1, A>) -> StorageResult<(), Self::Error>
-/// /// ```
-/// /// Writes the given `A` at its own coordinate `[i]`, replacing whatever is stored there.
-/// async fn put_a(
-///     &self,
-///     entity: operon::Entity<1usize, A>,
-/// ) -> operon::error::StorageResult<(), Self::Error>;
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/storage_single_ops.single.rs"))]
 /// ```
 fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> {
     entities.values().flat_map(|entity| -> [DocumentedFn; 2] {
@@ -86,27 +70,7 @@ fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = DocumentedFn> 
 ///
 /// # Example
 /// ```rust,ignore
-/// /// ```rust,ignore
-/// /// async fn get_all_b_j(&self, coordinate: [usize; 1]) -> StorageResult<Vec<B>, Self::Error>
-/// /// ```
-/// /// Reads every `B` stored at `[i, j]` over `j`, counting that dimension up from `0` and
-/// /// stopping at the first coordinate that holds nothing.
-/// /// Defaults to walking `get_b` one entity at a time.
-/// async fn get_all_b_j(
-///     &self,
-///     [i]: [usize; 1usize],
-/// ) -> operon::error::StorageResult<Vec<B>, Self::Error> {
-///     let final_results = {
-///         let mut results_0 = Vec::new();
-///         let mut j = 0usize;
-///         while let Some(value) = self.get_b([i, j]).await? {
-///             results_0.push(value);
-///             j += 1;
-///         }
-///         (!results_0.is_empty()).then_some(results_0)
-///     };
-///     Ok(final_results.unwrap_or_default())
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/storage_batch_gets.single.rs"))]
 /// ```
 fn batch_gets(
     tasks: &TaskConfigMap,
@@ -196,26 +160,7 @@ fn batch_gets(
 ///
 /// # Example
 /// ```rust,ignore
-/// /// ```rust,ignore
-/// /// async fn put_all_a(&self, entity: Entity<0, Vec<A>>) -> StorageResult<(), Self::Error>
-/// /// ```
-/// /// Writes a whole run of `A` at `[i]`, taking `i` from each value's position in
-/// /// `entity.value`.
-/// /// Defaults to walking `put_a` one entity at a time.
-/// async fn put_all_a(
-///     &self,
-///     entity: operon::Entity<0usize, Vec<A>>,
-/// ) -> operon::error::StorageResult<(), Self::Error> {
-///     let [] = entity.coordinate;
-///     for (i, value) in entity.value.into_iter().enumerate() {
-///         let entity_single = operon::Entity {
-///             coordinate: [i],
-///             value,
-///         };
-///         self.put_a(entity_single).await?;
-///     }
-///     Ok(())
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/storage_batch_inserts.single.rs"))]
 /// ```
 fn batch_inserts(tasks: &TaskConfigMap) -> impl Iterator<Item = DocumentedFn> {
     tasks.values().filter_map(|task| -> Option<DocumentedFn> {
