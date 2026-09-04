@@ -114,14 +114,19 @@ impl TicketRows {
             .collect()
     }
 
+    /// Inserts a ticket, keeping the counters in step.
+    fn insert(&mut self, key: TicketKey, row: TicketRow) {
+        self.count(row.status, 1);
+        self.index(&key);
+        self.map.insert(key, row);
+    }
+
     /// Inserts a ticket, leaving an existing one at the same key untouched.
     fn insert_new(&mut self, key: TicketKey, row: TicketRow) {
         if self.map.contains_key(&key) {
             return;
         }
-        self.count(row.status, 1);
-        self.index(&key);
-        self.map.insert(key, row);
+        self.insert(key, row);
     }
 
     /// Replaces the row at `key`, keeping the counters in step.
@@ -319,7 +324,7 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         rows.clear();
         for ticket in &tickets {
             let (key, row) = Self::split(ticket);
-            rows.insert_new(key, row);
+            rows.insert(key, row);
         }
         Ok(())
     }
