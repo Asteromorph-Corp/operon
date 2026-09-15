@@ -5,7 +5,8 @@ use crate::meta_storage::psql::error::PsqlResult;
 use crate::meta_storage::psql::{PsqlClient, PsqlMetaError};
 use crate::schema::{DimensionMetadata, Resolution, TableShape};
 use crate::utils::{
-    SchemaPrefix, ShapeAction, ShapeTable, SqlParams, build_tables, hash_metadata, shape_query,
+    SchemaPrefix, ShapeAction, ShapeTable, SqlParams, build_tables, hash_metadata, psql_identifier,
+    shape_query,
 };
 
 /// The table recording each dimension's shape ID, keyed by dimension ID.
@@ -49,7 +50,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         let id = self.dim_meta.id;
         let shape_record = DIMENSION_SHAPES.record(id);
         let shape_id = hash_metadata(&self.dim_meta);
-        let dimension_table = format!("dimension_{id}");
+        let dimension_table = psql_identifier("dimension", id);
         let tables = [dimension_table.as_str()];
 
         let shape_stmt = shape_query(shape_record, &tables, schema_prefix);
@@ -104,8 +105,9 @@ impl<const N: usize> std::fmt::Display for InitResolutionQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let deps = self.1.deps;
+        let table = psql_identifier("dimension", id);
 
-        writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}dimension_{id} (")?;
+        writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}{table} (")?;
         for dep in deps {
             writeln!(f, "    {dep} BIGINT,")?;
         }
@@ -128,8 +130,9 @@ impl<const N: usize> std::fmt::Display for ClearResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("dimension", id);
 
-        write!(f, "TRUNCATE TABLE {schema}dimension_{id};")
+        write!(f, "TRUNCATE TABLE {schema}{table};")
     }
 }
 
@@ -141,8 +144,9 @@ impl<const N: usize> std::fmt::Display for GetResolutionQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let deps = self.1.deps;
+        let table = psql_identifier("dimension", id);
 
-        write!(f, "SELECT ub FROM {schema}dimension_{id}")?;
+        write!(f, "SELECT ub FROM {schema}{table}")?;
 
         for (idx, dim) in deps.iter().enumerate() {
             if idx == 0 {
@@ -164,8 +168,9 @@ impl<const N: usize> std::fmt::Display for PutResolutionQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let deps = self.1.deps;
+        let table = psql_identifier("dimension", id);
 
-        write!(f, "INSERT INTO {schema}dimension_{id} (")?;
+        write!(f, "INSERT INTO {schema}{table} (")?;
         for dep in deps {
             write!(f, "{dep}, ")?;
         }

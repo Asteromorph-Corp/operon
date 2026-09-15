@@ -13,7 +13,7 @@ use crate::schema::{
 };
 use crate::utils::{
     SchemaPrefix, ShapeAction, ShapeTable, SqlParams, box_sql, build_tables, hash_metadata,
-    shape_query,
+    psql_identifier, shape_query,
 };
 
 /// The table recording each task's shape ID, keyed by task ID.
@@ -95,7 +95,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let id = self.task_meta.id;
         let shape_record = TICKET_SHAPES.record(id);
         let shape_id = hash_metadata(&self.task_meta);
-        let ticket_table = format!("ticket_{id}");
+        let ticket_table = psql_identifier("ticket", id);
         let tables = [ticket_table.as_str()];
 
         let shape_stmt = shape_query(shape_record, &tables, schema_prefix);
@@ -305,8 +305,9 @@ impl<const N: usize> std::fmt::Display for InitTicketQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("ticket", id);
 
-        writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}ticket_{id} (",)?;
+        writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}{table} (",)?;
         for dim in dims {
             writeln!(f, "    {dim} BIGINT,")?;
         }
@@ -355,6 +356,7 @@ impl<const N: usize> std::fmt::Display for TicketSummaryResyncQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("ticket", id);
 
         writeln!(f, "UPDATE {schema}ticket_summary SET")?;
         writeln!(f, "    waiting = counts.waiting,")?;
@@ -371,7 +373,7 @@ impl<const N: usize> std::fmt::Display for TicketSummaryResyncQuery<'_, N> {
             "        COUNT(*) FILTER (WHERE status = 'queued') AS queued,"
         )?;
         writeln!(f, "        COUNT(*) FILTER (WHERE status = 'done') AS done")?;
-        writeln!(f, "    FROM {schema}ticket_{id}")?;
+        writeln!(f, "    FROM {schema}{table}")?;
         writeln!(f, ") AS counts")?;
         write!(f, "WHERE task_id = '{id}';")
     }
@@ -402,9 +404,11 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("ticket", id);
+        let trigger_prefix = psql_identifier("trg_ticket", id);
 
-        writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_ins_trg")?;
-        writeln!(f, "    AFTER INSERT ON {schema}ticket_{id}")?;
+        writeln!(f, "CREATE OR REPLACE TRIGGER {trigger_prefix}_ins")?;
+        writeln!(f, "    AFTER INSERT ON {schema}{table}")?;
         writeln!(f, "    REFERENCING NEW TABLE AS NEW_TABLE")?;
         writeln!(f, "    FOR EACH STATEMENT")?;
         writeln!(
@@ -413,8 +417,8 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
         )?;
         writeln!(f)?;
 
-        writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_upd_trg")?;
-        writeln!(f, "    AFTER UPDATE ON {schema}ticket_{id}")?;
+        writeln!(f, "CREATE OR REPLACE TRIGGER {trigger_prefix}_upd")?;
+        writeln!(f, "    AFTER UPDATE ON {schema}{table}")?;
         writeln!(f, "    REFERENCING")?;
         writeln!(f, "        NEW TABLE AS NEW_TABLE")?;
         writeln!(f, "        OLD TABLE AS OLD_TABLE")?;
@@ -425,8 +429,8 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
         )?;
 
         writeln!(f)?;
-        writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_del_trg")?;
-        writeln!(f, "    AFTER DELETE ON {schema}ticket_{id}")?;
+        writeln!(f, "CREATE OR REPLACE TRIGGER {trigger_prefix}_del")?;
+        writeln!(f, "    AFTER DELETE ON {schema}{table}")?;
         writeln!(f, "    REFERENCING OLD TABLE AS OLD_TABLE")?;
         writeln!(f, "    FOR EACH STATEMENT")?;
         writeln!(
@@ -435,8 +439,8 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
         )?;
         writeln!(f)?;
 
-        writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_trunc_trg")?;
-        writeln!(f, "    AFTER TRUNCATE ON {schema}ticket_{id}")?;
+        writeln!(f, "CREATE OR REPLACE TRIGGER {trigger_prefix}_trunc")?;
+        writeln!(f, "    AFTER TRUNCATE ON {schema}{table}")?;
         writeln!(f, "    FOR EACH STATEMENT")?;
         write!(
             f,
@@ -452,8 +456,9 @@ impl<const N: usize> std::fmt::Display for ClearTicketQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("ticket", id);
 
-        write!(f, "TRUNCATE TABLE {schema}ticket_{id};")
+        write!(f, "TRUNCATE TABLE {schema}{table};")
     }
 }
 
@@ -464,8 +469,9 @@ impl<const N: usize> std::fmt::Display for GetAllTicketQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("ticket", id);
 
-        write!(f, "SELECT * FROM {schema}ticket_{id} WHERE status = $1;")
+        write!(f, "SELECT * FROM {schema}{table} WHERE status = $1;")
     }
 }
 
@@ -477,8 +483,9 @@ impl<const N: usize> std::fmt::Display for PutTicketQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("ticket", id);
 
-        write!(f, "INSERT INTO {schema}ticket_{id} (")?;
+        write!(f, "INSERT INTO {schema}{table} (")?;
         for dim in dims {
             write!(f, "{dim}, ")?;
         }
@@ -514,9 +521,10 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsDoneQuery<'_
         let self_dims = self.1.dims;
         let received_dims = self.2.dims;
         let aggregate_dims = self.3;
+        let table = psql_identifier("ticket", id);
 
         writeln!(f, "WITH updated AS (")?;
-        writeln!(f, "    UPDATE {schema}ticket_{id}")?;
+        writeln!(f, "    UPDATE {schema}{table}")?;
         writeln!(f, "    SET")?;
         writeln!(f, "        deps_done = deps_done + 1,")?;
         writeln!(f, "        status = CASE")?;
@@ -548,9 +556,10 @@ impl<const N: usize> std::fmt::Display for RaiseDepsQuotaQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let cols = self.2;
+        let table = psql_identifier("ticket", id);
 
         writeln!(f, "WITH updated AS (")?;
-        writeln!(f, "    UPDATE {schema}ticket_{id}")?;
+        writeln!(f, "    UPDATE {schema}{table}")?;
         writeln!(f, "    SET")?;
         writeln!(f, "        deps_quota = deps_quota + $1 - 1,")?;
         writeln!(f, "        status = CASE")?;
@@ -581,8 +590,9 @@ impl<const N: usize, const M: usize> std::fmt::Display for ExplodePopQuery<'_, N
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let task_id = self.1.id;
+        let table = psql_identifier("ticket", task_id);
 
-        writeln!(f, "DELETE FROM {schema}ticket_{task_id}")?;
+        writeln!(f, "DELETE FROM {schema}{table}")?;
         for (idx, dep) in self
             .2
             .deps
@@ -609,8 +619,9 @@ impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("ticket", id);
 
-        writeln!(f, "COPY {schema}ticket_{id} (")?;
+        writeln!(f, "COPY {schema}{table} (")?;
         write!(f, "    ")?;
         for dim in dims {
             write!(f, "{dim}, ")?;
@@ -629,8 +640,9 @@ impl<const N: usize> std::fmt::Display for MarkDoneQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("ticket", id);
 
-        write!(f, "UPDATE {schema}ticket_{id} SET status = 'done'")?;
+        write!(f, "UPDATE {schema}{table} SET status = 'done'")?;
         for (idx, dim) in dims.iter().enumerate() {
             if idx == 0 {
                 write!(f, " WHERE")?;
