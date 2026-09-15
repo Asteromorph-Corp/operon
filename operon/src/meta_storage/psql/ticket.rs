@@ -705,7 +705,7 @@ mod tests {
     #[case::empty(
         task_alpha(),
         indoc! {"
-            CREATE TABLE IF NOT EXISTS test_meta.ticket_alpha (
+            CREATE TABLE IF NOT EXISTS test_meta.ticket_alph_f055715e3dc40489 (
                 deps_done BIGINT NOT NULL,
                 deps_quota BIGINT NOT NULL,
                 status test_meta.ticket_status NOT NULL
@@ -715,7 +715,7 @@ mod tests {
     #[case::simple(
         task_beta(),
         indoc! {"
-            CREATE TABLE IF NOT EXISTS test_meta.ticket_beta (
+            CREATE TABLE IF NOT EXISTS test_meta.ticket_beta_20ef3e0fbac1a229 (
                 i BIGINT,
                 deps_done BIGINT NOT NULL,
                 deps_quota BIGINT NOT NULL,
@@ -762,7 +762,7 @@ mod tests {
                     COUNT(*) FILTER (WHERE status = 'waiting') AS waiting,
                     COUNT(*) FILTER (WHERE status = 'queued') AS queued,
                     COUNT(*) FILTER (WHERE status = 'done') AS done
-                FROM test_meta.ticket_beta
+                FROM test_meta.ticket_beta_20ef3e0fbac1a229
             ) AS counts
             WHERE task_id = 'beta';"
         },
@@ -794,28 +794,28 @@ mod tests {
     #[case::simple(
         task_beta(),
         indoc! {"
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
-                AFTER INSERT ON test_meta.ticket_beta
+            CREATE OR REPLACE TRIGGER trg_ticket_beta_20ef3e0fbac1a229_ins
+                AFTER INSERT ON test_meta.ticket_beta_20ef3e0fbac1a229
                 REFERENCING NEW TABLE AS NEW_TABLE
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION test_meta.trg_ticket_summary('beta');
 
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_upd_trg
-                AFTER UPDATE ON test_meta.ticket_beta
+            CREATE OR REPLACE TRIGGER trg_ticket_beta_20ef3e0fbac1a229_upd
+                AFTER UPDATE ON test_meta.ticket_beta_20ef3e0fbac1a229
                 REFERENCING
                     NEW TABLE AS NEW_TABLE
                     OLD TABLE AS OLD_TABLE
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION test_meta.trg_ticket_summary('beta');
 
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_del_trg
-                AFTER DELETE ON test_meta.ticket_beta
+            CREATE OR REPLACE TRIGGER trg_ticket_beta_20ef3e0fbac1a229_del
+                AFTER DELETE ON test_meta.ticket_beta_20ef3e0fbac1a229
                 REFERENCING OLD TABLE AS OLD_TABLE
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION test_meta.trg_ticket_summary('beta');
 
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_trunc_trg
-                AFTER TRUNCATE ON test_meta.ticket_beta
+            CREATE OR REPLACE TRIGGER trg_ticket_beta_20ef3e0fbac1a229_trunc
+                AFTER TRUNCATE ON test_meta.ticket_beta_20ef3e0fbac1a229
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION test_meta.trg_ticket_summary('beta');"
         }
@@ -830,7 +830,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case::simple(task_beta(), "TRUNCATE TABLE test_meta.ticket_beta;")]
+    #[case::simple(task_beta(), "TRUNCATE TABLE test_meta.ticket_beta_20ef3e0fbac1a229;")]
     fn test_clear_ticket_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
         #[case] task_meta: TaskMetadata<N>,
@@ -841,7 +841,10 @@ mod tests {
     }
 
     #[rstest]
-    #[case::simple(task_beta(), "SELECT * FROM test_meta.ticket_beta WHERE status = $1;")]
+    #[case::simple(
+        task_beta(),
+        "SELECT * FROM test_meta.ticket_beta_20ef3e0fbac1a229 WHERE status = $1;"
+    )]
     fn test_get_all_ticket_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
         #[case] task_meta: TaskMetadata<N>,
@@ -855,7 +858,7 @@ mod tests {
     #[case::empty(
         task_alpha(),
         indoc! {"
-            INSERT INTO test_meta.ticket_alpha (deps_done, deps_quota, status)
+            INSERT INTO test_meta.ticket_alph_f055715e3dc40489 (deps_done, deps_quota, status)
             VALUES ($1, $2, $3)
             ON CONFLICT DO NOTHING;"
         }
@@ -863,7 +866,7 @@ mod tests {
     #[case::simple(
         task_beta(),
         indoc! {"
-            INSERT INTO test_meta.ticket_beta (i, deps_done, deps_quota, status)
+            INSERT INTO test_meta.ticket_beta_20ef3e0fbac1a229 (i, deps_done, deps_quota, status)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT DO NOTHING;"
         }
@@ -880,7 +883,7 @@ mod tests {
     #[rstest]
     #[case::simple(task_beta(), task_alpha(), &[], indoc! { "
         WITH updated AS (
-            UPDATE test_meta.ticket_beta
+            UPDATE test_meta.ticket_beta_20ef3e0fbac1a229
             SET
                 deps_done = deps_done + 1,
                 status = CASE
@@ -908,10 +911,13 @@ mod tests {
     }
 
     #[rstest]
-    #[case::empty(task_alpha(), "UPDATE test_meta.ticket_alpha SET status = 'done';")]
+    #[case::empty(
+        task_alpha(),
+        "UPDATE test_meta.ticket_alph_f055715e3dc40489 SET status = 'done';"
+    )]
     #[case::simple(
         task_beta(),
-        "UPDATE test_meta.ticket_beta SET status = 'done' WHERE i = $1;"
+        "UPDATE test_meta.ticket_beta_20ef3e0fbac1a229 SET status = 'done' WHERE i = $1;"
     )]
     fn test_mark_done_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,

@@ -402,7 +402,7 @@ mod test {
     #[case(
         entity_a(),
         indoc! {"
-            CREATE TABLE IF NOT EXISTS test_meta.a (
+            CREATE TABLE IF NOT EXISTS test_meta.entity_a_13acce3537d6b799 (
                 id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
                 value JSONB,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
@@ -412,7 +412,7 @@ mod test {
     #[case(
         entity_b(),
         indoc! {"
-            CREATE TABLE IF NOT EXISTS test_meta.b (
+            CREATE TABLE IF NOT EXISTS test_meta.entity_b_8172151ff72c5e52 (
                 i BIGINT,
                 value JSONB,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
@@ -430,8 +430,11 @@ mod test {
     }
 
     #[rstest]
-    #[case(entity_a(), "SELECT value FROM test_meta.a;")]
-    #[case(entity_b(), "SELECT value FROM test_meta.b WHERE i = $1;")]
+    #[case(entity_a(), "SELECT value FROM test_meta.entity_a_13acce3537d6b799;")]
+    #[case(
+        entity_b(),
+        "SELECT value FROM test_meta.entity_b_8172151ff72c5e52 WHERE i = $1;"
+    )]
     fn test_get_entity_query<const N: usize>(
         schema_prefix: SchemaPrefix<'_>,
         #[case] metadata: EntityMetadata<N, ()>,
@@ -443,12 +446,12 @@ mod test {
 
     #[rstest]
     #[case(entity_a(), indoc! {"
-        INSERT INTO test_meta.a (value)
+        INSERT INTO test_meta.entity_a_13acce3537d6b799 (value)
         VALUES ($1)
         ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;"
     })]
     #[case(entity_b(), indoc! {"
-        INSERT INTO test_meta.b (i, value)
+        INSERT INTO test_meta.entity_b_8172151ff72c5e52 (i, value)
         VALUES ($1, $2)
         ON CONFLICT (i) DO UPDATE SET value = EXCLUDED.value;"
     })]
@@ -466,7 +469,7 @@ mod test {
         entity_b(),
         indoc! {"
             CREATE TEMP TABLE temp (
-                LIKE test_meta.b INCLUDING ALL
+                LIKE test_meta.entity_b_8172151ff72c5e52 INCLUDING ALL
             )
             ON COMMIT DROP;"
         }
@@ -494,7 +497,7 @@ mod test {
     #[case::simple(
         entity_b(),
         indoc! {"
-            INSERT INTO test_meta.b (i, value)
+            INSERT INTO test_meta.entity_b_8172151ff72c5e52 (i, value)
             SELECT i, value FROM temp
             ON CONFLICT (i) DO UPDATE SET value = EXCLUDED.value;"
         }
