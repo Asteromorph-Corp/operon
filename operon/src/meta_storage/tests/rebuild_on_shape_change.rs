@@ -147,7 +147,7 @@ async fn ticket_table_is_rebuilt_when_a_task_gains_a_dimension() {
     );
 
     assert_eq!(
-        columns(client, TICKET_SCHEMA, "ticket_delt_32edcf70fa43799c").await,
+        columns(client, TICKET_SCHEMA, "ticket_delta").await,
         ["i", "j", "deps_done", "deps_quota", "status"]
     );
 
