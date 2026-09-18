@@ -1,7 +1,7 @@
 mod sample_pipeline;
-pub use sample_pipeline::*;
+pub(crate) use sample_pipeline::*;
 
 mod normalize_string;
 
 mod helper;
-pub use helper::*;
+pub(crate) use helper::*;

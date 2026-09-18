@@ -13,7 +13,7 @@ use crate::macros::spec::spec::{impl_spec_utils, impl_task_spec, task_spec_defin
 use crate::utils::operon_ident;
 
 /// Generates the `spec` module containing the primary and task specs.
-pub fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
+pub(crate) fn mod_spec(all_configs: &AllConfig) -> syn::ItemMod {
     let task_specs = all_configs.tasks.values().map(|task| {
         let upstream_tasks = get_direct_upstream_tasks(task, &all_configs.tasks);
         let downstream_tasks = get_direct_downstream_tasks(task, &all_configs.tasks);

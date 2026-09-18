@@ -25,7 +25,7 @@ fn build_upstream_inverted_index(tasks: &TaskConfigMap) -> HashMap<&syn::Ident, 
 /// Return the full set of tasks that `target_task` depends on.
 ///
 /// The returned tasks are sorted lexicographically by id.
-pub fn get_upstream_tasks<'a>(
+pub(crate) fn get_upstream_tasks<'a>(
     target_task: &'a TaskConfig,
     all_tasks: &'a TaskConfigMap,
 ) -> IndexSet<&'a TaskConfig> {
@@ -57,7 +57,7 @@ pub fn get_upstream_tasks<'a>(
 /// Return the full set of tasks that `target_task` directly depends on.
 ///
 /// The returned tasks are sorted lexicographically by id.
-pub fn get_direct_upstream_tasks<'a>(
+pub(crate) fn get_direct_upstream_tasks<'a>(
     target_task: &'a TaskConfig,
     all_tasks: &'a TaskConfigMap,
 ) -> IndexSet<&'a TaskConfig> {

@@ -10,7 +10,7 @@ use crate::utils::{job_enum_ident, to_pascal_case};
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/job/job_enum_definition.rs"))]
 /// ```
-pub fn job_enum_definition(tasks: &TaskConfigMap) -> syn::ItemEnum {
+pub(crate) fn job_enum_definition(tasks: &TaskConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
     let variants = tasks.values().map(|task| -> syn::Variant {

@@ -1,15 +1,15 @@
-pub fn normalize_string(input: &str) -> String {
+pub(super) fn normalize_string(input: &str) -> String {
     let newline_normalized = normalize_raw_string_newlines(input);
     let comment_normalized = normalize_comments(&newline_normalized);
     let parenthesis_removed = remove_parenthesis(&comment_normalized);
     remove_trailing_commas(&parenthesis_removed)
 }
 
-pub fn remove_parenthesis(s: &str) -> String {
+pub(super) fn remove_parenthesis(s: &str) -> String {
     s.replace("{ Ok(elem) }", "Ok(elem)")
 }
 
-pub fn remove_trailing_commas(s: &str) -> String {
+pub(super) fn remove_trailing_commas(s: &str) -> String {
     let mut chars: Vec<char> = s.chars().collect();
     let mut i = 0;
 
@@ -32,7 +32,7 @@ pub fn remove_trailing_commas(s: &str) -> String {
     chars.into_iter().collect()
 }
 
-pub fn normalize_comments(input: &str) -> String {
+pub(super) fn normalize_comments(input: &str) -> String {
     let mut out = String::new();
     let mut chars = input.chars().peekable();
     let mut in_string = false;

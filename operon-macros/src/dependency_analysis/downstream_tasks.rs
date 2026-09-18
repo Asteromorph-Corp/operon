@@ -5,7 +5,7 @@ use crate::configs::{TaskConfig, TaskConfigMap};
 /// Return the full set of tasks that directly depend on `target_task`.
 ///
 /// The returned tasks are sorted lexicographically by id.
-pub fn get_direct_downstream_tasks<'a>(
+pub(crate) fn get_direct_downstream_tasks<'a>(
     target_task: &'a TaskConfig,
     all_tasks: &'a TaskConfigMap,
 ) -> IndexSet<&'a TaskConfig> {

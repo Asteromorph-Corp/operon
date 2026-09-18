@@ -9,7 +9,7 @@ use crate::macros::schema::mod_schema;
 use crate::macros::spec::mod_spec;
 use crate::macros::storage::mod_storage;
 
-pub fn operon(all_configs: &AllConfig) -> syn::File {
+pub(crate) fn operon(all_configs: &AllConfig) -> syn::File {
     let mod_core = mod_core(all_configs);
     let mod_metadata = mod_metadata(all_configs);
     let mod_schema = mod_schema(all_configs);

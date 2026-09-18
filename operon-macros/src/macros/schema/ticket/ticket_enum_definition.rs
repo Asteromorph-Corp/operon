@@ -10,7 +10,7 @@ use crate::utils::{ticket_enum_ident, to_pascal_case};
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/ticket/ticket_enum_definition.rs"))]
 /// ```
-pub fn ticket_enum_definition(tasks: &TaskConfigMap) -> syn::ItemEnum {
+pub(crate) fn ticket_enum_definition(tasks: &TaskConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();
     let ticket_enum_ident = ticket_enum_ident();
     let variants = tasks.values().map(|task| -> syn::Variant {

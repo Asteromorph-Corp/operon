@@ -29,7 +29,7 @@ use crate::utils::{
 ///     Ok(result)
 /// }
 /// ```
-pub fn batch_gets(
+pub(super) fn batch_gets(
     tasks: &TaskConfigMap,
     entities: &EntityConfigMap,
 ) -> impl Iterator<Item = syn::TraitItemFn> {

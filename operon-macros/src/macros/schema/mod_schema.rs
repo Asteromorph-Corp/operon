@@ -6,7 +6,7 @@ use crate::macros::schema::resolution::{impl_resolution_enum, resolution_enum_de
 use crate::macros::schema::ticket::{impl_ticket_enum, ticket_enum_definition};
 
 /// Generates the `schema` module with all schema types.
-pub fn mod_schema(all_configs: &AllConfig) -> syn::ItemMod {
+pub(crate) fn mod_schema(all_configs: &AllConfig) -> syn::ItemMod {
     let job_enum_def = job_enum_definition(&all_configs.tasks);
     let impl_job_enum = impl_job_enum();
 

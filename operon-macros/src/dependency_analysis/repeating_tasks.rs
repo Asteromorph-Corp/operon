@@ -3,7 +3,7 @@ use indexmap::IndexSet;
 use crate::configs::{TaskConfig, TaskConfigMap};
 
 /// Returns a set of task ids that are repeating tasks for the given target dimension.
-pub fn get_tasks_repeating_on<'a>(
+pub(crate) fn get_tasks_repeating_on<'a>(
     target_dim: &'a syn::Ident,
     all_tasks: &'a TaskConfigMap,
 ) -> IndexSet<&'a TaskConfig> {

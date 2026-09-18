@@ -13,7 +13,7 @@ pub(super) struct ConfigDecl {
     pub(super) _span: proc_macro2::Span,
 }
 impl ConfigDecl {
-    pub fn validate(&self) -> syn::Result<()> {
+    pub(super) fn validate(&self) -> syn::Result<()> {
         if self.tasks.is_empty() {
             return Err(syn::Error::new(
                 self._span,

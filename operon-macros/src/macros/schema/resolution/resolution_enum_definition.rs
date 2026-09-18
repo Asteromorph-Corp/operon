@@ -10,7 +10,7 @@ use crate::utils::{resolution_enum_ident, to_pascal_case};
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/resolution/resolution_enum_definition.rs"))]
 /// ```
-pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
+pub(crate) fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
     let variants = dimensions.values().map(|dim| -> syn::Variant {

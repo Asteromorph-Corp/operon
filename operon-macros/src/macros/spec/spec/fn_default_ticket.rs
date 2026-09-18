@@ -9,7 +9,7 @@ use crate::operon_ident;
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/fn_default_ticket.rs"))]
 /// ```
-pub fn fn_default_ticket(task: &TaskConfig) -> syn::ImplItemFn {
+pub(super) fn fn_default_ticket(task: &TaskConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
     let n = task.dims.len();
     let initial_quota = task.from.len();

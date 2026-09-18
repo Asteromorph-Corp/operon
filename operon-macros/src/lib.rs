@@ -1,3 +1,5 @@
+#![warn(unreachable_pub)]
+
 mod configs;
 mod dependency_analysis;
 mod macros;

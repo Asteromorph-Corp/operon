@@ -68,7 +68,7 @@ fn format_signature(task: &TaskConfig) -> String {
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/service.rs"))]
 /// ```
-pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
+pub(super) fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();

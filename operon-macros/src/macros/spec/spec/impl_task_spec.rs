@@ -19,7 +19,7 @@ use crate::utils::{
 
 /// Generates the implementation of the `TaskSpec` trait for a given task.
 #[allow(clippy::too_many_arguments)]
-pub fn impl_task_spec(
+pub(crate) fn impl_task_spec(
     service_id: &syn::Ident,
     task: &TaskConfig,
     all_upstream_tasks: &IndexSet<&TaskConfig>,
