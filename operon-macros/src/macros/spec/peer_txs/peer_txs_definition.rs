@@ -12,7 +12,7 @@ use crate::utils::{
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/peer_txs/peer_txs_definition.rs"))]
 /// ```
-pub fn peer_txs_definition(
+pub(crate) fn peer_txs_definition(
     task_id: &syn::Ident,
     event_receiving_task_ids: &IndexSet<&syn::Ident>,
 ) -> syn::ItemStruct {

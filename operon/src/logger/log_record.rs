@@ -1,11 +1,11 @@
 use ratatui::style::Stylize;
 use ratatui::text::{Line, Span};
 
-pub type LogRecordSender = tokio::sync::broadcast::Sender<LogRecord>;
-pub type LogRecordReceiver = tokio::sync::broadcast::Receiver<LogRecord>;
+pub(crate) type LogRecordSender = tokio::sync::broadcast::Sender<LogRecord>;
+pub(crate) type LogRecordReceiver = tokio::sync::broadcast::Receiver<LogRecord>;
 
 #[derive(Debug, Clone, Copy)]
-pub enum SourceType {
+pub(crate) enum SourceType {
     Levelled,
     Stdout,
     Stderr,
@@ -13,7 +13,7 @@ pub enum SourceType {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct LogRecord {
+pub(crate) struct LogRecord {
     timestamp: ::chrono::DateTime<::chrono::offset::Local>,
     source_type: SourceType,
     level: ::tracing::Level,
@@ -27,7 +27,7 @@ pub struct LogRecord {
 
 impl LogRecord {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         source_type: SourceType,
         level: ::tracing::Level,
         target: String,
@@ -50,7 +50,7 @@ impl LogRecord {
         }
     }
 
-    pub fn format_for_term(&self, width: u16, verbose: bool) -> Vec<Line<'static>> {
+    pub(crate) fn format_for_term(&self, width: u16, verbose: bool) -> Vec<Line<'static>> {
         let timestamp = self.timestamp.format("%y-%m-%d %H:%M:%S").to_string();
         let (level_colour, dim_level_colour) = match (self.source_type, self.level) {
             (SourceType::Stderr, _) | (SourceType::Stdout, _) => (
@@ -159,7 +159,7 @@ impl LogRecord {
         lines
     }
 
-    pub fn write_dump(&self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
+    pub(crate) fn write_dump(&self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
         let msg = match &self.span_context {
             Some(ctx) => format!("[{ctx}] {}", self.msg),
             None => self.msg.clone(),
@@ -177,7 +177,7 @@ impl LogRecord {
         )
     }
 
-    pub fn write_to_posix(
+    pub(crate) fn write_to_posix(
         &self,
         stdout: &mut impl std::io::Write,
         stderr: &mut impl std::io::Write,

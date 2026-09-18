@@ -1,13 +1,14 @@
 mod ui_loop;
-pub use ui_loop::UiLoop;
+pub(crate) use ui_loop::UiLoop;
 
 mod options;
-pub use options::{UiMode, UiOptions};
+pub use options::UiMode;
+pub(crate) use options::UiOptions;
 
 #[cfg(unix)]
 mod output_capture;
 #[cfg(unix)]
-pub use output_capture::*;
+use output_capture::*;
 
 mod error;
 pub use error::UiError;

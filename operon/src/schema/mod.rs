@@ -1,3 +1,5 @@
+#![doc(hidden)]
+
 mod job;
 pub(crate) use job::JobLike;
 pub use job::{Job, JobEnum};

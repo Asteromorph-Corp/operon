@@ -13,7 +13,7 @@ use crate::utils::{
 };
 
 /// The table recording each dimension's shape ID, keyed by dimension ID.
-pub(crate) const DIMENSION_SHAPES: ShapeTable<'static> = ShapeTable {
+pub(super) const DIMENSION_SHAPES: ShapeTable<'static> = ShapeTable {
     table: "_dimension_hash",
     column: "hash",
 };
@@ -46,6 +46,7 @@ impl<const N: usize> Resolution<N> {
 }
 
 /// Helper struct for building SQL queries related to resolutions.
+#[derive(Debug)]
 pub struct PsqlResolutionQueryBuilder<'a, const N: usize> {
     client: &'a PsqlClient<'a>,
     dim_meta: DimensionMetadata<N>,
@@ -118,7 +119,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
     async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearResolutionQuery(schema_prefix, self.dim_meta);
-        self.client.execute_stmt(&stmt, &[]).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &[]).await?;
         Ok(())
     }
 
@@ -137,7 +138,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
         let params = resolution.as_sql_params()?;
-        self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 
@@ -249,7 +250,7 @@ impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
 }
 
 /// Helper struct to generate the SQL query for inserting a resolution for a dimension.
-pub struct PutResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
+pub(super) struct PutResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for PutResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

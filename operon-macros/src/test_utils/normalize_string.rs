@@ -1,15 +1,15 @@
-pub fn normalize_string(input: &str) -> String {
+pub(super) fn normalize_string(input: &str) -> String {
     let newline_normalized = normalize_raw_string_newlines(input);
     let comment_normalized = normalize_comments(&newline_normalized);
     let parenthesis_removed = remove_parenthesis(&comment_normalized);
     remove_trailing_commas(&parenthesis_removed)
 }
 
-pub fn remove_parenthesis(s: &str) -> String {
+pub(super) fn remove_parenthesis(s: &str) -> String {
     s.replace("{ Ok(elem) }", "Ok(elem)")
 }
 
-pub fn remove_trailing_commas(s: &str) -> String {
+pub(super) fn remove_trailing_commas(s: &str) -> String {
     let mut chars: Vec<char> = s.chars().collect();
     let mut i = 0;
 
@@ -22,7 +22,7 @@ pub fn remove_trailing_commas(s: &str) -> String {
             }
             // If next significant char is a closing delimiter → remove comma (+ whitespace)
             if j < chars.len() && matches!(chars[j], ')' | ']' | '}') {
-                chars.drain(i..j);
+                let _drained = chars.drain(i..j);
                 continue; // re-process index i since characters shifted
             }
         }
@@ -32,7 +32,7 @@ pub fn remove_trailing_commas(s: &str) -> String {
     chars.into_iter().collect()
 }
 
-pub fn normalize_comments(input: &str) -> String {
+pub(super) fn normalize_comments(input: &str) -> String {
     let mut out = String::new();
     let mut chars = input.chars().peekable();
     let mut in_string = false;
@@ -65,11 +65,11 @@ pub fn normalize_comments(input: &str) -> String {
         if c == '/' && chars.peek() == Some(&'/') {
             // Look ahead for ///
             let mut lookahead = chars.clone();
-            lookahead.next(); // skip '//'
+            let _ = lookahead.next(); // skip '//'
             if lookahead.peek() == Some(&'/') {
                 // It's a doc comment
-                chars.next(); // consume second '/'
-                chars.next(); // consume third '/'
+                let _ = chars.next(); // consume second '/'
+                let _ = chars.next(); // consume third '/'
                 out.push_str("///");
                 // If next char is not space or slash, insert space
                 if let Some(&nc) = chars.peek()
@@ -92,7 +92,7 @@ pub fn normalize_comments(input: &str) -> String {
         // Detect multiline comment /** ... */
         if c == '/' && chars.peek() == Some(&'*') {
             let mut lookahead = chars.clone();
-            lookahead.next(); // consume *
+            let _ = lookahead.next(); // consume *
             if lookahead.peek() == Some(&'*') {
                 // Detect indent BEFORE "/**"
                 // Scan backwards until newline or start
@@ -106,14 +106,14 @@ pub fn normalize_comments(input: &str) -> String {
                     .take_while(|ch| ch.is_whitespace())
                     .collect();
 
-                chars.next(); // consume *
-                chars.next(); // consume second *
+                let _ = chars.next(); // consume *
+                let _ = chars.next(); // consume second *
                 // Collect content
                 let mut buf = String::new();
                 while let Some(nc) = chars.next() {
                     // End of block
                     if nc == '*' && chars.peek() == Some(&'/') {
-                        chars.next(); // consume '/'
+                        let _ = chars.next(); // consume '/'
                         break;
                     }
                     buf.push(nc);
@@ -164,17 +164,17 @@ fn normalize_raw_string_newlines(input: &str) -> String {
                     let mut la = it.clone();
                     let mut hashes = 0usize;
                     while matches!(la.peek(), Some('#')) {
-                        la.next();
+                        let _ = la.next();
                         hashes += 1;
                     }
                     if matches!(la.peek(), Some('"')) {
                         // Consume what we looked ahead: the hashes and the opening quote.
                         out.push('r');
                         for _ in 0..hashes {
-                            it.next();
+                            let _ = it.next();
                             out.push('#');
                         }
-                        it.next(); // consume the opening '"'
+                        let _ = it.next(); // consume the opening '"'
                         out.push('"');
                         state = State::Raw { hashes };
                         continue;
@@ -221,14 +221,14 @@ fn normalize_raw_string_newlines(input: &str) -> String {
                     let mut la = it.clone();
                     let mut seen = 0usize;
                     while seen < hashes && matches!(la.peek(), Some('#')) {
-                        la.next();
+                        let _ = la.next();
                         seen += 1;
                     }
                     if seen == hashes {
                         // Close it: emit '"' and those '#'s, consume them, and leave raw mode.
                         out.push('"');
                         for _ in 0..hashes {
-                            it.next();
+                            let _ = it.next();
                             out.push('#');
                         }
                         state = State::Outside;

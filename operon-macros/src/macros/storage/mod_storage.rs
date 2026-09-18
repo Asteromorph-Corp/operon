@@ -7,7 +7,7 @@ use crate::macros::storage::mem::mod_mem;
 use crate::macros::storage::psql::mod_psql;
 
 /// Generates the `storage` module with storage implementations.
-pub fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
+pub(crate) fn mod_storage(all_configs: &AllConfig) -> syn::ItemMod {
     let entities_definition = entities_definition(&all_configs.service_id, &all_configs.entities);
     let impl_entities_default =
         impl_entities_default(&all_configs.service_id, &all_configs.entities);

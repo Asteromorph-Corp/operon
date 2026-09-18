@@ -10,7 +10,10 @@ use crate::utils::{entities_ident, to_snake_case, to_type};
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/entities_definition.rs"))]
 /// ```
-pub fn entities_definition(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemStruct {
+pub(super) fn entities_definition(
+    service_id: &syn::Ident,
+    entities: &EntityConfigMap,
+) -> syn::ItemStruct {
     let operon = operon_ident();
     let entities_ident = entities_ident(service_id);
     let fields = entities.values().map(|entity| -> syn::Field {

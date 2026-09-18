@@ -85,7 +85,7 @@ impl PsqlClient<'_> {
         let shape_id = FOOTPRINT_VERSION.to_string();
 
         let init_record = init_shape_table_query(FOOTPRINT_SHAPES, schema_prefix);
-        self.execute(&init_record, &[]).await?;
+        let _num_rows = self.execute(&init_record, &[]).await?;
 
         let action = self.footprint_action(&shape_id).await?;
         let carried = match action {
@@ -122,7 +122,7 @@ impl PsqlClient<'_> {
         let schema_prefix = self.schema_prefix();
 
         let stmt = format!("TRUNCATE TABLE {schema_prefix}runs CASCADE");
-        self.execute(&stmt, &[]).await?;
+        let _num_rows = self.execute(&stmt, &[]).await?;
         Ok(())
     }
 
@@ -161,7 +161,8 @@ impl PsqlClient<'_> {
                 finished_at = EXCLUDED.finished_at"
         };
 
-        self.execute(&stmt, &[&GLOBAL, &run_id, &run_state, updated_at])
+        let _num_rows = self
+            .execute(&stmt, &[&GLOBAL, &run_id, &run_state, updated_at])
             .await?;
 
         Ok(())
@@ -175,7 +176,7 @@ impl PsqlClient<'_> {
             INSERT INTO {schema_prefix}run_executions (run_id, execution_id)
             VALUES ($1, $2)"
         };
-        self.execute(&stmt, &[&run_id, &execution_id]).await?;
+        let _num_rows = self.execute(&stmt, &[&run_id, &execution_id]).await?;
         Ok(())
     }
 
@@ -195,7 +196,8 @@ impl PsqlClient<'_> {
             SET ended_at = $3, end_reason = $4
             WHERE run_id = $1 AND execution_id = $2"
         };
-        self.execute(&stmt, &[run_id, &execution_id, at, &end_reason])
+        let _num_rows = self
+            .execute(&stmt, &[run_id, &execution_id, at, &end_reason])
             .await?;
         Ok(())
     }

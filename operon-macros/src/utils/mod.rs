@@ -1,7 +1,7 @@
 mod parse;
 
 mod ident;
-pub use ident::*;
+pub(crate) use ident::*;
 
 mod attr;
-pub use attr::*;
+pub(crate) use attr::*;

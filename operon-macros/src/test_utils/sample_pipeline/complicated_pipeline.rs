@@ -18,7 +18,7 @@ use crate::configs::{
     TaskArg, TaskConfig, TaskConfigMap,
 };
 
-pub fn task_alpha() -> TaskConfig {
+pub(crate) fn task_alpha() -> TaskConfig {
     TaskConfig {
         id: format_ident!("alpha"),
         from: vec![],
@@ -30,7 +30,7 @@ pub fn task_alpha() -> TaskConfig {
     }
 }
 
-pub fn task_beta() -> TaskConfig {
+pub(crate) fn task_beta() -> TaskConfig {
     TaskConfig {
         id: format_ident!("beta"),
         from: vec![],
@@ -42,7 +42,7 @@ pub fn task_beta() -> TaskConfig {
     }
 }
 
-pub fn task_gamma() -> TaskConfig {
+pub(crate) fn task_gamma() -> TaskConfig {
     TaskConfig {
         id: format_ident!("gamma"),
         from: vec![
@@ -63,7 +63,7 @@ pub fn task_gamma() -> TaskConfig {
     }
 }
 
-pub fn task_delta() -> TaskConfig {
+pub(crate) fn task_delta() -> TaskConfig {
     TaskConfig {
         id: format_ident!("delta"),
         from: vec![TaskArg {
@@ -78,7 +78,7 @@ pub fn task_delta() -> TaskConfig {
     }
 }
 
-pub fn task_epsilon() -> TaskConfig {
+pub(crate) fn task_epsilon() -> TaskConfig {
     TaskConfig {
         id: format_ident!("epsilon"),
         from: vec![
@@ -99,7 +99,7 @@ pub fn task_epsilon() -> TaskConfig {
     }
 }
 
-pub fn all_tasks() -> TaskConfigMap {
+pub(crate) fn all_tasks() -> TaskConfigMap {
     TaskConfigMap::from_iter([
         (format_ident!("alpha"), task_alpha()),
         (format_ident!("beta"), task_beta()),
@@ -109,35 +109,35 @@ pub fn all_tasks() -> TaskConfigMap {
     ])
 }
 
-pub fn dimension_i() -> DimensionConfig {
+pub(crate) fn dimension_i() -> DimensionConfig {
     DimensionConfig {
         id: format_ident!("i"),
         depends_on: vec![],
     }
 }
 
-pub fn dimension_j() -> DimensionConfig {
+pub(crate) fn dimension_j() -> DimensionConfig {
     DimensionConfig {
         id: format_ident!("j"),
         depends_on: vec![format_ident!("i")],
     }
 }
 
-pub fn dimension_k() -> DimensionConfig {
+pub(crate) fn dimension_k() -> DimensionConfig {
     DimensionConfig {
         id: format_ident!("k"),
         depends_on: vec![format_ident!("i"), format_ident!("j")],
     }
 }
 
-pub fn dimension_l() -> DimensionConfig {
+pub(crate) fn dimension_l() -> DimensionConfig {
     DimensionConfig {
         id: format_ident!("l"),
         depends_on: vec![],
     }
 }
 
-pub fn all_dimensions() -> DimensionConfigMap {
+pub(crate) fn all_dimensions() -> DimensionConfigMap {
     DimensionConfigMap::from_iter([
         (format_ident!("i"), dimension_i()),
         (format_ident!("j"), dimension_j()),
@@ -146,42 +146,42 @@ pub fn all_dimensions() -> DimensionConfigMap {
     ])
 }
 
-pub fn entity_a() -> EntityConfig {
+pub(crate) fn entity_a() -> EntityConfig {
     EntityConfig {
         id: format_ident!("A"),
         dims: vec![],
     }
 }
 
-pub fn entity_b() -> EntityConfig {
+pub(crate) fn entity_b() -> EntityConfig {
     EntityConfig {
         id: format_ident!("B"),
         dims: vec![format_ident!("i")],
     }
 }
 
-pub fn entity_c() -> EntityConfig {
+pub(crate) fn entity_c() -> EntityConfig {
     EntityConfig {
         id: format_ident!("C"),
         dims: vec![format_ident!("j")],
     }
 }
 
-pub fn entity_d() -> EntityConfig {
+pub(crate) fn entity_d() -> EntityConfig {
     EntityConfig {
         id: format_ident!("D"),
         dims: vec![format_ident!("i"), format_ident!("j"), format_ident!("k")],
     }
 }
 
-pub fn entity_e() -> EntityConfig {
+pub(crate) fn entity_e() -> EntityConfig {
     EntityConfig {
         id: format_ident!("E"),
         dims: vec![format_ident!("l")],
     }
 }
 
-pub fn all_entities() -> EntityConfigMap {
+pub(crate) fn all_entities() -> EntityConfigMap {
     EntityConfigMap::from_iter([
         (format_ident!("A"), entity_a()),
         (format_ident!("B"), entity_b()),
@@ -191,12 +191,12 @@ pub fn all_entities() -> EntityConfigMap {
     ])
 }
 
-pub fn service_id() -> syn::Ident {
+pub(crate) fn service_id() -> syn::Ident {
     format_ident!("complicated")
 }
 
 #[allow(dead_code)]
-pub fn complicated_pipeline() -> AllConfig {
+pub(crate) fn complicated_pipeline() -> AllConfig {
     AllConfig {
         service_id: service_id(),
         dimensions: all_dimensions(),

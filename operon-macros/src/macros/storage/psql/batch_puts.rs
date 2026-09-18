@@ -18,11 +18,11 @@ use crate::utils::{batch_put_entity_ident, operon_ident, to_snake_case, to_type}
 ///         .await
 /// }
 /// ```
-pub fn batch_puts(tasks: &TaskConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
+pub(super) fn batch_puts(tasks: &TaskConfigMap) -> impl Iterator<Item = syn::TraitItemFn> {
     tasks.values().filter_map(|task| -> Option<syn::TraitItemFn> {
         let operon = operon_ident();
         let id = to_snake_case(&task.to);
-        task.spawn_dim.as_ref()?;
+        let _ = task.spawn_dim.as_ref()?;
 
         let batch_put_fn_name = batch_put_entity_ident(&task.to);
 

@@ -5,31 +5,31 @@ use ratatui::text::{Line, Text};
 use crate::logger::LogRecord;
 
 #[derive(Debug, Clone)]
-pub struct LogBuffer {
+pub(super) struct LogBuffer {
     records: VecDeque<LogRecord>,
     capacity: usize,
 }
 
 impl LogBuffer {
-    pub fn new(size: usize) -> Self {
+    pub(super) fn new(size: usize) -> Self {
         Self {
             records: VecDeque::with_capacity(size),
             capacity: size,
         }
     }
 
-    pub fn push(&mut self, record: LogRecord) {
+    pub(super) fn push(&mut self, record: LogRecord) {
         if self.records.len() >= self.capacity {
-            self.records.pop_front();
+            let _drop = self.records.pop_front();
         }
         self.records.push_back(record);
     }
 
-    pub fn clear(&mut self) {
+    pub(super) fn clear(&mut self) {
         self.records.clear();
     }
 
-    pub fn to_lines(&self, width: u16, verbose: bool) -> Vec<Line<'static>> {
+    pub(super) fn to_lines(&self, width: u16, verbose: bool) -> Vec<Line<'static>> {
         self.records
             .iter()
             .flat_map(|r| r.format_for_term(width, verbose))
@@ -38,7 +38,7 @@ impl LogBuffer {
 
     /// Display the bottom `height` lines, skipping `cursor` lines.
     /// If `cursor + height` exceeds the number of lines, `cursor` will be clamped down.
-    pub fn to_text(
+    pub(super) fn to_text(
         &self,
         width: u16,
         height: u16,

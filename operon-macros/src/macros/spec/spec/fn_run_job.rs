@@ -90,7 +90,7 @@ fn get_all_required_dims<'a>(
 
 /// Generates the code that fetches and inserts the resolution entries into the resolution map.
 fn resolution_inserts(
-    required_dims: &IndexSet<RequiredDim>,
+    required_dims: &IndexSet<RequiredDim<'_>>,
     dimensions: &DimensionConfigMap,
 ) -> impl Iterator<Item = proc_macro2::TokenStream> {
     required_dims.iter().map(|dim| {

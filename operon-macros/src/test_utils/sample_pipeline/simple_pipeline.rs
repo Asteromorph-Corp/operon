@@ -20,7 +20,7 @@ use crate::configs::{
     TaskArg, TaskConfig, TaskConfigMap,
 };
 
-pub fn task_alpha() -> TaskConfig {
+pub(crate) fn task_alpha() -> TaskConfig {
     TaskConfig {
         id: format_ident!("alpha"),
         from: vec![],
@@ -32,7 +32,7 @@ pub fn task_alpha() -> TaskConfig {
     }
 }
 
-pub fn task_beta() -> TaskConfig {
+pub(crate) fn task_beta() -> TaskConfig {
     TaskConfig {
         id: format_ident!("beta"),
         from: vec![TaskArg {
@@ -47,7 +47,7 @@ pub fn task_beta() -> TaskConfig {
     }
 }
 
-pub fn task_gamma() -> TaskConfig {
+pub(crate) fn task_gamma() -> TaskConfig {
     TaskConfig {
         id: format_ident!("gamma"),
         from: vec![TaskArg {
@@ -62,7 +62,7 @@ pub fn task_gamma() -> TaskConfig {
     }
 }
 
-pub fn task_delta() -> TaskConfig {
+pub(crate) fn task_delta() -> TaskConfig {
     TaskConfig {
         id: format_ident!("delta"),
         from: vec![
@@ -87,7 +87,7 @@ pub fn task_delta() -> TaskConfig {
     }
 }
 
-pub fn task_epsilon() -> TaskConfig {
+pub(crate) fn task_epsilon() -> TaskConfig {
     TaskConfig {
         id: format_ident!("epsilon"),
         from: vec![
@@ -108,7 +108,7 @@ pub fn task_epsilon() -> TaskConfig {
     }
 }
 
-pub fn task_zeta() -> TaskConfig {
+pub(crate) fn task_zeta() -> TaskConfig {
     TaskConfig {
         id: format_ident!("zeta"),
         from: vec![
@@ -141,21 +141,21 @@ pub fn all_tasks() -> TaskConfigMap {
     ])
 }
 
-pub fn dimension_i() -> DimensionConfig {
+pub(crate) fn dimension_i() -> DimensionConfig {
     DimensionConfig {
         id: format_ident!("i"),
         depends_on: vec![],
     }
 }
 
-pub fn dimension_j() -> DimensionConfig {
+pub(crate) fn dimension_j() -> DimensionConfig {
     DimensionConfig {
         id: format_ident!("j"),
         depends_on: vec![format_ident!("i")],
     }
 }
 
-pub fn dimension_k() -> DimensionConfig {
+pub(crate) fn dimension_k() -> DimensionConfig {
     DimensionConfig {
         id: format_ident!("k"),
         depends_on: vec![format_ident!("i")],
@@ -171,42 +171,42 @@ pub fn all_dimensions() -> DimensionConfigMap {
     ])
 }
 
-pub fn entity_a() -> EntityConfig {
+pub(crate) fn entity_a() -> EntityConfig {
     EntityConfig {
         id: format_ident!("A"),
         dims: vec![format_ident!("i")],
     }
 }
 
-pub fn entity_b() -> EntityConfig {
+pub(crate) fn entity_b() -> EntityConfig {
     EntityConfig {
         id: format_ident!("B"),
         dims: vec![format_ident!("i"), format_ident!("j")],
     }
 }
 
-pub fn entity_c() -> EntityConfig {
+pub(crate) fn entity_c() -> EntityConfig {
     EntityConfig {
         id: format_ident!("C"),
         dims: vec![format_ident!("i"), format_ident!("k")],
     }
 }
 
-pub fn entity_d() -> EntityConfig {
+pub(crate) fn entity_d() -> EntityConfig {
     EntityConfig {
         id: format_ident!("D"),
         dims: vec![format_ident!("i"), format_ident!("j"), format_ident!("k")],
     }
 }
 
-pub fn entity_e() -> EntityConfig {
+pub(crate) fn entity_e() -> EntityConfig {
     EntityConfig {
         id: format_ident!("E"),
         dims: vec![format_ident!("i"), format_ident!("k")],
     }
 }
 
-pub fn entity_f() -> EntityConfig {
+pub(crate) fn entity_f() -> EntityConfig {
     EntityConfig {
         id: format_ident!("F"),
         dims: vec![format_ident!("i")],

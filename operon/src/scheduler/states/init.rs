@@ -12,7 +12,7 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct InitTransition<Svc, Sto, MSto>
+pub(crate) struct InitTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -30,7 +30,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(crate) fn new(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
@@ -44,7 +44,7 @@ where
         }
     }
 
-    pub fn state(
+    pub(crate) fn state(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,

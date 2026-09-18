@@ -46,7 +46,7 @@ async fn exercise<MSto: MetaBackend>(backend: &MSto) -> Vec<Step> {
         .await
         .expect("init_dimension_hash");
     client.init_ticket_hash().await.expect("init_ticket_hash");
-    client
+    let _ = client
         .resolution(dim_i())
         .init()
         .await
@@ -59,23 +59,23 @@ async fn exercise<MSto: MetaBackend>(backend: &MSto) -> Vec<Step> {
         .init_ticket_status_type()
         .await
         .expect("init_ticket_status_type");
-    client
+    let _ = client
         .ticket(task_alpha())
         .init()
         .await
         .expect("alpha init");
-    client.ticket(task_beta()).init().await.expect("beta init");
-    client
+    let _ = client.ticket(task_beta()).init().await.expect("beta init");
+    let _ = client
         .ticket(task_gamma())
         .init()
         .await
         .expect("gamma init");
-    client
+    let _ = client
         .ticket(task_delta())
         .init()
         .await
         .expect("delta init");
-    client.init_footprint().await.expect("init_footprint");
+    let _ = client.init_footprint().await.expect("init_footprint");
 
     // Start from a known state, so a reused database matches a fresh store.
     client

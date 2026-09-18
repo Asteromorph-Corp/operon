@@ -60,7 +60,7 @@ fn fn_link_dimension_ids(all_configs: &AllConfig) -> syn::ItemFn {
     }
 }
 
-pub fn misc(all_configs: &AllConfig) -> syn::ItemMod {
+pub(super) fn misc(all_configs: &AllConfig) -> syn::ItemMod {
     let fn_scheduler_handler = fn_scheduler_handler(all_configs);
     let fn_link_dimension_ids = fn_link_dimension_ids(all_configs);
     let storage_trait = storage_trait_ident(&all_configs.service_id);

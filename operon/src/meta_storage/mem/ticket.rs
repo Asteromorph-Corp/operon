@@ -14,7 +14,7 @@ use crate::schema::{
 type TicketKey = Box<[OptionCoordinate]>;
 
 /// A stored ticket's state, keyed in the table by its coordinate.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct TicketRow {
     deps_done: usize,
     deps_quota: usize,
@@ -22,7 +22,7 @@ struct TicketRow {
 }
 
 /// One task's ticket table.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(super) struct TicketTable {
     rows: RwLock<TicketRows>,
 }
@@ -32,7 +32,7 @@ pub(super) struct TicketTable {
 ///
 /// One lock spans all three: it makes a slice op's scan and write-back atomic, and it keeps a
 /// reader from observing the counters or an index midway through an update.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct TicketRows {
     map: HashMap<TicketKey, TicketRow>,
     indexes: HashMap<PinMask, PinIndex>,
@@ -54,7 +54,7 @@ impl TicketRows {
     /// Adds a key to every index built so far.
     fn index(&mut self, key: &TicketKey) {
         for (mask, index) in &mut self.indexes {
-            index
+            let _ = index
                 .entry(mask.apply(key))
                 .or_default()
                 .insert(key.clone());
@@ -67,9 +67,9 @@ impl TicketRows {
             let Entry::Occupied(mut bucket) = index.entry(mask.apply(key)) else {
                 continue;
             };
-            bucket.get_mut().remove(key);
+            let _ = bucket.get_mut().remove(key);
             if bucket.get().is_empty() {
-                bucket.remove();
+                let _value = bucket.remove();
             }
         }
     }
@@ -87,12 +87,12 @@ impl TicketRows {
         if !self.indexes.contains_key(mask) {
             let mut index = PinIndex::default();
             for key in self.map.keys() {
-                index
+                let _ = index
                     .entry(mask.apply(key))
                     .or_default()
                     .insert(key.clone());
             }
-            self.indexes.insert(mask.clone(), index);
+            let _old_value = self.indexes.insert(mask.clone(), index);
         }
 
         self.indexes[mask]
@@ -118,7 +118,7 @@ impl TicketRows {
     fn insert(&mut self, key: TicketKey, row: TicketRow) {
         self.count(row.status, 1);
         self.index(&key);
-        self.map.insert(key, row);
+        let _ = self.map.insert(key, row);
     }
 
     /// Inserts a ticket, leaving an existing one at the same key untouched.
@@ -131,7 +131,7 @@ impl TicketRows {
 
     /// Replaces the row at `key`, keeping the counters in step.
     fn replace(&mut self, key: &TicketKey, old_status: TicketStatus, row: TicketRow) {
-        self.map.insert(key.clone(), row);
+        let _ = self.map.insert(key.clone(), row);
         self.count(old_status, -1);
         self.count(row.status, 1);
     }
@@ -154,7 +154,7 @@ impl TicketRows {
 }
 
 /// One of a task's dimensions, as a query sees it: pinned to a concrete value, or free to vary.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 enum PinSlot {
     Free,
@@ -164,7 +164,7 @@ enum PinSlot {
 /// The set of a task's dimensions that a query pins, one slot per dimension.
 ///
 /// Every op pins a subset that the DAG fixes in advance, so a task sees only a handful of masks.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct PinMask(Box<[PinSlot]>);
 
 impl PinMask {
@@ -221,6 +221,7 @@ impl PinMask {
 type PinIndex = HashMap<TicketKey, HashSet<TicketKey>>;
 
 /// Helper struct for querying the in-memory tickets of a task.
+#[derive(Debug)]
 pub struct MemTicketQueryBuilder<'a, const N: usize> {
     store: &'a MemStore,
     task_meta: TaskMetadata<N>,
@@ -555,7 +556,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
@@ -579,7 +580,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
@@ -598,7 +599,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
@@ -624,7 +625,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(2).with_coordinate::<0>(0))
@@ -645,7 +646,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
@@ -667,7 +668,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets.put(Ticket::new(0)).await.unwrap();
 
@@ -698,7 +699,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(0).with_coordinate::<0>(0))
@@ -726,7 +727,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(0).with_coordinate::<0>(0))
@@ -742,7 +743,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
@@ -777,13 +778,13 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
             .await
             .unwrap();
-        tickets
+        let _newly_ready = tickets
             .raise_deps_done(task_alpha(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
@@ -806,16 +807,16 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets.put(Ticket::new(1)).await.unwrap();
         // Builds the index over `i` while the only ticket is still unexploded.
-        tickets
+        let _newly_ready = tickets
             .raise_deps_done(task_alpha(), Job { coordinate: [1] }, &[])
             .await
             .unwrap();
 
-        tickets
+        let _replaced = tickets
             .explode::<0, 0>(
                 DimensionMetadata { id: "i", deps: [] },
                 Resolution {
@@ -841,13 +842,13 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
             .await
             .unwrap();
-        tickets
+        let _newly_ready = tickets
             .raise_deps_done(task_alpha(), Job { coordinate: [0] }, &[])
             .await
             .unwrap();
@@ -871,7 +872,7 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_gamma());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         for i in 0..2 {
             for j in 0..2 {
@@ -909,12 +910,12 @@ mod tests {
         let (_backend, conn) = store().await;
         let client = conn.as_client();
         let tickets = client.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
         tickets
             .put(Ticket::new(1).with_coordinate::<0>(0))
             .await
             .unwrap();
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         assert_eq!(tickets.get_status().await.unwrap(), (0, 0, 1));
     }
@@ -924,7 +925,7 @@ mod tests {
     async fn a_poisoned_table_errors_rather_than_panicking() {
         let store = MemStore::default();
         let tickets = store.ticket(task_beta());
-        tickets.init().await.unwrap();
+        let _ = tickets.init().await.unwrap();
 
         let table = store.ticket_table("beta").unwrap().expect("table");
         let panicked = std::thread::spawn(move || {

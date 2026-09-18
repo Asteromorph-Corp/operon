@@ -12,7 +12,7 @@ use crate::scheduler::states::{NextState, SchedulerTransition, TransitionState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct RebuildTransition<Svc, Sto, MSto>
+pub(super) struct RebuildTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -30,7 +30,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(super) fn new(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
@@ -44,7 +44,7 @@ where
         }
     }
 
-    pub fn state(
+    pub(super) fn state(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
@@ -84,7 +84,7 @@ where
         let scratch_client = scratch_conn.as_client();
 
         // The in-memory tables are registered here, before anything writes to them.
-        scratch_handler
+        let _ = scratch_handler
             .init_meta_storage(scratch_client)
             .await
             .map_err(SchedulerError::during_rebuild)?;

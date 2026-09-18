@@ -6,7 +6,7 @@ use crate::schema::CheckMode;
 
 #[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
 #[clap(rename_all = "kebab-case")]
-pub enum Command {
+pub(super) enum Command {
     /// Start a new run using the best available restoration.
     Run {
         /// Start a fresh run, ignoring any existing data.

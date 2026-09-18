@@ -1,5 +1,6 @@
-pub type IndividualControlEventReceiver = tokio::sync::mpsc::Receiver<IndividualControlEvent>;
-pub type IndividualControlEventSender = tokio::sync::mpsc::Sender<IndividualControlEvent>;
+pub(crate) type IndividualControlEventReceiver =
+    tokio::sync::mpsc::Receiver<IndividualControlEvent>;
+pub(crate) type IndividualControlEventSender = tokio::sync::mpsc::Sender<IndividualControlEvent>;
 
 /// `IndividualScheduler`-`Scheduler` communication events.
 ///

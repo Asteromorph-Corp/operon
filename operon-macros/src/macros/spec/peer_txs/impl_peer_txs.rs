@@ -12,7 +12,7 @@ use crate::utils::{
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/peer_txs/impl_peer_txs.rs"))]
 /// ```
-pub fn impl_peer_txs(
+pub(crate) fn impl_peer_txs(
     task_id: &syn::Ident,
     event_receiving_task_ids: &IndexSet<&syn::Ident>,
 ) -> syn::ItemImpl {

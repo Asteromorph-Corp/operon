@@ -15,14 +15,14 @@ use crate::ui::UiError;
 struct SpanFields(Vec<(String, String)>);
 
 #[derive(Debug)]
-pub struct UiBroadcastLayer {
+pub(crate) struct UiBroadcastLayer {
     sender: LogRecordSender,
     level: tracing::Level,
     dump: Option<String>,
 }
 
 impl UiBroadcastLayer {
-    pub fn new(sender: LogRecordSender, options: LoggerOptions) -> Self {
+    pub(crate) fn new(sender: LogRecordSender, options: LoggerOptions) -> Self {
         Self {
             sender,
             level: options.level,
@@ -30,7 +30,7 @@ impl UiBroadcastLayer {
         }
     }
 
-    pub fn setup(self) -> Result<(), UiError> {
+    pub(crate) fn setup(self) -> Result<(), UiError> {
         use tracing_subscriber::prelude::*;
 
         // Bridge the `log` crate so third-party crates using `log` are captured.
@@ -58,7 +58,7 @@ impl UiBroadcastLayer {
         {
             Ok(file) => {
                 let mut writer = ::std::io::BufWriter::new(file);
-                let _ = writeln!(writer, "timestamp,level,target,file,module,line,message");
+                let _result = writeln!(writer, "timestamp,level,target,file,module,line,message");
                 writer.into_inner().unwrap()
             }
             Err(ref e) if e.kind() == ::std::io::ErrorKind::AlreadyExists => {
@@ -72,7 +72,7 @@ impl UiBroadcastLayer {
             }
         };
         let mut writer = ::std::io::BufWriter::new(log_file);
-        let _ = record.write_dump(&mut writer);
+        let _result = record.write_dump(&mut writer);
     }
 }
 
@@ -206,6 +206,6 @@ where
         self.dump_record(&record);
 
         // Send to UI (fails silently when UI closes)
-        let _ = self.sender.send(record);
+        let _result = self.sender.send(record);
     }
 }

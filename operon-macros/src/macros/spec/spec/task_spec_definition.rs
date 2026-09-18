@@ -8,7 +8,7 @@ use crate::utils::spec_ident;
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/task_spec_definition.rs"))]
 /// ```
-pub fn task_spec_definition(task_id: &syn::Ident) -> syn::ItemStruct {
+pub(crate) fn task_spec_definition(task_id: &syn::Ident) -> syn::ItemStruct {
     let spec_ident = spec_ident(task_id);
 
     parse_quote! {
