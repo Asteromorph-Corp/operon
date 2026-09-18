@@ -143,6 +143,50 @@ pub(crate) fn hash_metadata<T: Hash>(metadata: &T) -> String {
     format!("{:016x}", hasher.finish())
 }
 
+/// The maximum length of a PostgreSQL identifier.
+const PSQL_MAX_IDENTIFIER_LENGTH: usize = 63;
+
+/// The number of characters to take from the original ID for human readability.
+const PSQL_ID_PREFIX_LENGTH: usize = 4;
+
+/// The length threshold above which IDs are hashed to fit within PostgreSQL's identifier limit.
+const PSQL_ID_CLAMP_THRESHOLD: usize = 20;
+
+/// Generates a PostgreSQL-safe identifier from a user-provided ID.
+///
+/// Postgres limits identifiers to 63 bytes, so this function hashes the ID to ensure it fits.
+/// The output consists of:
+/// - The provided `prefix`.
+/// - The first 4 characters of the provided `id`.
+/// - A 16-character hash of the provided `id`.
+///
+/// in the format `{prefix}_{id_prefix}_{hash}`.
+pub(crate) fn psql_identifier(prefix: &str, id: &str) -> String {
+    let id = if id.len() <= PSQL_ID_CLAMP_THRESHOLD {
+        id.to_owned()
+    } else {
+        let id_prefix: String = id.chars().take(PSQL_ID_PREFIX_LENGTH).collect();
+        let hash = hash_str(id);
+        format!("{id_prefix}_{hash}")
+    };
+
+    let result = format!("{prefix}_{id}");
+    debug_assert!(
+        result.len() <= PSQL_MAX_IDENTIFIER_LENGTH,
+        "PSQL identifier may exceed 63 bytes: {result} (length: {})",
+        result.len(),
+    );
+
+    result
+}
+
+/// Hashes a string into a 16-character hex string.
+fn hash_str(s: &str) -> String {
+    let mut hasher = XxHash3_64::new();
+    s.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
 /// The table the shape IDs are recorded in.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ShapeTable<'a> {
@@ -458,6 +502,17 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+
+    #[rstest]
+    #[case::short("short_id", "ticket_short_id")]
+    #[case::long(
+        "this_is_a_very_long_task_name_that_would_exceed_postgresql_limits",
+        "ticket_this_738f27982fd1f340"
+    )]
+    fn test_psql_identifier_long_id_fits(#[case] id: &str, #[case] expected: &str) {
+        let result = psql_identifier("ticket", id);
+        assert_eq!(result, expected);
+    }
 
     #[rstest]
     #[case::unbuilt(None, TablesPresent::None, ShapeAction::Build)]
