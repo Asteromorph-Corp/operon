@@ -1,7 +1,7 @@
 # Operon
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.16080-b31b1b.svg)](https://arxiv.org/abs/2511.16080)
-[![Kellnr](https://img.shields.io/badge/kellnr-v0.6.0-blue.svg)](https://kellnr.spacer.im/crate?name=operon)
+[![crates.io](https://img.shields.io/badge/crates.io-v0.7.0-blue.svg)](https://crates.io/crates/operon)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-yellow.svg)](LICENSE-MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.91+-lightgray.svg)](https://blog.rust-lang.org/2025/10/30/Rust-1.91.0/)
 
@@ -51,9 +51,7 @@ You can find more examples in the [examples](operon/examples/) directory of this
 You will need the following to run Operon:
 
 - [Rust](https://www.rust-lang.org/tools/install) (tested with Rust 1.91+)
-- [Kellnr](https://kellnr.spacer.im/) access to download the Operon crate
-  - Alternatively, you can clone this repository and use the local path as described in the [Installation](#installation) section.
-- An async runtime configured via [`tokio`](https://crates.io/crates/tokio)
+  - An async runtime configured via [`tokio`](https://crates.io/crates/tokio)
 - A working [PostgreSQL](https://www.postgresql.org/download/) database (version 14 or later), to use the PostgreSQL backends
   - You will need a full [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) that can access the database.
   - A pipeline can also run without a database, keeping everything in process. See [Running Operon](#running-operon).
@@ -127,12 +125,10 @@ See [the `define_operon!` documentation](docs/define_operon_dsl.md).
 
 ### Installation
 
-Operon is available to internal members via [kellnr](https://kellnr.spacer.im/crate?name=operon).
-Add Operon to your project's dependencies by including the following in your `Cargo.toml`:
+Add Operon to your project's dependencies by adding `operon` in `Cargo.toml`:
 
-```toml
-[dependencies]
-operon = { version = "0.6.0", registry = "kellnr" }
+```bash
+cargo add operon
 ```
 
 Alternatively, clone this repository:
@@ -354,7 +350,7 @@ use operon::options::{PsqlMetaStorageOptions, PsqlStorageOptions};
 use operon::Operon;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     //# ——————————————————— Initializing Settings ————————————————————— #//
     let database_uri = "postgres://username:password@hostname:port/dbname";
 
@@ -468,3 +464,4 @@ This project is licensed under either the [MIT License](LICENSE-MIT) or the [Apa
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you shall be dual licensed as above, without any additional terms or conditions.
+Please read our [CONTRIBUTING.md](CONTRIBUTING.md) file for further information.

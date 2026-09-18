@@ -4,10 +4,9 @@ default-members = ["operon", "operon-macros"]
 resolver = "2"
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 rust-version = "1.91"
-publish = ["kellnr"]
 authors = [
     "Sungbin Moon <sb.moon@asteromorph.com>",
     "Jiho Park <jh.park@asteromorph.com>",
@@ -15,6 +14,7 @@ authors = [
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Asteromorph-Corp/operon"
 readme = "README.md"
+homepage = "https://asteromorph.com/"
 
 [workspace.dependencies]
-operon-macros = { version = "0.6.0", registry = "kellnr", path = "operon-macros" }
+operon-macros = { version = "0.7.0", path = "operon-macros" }

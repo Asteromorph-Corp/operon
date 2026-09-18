@@ -40,7 +40,6 @@ body:
     attributes:
       label: Suggested fix (optional)
       description: If you have an idea of how to fix the bug, please describe it here.
-  # For versioned projects only!
   - type: dropdown
     id: version
     attributes:
@@ -48,7 +47,8 @@ body:
       description: What version of our software are you running?
       options:
         - pre-release (next)
-        - 0.6.0 (latest)
+        - 0.7.0 (latest)
+        - 0.6.0
         - 0.5.0
         - 0.4.2
         - 0.3.1
@@ -70,15 +70,14 @@ body:
       label: Relevant log output
       description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
       render: shell
-  # # Enable after writing a CONTRIBUTING.md file!
-  # - type: checkboxes
-  #   id: guidelines
-  #   attributes:
-  #     label: Contribution Guidelines
-  #     description: By submitting this issue, you acknowledge that you follow our [Contribution Guidelines](https://example.com).
-  #     options:
-  #       - label: I have read and understood the Contribution Guidelines
-  #         required: true
+  - type: checkboxes
+    id: guidelines
+    attributes:
+      label: Contribution Guidelines
+      description: By submitting this issue, you acknowledge that you follow our [Contribution Guidelines](https://github.com/Asteromorph-Corp/operon/blob/main/CONTRIBUTING.md).
+      options:
+        - label: I have read and understood the Contribution Guidelines
+          required: true
   - type: upload
     id: screenshots
     attributes:

@@ -50,12 +50,11 @@ body:
     attributes:
       label: Additional context (optional)
       description: Add any mockups, sketches, links to prior art, or other context that might help.
-  # # Enable after writing a CONTRIBUTING.md file!
-  # - type: checkboxes
-  #   id: guidelines
-  #   attributes:
-  #     label: Contribution Guidelines
-  #     description: By submitting this request, you acknowledge that you follow our [Contribution Guidelines](https://example.com).
-  #     options:
-  #       - label: I have read and understood the Contribution Guidelines
-  #         required: true
+  - type: checkboxes
+    id: guidelines
+    attributes:
+      label: Contribution Guidelines
+      description: By submitting this request, you acknowledge that you follow our [Contribution Guidelines](https://github.com/Asteromorph-Corp/operon/blob/main/CONTRIBUTING.md).
+      options:
+        - label: I have read and understood the Contribution Guidelines
+          required: true

@@ -1008,7 +1008,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "operon"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "ansi_term",
  "async-trait",
@@ -1047,7 +1047,7 @@ dependencies = [
 
 [[package]]
 name = "operon-macros"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "heck",
  "indexmap",
@@ -1682,7 +1682,7 @@ dependencies = [
 
 [[package]]
 name = "test-renamed-crate"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "operon",
