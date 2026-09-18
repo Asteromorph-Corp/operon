@@ -8,7 +8,12 @@ use crate::meta_storage::MetaStorageError;
 pub(super) type PsqlResult<T> = Result<T, MetaStorageError<PsqlMetaError>>;
 
 /// Postgres-specific metadata errors.
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, ThisError)]
+#[non_exhaustive]
 pub enum PsqlMetaError {
     #[error("Database error: {}{}", .0, .0.source().map_or_else(String::new, |e| format!(", cause: {e}")))]
     Database(#[from] tokio_postgres::Error),

@@ -11,7 +11,12 @@ pub(crate) type MetaResult<T, MErr> = Result<T, MetaStorageError<MErr>>;
 ///
 /// Collects the backend-neutral domain errors any backend can raise, alongside the backend's own
 /// error type `MErr` carried by [`Backend`](Self::Backend).
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, ThisError)]
+#[non_exhaustive]
 pub enum MetaStorageError<MErr> {
     #[error("Integer conversion error: {0}")]
     IntegerConversionError(#[from] TryFromIntError),

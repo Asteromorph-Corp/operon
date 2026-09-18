@@ -10,7 +10,12 @@ pub type StorageResult<T, SErr> = Result<T, StorageError<SErr>>;
 ///
 /// Collects the backend-neutral domain errors any storage backend can raise, alongside the
 /// backend's own error type `SErr` carried by [`Backend`](Self::Backend).
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum StorageError<SErr> {
     #[error("Integer conversion error: {0}")]
     IntegerConversionError(#[from] TryFromIntError),
@@ -35,7 +40,12 @@ pub enum StorageError<SErr> {
 }
 
 /// Describes the state of a dimension in an entity lookup.
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`: adding a state variant must stay a non-breaking change.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum DimState {
     /// The dimension has a known value.
     Value(usize),

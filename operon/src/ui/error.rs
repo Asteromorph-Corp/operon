@@ -1,6 +1,10 @@
 use thiserror::Error;
 
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum UiError {
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),

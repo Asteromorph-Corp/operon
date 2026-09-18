@@ -8,7 +8,12 @@ use crate::storage::StorageError;
 pub(crate) type PsqlStorageResult<T> = Result<T, StorageError<PsqlStorageError>>;
 
 /// Postgres-specific entity-storage errors.
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, ThisError)]
+#[non_exhaustive]
 pub enum PsqlStorageError {
     #[error("Database error: {}{}", .0, .0.source().map_or_else(String::new, |e| format!(", cause: {e}")))]
     Database(#[from] tokio_postgres::Error),

@@ -9,7 +9,12 @@ use crate::storage::StorageError;
 /// ([`OperonService::Error`](crate::service::OperonService::Error)), the entity storage's error
 /// type `SErr` ([`OperonStorage::Error`](crate::storage::OperonStorage::Error)), and the metadata
 /// backend's error type `MErr` ([`MetaBackend::Error`](crate::meta_storage::MetaBackend::Error)).
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum SchedulerError<UErr, SErr, MErr> {
     #[error("Error in user provided function: {0}")]
     UserError(UErr),

@@ -8,7 +8,12 @@ use crate::meta_storage::{MetaResult, MetaStorageError};
 pub(super) type MemResult<T> = MetaResult<T, MemMetaError>;
 
 /// In-memory-specific metadata errors.
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, ThisError)]
+#[non_exhaustive]
 pub enum MemMetaError {
     #[error("In-memory metadata store lock poisoned")]
     Poisoned,
