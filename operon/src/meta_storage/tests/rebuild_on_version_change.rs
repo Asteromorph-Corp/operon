@@ -33,7 +33,7 @@ const PARTIAL_SCHEMA: &str = "operon_rebuild_footprint_partial";
 /// Drops the schema the sequence owns, so it starts from nothing recorded.
 async fn drop_schema(client: PsqlClient<'_>, schema: &str) {
     let stmt = format!("DROP SCHEMA IF EXISTS {schema} CASCADE;");
-    client.execute(&stmt, &[]).await.expect("drop the schema");
+    let _num_rows = client.execute(&stmt, &[]).await.expect("drop the schema");
 }
 
 /// Builds the footprint tables as a release predating footprint versioning would, recording a
@@ -77,7 +77,7 @@ async fn init_unversioned_footprint(client: PsqlClient<'_>, schema: &str, run_id
 async fn set_recorded_version(client: PsqlClient<'_>, schema: &str, version: &str) {
     let stmt =
         format!("UPDATE {schema}._footprint_version SET version = '{version}' WHERE id = 'runs';");
-    client
+    let _num_rows = client
         .execute(&stmt, &[])
         .await
         .expect("record another version");
@@ -111,7 +111,7 @@ async fn footprint_tables_are_rebuilt_when_they_predate_versioning() {
 
     // The init rebuilds both tables, carrying the run over as aborted and discarding its
     // execution history.
-    client.init_footprint().await.expect("init_footprint");
+    let _ = client.init_footprint().await.expect("init_footprint");
     assert_eq!(row_count(client, REBUILD_SCHEMA, "run_executions").await, 0);
     assert_eq!(
         client
@@ -153,7 +153,7 @@ async fn footprint_tables_are_rebuilt_when_the_recorded_version_differs() {
 
     drop_schema(client, BUMPED_VERSION_SCHEMA).await;
     client.init_schema().await.expect("init_schema");
-    client.init_footprint().await.expect("first init_footprint");
+    let _ = client.init_footprint().await.expect("first init_footprint");
 
     let footprint = RunFootprint::new(Uuid::new_v4(), RunState::Stopped);
     client.upsert_run(&footprint).await.expect("record a run");
@@ -169,7 +169,7 @@ async fn footprint_tables_are_rebuilt_when_the_recorded_version_differs() {
 
     // A release that bumped the version leaves the tables recorded under the old one.
     set_recorded_version(client, BUMPED_VERSION_SCHEMA, "0").await;
-    client
+    let _ = client
         .init_footprint()
         .await
         .expect("second init_footprint");
@@ -203,7 +203,7 @@ async fn footprint_tables_survive_an_init_at_the_same_version() {
 
     drop_schema(client, SAME_VERSION_SCHEMA).await;
     client.init_schema().await.expect("init_schema");
-    client.init_footprint().await.expect("first init_footprint");
+    let _ = client.init_footprint().await.expect("first init_footprint");
 
     let footprint = RunFootprint::new(Uuid::new_v4(), RunState::Stopped);
     client.upsert_run(&footprint).await.expect("record a run");
@@ -213,7 +213,7 @@ async fn footprint_tables_survive_an_init_at_the_same_version() {
         .expect("record an execution");
 
     // The version is unchanged, so the run survives the second init.
-    client
+    let _ = client
         .init_footprint()
         .await
         .expect("second init_footprint");
@@ -244,13 +244,13 @@ async fn footprint_tables_are_rebuilt_when_only_some_of_them_stand() {
 
     drop_schema(client, PARTIAL_SCHEMA).await;
     client.init_schema().await.expect("init_schema");
-    client.init_footprint().await.expect("first init_footprint");
+    let _ = client.init_footprint().await.expect("first init_footprint");
 
     let footprint = RunFootprint::new(Uuid::new_v4(), RunState::Stopped);
     client.upsert_run(&footprint).await.expect("record a run");
 
     let stmt = format!("DROP TABLE {PARTIAL_SCHEMA}.run_executions;");
-    client
+    let _num_rows = client
         .execute(&stmt, &[])
         .await
         .expect("drop run_executions");

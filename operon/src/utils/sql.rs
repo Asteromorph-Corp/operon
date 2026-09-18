@@ -30,12 +30,13 @@ pub struct SchemaPrefix<'a>(pub Option<&'a str>);
 pub struct SchemaPrefixOwned(pub Option<String>);
 
 impl SchemaPrefix<'_> {
-    pub fn to_owned(self) -> SchemaPrefixOwned {
+    /// Converts this borrowed prefix into an owned one.
+    pub fn into_owned(self) -> SchemaPrefixOwned {
         SchemaPrefixOwned(self.0.map(|s| s.to_owned()))
     }
 }
 
-impl std::fmt::Display for SchemaPrefix<'_> {
+impl Display for SchemaPrefix<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(schema) = self.0 {
             write!(f, "{schema}.")
@@ -45,7 +46,7 @@ impl std::fmt::Display for SchemaPrefix<'_> {
     }
 }
 
-impl std::fmt::Display for SchemaPrefixOwned {
+impl Display for SchemaPrefixOwned {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(schema) = &self.0 {
             write!(f, "{schema}.")

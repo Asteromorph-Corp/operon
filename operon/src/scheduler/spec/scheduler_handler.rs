@@ -16,6 +16,7 @@ use crate::schema::{CheckMode, Progress, SharedProgressMap, TableShape};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
+#[allow(missing_debug_implementations)]
 pub struct SchedulerHandler<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> {
     pub task_handlers: Vec<Box<dyn TaskHandler<Svc, Sto, MSto>>>,
 }
@@ -85,7 +86,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
             let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
                 PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
             >(channel_size);
-            peer_txs.insert(task_handler.task_id(), peer_tx);
+            let _opt = peer_txs.insert(task_handler.task_id(), peer_tx);
             schedules_with_rx.push(HandlerWithRx::new(task_handler.as_ref(), peer_rx));
         });
 
@@ -193,7 +194,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
             let Some(progress) = progresses.0.get(schedule.task_id()) else {
                 return Err(SchedulerError::missing_progress(schedule.task_id()));
             };
-            (*progress.write().await).update(done, queued, waiting);
+            let _ = (*progress.write().await).update(done, queued, waiting);
         }
         Ok(())
     }

@@ -74,7 +74,7 @@ where
     /// Always sends a result unless the scheduler panics.
     pub(crate) async fn work_and_send(self, sched_tx: SchedulerStateSender) {
         let result = self.work().await;
-        let _ = sched_tx.send(result.map_err(|e| e.to_string()));
+        let _send_result = sched_tx.send(result.map_err(|e| e.to_string()));
     }
 
     /// Main work loop for the scheduler.

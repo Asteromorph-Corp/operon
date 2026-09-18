@@ -84,7 +84,7 @@ where
         let scratch_client = scratch_conn.as_client();
 
         // The in-memory tables are registered here, before anything writes to them.
-        scratch_handler
+        let _ = scratch_handler
             .init_meta_storage(scratch_client)
             .await
             .map_err(SchedulerError::during_rebuild)?;

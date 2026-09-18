@@ -6,6 +6,7 @@
 pub struct MemStorageOptions {}
 
 impl MemStorageOptions {
+    /// Constructs a new `MemStorageOptions` instance.
     pub fn new() -> Self {
         Self {}
     }

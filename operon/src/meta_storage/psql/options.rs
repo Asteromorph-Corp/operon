@@ -121,7 +121,7 @@ fn create_pool(
 ) -> Result<deadpool_postgres::Pool, PsqlMetaError> {
     // Might want to make these hardcoded config values configurable.
     let mut pg_config = tokio_postgres::Config::from_str(uri)?;
-    pg_config
+    let _ = pg_config
         .keepalives(true)
         .keepalives_idle(keepalives_idle)
         .keepalives_interval(keepalives_interval);

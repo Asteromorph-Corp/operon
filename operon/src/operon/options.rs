@@ -3,6 +3,7 @@ use crate::scheduler::SchedulerOptions;
 use crate::ui::{UiMode, UiOptions};
 
 /// Surface-level settings for a run: UI mode, internal channel sizing, and logging.
+#[derive(Debug)]
 pub struct OperonOptions {
     // UI options
     pub(super) ui_mode: UiMode,
@@ -32,26 +33,31 @@ impl OperonOptions {
         Self::default()
     }
 
+    /// Sets the UI mode for the run.
     pub fn with_ui_mode(mut self, mode: UiMode) -> Self {
         self.ui_mode = mode;
         self
     }
 
+    /// Sets the internal channel size for the scheduler.
     pub fn with_internal_channel_size(mut self, size: usize) -> Self {
         self.internal_channel_size = size;
         self
     }
 
+    /// Sets the logging level for the run.
     pub fn with_log_level(mut self, level: tracing::Level) -> Self {
         self.log_level = level;
         self
     }
 
+    /// Sets the maximum number of log messages for the UI to remember.
     pub fn with_log_buffer_size(mut self, size: usize) -> Self {
         self.log_buffer_size = size;
         self
     }
 
+    /// Sets the path to the file where logs will be dumped.
     pub fn with_log_dump(mut self, dump: impl Into<String>) -> Self {
         self.log_dump = Some(dump.into());
         self

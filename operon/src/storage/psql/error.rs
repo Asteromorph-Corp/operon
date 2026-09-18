@@ -15,16 +15,22 @@ pub(crate) type PsqlStorageResult<T> = Result<T, StorageError<PsqlStorageError>>
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum PsqlStorageError {
+    /// A Postgres database error.
     #[error("Database error: {}{}", .0, .0.source().map_or_else(String::new, |e| format!(", cause: {e}")))]
     Database(#[from] tokio_postgres::Error),
+    /// A Postgres connection pool error.
     #[error("Database pool error: {0}")]
     DatabasePool(#[from] deadpool_postgres::PoolError),
+    /// Failed to build the Postgres connection pool.
     #[error("Failed to build connection pool: {0}")]
     PoolBuild(#[from] deadpool_postgres::BuildError),
+    /// Could not serialize or deserialize JSON data.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    /// Could not serialize or deserialize CSV data.
     #[error("CSV error: {0}")]
     Csv(#[from] csv::Error),
+    /// A file or stream I/O error.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

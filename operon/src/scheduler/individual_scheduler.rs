@@ -351,7 +351,7 @@ where
                     let meta_storage = self.meta_storage.clone();
 
                     // Move the permit into the task so it is released on drop.
-                    self.handles.spawn(async move {
+                    let _abort_handle = self.handles.spawn(async move {
                         tracing::trace!("Running job {job:?} in `{task_id}` scheduler.");
                         let _permit = permit;
                         match spec.run_job(&*service, &*storage, meta_storage, job).await {

@@ -1,3 +1,5 @@
+#![doc(hidden)]
+
 mod valid_operon;
 pub use valid_operon::ValidOperon;
 

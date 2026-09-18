@@ -18,33 +18,50 @@ pub(crate) type MetaResult<T, MErr> = Result<T, MetaStorageError<MErr>>;
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum MetaStorageError<MErr> {
+    /// An integer conversion error.
     #[error("Integer conversion error: {0}")]
     IntegerConversionError(#[from] TryFromIntError),
+    /// Encountered an invalid run state.
     #[error("Invalid run state: {0}")]
     InvalidRunState(String),
+    /// Invoked an explosion on an already-resolved dimension.
     #[error("Invalid explosion: Called `explode({dim})` on `{task}`, but `{dim}` was resolved.")]
     InvalidExplosion {
+        /// The name of the task on which the invalid explosion was invoked.
         task: &'static str,
+        /// The dimension name this explosion tried to resolve.
         dim: &'static str,
     },
+    /// Missing ticket summary for a task.
     #[error("Missing ticket summary for task '{task}'")]
-    MissingTicketSummary { task: &'static str },
+    MissingTicketSummary {
+        /// The name of the task whose ticket summary is missing.
+        task: &'static str,
+    },
+    /// Missing resolution for a dimension.
     #[error("Missing resolution for dimension `{dim}[{}]`", fmt_deps(.deps))]
     MissingResolution {
+        /// The name of the dimension that is missing a resolution.
         dim: &'static str,
+        /// The ancestor coordinates of this resolution.
         deps: Vec<(&'static str, usize)>,
     },
+    /// Unspecified internal error.
     #[error("Internal error: {0}")]
     Internal(&'static str),
+    /// Tried to run two instances of Operon against the same metadata schema.
     #[error("Another Operon instance is already running against metadata schema `{0}`")]
     SchemaLocked(String),
+    /// Lost the advisory lock on the metadata schema.
     #[error(
         "Lost the advisory lock on metadata schema `{0}` (connection dropped or lock \
          otherwise released); stopping to avoid running unguarded"
     )]
     LockLost(String),
+    /// An error from a specific metadata backend.
     #[error(transparent)]
     Backend(MErr),
+    /// An error from the scratch in-memory store during the rebuild phase.
     #[error("Error from scratch in-memory store used during rebuild: {0}")]
     RebuildBackend(MemMetaError),
 }
@@ -57,11 +74,11 @@ fn fmt_deps(deps: &[(&'static str, usize)]) -> String {
 }
 
 impl<MErr> MetaStorageError<MErr> {
-    pub fn invalid_explosion(task: &'static str, dim: &'static str) -> Self {
+    pub(crate) fn invalid_explosion(task: &'static str, dim: &'static str) -> Self {
         Self::InvalidExplosion { task, dim }
     }
 
-    pub fn missing_ticket_summary(task: &'static str) -> Self {
+    pub(crate) fn missing_ticket_summary(task: &'static str) -> Self {
         Self::MissingTicketSummary { task }
     }
 

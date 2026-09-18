@@ -16,24 +16,34 @@ use crate::storage::StorageError;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum SchedulerError<UErr, SErr, MErr> {
+    /// Error in the user-provided function.
     #[error("Error in user provided function: {0}")]
     UserError(UErr),
+    /// Error in the entity storage backend.
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError<SErr>),
+    /// Error in the metadata storage backend.
     #[error("Metadata storage error: {0}")]
     MetaStorage(#[from] MetaStorageError<MErr>),
+    /// Failed to join futures.
     #[error("Join failed: {0}")]
     JoinFailed(#[from] JoinError),
+    /// Failed to acquire per-task semaphore.
     #[error("Failed to acquire semaphore")]
     SemaphoreAcquireFailed,
+    /// Failed to receive control event.
     #[error("Failed to receive control event")]
     ControlEventReceiveFailed,
+    /// Failed to send peer event.
     #[error("Failed to send peer event")]
     PeerEventSendFailed,
+    /// Received a peer event irrelevant to the current task.
     #[error("Irrelevant {0} event received in `{1}` scheduler")]
     InvalidPeerEventReceived(&'static str, &'static str),
+    /// Missing progress entry for a task.
     #[error("Missing progress entry for task: {0}")]
     MissingProgressEntry(String),
+    /// Unspecified error.
     #[error("Other error: {0}")]
     Other(String),
 }

@@ -17,24 +17,36 @@ pub type StorageResult<T, SErr> = Result<T, StorageError<SErr>>;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum StorageError<SErr> {
+    /// An integer conversion error.
     #[error("Integer conversion error: {0}")]
     IntegerConversionError(#[from] TryFromIntError),
+    /// Encountered an invalid run state.
     #[error("Invalid run state: {0}")]
     InvalidRunState(String),
+    /// An entity entry was not found in the storage backend.
     #[error("Entity `{entity}[{}]` not found", fmt_dims(.dims))]
     EntityNotFound {
+        /// The name of the entity that was not found.
         entity: &'static str,
+        /// The coordinates to the entity entry that was expected.
         dims: Vec<(&'static str, usize)>,
     },
+    /// The found entity entries had a count less than expected.
     #[error("Entity `{entity}[{}]` expects {expected} elements, but only {actual} were found", fmt_dim_states(.dims))]
     EntityLengthMismatch {
+        /// The name of the entities that were not found.
         entity: &'static str,
+        /// The coordinates to the entity entries that were expected.
         dims: Vec<(&'static str, DimState)>,
+        /// The expected number of entity entries.
         expected: usize,
+        /// The actual number of entity entries found.
         actual: usize,
     },
+    /// An unspecified error from the storage backend.
     #[error("Internal error: {0}")]
     Internal(&'static str),
+    /// An error from a specific storage backend.
     #[error(transparent)]
     Backend(SErr),
 }

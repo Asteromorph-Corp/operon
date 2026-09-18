@@ -10,16 +10,18 @@ use crate::storage::psql::{
 use crate::utils::SchemaPrefix;
 
 /// The SQL storage that can be used with the service.
-///
-/// This can only be used when all entities implement `Serialize` and `DeserializeOwned`.
 #[derive(Debug, Clone)]
 pub struct PsqlStorage<T> {
+    /// Underlying connection pool to the PostgreSQL database.
     pub pool: deadpool_postgres::Pool,
+    /// Optional schema name to use for this storage.
     pub schema: Option<String>,
+    /// Metadata about the entities in the storage.
     pub entities_meta: T,
 }
 
 impl<T> PsqlStorage<T> {
+    /// Returns a connection to the PostgreSQL database.
     pub async fn conn(&self) -> PsqlStorageResult<StorageClient<'_>> {
         let client = self.pool.get().await?;
         let schema = self.schema.as_deref();
@@ -27,6 +29,7 @@ impl<T> PsqlStorage<T> {
         Ok(StorageClient::new(client, schema))
     }
 
+    /// Returns the SQL-printable schema prefix for this storage.
     pub fn schema_prefix(&self) -> SchemaPrefix<'_> {
         SchemaPrefix(self.schema.as_deref())
     }
@@ -54,7 +57,8 @@ impl<T: Default> PsqlStorage<T> {
                 .database_uri
                 .expose_secret()
                 .parse::<tokio_postgres::Config>()?;
-            config
+
+            let _ = config
                 .keepalives(true)
                 .keepalives_idle(options.keepalives_idle)
                 .keepalives_interval(options.keepalives_interval);

@@ -8,6 +8,7 @@ use crate::meta_storage::mem::MemMetaStorage;
 pub struct MemMetaStorageOptions {}
 
 impl MemMetaStorageOptions {
+    /// Constructs a new [`MemMetaStorageOptions`] instance.
     pub fn new() -> Self {
         Self {}
     }

@@ -1,3 +1,5 @@
+#![doc(hidden)]
+
 mod control_event;
 pub(crate) use control_event::*;
 

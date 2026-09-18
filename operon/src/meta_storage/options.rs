@@ -21,6 +21,7 @@ use crate::meta_storage::{AnyBackend, AnyBackendError, MetaStorageError};
 ///
 /// [`psql`]: MetaBackendOptions::psql
 #[non_exhaustive]
+#[derive(Debug)]
 pub enum MetaBackendOptions {
     /// The Postgres backend and its configuration.
     Psql(PsqlMetaStorageOptions),

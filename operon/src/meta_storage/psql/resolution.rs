@@ -46,6 +46,7 @@ impl<const N: usize> Resolution<N> {
 }
 
 /// Helper struct for building SQL queries related to resolutions.
+#[derive(Debug)]
 pub struct PsqlResolutionQueryBuilder<'a, const N: usize> {
     client: &'a PsqlClient<'a>,
     dim_meta: DimensionMetadata<N>,
@@ -118,7 +119,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
     async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearResolutionQuery(schema_prefix, self.dim_meta);
-        self.client.execute_stmt(&stmt, &[]).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &[]).await?;
         Ok(())
     }
 
@@ -137,7 +138,7 @@ impl<const N: usize> MetaResolutionApi<N> for PsqlResolutionQueryBuilder<'_, N> 
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutResolutionQuery(schema_prefix, self.dim_meta);
         let params = resolution.as_sql_params()?;
-        self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 

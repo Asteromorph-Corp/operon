@@ -192,7 +192,7 @@ where
                 (_, Some(inconsistent_tasks), true) if !inconsistent_tasks.is_empty() => {
                     tracing::info!("Rebuilding the run while redoing inconsistent tasks.");
                     for task in inconsistent_tasks {
-                        skip.insert(task.to_string());
+                        let _ = skip.insert(task.to_string());
                     }
                     Some(RunMode::Rebuild { skip })
                 }

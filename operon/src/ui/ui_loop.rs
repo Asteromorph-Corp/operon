@@ -206,17 +206,15 @@ impl UiLoop {
         terminal.clear()?;
 
         let snapshot = self.progresses.snapshot().await;
-        MAX_TASK_NAME_LEN
-            .set(
-                snapshot
-                    .0
-                    .keys()
-                    .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
-                    .max()
-                    .expect("At least one task name exists")
-                    .clamp(4, 20),
-            )
-            .ok();
+        let _ = MAX_TASK_NAME_LEN.set(
+            snapshot
+                .0
+                .keys()
+                .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
+                .max()
+                .expect("At least one task name exists")
+                .clamp(4, 20),
+        );
 
         // Main loop for the UI.
         let mut events = EventStream::new();
@@ -453,7 +451,7 @@ impl UiLoop {
 
         let min_width = MIN_TERMINAL_WIDTH_THRESHOLD + max_len;
         if size.width < min_width || size.height < 10 {
-            terminal.draw(|frame| {
+            let _ = terminal.draw(|frame| {
                 let vertical = Layout::vertical([
                     Constraint::Fill(1),
                     Constraint::Length(1),
@@ -516,7 +514,7 @@ impl UiLoop {
             self.progress_cursor = total_progress_bars.saturating_sub(num_progress_bars);
         }
 
-        terminal.draw(|frame| {
+        let _ = terminal.draw(|frame| {
             let [
                 progress_head,
                 progress_area,

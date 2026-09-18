@@ -20,7 +20,7 @@ impl LogBuffer {
 
     pub(super) fn push(&mut self, record: LogRecord) {
         if self.records.len() >= self.capacity {
-            self.records.pop_front();
+            let _drop = self.records.pop_front();
         }
         self.records.push_back(record);
     }

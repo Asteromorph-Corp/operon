@@ -21,7 +21,7 @@ impl CommandPrompt {
             }
             (_, KeyCode::Char(c)) => self.input.push(c),
             (_, KeyCode::Backspace) => {
-                self.input.pop();
+                let _ = self.input.pop();
             }
             (_, KeyCode::Enter) => {
                 let command = self.input.parse::<Command>();

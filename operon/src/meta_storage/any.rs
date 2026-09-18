@@ -55,7 +55,9 @@ macro_rules! map_backend {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum AnyBackend {
+    /// The Postgres backend.
     Psql(PsqlMetaStorage),
+    /// The in-memory backend.
     Mem(MemMetaStorage),
 }
 
@@ -63,8 +65,10 @@ pub enum AnyBackend {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AnyBackendError {
+    /// An error from the Postgres backend.
     #[error(transparent)]
     Psql(PsqlMetaError),
+    /// An error from the in-memory backend.
     #[error(transparent)]
     Mem(MemMetaError),
 }
@@ -110,8 +114,11 @@ impl MetaBackend for AnyBackend {
 
 /// A checked-out connection over a runtime-selected backend.
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub enum AnyConn<'a> {
+    /// A connection to the Postgres backend.
     Psql(PsqlConn<'a>),
+    /// A connection to the in-memory backend.
     Mem(MemConn),
 }
 
@@ -126,8 +133,11 @@ impl MetaConnApi<AnyBackend> for AnyConn<'_> {
 }
 
 /// A transaction over a runtime-selected backend.
+#[derive(Debug)]
 pub enum AnyTx<'a> {
+    /// A transaction over the Postgres backend.
     Psql(PsqlTx<'a>),
+    /// A transaction over the in-memory backend.
     Mem(MemTx<'a>),
 }
 
@@ -146,7 +156,7 @@ impl MetaTxApi<AnyBackend> for AnyTx<'_> {
 }
 
 /// A query handle over a runtime-selected backend.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum AnyClient<'a> {
     Psql(PsqlClient<'a>),
     Mem(MemClient<'a>),
@@ -221,8 +231,11 @@ impl MetaClientApi<AnyBackend> for AnyClient<'_> {
 }
 
 /// A ticket query builder over a runtime-selected backend.
+#[derive(Debug)]
 pub enum AnyTicket<'a, const N: usize> {
+    /// A ticket query builder over the Postgres backend.
     Psql(PsqlTicketQueryBuilder<'a, N>),
+    /// A ticket query builder over the in-memory backend.
     Mem(MemTicketQueryBuilder<'a, N>),
 }
 
@@ -298,8 +311,11 @@ impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
 }
 
 /// A resolution query builder over a runtime-selected backend.
+#[derive(Debug)]
 pub enum AnyResolution<'a, const N: usize> {
+    /// A resolution query builder over the Postgres backend.
     Psql(PsqlResolutionQueryBuilder<'a, N>),
+    /// A resolution query builder over the in-memory backend.
     Mem(MemResolutionQueryBuilder<'a, N>),
 }
 

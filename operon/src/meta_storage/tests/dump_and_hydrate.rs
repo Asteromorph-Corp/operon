@@ -29,7 +29,7 @@ async fn init<MSto: MetaBackend>(client: MSto::Client<'_>) {
         .await
         .expect("init_dimension_hash");
     client.init_ticket_hash().await.expect("init_ticket_hash");
-    client
+    let _ = client
         .resolution(dim_i())
         .init()
         .await
@@ -42,12 +42,12 @@ async fn init<MSto: MetaBackend>(client: MSto::Client<'_>) {
         .init_ticket_status_type()
         .await
         .expect("init_ticket_status_type");
-    client
+    let _ = client
         .ticket(task_alpha())
         .init()
         .await
         .expect("alpha init");
-    client.ticket(task_beta()).init().await.expect("beta init");
+    let _ = client.ticket(task_beta()).init().await.expect("beta init");
 
     client
         .resolution(dim_i())
@@ -99,7 +99,7 @@ async fn populate<MSto: MetaBackend>(client: MSto::Client<'_>) {
         .put(Ticket::new(1).with_coordinate::<0>(2))
         .await
         .expect("beta put");
-    client
+    let _tickets = client
         .ticket(task_beta())
         .raise_deps_done::<0>(task_alpha(), Job { coordinate: [] }, &[])
         .await

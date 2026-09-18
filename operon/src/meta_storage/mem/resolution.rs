@@ -8,12 +8,13 @@ use crate::meta_storage::mem::store::MemStore;
 use crate::schema::{DimensionMetadata, Resolution, TableShape};
 
 /// One dimension's resolution table, mapping a coordinate to its upper bound.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(super) struct ResolutionTable {
     rows: RwLock<HashMap<Box<[usize]>, usize>>,
 }
 
 /// Helper struct for querying the in-memory resolutions of a dimension.
+#[derive(Debug)]
 pub struct MemResolutionQueryBuilder<'a, const N: usize> {
     store: &'a MemStore,
     dim_meta: DimensionMetadata<N>,
@@ -63,7 +64,7 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
         };
         let mut rows = table.rows.write()?;
         if let Entry::Vacant(entry) = rows.entry(resolution.coordinate.into()) {
-            entry.insert(resolution.ub);
+            let _ = entry.insert(resolution.ub);
         }
         Ok(())
     }
@@ -90,7 +91,7 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
         let mut rows = table.rows.write()?;
         rows.clear();
         for resolution in resolutions {
-            rows.insert(resolution.coordinate.into(), resolution.ub);
+            let _ = rows.insert(resolution.coordinate.into(), resolution.ub);
         }
         Ok(())
     }

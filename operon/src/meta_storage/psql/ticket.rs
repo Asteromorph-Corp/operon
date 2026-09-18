@@ -69,6 +69,7 @@ impl<const N: usize> Ticket<N> {
 }
 
 /// Helper struct for building SQL queries related to tickets.
+#[derive(Debug)]
 pub struct PsqlTicketQueryBuilder<'a, const N: usize> {
     client: &'a PsqlClient<'a>,
     task_meta: TaskMetadata<N>,
@@ -149,7 +150,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         if inserted_summary_rows > 0 && action == ShapeAction::Keep {
             // This summary row was just zeroed out, so recount the tickets into it.
             let resync_stmt = TicketSummaryResyncQuery(schema_prefix, self.task_meta);
-            self.client.execute_stmt(&resync_stmt, &[]).await?;
+            let _num_rows = self.client.execute_stmt(&resync_stmt, &[]).await?;
         }
         Ok(action.into())
     }
@@ -157,7 +158,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearTicketQuery(schema_prefix, self.task_meta);
-        self.client.execute_stmt(&stmt, &[]).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &[]).await?;
         Ok(())
     }
 
@@ -176,7 +177,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutTicketQuery(schema_prefix, self.task_meta);
         let params = ticket.as_sql_params()?;
-        self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 
@@ -305,7 +306,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let schema = self.client.schema_prefix();
         let stmt = MarkDoneQuery(schema, self.task_meta);
         let params = SqlParams::from_usize(job.coordinate)?;
-        self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 
@@ -363,7 +364,7 @@ impl<const N: usize> std::fmt::Display for InitTicketQuery<'_, N> {
 /// Helper struct to generate the SQL queries for ticket summary insert.
 struct TicketSummaryInsertQuery<'a>(SchemaPrefix<'a>);
 
-impl<'a> std::fmt::Display for TicketSummaryInsertQuery<'a> {
+impl std::fmt::Display for TicketSummaryInsertQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
 
@@ -686,7 +687,7 @@ impl<const N: usize> std::fmt::Display for MarkDoneQuery<'_, N> {
 /// A helper struct to generate the SQL query for fetching a task's ticket counts.
 struct GetStatusQuery<'a>(SchemaPrefix<'a>);
 
-impl<'a> std::fmt::Display for GetStatusQuery<'a> {
+impl std::fmt::Display for GetStatusQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
 

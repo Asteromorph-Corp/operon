@@ -58,7 +58,7 @@ impl UiBroadcastLayer {
         {
             Ok(file) => {
                 let mut writer = ::std::io::BufWriter::new(file);
-                let _ = writeln!(writer, "timestamp,level,target,file,module,line,message");
+                let _result = writeln!(writer, "timestamp,level,target,file,module,line,message");
                 writer.into_inner().unwrap()
             }
             Err(ref e) if e.kind() == ::std::io::ErrorKind::AlreadyExists => {
@@ -72,7 +72,7 @@ impl UiBroadcastLayer {
             }
         };
         let mut writer = ::std::io::BufWriter::new(log_file);
-        let _ = record.write_dump(&mut writer);
+        let _result = record.write_dump(&mut writer);
     }
 }
 
@@ -206,6 +206,6 @@ where
         self.dump_record(&record);
 
         // Send to UI (fails silently when UI closes)
-        let _ = self.sender.send(record);
+        let _result = self.sender.send(record);
     }
 }

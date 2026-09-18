@@ -63,7 +63,7 @@ fn dim_j_over_i() -> DimensionMetadata<1> {
 /// Drops the schema the sequence owns, so it starts from nothing recorded.
 async fn drop_schema(client: PsqlClient<'_>, schema: &str) {
     let stmt = format!("DROP SCHEMA IF EXISTS {schema} CASCADE;");
-    client.execute(&stmt, &[]).await.expect("drop the schema");
+    let _num_rows = client.execute(&stmt, &[]).await.expect("drop the schema");
 }
 
 /// The columns of a table, in the order they were declared.
@@ -104,7 +104,7 @@ async fn ticket_table_is_rebuilt_when_a_task_gains_a_dimension() {
         .expect("init_ticket_summary");
 
     // A run over `i` alone, carried to a ticket the summary counts.
-    client
+    let _ = client
         .ticket(delta_over_i())
         .init()
         .await
@@ -207,7 +207,7 @@ async fn resolution_table_is_rebuilt_when_a_dimension_gains_a_dependency() {
         .expect("init_dimension_hash");
 
     // A run resolving `j` once, carried to a resolution.
-    client
+    let _ = client
         .resolution(dim_j())
         .init()
         .await
@@ -293,7 +293,7 @@ async fn ticket_summary_is_rebuilt_when_its_shape_changes() {
         .expect("first init_ticket_summary");
 
     // A run over `i`, carried to one ticket the summary counts done and one it counts queued.
-    client
+    let _ = client
         .ticket(delta_over_i())
         .init()
         .await
@@ -396,7 +396,7 @@ async fn ticket_table_is_rebuilt_when_its_shape_is_unrecorded() {
         .await
         .expect("init_ticket_summary");
 
-    client
+    let _ = client
         .ticket(delta_over_i())
         .init()
         .await
@@ -409,7 +409,7 @@ async fn ticket_table_is_rebuilt_when_its_shape_is_unrecorded() {
 
     // A release predating the shape record leaves its table standing with nothing vouching for it.
     let stmt = format!("DELETE FROM {UNRECORDED_SCHEMA}._ticket_hash WHERE id = 'delta';");
-    client
+    let _ = client
         .execute(&stmt, &[])
         .await
         .expect("drop the shape record");
