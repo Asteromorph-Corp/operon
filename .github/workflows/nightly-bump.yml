@@ -1,0 +1,77 @@
+name: Bump nightly toolchain
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 03:21 UTC on the 1st of every month.
+    - cron: "21 3 1 * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump nightly toolchain
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Find newest usable nightly
+        id: find
+        env:
+          TARGET: x86_64-unknown-linux-gnu
+        run: |
+          current=$(cat .github/nightly-toolchain)
+          date=$(curl -sSfL --retry 3 \
+            "https://rust-lang.github.io/rustup-components-history/$TARGET/rustfmt.json" \
+            | jq -er '.last_available')
+          candidate="nightly-$date"
+
+          case "$date" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+            *) echo "::error::Unexpected last_available value: $date"; exit 1 ;;
+          esac
+
+          if [ "$candidate" = "$current" ]; then
+            echo "Already pinned to the newest usable nightly ($current)."
+            exit 0
+          fi
+
+          if [[ "$candidate" < "$current" ]]; then
+            echo "::warning::Newest usable nightly $candidate is older than the current pin $current, skipping."
+            exit 0
+          fi
+
+          echo "Bumping $current -> $candidate."
+          echo "version=$candidate" >> "$GITHUB_OUTPUT"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+
+      - name: Write new pin
+        if: steps.find.outputs.version != ''
+        run: echo "${{ steps.find.outputs.version }}" > .github/nightly-toolchain
+
+      - name: Mint a token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RUST_CICD_APP_ID }}
+          private-key: ${{ secrets.RUST_CICD_APP_PRIVATE_KEY }}
+
+      - name: Open pull request
+        if: steps.find.outputs.version != ''
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: chore/bump-nightly-toolchain
+          delete-branch: true
+          commit-message: "chore: bump nightly toolchain to ${{ steps.find.outputs.version }}"
+          title: "chore: bump nightly toolchain to ${{ steps.find.outputs.version }}"
+          body: |
+            Bumps the pinned nightly toolchain used by the CI workflow.
+
+            - Before: `${{ steps.find.outputs.current }}`
+            - After: `${{ steps.find.outputs.version }}`
