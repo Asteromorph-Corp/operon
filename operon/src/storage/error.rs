@@ -52,12 +52,7 @@ pub enum StorageError<SErr> {
 }
 
 /// Describes the state of a dimension in an entity lookup.
-///
-/// # Stability
-///
-/// This enum is `#[non_exhaustive]`: adding a state variant must stay a non-breaking change.
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum DimState {
     /// The dimension has a known value.
     Value(usize),
