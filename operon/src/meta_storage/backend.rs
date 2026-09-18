@@ -193,6 +193,17 @@ pub trait MetaTicketApi<const N: usize> {
     /// Stores `ticket`, leaving an existing ticket at the same coordinate untouched.
     fn put(&self, ticket: Ticket<N>) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
 
+    /// Reads every ticket of this task.
+    fn dump(&self) -> impl Future<Output = MetaResult<Vec<Ticket<N>>, Self::Error>> + Send;
+
+    /// Hydrates the tickets of this task with `tickets`.
+    ///
+    /// Existing tickets are discarded.
+    fn hydrate(
+        &self,
+        tickets: Vec<Ticket<N>>,
+    ) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
+
     /// Counts the finished `upstream_job` against every waiting ticket that depends on it, and
     /// returns the ones it made runnable.
     ///
@@ -264,5 +275,16 @@ pub trait MetaResolutionApi<const N: usize> {
     fn put(
         &self,
         resolution: Resolution<N>,
+    ) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
+
+    /// Reads every resolution of this dimension.
+    fn dump(&self) -> impl Future<Output = MetaResult<Vec<Resolution<N>>, Self::Error>> + Send;
+
+    /// Hydrates the resolutions of this dimension with `resolutions`.
+    ///
+    /// Existing resolutions are discarded.
+    fn hydrate(
+        &self,
+        resolutions: Vec<Resolution<N>>,
     ) -> impl Future<Output = MetaResult<(), Self::Error>> + Send;
 }

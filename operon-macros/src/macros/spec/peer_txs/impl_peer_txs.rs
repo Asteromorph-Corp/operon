@@ -6,33 +6,13 @@ use crate::utils::{
     task_id_ident, ticket_enum_ident,
 };
 
-/// Generates an implementation of `PeerEventSenders` for a task's peer event senders.
+/// Generates an implementation of `PeerEventSenders` trait for a task's peer event senders.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::__private::async_trait::async_trait]
-/// #[automatically_derived]
-/// impl operon::__private::PeerEventSenders<schema::JobEnum, schema::ResolutionEnum> for BetaPeerTxs {
-///     fn gather_from(
-///         mut senders: operon::__private::PeerEventSenderMap<schema::JobEnum, schema::ResolutionEnum>,
-///     ) -> Self {
-///         BetaPeerTxs {
-///             to_delta: senders
-///                 .remove(metadata::DELTA_ID)
-///                 .unwrap_or_else(|| panic!("No sender for task `{}` found", metadata::DELTA_ID)),
-///             to_epsilon: senders
-///                 .remove(metadata::EPSILON_ID)
-///                 .unwrap_or_else(|| panic!("No sender for task `{}` found", metadata::EPSILON_ID)),
-///         }
-///     }
-///
-///     fn downgrade_all(&mut self) {
-///         self.to_delta.downgrade();
-///         self.to_epsilon.downgrade();
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/peer_txs/impl_peer_txs.rs"))]
 /// ```
-pub fn impl_peer_txs(
+pub(crate) fn impl_peer_txs(
     task_id: &syn::Ident,
     event_receiving_task_ids: &IndexSet<&syn::Ident>,
 ) -> syn::ItemImpl {

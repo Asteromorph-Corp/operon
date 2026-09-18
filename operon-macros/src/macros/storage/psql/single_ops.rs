@@ -4,20 +4,11 @@ use crate::configs::{EntityConfig, EntityConfigMap};
 use crate::operon_ident;
 use crate::utils::{get_entity_ident, put_entity_ident, to_snake_case, to_type};
 
-/// Generates a get function for the implementation of the storage trait.
+/// Generates a psql get function for an entity.
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn get_b(
-///     &self,
-///     coordinate: [usize; 2usize],
-/// ) -> operon::error::StorageResult<Option<B>, Self::Error> {
-///     self.conn()
-///         .await?
-///         .entity(self.entities_meta.b)
-///         .get(coordinate)
-///         .await
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/single_get.rs"))]
 /// ```
 fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
@@ -39,20 +30,11 @@ fn single_get(entity: &EntityConfig) -> syn::ImplItemFn {
     }
 }
 
-/// Generates a put function for the implementation of the storage trait.
+/// Generates a psql put function for an entity.
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn put_b(
-///     &self,
-///     entity: operon::Entity<2usize, B>,
-/// ) -> operon::error::StorageResult<(), Self::Error> {
-///     self.conn()
-///         .await?
-///         .entity(self.entities_meta.b)
-///         .put(entity)
-///         .await
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/single_put.rs"))]
 /// ```
 fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     let operon = operon_ident();
@@ -74,7 +56,7 @@ fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     }
 }
 
-pub fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::ImplItemFn> {
+pub(super) fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::ImplItemFn> {
     entities
         .values()
         .flat_map(|entity| [single_get(entity), single_put(entity)])
@@ -89,14 +71,14 @@ mod tests {
     use crate::test_utils::simple_pipeline::entity_b;
 
     #[rstest]
-    #[case::simple(entity_b(), "storage/single_get.rs")]
+    #[case::simple(entity_b(), "storage/psql/single_get.rs")]
     fn test_single_get(#[case] entity: EntityConfig, #[case] fixture_path: &str) {
         let item = single_get(&entity);
         assert_item_eq(&item, fixture_path);
     }
 
     #[rstest]
-    #[case::simple(entity_b(), "storage/single_put.rs")]
+    #[case::simple(entity_b(), "storage/psql/single_put.rs")]
     fn test_single_put(#[case] entity: EntityConfig, #[case] fixture_path: &str) {
         let item = single_put(&entity);
         assert_item_eq(&item, fixture_path);

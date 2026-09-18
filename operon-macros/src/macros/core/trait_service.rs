@@ -62,27 +62,13 @@ fn format_signature(task: &TaskConfig) -> String {
     )
 }
 
-/// Generates a trait for the service based on the provided AllConfig.
+/// Generates the service trait.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[operon::__private::async_trait::async_trait]
-/// pub trait CookingService:
-///     operon::OperonService<
-///         JobEnum = schema::JobEnum,
-///         ResolutionEnum = schema::ResolutionEnum,
-///         TicketEnum = schema::TicketEnum,
-///     >
-/// {
-///     async fn alpha(&self) -> Result<Vec<A>, Self::Error>;
-///     async fn beta(&self, a: A) -> Result<Vec<B>, Self::Error>;
-///     async fn gamma(&self, a: A) -> Result<Vec<C>, Self::Error>;
-///     async fn delta(&self, a: A, b: B, c: C) -> Result<D, Self::Error>;
-///     async fn epsilon(&self, b_j: Vec<B>, d_j: Vec<D>) -> Result<E, Self::Error>;
-///     async fn zeta(&self, c_k: Vec<C>, e_k: Vec<E>) -> Result<F, Self::Error>;
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core/service.rs"))]
 /// ```
-pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
+pub(super) fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
     let res_enum_ident = resolution_enum_ident();
@@ -153,8 +139,8 @@ pub fn trait_service(all_configs: &AllConfig) -> syn::ItemTrait {
     };
 
     parse_quote! {
-        #[#operon::__private::async_trait::async_trait]
         #[doc = #doc_comment]
+        #[#operon::__private::async_trait::async_trait]
         pub trait #svc_ident: #operon::OperonService<
             JobEnum = schema::#job_enum_ident,
             ResolutionEnum = schema::#res_enum_ident,
@@ -175,8 +161,7 @@ mod tests {
 
     #[rstest]
     fn test_trait_service(all_config: AllConfig) {
-        let mut result = trait_service(&all_config);
-        result.attrs.retain(|attr| attr.path().is_ident("doc"));
+        let result = trait_service(&all_config);
         assert_item_eq(&result, "core/service.rs");
     }
 }

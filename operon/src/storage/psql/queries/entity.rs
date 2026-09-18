@@ -10,11 +10,11 @@ use crate::storage::psql::client::StorageClient;
 use crate::storage::psql::{PsqlStorageError, PsqlStorageResult};
 use crate::utils::{
     SchemaPrefix, SchemaPrefixOwned, ShapeAction, ShapeTable, SqlParams, build_tables,
-    hash_metadata, shape_query,
+    hash_metadata, psql_identifier, shape_query,
 };
 
 /// The table recording each entity's shape ID, keyed by entity ID.
-pub(crate) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
+pub(super) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
     table: "_entity_hash",
     column: "hash",
 };
@@ -23,12 +23,14 @@ pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
 impl<T> PsqlEntity for T where T: Serialize + DeserializeOwned + Send + Sync + 'static {}
 
 /// Helper struct for building SQL queries related to entities.
+#[derive(Debug)]
 pub struct EntityQueryBuilder<'a, const N: usize, T: PsqlEntity> {
     client: StorageClient<'a>,
     entity_meta: EntityMetadata<N, T>,
 }
 
 impl<'a> StorageClient<'a> {
+    /// Constructs an `EntityQueryBuilder` for the given entity metadata.
     pub fn entity<const N: usize, T: PsqlEntity>(
         self,
         entity_meta: EntityMetadata<N, T>,
@@ -64,7 +66,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         let stmt = PutEntityQuery(schema_prefix, self.entity_meta);
         let params = SqlParams::from_usize(entity.coordinate)?
             .extend(vec![Box::new(serde_json::to_value(&entity.value)?)]);
-        self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 
@@ -102,11 +104,11 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     ) -> PsqlStorageResult<()> {
         const { assert!(M + 1 == N) }
 
-        let schema_prefix = self.client.schema_prefix().to_owned();
+        let schema_prefix = self.client.schema_prefix().into_owned();
         let tx = self.client.transaction().await?;
 
         let temp_table_stmt = BatchPutTempTableQuery(&schema_prefix, self.entity_meta).to_string();
-        tx.execute(&temp_table_stmt, &[]).await?;
+        let _num_rows = tx.execute(&temp_table_stmt, &[]).await?;
 
         let mut writer = csv::WriterBuilder::new()
             .has_headers(false)
@@ -126,7 +128,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         sink.close().await?;
 
         let insert_stmt = BatchPutInsertQuery(&schema_prefix, self.entity_meta).to_string();
-        tx.execute(&insert_stmt, &[]).await?;
+        let _num_rows = tx.execute(&insert_stmt, &[]).await?;
 
         tx.commit().await?;
         Ok(())
@@ -149,7 +151,8 @@ impl<const N: usize, T: Send + Sync + 'static> EntityQueries for EntityMetadata<
     async fn init(&self, client: &StorageClient<'_>) -> PsqlStorageResult<()> {
         let schema_prefix = client.schema_prefix();
         let record = ENTITY_SHAPES.record(self.id);
-        let tables = [self.id];
+        let table = psql_identifier("entity", self.id);
+        let tables = [table.as_str()];
         let shape_id = hash_metadata(self);
 
         let shape_stmt = shape_query(record, &tables, schema_prefix);
@@ -178,8 +181,9 @@ impl<const N: usize, T> std::fmt::Display for InitEntityQuery<'_, N, T> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("entity", id);
 
-        writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}{id} (",)?;
+        writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}{table} (",)?;
 
         for dim in &dims {
             writeln!(f, "    {dim} BIGINT,")?;
@@ -210,8 +214,9 @@ impl<const N: usize, T> std::fmt::Display for GetEntityQuery<'_, N, T> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("entity", id);
 
-        write!(f, "SELECT value FROM {schema}{id}")?;
+        write!(f, "SELECT value FROM {schema}{table}")?;
         for (idx, dim) in dims.iter().enumerate() {
             if idx == 0 {
                 write!(f, " WHERE")?;
@@ -233,8 +238,9 @@ impl<const N: usize, T> std::fmt::Display for PutEntityQuery<'_, N, T> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("entity", id);
 
-        write!(f, "INSERT INTO {schema}{id} (")?;
+        write!(f, "INSERT INTO {schema}{table} (")?;
         for dim in dims {
             write!(f, "{dim}, ")?;
         }
@@ -272,6 +278,7 @@ impl<const N: usize, const M: usize, T> std::fmt::Display for BatchGetQuery<'_, 
         let id = self.1.id;
         let dims = self.1.dims;
         let over_dims = self.2;
+        let table = psql_identifier("entity", id);
 
         write!(f, "SELECT value")?;
         for over_dim in over_dims {
@@ -279,7 +286,7 @@ impl<const N: usize, const M: usize, T> std::fmt::Display for BatchGetQuery<'_, 
         }
         writeln!(f)?;
 
-        writeln!(f, "FROM {schema}{id}")?;
+        writeln!(f, "FROM {schema}{table}")?;
 
         for (idx, dim) in dims
             .iter()
@@ -313,9 +320,10 @@ impl<const N: usize, T> std::fmt::Display for BatchPutTempTableQuery<'_, N, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("entity", id);
 
         writeln!(f, "CREATE TEMP TABLE temp (")?;
-        writeln!(f, "    LIKE {schema}{id} INCLUDING ALL")?;
+        writeln!(f, "    LIKE {schema}{table} INCLUDING ALL")?;
         writeln!(f, ")")?;
         write!(f, "ON COMMIT DROP;")
     }
@@ -345,8 +353,9 @@ impl<const N: usize, T> std::fmt::Display for BatchPutInsertQuery<'_, N, T> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("entity", id);
 
-        write!(f, "INSERT INTO {schema}{id} (")?;
+        write!(f, "INSERT INTO {schema}{table} (")?;
         for dim in dims {
             write!(f, "{dim}, ")?;
         }
@@ -395,7 +404,7 @@ mod test {
     #[case(
         entity_a(),
         indoc! {"
-            CREATE TABLE IF NOT EXISTS test_meta.a (
+            CREATE TABLE IF NOT EXISTS test_meta.entity_a (
                 id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
                 value JSONB,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
@@ -405,7 +414,7 @@ mod test {
     #[case(
         entity_b(),
         indoc! {"
-            CREATE TABLE IF NOT EXISTS test_meta.b (
+            CREATE TABLE IF NOT EXISTS test_meta.entity_b (
                 i BIGINT,
                 value JSONB,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
@@ -423,8 +432,8 @@ mod test {
     }
 
     #[rstest]
-    #[case(entity_a(), "SELECT value FROM test_meta.a;")]
-    #[case(entity_b(), "SELECT value FROM test_meta.b WHERE i = $1;")]
+    #[case(entity_a(), "SELECT value FROM test_meta.entity_a;")]
+    #[case(entity_b(), "SELECT value FROM test_meta.entity_b WHERE i = $1;")]
     fn test_get_entity_query<const N: usize>(
         schema_prefix: SchemaPrefix<'_>,
         #[case] metadata: EntityMetadata<N, ()>,
@@ -436,12 +445,12 @@ mod test {
 
     #[rstest]
     #[case(entity_a(), indoc! {"
-        INSERT INTO test_meta.a (value)
+        INSERT INTO test_meta.entity_a (value)
         VALUES ($1)
         ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;"
     })]
     #[case(entity_b(), indoc! {"
-        INSERT INTO test_meta.b (i, value)
+        INSERT INTO test_meta.entity_b (i, value)
         VALUES ($1, $2)
         ON CONFLICT (i) DO UPDATE SET value = EXCLUDED.value;"
     })]
@@ -459,7 +468,7 @@ mod test {
         entity_b(),
         indoc! {"
             CREATE TEMP TABLE temp (
-                LIKE test_meta.b INCLUDING ALL
+                LIKE test_meta.entity_b INCLUDING ALL
             )
             ON COMMIT DROP;"
         }
@@ -469,7 +478,7 @@ mod test {
         #[case] metadata: EntityMetadata<N, ()>,
         #[case] expected: &str,
     ) {
-        let stmt = BatchPutTempTableQuery(&schema_prefix.to_owned(), metadata).to_string();
+        let stmt = BatchPutTempTableQuery(&schema_prefix.into_owned(), metadata).to_string();
         assert_eq!(stmt, expected);
     }
 
@@ -487,7 +496,7 @@ mod test {
     #[case::simple(
         entity_b(),
         indoc! {"
-            INSERT INTO test_meta.b (i, value)
+            INSERT INTO test_meta.entity_b (i, value)
             SELECT i, value FROM temp
             ON CONFLICT (i) DO UPDATE SET value = EXCLUDED.value;"
         }
@@ -497,7 +506,7 @@ mod test {
         #[case] metadata: EntityMetadata<N, ()>,
         #[case] expected: &str,
     ) {
-        let query = BatchPutInsertQuery(&schema_prefix.to_owned(), metadata).to_string();
+        let query = BatchPutInsertQuery(&schema_prefix.into_owned(), metadata).to_string();
         assert_eq!(query, expected);
     }
 }

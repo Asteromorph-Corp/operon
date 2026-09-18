@@ -6,37 +6,13 @@ use crate::utils::{
     task_metadata_ident,
 };
 
-/// Generates the implementation of utility function for a spec struct of given task.
+/// Generates an implementation of utility functions for a task spec.
 ///
 /// # Example
 /// ```rust,ignore
-/// impl BetaSpec {
-///     pub const fn task_meta(&self) -> operon::__private::TaskMetadata<1usize> {
-///         metadata::task_beta_meta()
-///     }
-///
-///     pub const fn spawn_dim_meta(&self) -> operon::__private::DimensionMetadata<1usize> {
-///         metadata::dimension_j_meta()
-///     }
-///
-///     pub fn all_upstream_tasks(&self) -> std::collections::HashSet<&'static str> {
-///         std::collections::HashSet::from_iter(["alpha", "beta"])
-///     }
-///
-///     pub fn into_handler<Svc: CookingService, Sto: CookingStorage, MSto: operon::__private::MetaBackend>(
-///         self,
-///     ) -> Box<dyn operon::__private::TaskHandler<Svc, Sto, MSto>> {
-///         let task_meta = self.task_meta();
-///         let all_upstream_tasks = self.all_upstream_tasks();
-///         Box::new(operon::__private::SpecWithMetadata::new(
-///             self,
-///             task_meta,
-///             all_upstream_tasks,
-///         ))
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/spec/impl_spec_utils.simple.rs"))]
 /// ```
-pub fn impl_spec_utils(service_id: &syn::Ident, task: &TaskConfig) -> syn::ItemImpl {
+pub(crate) fn impl_spec_utils(service_id: &syn::Ident, task: &TaskConfig) -> syn::ItemImpl {
     let operon = operon_ident();
     let spec_ident = spec_ident(&task.id);
 

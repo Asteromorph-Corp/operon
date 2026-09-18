@@ -69,7 +69,7 @@ impl StorageClient<'_> {
         let shape_id = FOOTPRINT_VERSION.to_string();
 
         let init_record = init_shape_table_query(FOOTPRINT_SHAPES, schema_prefix);
-        self.execute(&init_record, &[]).await?;
+        let _num_rows = self.execute(&init_record, &[]).await?;
 
         let action = self.footprint_action(&shape_id).await?;
         let carried = match action {
@@ -131,7 +131,8 @@ impl StorageClient<'_> {
                 updated_at = EXCLUDED.updated_at,
                 state = EXCLUDED.state"
         };
-        self.execute(&stmt, &[&GLOBAL, run_id, updated_at, &state])
+        let _num_rows = self
+            .execute(&stmt, &[&GLOBAL, run_id, updated_at, &state])
             .await?;
         Ok(())
     }

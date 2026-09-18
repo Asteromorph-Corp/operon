@@ -8,14 +8,9 @@ use crate::utils::{dimension_metadata_ident, to_lit_str};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub const fn dimension_j_meta() -> operon::__private::DimensionMetadata<1usize> {
-///     operon::__private::DimensionMetadata {
-///         id: "j",
-///         deps: ["i"],
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/metadata/dimension.rs"))]
 /// ```
-pub fn dimension_metadata(dimension: &DimensionConfig) -> syn::ItemFn {
+pub(super) fn dimension_metadata(dimension: &DimensionConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = dimension_metadata_ident(&dimension.id);
     let n = dimension.depends_on.len();

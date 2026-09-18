@@ -17,16 +17,16 @@ struct FdHandle {
 }
 
 #[derive(Default)]
-pub struct FdRedirect {
+pub(super) struct FdRedirect {
     specs: Vec<FdSpec>,
 }
 
-pub struct FdRedirectHandle {
+pub(super) struct FdRedirectHandle {
     handles: Vec<FdHandle>,
 }
 
 impl FdRedirectHandle {
-    pub fn original_fd(&self, target: &impl AsRawFd) -> Option<std::fs::File> {
+    pub(super) fn original_fd(&self, target: &impl AsRawFd) -> Option<std::fs::File> {
         self.handles
             .iter()
             .find(|h| h.target_fd == target.as_raw_fd())
@@ -39,11 +39,11 @@ impl FdRedirectHandle {
 }
 
 impl FdRedirect {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self::default()
     }
 
-    pub fn with_fd(
+    pub(super) fn with_fd(
         mut self,
         target: &impl AsRawFd,
         name: &str,
@@ -57,7 +57,7 @@ impl FdRedirect {
         self
     }
 
-    pub fn capture(self) -> io::Result<FdRedirectHandle> {
+    pub(super) fn capture(self) -> io::Result<FdRedirectHandle> {
         let mut handles = Vec::with_capacity(self.specs.len());
 
         for spec in self.specs {
@@ -79,7 +79,7 @@ impl FdRedirect {
 
         let (read_end, write_end) = nix::unistd::pipe().map_err(io::Error::from)?;
 
-        nix::unistd::dup2(write_end.as_raw_fd(), spec.fd).map_err(io::Error::from)?;
+        let _ = nix::unistd::dup2(write_end.as_raw_fd(), spec.fd).map_err(io::Error::from)?;
 
         drop(write_end);
 
@@ -125,14 +125,14 @@ impl Drop for FdRedirectHandle {
     }
 }
 
-pub fn capture_std_outputs() -> io::Result<FdRedirectHandle> {
+pub(super) fn capture_std_outputs() -> io::Result<FdRedirectHandle> {
     // Capture standard outputs at the Error level,
     // since the standard I/O shouldn't be filtered out by log level filters.
     FdRedirect::new()
-        .with_fd(&std::io::stdout(), "stdout", |line| {
+        .with_fd(&io::stdout(), "stdout", |line| {
             tracing::error!(target: "stdio::stdout", "{}", line);
         })
-        .with_fd(&std::io::stderr(), "stderr", |line| {
+        .with_fd(&io::stderr(), "stderr", |line| {
             tracing::error!(target: "stdio::stderr", "{}", line);
         })
         .capture()

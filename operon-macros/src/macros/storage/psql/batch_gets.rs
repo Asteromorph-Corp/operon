@@ -10,7 +10,7 @@ use crate::utils::{
 ///
 /// # Example
 /// ```rust,ignore
-/// async fn get_all_b_over_j(
+/// async fn get_all_b_j(
 ///     &self,
 ///     [i]: [usize; 1usize],
 /// ) -> operon::error::StorageResult<Vec<B>, Self::Error> {
@@ -23,13 +23,13 @@ use crate::utils::{
 ///
 ///     let mut result: Vec<B> = Default::default();
 ///     for entity in entities {
-///         result.push(entity);
+///         result.push(entity.value);
 ///     }
 ///
 ///     Ok(result)
 /// }
 /// ```
-pub fn batch_gets(
+pub(super) fn batch_gets(
     tasks: &TaskConfigMap,
     entities: &EntityConfigMap,
 ) -> impl Iterator<Item = syn::TraitItemFn> {
@@ -107,6 +107,6 @@ mod tests {
     #[rstest]
     fn test_batch_gets(all_tasks: TaskConfigMap, all_entities: EntityConfigMap) {
         let items = batch_gets(&all_tasks, &all_entities).collect::<Vec<_>>();
-        assert_items_eq_in_trait(&items, "storage/batch_gets.rs");
+        assert_items_eq_in_trait(&items, "storage/psql/batch_gets.rs");
     }
 }

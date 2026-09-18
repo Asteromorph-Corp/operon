@@ -4,18 +4,13 @@ use crate::configs::DimensionConfigMap;
 use crate::operon_ident;
 use crate::utils::{resolution_enum_ident, to_pascal_case};
 
-/// Generates an enum representing the resolution of any dimension.
+/// Generates an enum representing a resolution of any dimension in the pipeline.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[derive(Debug, Clone)]
-/// pub enum ResolutionEnum {
-///     I(operon::__private::Resolution<0usize>),
-///     J(operon::__private::Resolution<1usize>),
-///     K(operon::__private::Resolution<1usize>),
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/resolution/resolution_enum_definition.rs"))]
 /// ```
-pub fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
+pub(crate) fn resolution_enum_definition(dimensions: &DimensionConfigMap) -> syn::ItemEnum {
     let operon = operon_ident();
     let res_enum_ident = resolution_enum_ident();
     let variants = dimensions.values().map(|dim| -> syn::Variant {

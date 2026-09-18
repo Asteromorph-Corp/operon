@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tokio::time::Instant;
 use uuid::Uuid;
 
-use crate::meta_storage::{MetaBackend, MetaConnApi, MetaTxApi};
+use crate::meta_storage::{MemMetaStorage, MetaBackend, MetaConnApi, MetaTxApi};
 use crate::scheduler::SchedulerError;
 use crate::scheduler::context::SchedulerContext;
 use crate::scheduler::states::start::StartTransition;
@@ -12,7 +12,7 @@ use crate::scheduler::states::{NextState, SchedulerTransition, TransitionState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct RebuildTransition<Svc, Sto, MSto>
+pub(super) struct RebuildTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -30,7 +30,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(super) fn new(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
@@ -44,7 +44,7 @@ where
         }
     }
 
-    pub fn state(
+    pub(super) fn state(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
@@ -74,34 +74,69 @@ where
     async fn execute(self) -> Result<NextState<Self::Error>, Self::Error> {
         let start = Instant::now();
 
-        let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
-        let tx = conn.transaction().await?;
+        let scratch = MemMetaStorage::default();
+        let scratch_handler = self.ctx.handler.to_mem();
 
-        let rebuilders = self
-            .ctx
+        let scratch_conn = scratch
+            .scheduler_conn()
+            .await
+            .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
+        let scratch_client = scratch_conn.as_client();
+
+        // The in-memory tables are registered here, before anything writes to them.
+        let _ = scratch_handler
+            .init_meta_storage(scratch_client)
+            .await
+            .map_err(SchedulerError::during_rebuild)?;
+
+        let mut conn = self.ctx.meta_storage.scheduler_conn().await?;
+        self.ctx
             .handler
+            .hydrate_mem(conn.as_client(), scratch_client)
+            .await?;
+
+        let rebuilders = scratch_handler
             .prepare_rebuilders(
                 &self.ctx.storage,
                 &self.ctx.progresses,
-                tx.as_client(),
+                scratch_client,
                 &self.skip,
             )
-            .await?;
+            .await
+            .map_err(SchedulerError::during_rebuild)?;
 
-        self.ctx.handler.clear_resolution(tx.as_client()).await?;
-        self.ctx.handler.clear_tickets(tx.as_client()).await?;
+        scratch_handler
+            .clear_resolution(scratch_client)
+            .await
+            .map_err(SchedulerError::during_rebuild)?;
+        scratch_handler
+            .clear_tickets(scratch_client)
+            .await
+            .map_err(SchedulerError::during_rebuild)?;
 
-        self.ctx.handler.put_default_tickets(tx.as_client()).await?;
-        self.ctx
-            .handler
-            .update_ui(&self.ctx.progresses, tx.as_client())
-            .await?;
+        scratch_handler
+            .put_default_tickets(scratch_client)
+            .await
+            .map_err(SchedulerError::during_rebuild)?;
+        scratch_handler
+            .update_ui(&self.ctx.progresses, scratch_client)
+            .await
+            .map_err(SchedulerError::during_rebuild)?;
 
         for rebuilder in rebuilders {
-            rebuilder.rebuild(tx.as_client()).await?;
+            rebuilder
+                .rebuild(scratch_client)
+                .await
+                .map_err(SchedulerError::during_rebuild)?;
         }
 
+        let tx = conn.transaction().await?;
+        self.ctx
+            .handler
+            .dump_mem(scratch_client, tx.as_client())
+            .await?;
         tx.commit().await?;
+
         tracing::info!(
             "Rebuild completed in: {:?}, starting the run.",
             start.elapsed()

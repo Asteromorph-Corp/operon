@@ -125,7 +125,7 @@ impl TaskDecl {
     }
 }
 impl Parse for TaskDecl {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let start = input.span();
 
         // Parse optional #[operon(...)] attribute before the task line.
@@ -142,7 +142,7 @@ impl Parse for TaskDecl {
             while !args_content.is_empty() {
                 args.push(args_content.parse()?);
                 if !args_content.is_empty() {
-                    args_content.parse::<Token![,]>()?;
+                    let _ = args_content.parse::<Token![,]>()?;
                 }
             }
             args
@@ -165,7 +165,7 @@ impl Parse for TaskDecl {
             while !input.is_empty() && !input.peek(Token![;]) {
                 dims.push(input.parse()?);
                 if !input.is_empty() && !input.peek(Token![;]) {
-                    input.parse::<Token![,]>()?;
+                    let _ = input.parse::<Token![,]>()?;
                 }
             }
             dims
@@ -215,7 +215,7 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonTaskAttrs> 
                 while !content.is_empty() {
                     let is_desc = content.peek(Token![-]);
                     if is_desc {
-                        content.parse::<Token![-]>()?;
+                        let _ = content.parse::<Token![-]>()?;
                     }
                     let dim: Ident = content.parse()?;
                     let dir = if is_desc {
@@ -225,7 +225,7 @@ fn parse_operon_attrs(attrs: &[syn::Attribute]) -> syn::Result<OperonTaskAttrs> 
                     };
                     priority.push((dim, dir));
                     if !content.is_empty() {
-                        content.parse::<Token![,]>()?;
+                        let _ = content.parse::<Token![,]>()?;
                     }
                 }
                 result.priority = Some(priority);

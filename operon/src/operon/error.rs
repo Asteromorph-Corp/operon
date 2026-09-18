@@ -6,7 +6,12 @@ use crate::ui::UiError;
 ///
 /// Operon runs its scheduler behind a UI that consumes backend errors,
 /// so the error surface is limited to UI errors and scheduler panics.
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum OperonError {
     /// Error in the terminal UI
     #[error("Terminal UI error: {0}")]

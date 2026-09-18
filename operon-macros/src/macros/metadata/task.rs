@@ -9,16 +9,9 @@ use crate::utils::{task_metadata_ident, to_lit_str};
 ///
 /// # Example
 /// ```rust,ignore
-/// pub const fn task_beta_meta() -> operon::__private::TaskMetadata<1usize> {
-///     operon::__private::TaskMetadata {
-///         id: "beta",
-///         dims: ["i"],
-///         spawn_dim: Some("j"),
-///         priority: &[("i", operon::__private::Direction::Ascending)],
-///     }
-/// }
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/metadata/task.rs"))]
 /// ```
-pub fn task_metadata(task: &TaskConfig) -> syn::ItemFn {
+pub(super) fn task_metadata(task: &TaskConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = task_metadata_ident(&task.id);
     let n = task.dims.len();

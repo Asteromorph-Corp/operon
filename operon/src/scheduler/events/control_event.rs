@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use crate::schema::CheckMode;
 
-pub type ControlEventReceiver = tokio::sync::mpsc::Receiver<ControlEvent>;
-pub type ControlEventSender = tokio::sync::mpsc::Sender<ControlEvent>;
+pub(crate) type ControlEventReceiver = tokio::sync::mpsc::Receiver<ControlEvent>;
+pub(crate) type ControlEventSender = tokio::sync::mpsc::Sender<ControlEvent>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RunEventInner {
+pub(crate) enum RunEventInner {
     Unspecified {
         redo_inconsistent_tasks: bool,
     },
@@ -21,7 +21,7 @@ pub enum RunEventInner {
 ///
 /// These are used for communication between individual schedulers and the UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ControlEvent {
+pub(crate) enum ControlEvent {
     /// Perform a check on the consistency between the storages.
     Check {
         mode: CheckMode,
@@ -47,9 +47,9 @@ pub enum ControlEvent {
 }
 
 impl ControlEvent {
-    pub const FRESH_RUN: Self = Self::Run(RunEventInner::Fresh);
+    pub(crate) const FRESH_RUN: Self = Self::Run(RunEventInner::Fresh);
 
-    pub const FORCE_QUIT: Self = Self::Quit {
+    pub(crate) const FORCE_QUIT: Self = Self::Quit {
         force: true,
         no_exit: false,
     };

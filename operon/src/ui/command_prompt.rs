@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 use crate::ui::command::Command;
 
 #[derive(Default, Debug, Clone)]
-pub struct CommandPrompt {
+pub(super) struct CommandPrompt {
     input: String,
 }
 
@@ -21,7 +21,7 @@ impl CommandPrompt {
             }
             (_, KeyCode::Char(c)) => self.input.push(c),
             (_, KeyCode::Backspace) => {
-                self.input.pop();
+                let _ = self.input.pop();
             }
             (_, KeyCode::Enter) => {
                 let command = self.input.parse::<Command>();

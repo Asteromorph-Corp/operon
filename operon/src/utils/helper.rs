@@ -1,5 +1,5 @@
 /// Splitting an iterator into its first item and the rest, by value.
-pub trait SplitFirstOwned<T> {
+pub(crate) trait SplitFirstOwned<T> {
     /// The first item and everything after it, or `None` when there is no first item.
     fn split_first_owned(self) -> Option<(T, Vec<T>)>;
 }

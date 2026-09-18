@@ -3,15 +3,16 @@ use crate::scheduler::SchedulerOptions;
 use crate::ui::{UiMode, UiOptions};
 
 /// Surface-level settings for a run: UI mode, internal channel sizing, and logging.
+#[derive(Debug)]
 pub struct OperonOptions {
     // UI options
-    pub(crate) ui_mode: UiMode,
+    pub(super) ui_mode: UiMode,
     // Scheduler options
-    pub(crate) internal_channel_size: usize,
+    pub(super) internal_channel_size: usize,
     // Log options
-    pub(crate) log_level: tracing::Level,
-    pub(crate) log_buffer_size: usize,
-    pub(crate) log_dump: Option<String>,
+    pub(super) log_level: tracing::Level,
+    pub(super) log_buffer_size: usize,
+    pub(super) log_dump: Option<String>,
 }
 
 impl Default for OperonOptions {
@@ -32,32 +33,37 @@ impl OperonOptions {
         Self::default()
     }
 
+    /// Sets the UI mode for the run.
     pub fn with_ui_mode(mut self, mode: UiMode) -> Self {
         self.ui_mode = mode;
         self
     }
 
+    /// Sets the internal channel size for the scheduler.
     pub fn with_internal_channel_size(mut self, size: usize) -> Self {
         self.internal_channel_size = size;
         self
     }
 
+    /// Sets the logging level for the run.
     pub fn with_log_level(mut self, level: tracing::Level) -> Self {
         self.log_level = level;
         self
     }
 
+    /// Sets the maximum number of log messages for the UI to remember.
     pub fn with_log_buffer_size(mut self, size: usize) -> Self {
         self.log_buffer_size = size;
         self
     }
 
+    /// Sets the path to the file where logs will be dumped.
     pub fn with_log_dump(mut self, dump: impl Into<String>) -> Self {
         self.log_dump = Some(dump.into());
         self
     }
 
-    pub(crate) fn split(self) -> (UiOptions, SchedulerOptions, LoggerOptions) {
+    pub(super) fn split(self) -> (UiOptions, SchedulerOptions, LoggerOptions) {
         let ui_options = UiOptions {
             mode: self.ui_mode,
             log_buffer_size: self.log_buffer_size,

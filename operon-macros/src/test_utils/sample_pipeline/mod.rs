@@ -1,2 +1,2 @@
-pub mod complicated_pipeline;
-pub mod simple_pipeline;
+pub(crate) mod complicated_pipeline;
+pub(crate) mod simple_pipeline;

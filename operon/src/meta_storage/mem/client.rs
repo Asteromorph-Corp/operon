@@ -12,6 +12,7 @@ use crate::schema::{DimensionMetadata, RunFootprint, TableShape, TaskMetadata};
 ///
 /// The store is process-local, so a "connection" is just a shared handle to it. It owns its handle,
 /// so it can be handed out for `'static`.
+#[derive(Debug)]
 pub struct MemConn {
     store: Arc<MemStore>,
 }
@@ -36,6 +37,7 @@ impl MetaConnApi<MemMetaStorage> for MemConn {
 }
 
 /// A transaction over the in-memory store.
+#[derive(Debug)]
 pub struct MemTx<'a> {
     store: &'a MemStore,
 }
@@ -57,7 +59,7 @@ impl MetaTxApi<MemMetaStorage> for MemTx<'_> {
 }
 
 /// A borrowed handle for issuing queries against the in-memory store.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct MemClient<'a>(&'a MemStore);
 
 impl MetaClientApi<MemMetaStorage> for MemClient<'_> {

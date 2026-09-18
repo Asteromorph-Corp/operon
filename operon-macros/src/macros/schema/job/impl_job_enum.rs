@@ -2,14 +2,13 @@ use syn::parse_quote;
 
 use crate::utils::{job_enum_ident, operon_ident};
 
-/// Generates an implementation of the `JobEnum` trait for the `JobEnum` type.
+/// Generates an implementation of the `JobEnum` trait for the job enum type.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[automatically_derived]
-/// impl operon::__private::JobEnum for JobEnum {}
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/schema/job/impl_job_enum.rs"))]
 /// ```
-pub fn impl_job_enum() -> syn::ItemImpl {
+pub(crate) fn impl_job_enum() -> syn::ItemImpl {
     let operon = operon_ident();
     let job_enum_ident = job_enum_ident();
 

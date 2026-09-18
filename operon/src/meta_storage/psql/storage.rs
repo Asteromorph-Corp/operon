@@ -16,8 +16,11 @@ use crate::meta_storage::{MetaBackend, MetaStorageError};
 /// metadata against concurrent corruption.
 #[derive(Debug, Clone)]
 pub struct PsqlMetaStorage {
+    /// The pool for individual job workers.
     pub worker_pool: deadpool_postgres::Pool,
+    /// The pool for the top-level schedulers.
     pub scheduler_pool: deadpool_postgres::Pool,
+    /// The optional schema name.
     pub schema: Option<String>,
     pub(super) lock_pool: deadpool_postgres::Pool,
     pub(super) lock: Arc<OnceCell<AdvisoryLock>>,
@@ -58,7 +61,7 @@ impl MetaBackend for PsqlMetaStorage {
     }
 
     async fn ensure_lock(&self) -> PsqlResult<()> {
-        self.lock().await?;
+        let _ = self.lock().await?;
         Ok(())
     }
 

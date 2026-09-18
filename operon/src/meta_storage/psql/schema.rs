@@ -89,21 +89,21 @@ impl PsqlClient<'_> {
             return Ok(());
         };
         let create_schema = format!("CREATE SCHEMA IF NOT EXISTS {schema}");
-        self.execute(&create_schema, &[]).await?;
+        let _num_rows = self.execute(&create_schema, &[]).await?;
         Ok(())
     }
 
     /// Initializes the table recording each task's ticket shape.
     pub async fn init_ticket_hash(&self) -> PsqlResult<()> {
         let stmt = init_shape_table_query(TICKET_SHAPES, self.schema_prefix());
-        self.execute(&stmt, &[]).await?;
+        let _num_rows = self.execute(&stmt, &[]).await?;
         Ok(())
     }
 
     /// Initializes the table recording each dimension's shape.
     pub async fn init_dimension_hash(&self) -> PsqlResult<()> {
         let stmt = init_shape_table_query(DIMENSION_SHAPES, self.schema_prefix());
-        self.execute(&stmt, &[]).await?;
+        let _num_rows = self.execute(&stmt, &[]).await?;
         Ok(())
     }
 
@@ -121,7 +121,7 @@ impl PsqlClient<'_> {
                 WHEN duplicate_object THEN null;
             END $$;"
         );
-        self.execute(&create_status_type, &[]).await?;
+        let _num_rows = self.execute(&create_status_type, &[]).await?;
         Ok(())
     }
 
@@ -134,7 +134,7 @@ impl PsqlClient<'_> {
         let schema_prefix = self.schema_prefix();
 
         let init_record = init_shape_table_query(SUMMARY_SHAPES, schema_prefix);
-        self.execute(&init_record, &[]).await?;
+        let _num_rows = self.execute(&init_record, &[]).await?;
 
         let init_query = init_summary_query(schema_prefix);
         let shape_id = hash_metadata(&init_query);

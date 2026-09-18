@@ -102,7 +102,7 @@ impl<W: ::std::io::Write> Drop for TerminalGuard<W> {
 }
 
 /// The main UI loop that handles user input and updates the UI state.
-pub struct UiLoop {
+pub(crate) struct UiLoop {
     mode: UiMode,
     progresses: SharedProgressMap,
     progress_cursor: u16,
@@ -118,7 +118,7 @@ pub struct UiLoop {
 impl UiLoop {
     /// Create a new UI loop with the given state, primary upper bound, log receiver,
     /// control event sender, and recovery state receiver.
-    pub fn new(
+    pub(crate) fn new(
         progresses: SharedProgressMap,
         log_rx: LogRecordReceiver,
         ctrl_tx: ControlEventSender,
@@ -139,7 +139,7 @@ impl UiLoop {
         }
     }
 
-    pub fn is_task(&self, task_name: &str) -> bool {
+    pub(crate) fn is_task(&self, task_name: &str) -> bool {
         self.progresses.0.contains_key(task_name)
     }
 
@@ -164,14 +164,14 @@ impl UiLoop {
         }
     }
 
-    pub async fn run(self) -> Result<(), UiError> {
+    pub(crate) async fn run(self) -> Result<(), UiError> {
         match self.mode {
             UiMode::Interactive => self.run_interactive().await,
             UiMode::Headless => self.run_headless().await,
         }
     }
 
-    pub async fn run_interactive(mut self) -> Result<(), UiError> {
+    pub(crate) async fn run_interactive(mut self) -> Result<(), UiError> {
         // Capture stdout/stderr and forward to tracing (must be after subscriber setup).
         // Best-effort: if capture fails or is unavailable (non-Unix), fall back to normal stdout.
         #[cfg(unix)]
@@ -206,17 +206,15 @@ impl UiLoop {
         terminal.clear()?;
 
         let snapshot = self.progresses.snapshot().await;
-        MAX_TASK_NAME_LEN
-            .set(
-                snapshot
-                    .0
-                    .keys()
-                    .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
-                    .max()
-                    .expect("At least one task name exists")
-                    .clamp(4, 20),
-            )
-            .ok();
+        let _ = MAX_TASK_NAME_LEN.set(
+            snapshot
+                .0
+                .keys()
+                .map(|name| u16::try_from(name.len()).expect("Progress name too long"))
+                .max()
+                .expect("At least one task name exists")
+                .clamp(4, 20),
+        );
 
         // Main loop for the UI.
         let mut events = EventStream::new();
@@ -276,7 +274,7 @@ impl UiLoop {
         Ok(())
     }
 
-    pub async fn run_headless(mut self) -> Result<(), UiError> {
+    pub(crate) async fn run_headless(mut self) -> Result<(), UiError> {
         // Main loop for the headless UI.
         // Recovery is disabled for this mode,
         // so we always run fresh off the bat and wait
@@ -453,7 +451,7 @@ impl UiLoop {
 
         let min_width = MIN_TERMINAL_WIDTH_THRESHOLD + max_len;
         if size.width < min_width || size.height < 10 {
-            terminal.draw(|frame| {
+            let _ = terminal.draw(|frame| {
                 let vertical = Layout::vertical([
                     Constraint::Fill(1),
                     Constraint::Length(1),
@@ -516,7 +514,7 @@ impl UiLoop {
             self.progress_cursor = total_progress_bars.saturating_sub(num_progress_bars);
         }
 
-        terminal.draw(|frame| {
+        let _ = terminal.draw(|frame| {
             let [
                 progress_head,
                 progress_area,

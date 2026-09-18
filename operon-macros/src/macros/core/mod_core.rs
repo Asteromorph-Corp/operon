@@ -4,7 +4,8 @@ use crate::configs::AllConfig;
 use crate::macros::core::trait_service::trait_service;
 use crate::macros::core::trait_storage::trait_storage;
 
-pub fn mod_core(all_configs: &AllConfig) -> syn::ItemMod {
+/// Generates the `core` module with the service and storage trait.
+pub(crate) fn mod_core(all_configs: &AllConfig) -> syn::ItemMod {
     let svc_trait = trait_service(all_configs);
     let sto_trait = trait_storage(all_configs);
 

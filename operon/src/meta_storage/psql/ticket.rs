@@ -13,7 +13,7 @@ use crate::schema::{
 };
 use crate::utils::{
     SchemaPrefix, ShapeAction, ShapeTable, SqlParams, box_sql, build_tables, hash_metadata,
-    shape_query,
+    psql_identifier, shape_query,
 };
 
 /// The table recording each task's shape ID, keyed by task ID.
@@ -69,6 +69,7 @@ impl<const N: usize> Ticket<N> {
 }
 
 /// Helper struct for building SQL queries related to tickets.
+#[derive(Debug)]
 pub struct PsqlTicketQueryBuilder<'a, const N: usize> {
     client: &'a PsqlClient<'a>,
     task_meta: TaskMetadata<N>,
@@ -87,6 +88,29 @@ impl<'a> PsqlClient<'a> {
     }
 }
 
+impl<const N: usize> PsqlTicketQueryBuilder<'_, N> {
+    /// Streams `tickets` into this task's ticket table over `COPY ... FROM STDIN`.
+    async fn copy_in(&self, tickets: &[Ticket<N>]) -> PsqlResult<()> {
+        if tickets.is_empty() {
+            return Ok(());
+        }
+
+        let copy_stmt = CopyInQuery(self.client.schema_prefix(), self.task_meta);
+        let sink = self
+            .client
+            .copy_in::<_, Bytes>(&copy_stmt.to_string())
+            .await?;
+        let mut sink = Box::pin(sink);
+        for ticket in tickets {
+            sink.feed(ticket.to_copy_string()?.into())
+                .await
+                .map_err(PsqlMetaError::from)?;
+        }
+        sink.close().await.map_err(PsqlMetaError::from)?;
+        Ok(())
+    }
+}
+
 impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     type Error = PsqlMetaError;
 
@@ -95,7 +119,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let id = self.task_meta.id;
         let shape_record = TICKET_SHAPES.record(id);
         let shape_id = hash_metadata(&self.task_meta);
-        let ticket_table = format!("ticket_{id}");
+        let ticket_table = psql_identifier("ticket", id);
         let tables = [ticket_table.as_str()];
 
         let shape_stmt = shape_query(shape_record, &tables, schema_prefix);
@@ -126,7 +150,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         if inserted_summary_rows > 0 && action == ShapeAction::Keep {
             // This summary row was just zeroed out, so recount the tickets into it.
             let resync_stmt = TicketSummaryResyncQuery(schema_prefix, self.task_meta);
-            self.client.execute_stmt(&resync_stmt, &[]).await?;
+            let _num_rows = self.client.execute_stmt(&resync_stmt, &[]).await?;
         }
         Ok(action.into())
     }
@@ -134,7 +158,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
     async fn clear(&self) -> PsqlResult<()> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = ClearTicketQuery(schema_prefix, self.task_meta);
-        self.client.execute_stmt(&stmt, &[]).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &[]).await?;
         Ok(())
     }
 
@@ -153,8 +177,24 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let schema_prefix = self.client.schema_prefix();
         let stmt = PutTicketQuery(schema_prefix, self.task_meta);
         let params = ticket.as_sql_params()?;
-        self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
+    }
+
+    async fn dump(&self) -> PsqlResult<Vec<Ticket<N>>> {
+        let schema_prefix = self.client.schema_prefix();
+        let stmt = DumpTicketQuery(schema_prefix, self.task_meta);
+        let rows = self.client.query_stmt(&stmt, &[]).await?;
+        let tickets = rows
+            .iter()
+            .map(|row| Ticket::from_row(self.task_meta, row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tickets)
+    }
+
+    async fn hydrate(&self, tickets: Vec<Ticket<N>>) -> PsqlResult<()> {
+        self.clear().await?;
+        self.copy_in(&tickets).await
     }
 
     async fn raise_deps_done<const M: usize>(
@@ -257,18 +297,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
             .map(|ticket| ticket.update_status())
             .collect::<Vec<_>>();
 
-        let copy_stmt = CopyInQuery(schema_prefix, self.task_meta);
-        let sink = self
-            .client
-            .copy_in::<_, Bytes>(&copy_stmt.to_string())
-            .await?;
-        let mut sink = Box::pin(sink);
-        for ticket in &new_tickets {
-            sink.feed(ticket.to_copy_string()?.into())
-                .await
-                .map_err(PsqlMetaError::from)?;
-        }
-        sink.close().await.map_err(PsqlMetaError::from)?;
+        self.copy_in(&new_tickets).await?;
 
         Ok(tickets)
     }
@@ -277,7 +306,7 @@ impl<const N: usize> MetaTicketApi<N> for PsqlTicketQueryBuilder<'_, N> {
         let schema = self.client.schema_prefix();
         let stmt = MarkDoneQuery(schema, self.task_meta);
         let params = SqlParams::from_usize(job.coordinate)?;
-        self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 
@@ -305,8 +334,9 @@ impl<const N: usize> std::fmt::Display for InitTicketQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("ticket", id);
 
-        writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}ticket_{id} (",)?;
+        writeln!(f, "CREATE TABLE IF NOT EXISTS {schema}{table} (",)?;
         for dim in dims {
             writeln!(f, "    {dim} BIGINT,")?;
         }
@@ -335,7 +365,7 @@ impl<const N: usize> std::fmt::Display for InitTicketQuery<'_, N> {
 /// Helper struct to generate the SQL queries for ticket summary insert.
 struct TicketSummaryInsertQuery<'a>(SchemaPrefix<'a>);
 
-impl<'a> std::fmt::Display for TicketSummaryInsertQuery<'a> {
+impl std::fmt::Display for TicketSummaryInsertQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
 
@@ -355,6 +385,7 @@ impl<const N: usize> std::fmt::Display for TicketSummaryResyncQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("ticket", id);
 
         writeln!(f, "UPDATE {schema}ticket_summary SET")?;
         writeln!(f, "    waiting = counts.waiting,")?;
@@ -371,7 +402,7 @@ impl<const N: usize> std::fmt::Display for TicketSummaryResyncQuery<'_, N> {
             "        COUNT(*) FILTER (WHERE status = 'queued') AS queued,"
         )?;
         writeln!(f, "        COUNT(*) FILTER (WHERE status = 'done') AS done")?;
-        writeln!(f, "    FROM {schema}ticket_{id}")?;
+        writeln!(f, "    FROM {schema}{table}")?;
         writeln!(f, ") AS counts")?;
         write!(f, "WHERE task_id = '{id}';")
     }
@@ -402,9 +433,11 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("ticket", id);
+        let trigger_prefix = psql_identifier("trg_ticket", id);
 
-        writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_ins_trg")?;
-        writeln!(f, "    AFTER INSERT ON {schema}ticket_{id}")?;
+        writeln!(f, "CREATE OR REPLACE TRIGGER {trigger_prefix}_ins")?;
+        writeln!(f, "    AFTER INSERT ON {schema}{table}")?;
         writeln!(f, "    REFERENCING NEW TABLE AS NEW_TABLE")?;
         writeln!(f, "    FOR EACH STATEMENT")?;
         writeln!(
@@ -413,8 +446,8 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
         )?;
         writeln!(f)?;
 
-        writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_upd_trg")?;
-        writeln!(f, "    AFTER UPDATE ON {schema}ticket_{id}")?;
+        writeln!(f, "CREATE OR REPLACE TRIGGER {trigger_prefix}_upd")?;
+        writeln!(f, "    AFTER UPDATE ON {schema}{table}")?;
         writeln!(f, "    REFERENCING")?;
         writeln!(f, "        NEW TABLE AS NEW_TABLE")?;
         writeln!(f, "        OLD TABLE AS OLD_TABLE")?;
@@ -425,8 +458,8 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
         )?;
 
         writeln!(f)?;
-        writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_del_trg")?;
-        writeln!(f, "    AFTER DELETE ON {schema}ticket_{id}")?;
+        writeln!(f, "CREATE OR REPLACE TRIGGER {trigger_prefix}_del")?;
+        writeln!(f, "    AFTER DELETE ON {schema}{table}")?;
         writeln!(f, "    REFERENCING OLD TABLE AS OLD_TABLE")?;
         writeln!(f, "    FOR EACH STATEMENT")?;
         writeln!(
@@ -435,8 +468,8 @@ impl<const N: usize> std::fmt::Display for TicketSummaryTriggerQuery<'_, N> {
         )?;
         writeln!(f)?;
 
-        writeln!(f, "CREATE OR REPLACE TRIGGER ticket_{id}_summary_trunc_trg")?;
-        writeln!(f, "    AFTER TRUNCATE ON {schema}ticket_{id}")?;
+        writeln!(f, "CREATE OR REPLACE TRIGGER {trigger_prefix}_trunc")?;
+        writeln!(f, "    AFTER TRUNCATE ON {schema}{table}")?;
         writeln!(f, "    FOR EACH STATEMENT")?;
         write!(
             f,
@@ -452,8 +485,9 @@ impl<const N: usize> std::fmt::Display for ClearTicketQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("ticket", id);
 
-        write!(f, "TRUNCATE TABLE {schema}ticket_{id};")
+        write!(f, "TRUNCATE TABLE {schema}{table};")
     }
 }
 
@@ -464,8 +498,9 @@ impl<const N: usize> std::fmt::Display for GetAllTicketQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let id = self.1.id;
+        let table = psql_identifier("ticket", id);
 
-        write!(f, "SELECT * FROM {schema}ticket_{id} WHERE status = $1;")
+        write!(f, "SELECT * FROM {schema}{table} WHERE status = $1;")
     }
 }
 
@@ -477,8 +512,9 @@ impl<const N: usize> std::fmt::Display for PutTicketQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("ticket", id);
 
-        write!(f, "INSERT INTO {schema}ticket_{id} (")?;
+        write!(f, "INSERT INTO {schema}{table} (")?;
         for dim in dims {
             write!(f, "{dim}, ")?;
         }
@@ -499,6 +535,18 @@ impl<const N: usize> std::fmt::Display for PutTicketQuery<'_, N> {
     }
 }
 
+/// Helper struct to generate the SQL query for getting every ticket of a given task.
+struct DumpTicketQuery<'a, const N: usize>(SchemaPrefix<'a>, TaskMetadata<N>);
+
+impl<const N: usize> std::fmt::Display for DumpTicketQuery<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schema = self.0;
+        let id = self.1.id;
+
+        write!(f, "SELECT * FROM {schema}ticket_{id};")
+    }
+}
+
 /// Helper struct to generate the SQL query for raising `deps_done` count of tickets.
 struct RaiseDepsDoneQuery<'a, const N: usize, const M: usize>(
     SchemaPrefix<'a>,
@@ -514,9 +562,10 @@ impl<const N: usize, const M: usize> std::fmt::Display for RaiseDepsDoneQuery<'_
         let self_dims = self.1.dims;
         let received_dims = self.2.dims;
         let aggregate_dims = self.3;
+        let table = psql_identifier("ticket", id);
 
         writeln!(f, "WITH updated AS (")?;
-        writeln!(f, "    UPDATE {schema}ticket_{id}")?;
+        writeln!(f, "    UPDATE {schema}{table}")?;
         writeln!(f, "    SET")?;
         writeln!(f, "        deps_done = deps_done + 1,")?;
         writeln!(f, "        status = CASE")?;
@@ -548,9 +597,10 @@ impl<const N: usize> std::fmt::Display for RaiseDepsQuotaQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let cols = self.2;
+        let table = psql_identifier("ticket", id);
 
         writeln!(f, "WITH updated AS (")?;
-        writeln!(f, "    UPDATE {schema}ticket_{id}")?;
+        writeln!(f, "    UPDATE {schema}{table}")?;
         writeln!(f, "    SET")?;
         writeln!(f, "        deps_quota = deps_quota + $1 - 1,")?;
         writeln!(f, "        status = CASE")?;
@@ -581,8 +631,9 @@ impl<const N: usize, const M: usize> std::fmt::Display for ExplodePopQuery<'_, N
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
         let task_id = self.1.id;
+        let table = psql_identifier("ticket", task_id);
 
-        writeln!(f, "DELETE FROM {schema}ticket_{task_id}")?;
+        writeln!(f, "DELETE FROM {schema}{table}")?;
         for (idx, dep) in self
             .2
             .deps
@@ -609,8 +660,9 @@ impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("ticket", id);
 
-        writeln!(f, "COPY {schema}ticket_{id} (")?;
+        writeln!(f, "COPY {schema}{table} (")?;
         write!(f, "    ")?;
         for dim in dims {
             write!(f, "{dim}, ")?;
@@ -629,8 +681,9 @@ impl<const N: usize> std::fmt::Display for MarkDoneQuery<'_, N> {
         let schema = self.0;
         let id = self.1.id;
         let dims = self.1.dims;
+        let table = psql_identifier("ticket", id);
 
-        write!(f, "UPDATE {schema}ticket_{id} SET status = 'done'")?;
+        write!(f, "UPDATE {schema}{table} SET status = 'done'")?;
         for (idx, dim) in dims.iter().enumerate() {
             if idx == 0 {
                 write!(f, " WHERE")?;
@@ -646,7 +699,7 @@ impl<const N: usize> std::fmt::Display for MarkDoneQuery<'_, N> {
 /// A helper struct to generate the SQL query for fetching a task's ticket counts.
 struct GetStatusQuery<'a>(SchemaPrefix<'a>);
 
-impl<'a> std::fmt::Display for GetStatusQuery<'a> {
+impl std::fmt::Display for GetStatusQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schema = self.0;
 
@@ -782,13 +835,13 @@ mod tests {
     #[case::simple(
         task_beta(),
         indoc! {"
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_ins_trg
+            CREATE OR REPLACE TRIGGER trg_ticket_beta_ins
                 AFTER INSERT ON test_meta.ticket_beta
                 REFERENCING NEW TABLE AS NEW_TABLE
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION test_meta.trg_ticket_summary('beta');
 
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_upd_trg
+            CREATE OR REPLACE TRIGGER trg_ticket_beta_upd
                 AFTER UPDATE ON test_meta.ticket_beta
                 REFERENCING
                     NEW TABLE AS NEW_TABLE
@@ -796,13 +849,13 @@ mod tests {
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION test_meta.trg_ticket_summary('beta');
 
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_del_trg
+            CREATE OR REPLACE TRIGGER trg_ticket_beta_del
                 AFTER DELETE ON test_meta.ticket_beta
                 REFERENCING OLD TABLE AS OLD_TABLE
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION test_meta.trg_ticket_summary('beta');
 
-            CREATE OR REPLACE TRIGGER ticket_beta_summary_trunc_trg
+            CREATE OR REPLACE TRIGGER trg_ticket_beta_trunc
                 AFTER TRUNCATE ON test_meta.ticket_beta
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION test_meta.trg_ticket_summary('beta');"
@@ -862,6 +915,18 @@ mod tests {
         #[case] expected: &str,
     ) {
         let stmt = PutTicketQuery(schema_prefix, task_meta).to_string();
+        assert_eq!(stmt, expected);
+    }
+
+    #[rstest]
+    #[case::simple(task_alpha(), "SELECT * FROM test_meta.ticket_alpha;")]
+    #[case::with_dimension(task_beta(), "SELECT * FROM test_meta.ticket_beta;")]
+    fn test_dump_ticket_query<const N: usize>(
+        schema_prefix: SchemaPrefix<'static>,
+        #[case] task_meta: TaskMetadata<N>,
+        #[case] expected: &str,
+    ) {
+        let stmt = DumpTicketQuery(schema_prefix, task_meta).to_string();
         assert_eq!(stmt, expected);
     }
 

@@ -4,9 +4,10 @@ description = "Procedural macros for the Operon workflow engine."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
-publish.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+categories = ["development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true
