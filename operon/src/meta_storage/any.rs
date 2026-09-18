@@ -245,6 +245,14 @@ impl<const N: usize> MetaTicketApi<N> for AnyTicket<'_, N> {
         map_lift_backend!(self, |builder| builder.put(ticket).await)
     }
 
+    async fn dump(&self) -> MetaResult<Vec<Ticket<N>>, AnyBackendError> {
+        map_lift_backend!(self, |ticket| ticket.dump().await)
+    }
+
+    async fn hydrate(&self, tickets: Vec<Ticket<N>>) -> MetaResult<(), AnyBackendError> {
+        map_lift_backend!(self, |builder| builder.hydrate(tickets).await)
+    }
+
     async fn raise_deps_done<const M: usize>(
         &self,
         upstream_meta: TaskMetadata<M>,
@@ -315,5 +323,13 @@ impl<const N: usize> MetaResolutionApi<N> for AnyResolution<'_, N> {
 
     async fn put(&self, resolution: Resolution<N>) -> MetaResult<(), AnyBackendError> {
         map_lift_backend!(self, |builder| builder.put(resolution).await)
+    }
+
+    async fn dump(&self) -> MetaResult<Vec<Resolution<N>>, AnyBackendError> {
+        map_lift_backend!(self, |resolution| resolution.dump().await)
+    }
+
+    async fn hydrate(&self, resolutions: Vec<Resolution<N>>) -> MetaResult<(), AnyBackendError> {
+        map_lift_backend!(self, |builder| builder.hydrate(resolutions).await)
     }
 }

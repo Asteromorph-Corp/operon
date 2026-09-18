@@ -114,14 +114,19 @@ impl TicketRows {
             .collect()
     }
 
+    /// Inserts a ticket, keeping the counters in step.
+    fn insert(&mut self, key: TicketKey, row: TicketRow) {
+        self.count(row.status, 1);
+        self.index(&key);
+        self.map.insert(key, row);
+    }
+
     /// Inserts a ticket, leaving an existing one at the same key untouched.
     fn insert_new(&mut self, key: TicketKey, row: TicketRow) {
         if self.map.contains_key(&key) {
             return;
         }
-        self.count(row.status, 1);
-        self.index(&key);
-        self.map.insert(key, row);
+        self.insert(key, row);
     }
 
     /// Replaces the row at `key`, keeping the counters in step.
@@ -297,6 +302,30 @@ impl<const N: usize> MetaTicketApi<N> for MemTicketQueryBuilder<'_, N> {
         let table = self.require_table()?;
         let (key, row) = Self::split(&ticket);
         table.rows.write()?.insert_new(key, row);
+        Ok(())
+    }
+
+    async fn dump(&self) -> MemResult<Vec<Ticket<N>>> {
+        let Some(table) = self.table()? else {
+            return Ok(Vec::new());
+        };
+        let rows = table.rows.read()?;
+        let tickets = rows
+            .map
+            .iter()
+            .map(|(key, row)| Self::ticket_of(key, row))
+            .collect::<Vec<_>>();
+        Ok(tickets)
+    }
+
+    async fn hydrate(&self, tickets: Vec<Ticket<N>>) -> MemResult<()> {
+        let table = self.require_table()?;
+        let mut rows = table.rows.write()?;
+        rows.clear();
+        for ticket in &tickets {
+            let (key, row) = Self::split(ticket);
+            rows.insert(key, row);
+        }
         Ok(())
     }
 

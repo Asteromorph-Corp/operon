@@ -2,7 +2,7 @@ use thiserror::Error;
 use tokio::sync::AcquireError;
 use tokio::task::JoinError;
 
-use crate::meta_storage::MetaStorageError;
+use crate::meta_storage::{MemMetaError, MetaStorageError};
 use crate::storage::StorageError;
 
 /// The scheduler's error, generic over the service's error type `UErr`
@@ -40,6 +40,28 @@ impl<UErr, SErr, MErr> SchedulerError<UErr, SErr, MErr> {
 
     pub(crate) fn other(msg: impl Into<String>) -> Self {
         Self::Other(msg.into())
+    }
+}
+
+impl<UErr, SErr> SchedulerError<UErr, SErr, MemMetaError> {
+    /// Re-types an error from the scratch in-memory store used during rebuild.
+    pub(crate) fn during_rebuild<MErr>(self) -> SchedulerError<UErr, SErr, MErr> {
+        match self {
+            SchedulerError::UserError(e) => SchedulerError::UserError(e),
+            SchedulerError::Storage(e) => SchedulerError::Storage(e),
+            SchedulerError::MetaStorage(e) => SchedulerError::MetaStorage(e.during_rebuild()),
+            SchedulerError::JoinFailed(e) => SchedulerError::JoinFailed(e),
+            SchedulerError::SemaphoreAcquireFailed => SchedulerError::SemaphoreAcquireFailed,
+            SchedulerError::ControlEventReceiveFailed => SchedulerError::ControlEventReceiveFailed,
+            SchedulerError::PeerEventSendFailed => SchedulerError::PeerEventSendFailed,
+            SchedulerError::InvalidPeerEventReceived(event, task) => {
+                SchedulerError::InvalidPeerEventReceived(event, task)
+            }
+            SchedulerError::MissingProgressEntry(task) => {
+                SchedulerError::MissingProgressEntry(task)
+            }
+            SchedulerError::Other(msg) => SchedulerError::Other(msg),
+        }
     }
 }
 

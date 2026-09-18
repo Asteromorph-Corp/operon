@@ -3,7 +3,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::meta_storage::{MetaBackend, MetaClientApi, MetaResolutionApi, MetaTicketApi};
+use crate::MemMetaStorage;
+use crate::meta_storage::{
+    MemClient, MetaBackend, MetaClientApi, MetaResolutionApi, MetaTicketApi,
+};
 use crate::scheduler::events::{
     IndividualControlEventReceiver, ServicePeerEventReceiver, ServicePeerEventSenderMap,
 };
@@ -14,6 +17,17 @@ use crate::schema::{CheckMode, Job, SharedProgress, TableShape, Ticket};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
+/// Rebuilds a task's handler against the in-memory backend, for the scratch store a staged
+/// rebuild replays into.
+pub trait ToMemHandler<Svc, Sto>: Send + Sync + 'static
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+{
+    /// Converts the task handler to an in-memory version.
+    fn to_mem(&self) -> Box<dyn TaskHandler<Svc, Sto, MemMetaStorage>>;
+}
+
 #[async_trait]
 /// The dyn-compatible face of one task's [`TaskSpec`], carrying the arity `N` as a type parameter
 /// would not.
@@ -21,7 +35,7 @@ use crate::storage::OperonStorage;
 /// Implemented for every [`SpecWithMetadata`], so that the scheduler holds the tasks of a pipeline
 /// in one collection despite their differing arities.
 /// It is what the scheduler prepares a task's metadata and starts its individual scheduler through.
-pub trait TaskHandler<Svc, Sto, MSto>: Send + Sync + 'static
+pub trait TaskHandler<Svc, Sto, MSto>: ToMemHandler<Svc, Sto> + Send + Sync + 'static
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -97,6 +111,22 @@ where
         mode: CheckMode,
     ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
 
+    /// Hydrates the scratch in-memory database using the metadata storage.
+    async fn hydrate_mem(
+        &self,
+        src: MSto::Client<'_>,
+        dst: MemClient<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
+
+    /// Dumps the metadata from scratch in-memory database to the metadata storage.
+    ///
+    /// Existing data in the metadata storage is discarded.
+    async fn dump_mem(
+        &self,
+        src: MemClient<'_>,
+        dst: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>>;
+
     /// Prepare this task's [`TaskRebuilder`] for the given storage and metadata client by fetching
     /// the necessary data.
     async fn prepare_rebuild(
@@ -124,6 +154,17 @@ where
     ) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 }
 
+impl<Svc, Sto, TS, const N: usize> ToMemHandler<Svc, Sto> for SpecWithMetadata<Svc, Sto, TS, N>
+where
+    Svc: OperonService,
+    Sto: OperonStorage,
+    TS: TaskSpec<Svc, Sto, MemMetaStorage, Job = Job<N>, Ticket = Ticket<N>>,
+{
+    fn to_mem(&self) -> Box<dyn TaskHandler<Svc, Sto, MemMetaStorage>> {
+        Box::new(SpecWithMetadata::new(self.spec.clone(), self.task_meta))
+    }
+}
+
 #[async_trait]
 impl<Svc, Sto, TS, MSto, const N: usize> TaskHandler<Svc, Sto, MSto>
     for SpecWithMetadata<Svc, Sto, TS, N>
@@ -131,7 +172,8 @@ where
     Svc: OperonService,
     Sto: OperonStorage,
     MSto: MetaBackend,
-    TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>> + Clone,
+    TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
+    Self: ToMemHandler<Svc, Sto>,
 {
     fn task_id(&self) -> &'static str {
         self.task_meta.id
@@ -226,6 +268,52 @@ where
         mode: CheckMode,
     ) -> Result<bool, SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
         self.spec.check_consistency(storage, client, mode).await
+    }
+
+    async fn hydrate_mem(
+        &self,
+        src: MSto::Client<'_>,
+        dst: MemClient<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        let tickets = src.ticket(self.task_meta).dump().await?;
+        dst.ticket(self.task_meta)
+            .hydrate(tickets)
+            .await
+            .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
+
+        if let Some(spawn_dim_meta) = self.task_meta.spawn_dim_meta() {
+            let resolutions = src.resolution(spawn_dim_meta).dump().await?;
+            dst.resolution(spawn_dim_meta)
+                .hydrate(resolutions)
+                .await
+                .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
+        }
+
+        Ok(())
+    }
+
+    async fn dump_mem(
+        &self,
+        src: MemClient<'_>,
+        dst: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        let tickets = src
+            .ticket(self.task_meta)
+            .dump()
+            .await
+            .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
+        dst.ticket(self.task_meta).hydrate(tickets).await?;
+
+        if let Some(spawn_dim_meta) = self.task_meta.spawn_dim_meta() {
+            let resolutions = src
+                .resolution(spawn_dim_meta)
+                .dump()
+                .await
+                .map_err(|e| SchedulerError::MetaStorage(e.during_rebuild()))?;
+            dst.resolution(spawn_dim_meta).hydrate(resolutions).await?;
+        }
+
+        Ok(())
     }
 
     async fn prepare_rebuild(

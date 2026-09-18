@@ -67,4 +67,31 @@ impl<const N: usize> MetaResolutionApi<N> for MemResolutionQueryBuilder<'_, N> {
         }
         Ok(())
     }
+
+    async fn dump(&self) -> MemResult<Vec<Resolution<N>>> {
+        let Some(table) = self.store.resolution_table(self.dim_meta.id)? else {
+            return Ok(Vec::new());
+        };
+        let rows = table.rows.read()?;
+        let resolutions = rows
+            .iter()
+            .map(|(coordinate, &ub)| Resolution {
+                coordinate: std::array::from_fn(|i| coordinate[i]),
+                ub,
+            })
+            .collect::<Vec<_>>();
+        Ok(resolutions)
+    }
+
+    async fn hydrate(&self, resolutions: Vec<Resolution<N>>) -> MemResult<()> {
+        let Some(table) = self.store.resolution_table(self.dim_meta.id)? else {
+            return Ok(());
+        };
+        let mut rows = table.rows.write()?;
+        rows.clear();
+        for resolution in resolutions {
+            rows.insert(resolution.coordinate.into(), resolution.ub);
+        }
+        Ok(())
+    }
 }

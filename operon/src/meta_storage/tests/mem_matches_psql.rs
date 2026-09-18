@@ -8,102 +8,17 @@
 //! They run against a schema of their own, which they clear before each sequence.
 
 use crate::meta_storage::mem::MemMetaStorage;
-use crate::meta_storage::tests::utils::psql_backend;
+use crate::meta_storage::tests::utils::{
+    TicketView, dim_i, psql_backend, task_alpha, task_beta, task_delta, task_gamma, task_over_j,
+    views,
+};
 use crate::meta_storage::{
     MetaBackend, MetaClientApi, MetaConnApi, MetaResolutionApi, MetaTicketApi,
 };
-use crate::schema::{DimensionMetadata, Job, Resolution, TaskMetadata, Ticket, TicketStatus};
+use crate::schema::{Job, Resolution, Ticket, TicketStatus};
 
 /// The schema the differential sequences own outright.
 const SCHEMA: &str = "operon_differential";
-
-/// A task with no dimensions, spawning the dimension `i`.
-fn task_alpha() -> TaskMetadata<0> {
-    TaskMetadata {
-        id: "alpha",
-        dims: [],
-        spawn_dim: Some("i"),
-        priority: &[],
-    }
-}
-
-/// A task over `i`, downstream of `alpha`.
-fn task_beta() -> TaskMetadata<1> {
-    TaskMetadata {
-        id: "beta",
-        dims: ["i"],
-        spawn_dim: None,
-        priority: &[],
-    }
-}
-
-/// A task over `i`, downstream of `beta`, used to pin `raise_deps_done` to one coordinate.
-fn task_gamma() -> TaskMetadata<1> {
-    TaskMetadata {
-        id: "gamma",
-        dims: ["i"],
-        spawn_dim: None,
-        priority: &[],
-    }
-}
-
-/// A task over both `i` and `j`, whose upstreams pin one of the two.
-///
-/// Its upstreams pin a proper subset of its dimensions, which is the query shape a single-dimension
-/// task cannot produce.
-fn task_delta() -> TaskMetadata<2> {
-    TaskMetadata {
-        id: "delta",
-        dims: ["i", "j"],
-        spawn_dim: None,
-        priority: &[],
-    }
-}
-
-/// An upstream of `delta` over `j` alone.
-fn task_over_j() -> TaskMetadata<1> {
-    TaskMetadata {
-        id: "over_j",
-        dims: ["j"],
-        spawn_dim: None,
-        priority: &[],
-    }
-}
-
-/// The dimension `alpha` spawns.
-fn dim_i() -> DimensionMetadata<0> {
-    DimensionMetadata { id: "i", deps: [] }
-}
-
-/// A ticket projected onto its comparable parts.
-///
-/// `Ticket` is neither `PartialEq` nor `Ord`, and both backends return tickets in an unspecified
-/// order, so observations are projected and sorted before they are compared.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct TicketView {
-    coordinate: Vec<Option<usize>>,
-    deps_done: usize,
-    deps_quota: usize,
-    status: String,
-}
-
-impl TicketView {
-    fn of<const N: usize>(ticket: &Ticket<N>) -> Self {
-        Self {
-            coordinate: ticket.coordinate.iter().map(|coord| coord.0).collect(),
-            deps_done: ticket.deps_done(),
-            deps_quota: ticket.deps_quota(),
-            status: ticket.status.to_string(),
-        }
-    }
-}
-
-/// Projects and sorts a set of tickets into a comparable observation.
-fn views<const N: usize>(tickets: &[Ticket<N>]) -> Vec<TicketView> {
-    let mut views = tickets.iter().map(TicketView::of).collect::<Vec<_>>();
-    views.sort();
-    views
-}
 
 /// What a single step of a sequence observed.
 #[derive(Debug, PartialEq, Eq)]
