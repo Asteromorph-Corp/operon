@@ -2,13 +2,13 @@ use proc_macro_error::{Diagnostic, Level};
 use syn::parse_str;
 
 #[derive(Default)]
-pub struct OperonAttrs {
+pub(crate) struct OperonAttrs {
     pub crate_path: Option<syn::Path>,
     pub definition_path: Option<syn::Path>,
     pub error_type: Option<syn::Type>,
 }
 
-pub fn extract_attr<T: Default>(
+pub(crate) fn extract_attr<T: Default>(
     attrs: &[syn::Attribute],
     get_attr: impl Fn(&syn::Attribute) -> Result<Option<T>, Diagnostic>,
 ) -> Result<T, Diagnostic> {
@@ -18,7 +18,7 @@ pub fn extract_attr<T: Default>(
         .unwrap_or_else(|| Ok(T::default()))
 }
 
-pub fn get_operon_attrs(attr: &syn::Attribute) -> Result<Option<OperonAttrs>, Diagnostic> {
+pub(crate) fn get_operon_attrs(attr: &syn::Attribute) -> Result<Option<OperonAttrs>, Diagnostic> {
     if !attr.path().is_ident("operon") {
         return Ok(None);
     }

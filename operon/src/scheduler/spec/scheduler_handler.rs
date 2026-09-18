@@ -5,7 +5,8 @@ use futures::{StreamExt, TryStreamExt};
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
-use crate::meta_storage::{MetaBackend, MetaClientApi};
+use crate::MemMetaStorage;
+use crate::meta_storage::{MemClient, MetaBackend, MetaClientApi};
 use crate::scheduler::events::{
     IndividualControlEventSender, PeerEvent, PeerEventSenderMap, ServicePeerEventReceiver,
     ServicePeerEventSenderMap,
@@ -15,6 +16,7 @@ use crate::schema::{CheckMode, Progress, SharedProgressMap, TableShape};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
+#[allow(missing_debug_implementations)]
 pub struct SchedulerHandler<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> {
     pub task_handlers: Vec<Box<dyn TaskHandler<Svc, Sto, MSto>>>,
 }
@@ -84,7 +86,7 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
             let (peer_tx, peer_rx) = tokio::sync::mpsc::channel::<
                 PeerEvent<Svc::JobEnum, Svc::ResolutionEnum, Svc::TicketEnum>,
             >(channel_size);
-            peer_txs.insert(task_handler.task_id(), peer_tx);
+            let _opt = peer_txs.insert(task_handler.task_id(), peer_tx);
             schedules_with_rx.push(HandlerWithRx::new(task_handler.as_ref(), peer_rx));
         });
 
@@ -192,9 +194,45 @@ impl<Svc: OperonService, Sto: OperonStorage, MSto: MetaBackend> SchedulerHandler
             let Some(progress) = progresses.0.get(schedule.task_id()) else {
                 return Err(SchedulerError::missing_progress(schedule.task_id()));
             };
-            (*progress.write().await).update(done, queued, waiting);
+            let _ = (*progress.write().await).update(done, queued, waiting);
         }
         Ok(())
+    }
+
+    /// Hydrates the scratch in-memory database using the metadata storage.
+    pub(crate) async fn hydrate_mem(
+        &self,
+        src: MSto::Client<'_>,
+        dst: MemClient<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        for schedule in &self.task_handlers {
+            schedule.hydrate_mem(src, dst).await?;
+        }
+        Ok(())
+    }
+
+    /// Dumps the metadata from scratch in-memory database to the metadata storage.
+    ///
+    /// Existing data in the metadata storage is discarded.
+    pub(crate) async fn dump_mem(
+        &self,
+        src: MemClient<'_>,
+        dst: MSto::Client<'_>,
+    ) -> Result<(), SchedulerError<Svc::Error, Sto::Error, MSto::Error>> {
+        for schedule in &self.task_handlers {
+            schedule.dump_mem(src, dst).await?;
+        }
+        Ok(())
+    }
+
+    /// Converts the scheduler handler to an in-memory version.
+    pub(crate) fn to_mem(&self) -> SchedulerHandler<Svc, Sto, MemMetaStorage> {
+        let task_handlers = self
+            .task_handlers
+            .iter()
+            .map(|handler| handler.to_mem())
+            .collect();
+        SchedulerHandler { task_handlers }
     }
 
     pub(crate) async fn prepare_rebuilders(
@@ -231,7 +269,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(crate) fn new(
         handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto, MSto>>,
         peer_txs: ServicePeerEventSenderMap<Svc>,
     ) -> Self {
@@ -241,7 +279,7 @@ where
         }
     }
 
-    pub fn run_schedulers(
+    pub(crate) fn run_schedulers(
         self,
         service: &Arc<Svc>,
         storage: &Arc<Sto>,
@@ -286,7 +324,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(crate) fn new(
         handler: &'a dyn TaskHandler<Svc, Sto, MSto>,
         peer_rx: ServicePeerEventReceiver<Svc>,
     ) -> Self {
@@ -295,7 +333,7 @@ where
 }
 
 impl ControlChannel {
-    pub fn new(
+    pub(crate) fn new(
         task_id: &'static str,
         upstream_tasks: Vec<&'static str>,
         tx: IndividualControlEventSender,

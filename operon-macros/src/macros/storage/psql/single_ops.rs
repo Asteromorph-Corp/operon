@@ -56,7 +56,7 @@ fn single_put(entity: &EntityConfig) -> syn::ImplItemFn {
     }
 }
 
-pub fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::ImplItemFn> {
+pub(super) fn single_ops(entities: &EntityConfigMap) -> impl Iterator<Item = syn::ImplItemFn> {
     entities
         .values()
         .flat_map(|entity| [single_get(entity), single_put(entity)])

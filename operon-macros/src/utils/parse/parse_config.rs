@@ -10,6 +10,7 @@ use crate::configs::{
     TaskArg, TaskConfig, TaskConfigMap,
 };
 
+#[allow(single_use_lifetimes)]
 fn validate_downwards_closed<'a>(
     dims: impl IntoIterator<Item = &'a syn::Ident>,
     configs: &DimensionConfigMap,
@@ -30,6 +31,7 @@ fn validate_downwards_closed<'a>(
     Ok(())
 }
 
+#[allow(single_use_lifetimes)]
 fn validate_topologically_sorted<'a>(
     dims: impl IntoIterator<Item = &'a syn::Ident>,
     configs: &DimensionConfigMap,
@@ -66,7 +68,7 @@ fn validate_topologically_sorted<'a>(
 }
 
 impl Parse for AllConfig {
-    fn parse(input: &ParseBuffer) -> syn::Result<AllConfig> {
+    fn parse(input: &ParseBuffer<'_>) -> syn::Result<AllConfig> {
         let config_decl: ConfigDecl = input.parse()?;
         let service_id = config_decl.service_id;
         let mut dimensions: DimensionConfigMap = IndexMap::new();
@@ -209,13 +211,13 @@ impl Parse for AllConfig {
                 id: new_entity.id.clone(),
                 dims: new_entity_dims,
             };
-            entities.insert(new_entity.id.clone(), new_entity_config);
+            let _old_value = entities.insert(new_entity.id.clone(), new_entity_config);
             if let Some(dim) = new_entity.dims.first() {
                 let new_dim_config = DimensionConfig {
                     id: dim.clone(),
                     depends_on: dims.clone(),
                 };
-                dimensions.insert(dim.clone(), new_dim_config);
+                let _old_value = dimensions.insert(dim.clone(), new_dim_config);
             }
             let task_config = TaskConfig {
                 id: task.id.clone(),
@@ -232,7 +234,7 @@ impl Parse for AllConfig {
                 pool_size,
                 priority: priority.unwrap_or_default(),
             };
-            tasks.insert(task.id, task_config);
+            let _old_value = tasks.insert(task.id, task_config);
         }
 
         Ok(AllConfig {

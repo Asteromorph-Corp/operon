@@ -4,7 +4,7 @@
 //! speed on work that is rebuilt from scratch on failure.
 
 mod client;
-pub use client::{MemClient, MemConn, MemTx};
+pub(crate) use client::{MemClient, MemConn, MemTx};
 
 mod error;
 pub use error::MemMetaError;
@@ -20,5 +20,5 @@ pub use storage::MemMetaStorage;
 mod resolution;
 mod ticket;
 
-pub use resolution::MemResolutionQueryBuilder;
-pub use ticket::MemTicketQueryBuilder;
+pub(crate) use resolution::MemResolutionQueryBuilder;
+pub(crate) use ticket::MemTicketQueryBuilder;

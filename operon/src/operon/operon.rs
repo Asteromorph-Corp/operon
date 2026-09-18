@@ -33,6 +33,7 @@ async fn asymmetric_try_join<T, U, E>(
 ///
 /// Provided a data storage, a service, and a metadata backend, calling `run` will start executing
 /// the jobs.
+#[derive(Debug)]
 pub struct Operon<Svc, Sto, MSto>
 where
     Svc: OperonService,

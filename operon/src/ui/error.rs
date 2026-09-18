@@ -1,19 +1,20 @@
 use thiserror::Error;
 
+/// An error from Operon's UI.
+///
+/// # Stability
+///
+/// This enum is `#[non_exhaustive]`.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum UiError {
+    /// A file or stream I/O error.
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
-    #[error("Log buffer error: {0}")]
-    LogReceiveFailed(tokio::sync::broadcast::error::TryRecvError),
+    /// Could not set global `tracing` subscriber.
     #[error("Set subscriber error: {0}")]
     SetSubscriberError(#[from] tracing::subscriber::SetGlobalDefaultError),
+    /// Unspecified error.
     #[error("Other error: {0}")]
     Other(String),
-}
-
-impl From<tokio::sync::broadcast::error::TryRecvError> for UiError {
-    fn from(e: tokio::sync::broadcast::error::TryRecvError) -> Self {
-        UiError::LogReceiveFailed(e)
-    }
 }

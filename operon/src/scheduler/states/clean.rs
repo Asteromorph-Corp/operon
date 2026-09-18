@@ -9,7 +9,7 @@ use crate::scheduler::states::{NextState, SchedulerTransition, TransitionState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct CleanTransition<Svc, Sto, MSto>
+pub(super) struct CleanTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -26,7 +26,11 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(ctx: SchedulerContext<Svc, Sto, MSto>, channel_size: usize, run_id: Uuid) -> Self {
+    pub(super) fn new(
+        ctx: SchedulerContext<Svc, Sto, MSto>,
+        channel_size: usize,
+        run_id: Uuid,
+    ) -> Self {
         Self {
             ctx,
             channel_size,
@@ -34,7 +38,7 @@ where
         }
     }
 
-    pub fn state(
+    pub(super) fn state(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,

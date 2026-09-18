@@ -8,4 +8,4 @@ mod misc;
 mod prelude;
 
 mod operon;
-pub use operon::*;
+pub(crate) use operon::*;

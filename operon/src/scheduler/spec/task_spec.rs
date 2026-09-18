@@ -9,7 +9,7 @@ use crate::schema::{
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-/// One task's [`TaskSpec`] paired with the metadata describing the task it was generated for.
+#[derive(Debug)]
 pub struct SpecWithMetadata<Svc, Sto, TS, const N: usize> {
     pub spec: TS,
     pub task_meta: TaskMetadata<N>,

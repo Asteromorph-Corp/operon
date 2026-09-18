@@ -12,7 +12,7 @@ use crate::utils::rebuilder_ident;
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/spec/rebuilder/task_rebuilder_definition.rs"))]
 /// ```
-pub fn task_rebuilder_definition(task: &TaskConfig) -> syn::ItemStruct {
+pub(crate) fn task_rebuilder_definition(task: &TaskConfig) -> syn::ItemStruct {
     let operon = operon_ident();
     let rebuilder_ident = rebuilder_ident(&task.id);
     let resolution_type = resolution_type(task);

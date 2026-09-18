@@ -34,7 +34,7 @@ type WorkerResult<J, R, UErr, SErr, MErr> =
 type WorkerHandles<J, R, UErr, SErr, MErr> = JoinSet<WorkerResult<J, R, UErr, SErr, MErr>>;
 
 /// Each individual scheduler conceptually "owns" a table in the ticket storage.
-pub struct IndividualScheduler<Svc, Sto, TS, MSto, const N: usize>
+pub(super) struct IndividualScheduler<Svc, Sto, TS, MSto, const N: usize>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -59,7 +59,7 @@ where
     MSto: MetaBackend,
     TS: TaskSpec<Svc, Sto, MSto, Job = Job<N>, Ticket = Ticket<N>>,
 {
-    pub fn new(
+    pub(super) fn new(
         spec: SpecWithMetadata<Svc, Sto, TS, N>,
         service: Arc<Svc>,
         storage: Arc<Sto>,
@@ -167,7 +167,7 @@ where
     /// **and** the broadcast channel has closed.
     ///
     /// Usually called by the top-level `Scheduler::run` with `tokio::spawn`.
-    pub async fn run(
+    pub(super) async fn run(
         mut self,
         peer_tx_map: ServicePeerEventSenderMap<Svc>,
         peer_rx: ServicePeerEventReceiver<Svc>,
@@ -351,7 +351,7 @@ where
                     let meta_storage = self.meta_storage.clone();
 
                     // Move the permit into the task so it is released on drop.
-                    self.handles.spawn(async move {
+                    let _abort_handle = self.handles.spawn(async move {
                         tracing::trace!("Running job {job:?} in `{task_id}` scheduler.");
                         let _permit = permit;
                         match spec.run_job(&*service, &*storage, meta_storage, job).await {

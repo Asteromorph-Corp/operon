@@ -38,7 +38,7 @@ fn load_fixture(fixture_path: &str) -> String {
     prettify_file(&file)
 }
 
-pub fn load_fixture_in_trait(fixture_path: &str) -> String {
+pub(crate) fn load_fixture_in_trait(fixture_path: &str) -> String {
     let src = fs::read_to_string(get_fixture_path(fixture_path)).expect("fixture file missing");
     let normalized = normalize_string(&src);
     let items: proc_macro2::TokenStream = normalized.parse().expect("fixture didn’t parse");
@@ -50,7 +50,7 @@ pub fn load_fixture_in_trait(fixture_path: &str) -> String {
     prettify_file(&file)
 }
 
-pub fn assert_item_eq(item: &impl quote::ToTokens, fixture_path: &str) {
+pub(crate) fn assert_item_eq(item: &impl ToTokens, fixture_path: &str) {
     let pretty = prettify_item(item);
     let expected = load_fixture(fixture_path);
     pretty_assertions::assert_eq!(pretty, expected);
@@ -59,7 +59,7 @@ pub fn assert_item_eq(item: &impl quote::ToTokens, fixture_path: &str) {
 /// Test helper to compare a list of items in a trait context.
 ///
 /// Since `prettyplease` can only format complete files, we wrap the items in a dummy trait.
-pub fn assert_items_eq_in_trait(items: &[impl ToTokens], fixture_path: &str) {
+pub(crate) fn assert_items_eq_in_trait(items: &[impl ToTokens], fixture_path: &str) {
     let pretty = prettify_items_in_trait(items);
     let expected = load_fixture_in_trait(fixture_path);
     pretty_assertions::assert_eq!(pretty, expected);

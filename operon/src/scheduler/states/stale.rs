@@ -17,7 +17,7 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct StaleState<Svc, Sto, MSto>
+pub(super) struct StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -32,14 +32,14 @@ where
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum StaleKind {
+pub(super) enum StaleKind {
     Complete,
     GracefulStop,
     Abort { shape_changed: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RunMode {
+pub(super) enum RunMode {
     Clean,
     Rebuild { skip: HashSet<String> },
     Restore,
@@ -51,7 +51,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(super) fn new(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,
@@ -192,7 +192,7 @@ where
                 (_, Some(inconsistent_tasks), true) if !inconsistent_tasks.is_empty() => {
                     tracing::info!("Rebuilding the run while redoing inconsistent tasks.");
                     for task in inconsistent_tasks {
-                        skip.insert(task.to_string());
+                        let _ = skip.insert(task.to_string());
                     }
                     Some(RunMode::Rebuild { skip })
                 }

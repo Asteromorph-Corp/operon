@@ -14,7 +14,7 @@ use crate::utils::{
 };
 
 /// The table recording each entity's shape ID, keyed by entity ID.
-pub(crate) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
+pub(super) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
     table: "_entity_hash",
     column: "hash",
 };
@@ -23,12 +23,14 @@ pub trait PsqlEntity: Serialize + DeserializeOwned + Send + Sync + 'static {}
 impl<T> PsqlEntity for T where T: Serialize + DeserializeOwned + Send + Sync + 'static {}
 
 /// Helper struct for building SQL queries related to entities.
+#[derive(Debug)]
 pub struct EntityQueryBuilder<'a, const N: usize, T: PsqlEntity> {
     client: StorageClient<'a>,
     entity_meta: EntityMetadata<N, T>,
 }
 
 impl<'a> StorageClient<'a> {
+    /// Constructs an `EntityQueryBuilder` for the given entity metadata.
     pub fn entity<const N: usize, T: PsqlEntity>(
         self,
         entity_meta: EntityMetadata<N, T>,
@@ -64,7 +66,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         let stmt = PutEntityQuery(schema_prefix, self.entity_meta);
         let params = SqlParams::from_usize(entity.coordinate)?
             .extend(vec![Box::new(serde_json::to_value(&entity.value)?)]);
-        self.client.execute_stmt(&stmt, &params.borrow()).await?;
+        let _num_rows = self.client.execute_stmt(&stmt, &params.borrow()).await?;
         Ok(())
     }
 
@@ -102,11 +104,11 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
     ) -> PsqlStorageResult<()> {
         const { assert!(M + 1 == N) }
 
-        let schema_prefix = self.client.schema_prefix().to_owned();
+        let schema_prefix = self.client.schema_prefix().into_owned();
         let tx = self.client.transaction().await?;
 
         let temp_table_stmt = BatchPutTempTableQuery(&schema_prefix, self.entity_meta).to_string();
-        tx.execute(&temp_table_stmt, &[]).await?;
+        let _num_rows = tx.execute(&temp_table_stmt, &[]).await?;
 
         let mut writer = csv::WriterBuilder::new()
             .has_headers(false)
@@ -126,7 +128,7 @@ impl<const N: usize, T: PsqlEntity> EntityQueryBuilder<'_, N, T> {
         sink.close().await?;
 
         let insert_stmt = BatchPutInsertQuery(&schema_prefix, self.entity_meta).to_string();
-        tx.execute(&insert_stmt, &[]).await?;
+        let _num_rows = tx.execute(&insert_stmt, &[]).await?;
 
         tx.commit().await?;
         Ok(())
@@ -476,7 +478,7 @@ mod test {
         #[case] metadata: EntityMetadata<N, ()>,
         #[case] expected: &str,
     ) {
-        let stmt = BatchPutTempTableQuery(&schema_prefix.to_owned(), metadata).to_string();
+        let stmt = BatchPutTempTableQuery(&schema_prefix.into_owned(), metadata).to_string();
         assert_eq!(stmt, expected);
     }
 
@@ -504,7 +506,7 @@ mod test {
         #[case] metadata: EntityMetadata<N, ()>,
         #[case] expected: &str,
     ) {
-        let query = BatchPutInsertQuery(&schema_prefix.to_owned(), metadata).to_string();
+        let query = BatchPutInsertQuery(&schema_prefix.into_owned(), metadata).to_string();
         assert_eq!(query, expected);
     }
 }

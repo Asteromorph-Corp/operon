@@ -10,7 +10,7 @@ use crate::utils::{entity_metadata_ident, to_lit_str, to_type};
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/metadata/entity.rs"))]
 /// ```
-pub fn entity_metadata(entity: &EntityConfig) -> syn::ItemFn {
+pub(super) fn entity_metadata(entity: &EntityConfig) -> syn::ItemFn {
     let operon = operon_ident();
     let fn_name = entity_metadata_ident(&entity.id);
     let n = entity.dims.len();

@@ -8,4 +8,4 @@ mod batch_puts;
 mod single_ops;
 
 mod mod_psql;
-pub use mod_psql::*;
+pub(super) use mod_psql::*;

@@ -6,7 +6,7 @@ use crate::macros::storage::psql::impl_service_storage::impl_service_storage;
 use crate::macros::storage::psql::storage_definition::storage_definition;
 
 /// Generates the `psql` module for psql storage struct.
-pub fn mod_psql(all_configs: &AllConfig) -> syn::ItemMod {
+pub(crate) fn mod_psql(all_configs: &AllConfig) -> syn::ItemMod {
     let data_storage_definition = storage_definition(&all_configs.service_id);
 
     let impl_entities_queries =

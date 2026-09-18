@@ -7,4 +7,4 @@ mod impl_service_storage;
 mod trait_options_ext;
 
 mod mod_mem;
-pub use mod_mem::*;
+pub(super) use mod_mem::*;

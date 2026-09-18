@@ -11,7 +11,7 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct FreshState<Svc, Sto, MSto>
+pub(super) struct FreshState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -28,7 +28,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(super) fn new(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,

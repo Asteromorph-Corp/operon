@@ -17,7 +17,7 @@ use crate::schema::RunFootprint;
 /// # Concurrency
 ///
 /// A table takes one lock over all of its rows, so writes to the same task serialize.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(super) struct MemStore {
     tickets: RwLock<HashMap<&'static str, Arc<TicketTable>>>,
     resolutions: RwLock<HashMap<&'static str, Arc<ResolutionTable>>>,
@@ -26,6 +26,7 @@ pub(super) struct MemStore {
 }
 
 /// One recorded execution of a run.
+#[derive(Debug)]
 struct Execution {
     run_id: Uuid,
     ended_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -35,7 +36,8 @@ struct Execution {
 impl MemStore {
     /// Registers a task's ticket table, keeping an existing one.
     pub(super) fn init_ticket_table(&self, task_id: &'static str) -> MemResult<()> {
-        self.tickets
+        let _ = self
+            .tickets
             .write()?
             .entry(task_id)
             .or_insert_with(|| Arc::new(TicketTable::default()));
@@ -52,7 +54,8 @@ impl MemStore {
 
     /// Registers a dimension's resolution table, keeping an existing one.
     pub(super) fn init_resolution_table(&self, dim_id: &'static str) -> MemResult<()> {
-        self.resolutions
+        let _ = self
+            .resolutions
             .write()?
             .entry(dim_id)
             .or_insert_with(|| Arc::new(ResolutionTable::default()));
@@ -83,7 +86,7 @@ impl MemStore {
     }
 
     pub(super) fn put_execution(&self, run_id: Uuid, execution_id: Uuid) -> MemResult<()> {
-        self.executions.write()?.insert(
+        let _old_value = self.executions.write()?.insert(
             execution_id,
             Execution {
                 run_id,

@@ -9,7 +9,10 @@ use crate::utils::{entities_ident, entity_metadata_ident, to_snake_case};
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/impl_entities_default.rs"))]
 /// ```
-pub fn impl_entities_default(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemImpl {
+pub(super) fn impl_entities_default(
+    service_id: &syn::Ident,
+    entities: &EntityConfigMap,
+) -> syn::ItemImpl {
     let entities_ident = entities_ident(service_id);
     let fields = entities.values().map(|entity| -> syn::FieldValue {
         let field_ident = to_snake_case(&entity.id);

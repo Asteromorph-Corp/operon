@@ -10,7 +10,10 @@ use crate::utils::{entities_ident, to_snake_case};
 /// ```rust,ignore
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/storage/psql/impl_entities_queries.rs"))]
 /// ```
-pub fn impl_entities_queries(service_id: &syn::Ident, entities: &EntityConfigMap) -> syn::ItemImpl {
+pub(super) fn impl_entities_queries(
+    service_id: &syn::Ident,
+    entities: &EntityConfigMap,
+) -> syn::ItemImpl {
     let operon = operon_ident();
     let entities_ident = entities_ident(service_id);
     let fields = entities.keys().map(to_snake_case).collect::<Vec<_>>();
