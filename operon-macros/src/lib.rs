@@ -1,4 +1,20 @@
+//! # operon-macros
+//!
+//! Macros for the Operon crate.
+
 #![warn(unreachable_pub)]
+#![warn(unused_lifetimes)]
+#![warn(unused_qualifications)]
+#![warn(single_use_lifetimes)]
+#![warn(trivial_casts)]
+#![warn(trivial_numeric_casts)]
+#![warn(missing_debug_implementations)]
+#![warn(missing_docs)]
+#![warn(rust_2018_idioms)]
+#![warn(noop_method_call)]
+#![warn(let_underscore_drop)]
+#![warn(meta_variable_misuse)]
+#![warn(unused_results)]
 
 mod configs;
 mod dependency_analysis;
@@ -18,10 +34,11 @@ use crate::utils::{extract_attr, get_operon_attrs, operon_ident};
 
 // TODO: use text fixtures instead of constructing the configs in code.
 
+/// Define the pipeline in the Operon DSL.
 #[proc_macro]
 #[proc_macro_error]
 pub fn define_operon(input: TokenStream) -> TokenStream {
-    let all_configs: crate::configs::AllConfig = match syn::parse(input) {
+    let all_configs: configs::AllConfig = match syn::parse(input) {
         Ok(config) => config,
         Err(e) => return e.to_compile_error().into(),
     };

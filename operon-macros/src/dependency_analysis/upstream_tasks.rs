@@ -16,7 +16,7 @@ fn build_upstream_inverted_index(tasks: &TaskConfigMap) -> HashMap<&syn::Ident, 
             );
         }
 
-        index.insert(&task.to, task);
+        let _ = index.insert(&task.to, task);
     }
 
     index

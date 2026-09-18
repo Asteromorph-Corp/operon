@@ -10,7 +10,7 @@ pub(super) struct EntityDecl {
     pub(super) _span: proc_macro2::Span,
 }
 impl Parse for EntityDecl {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let start = input.span();
         let id: Ident = input.parse()?;
         let lt_token = if input.peek(Token![<]) {
@@ -23,7 +23,7 @@ impl Parse for EntityDecl {
             while !input.is_empty() && !input.peek(Token![>]) {
                 dims.push(input.parse()?);
                 if !input.is_empty() && !input.peek(Token![>]) {
-                    input.parse::<Token![,]>()?;
+                    let _ = input.parse::<Token![,]>()?;
                 }
             }
             dims

@@ -50,7 +50,7 @@ pub(crate) fn load_fixture_in_trait(fixture_path: &str) -> String {
     prettify_file(&file)
 }
 
-pub(crate) fn assert_item_eq(item: &impl quote::ToTokens, fixture_path: &str) {
+pub(crate) fn assert_item_eq(item: &impl ToTokens, fixture_path: &str) {
     let pretty = prettify_item(item);
     let expected = load_fixture(fixture_path);
     pretty_assertions::assert_eq!(pretty, expected);

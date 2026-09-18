@@ -24,7 +24,7 @@ impl ConfigDecl {
     }
 }
 impl Parse for ConfigDecl {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let start = input.span();
         let service_id: Ident = input.parse()?;
         let eq_token: Token![=] = input.parse()?;
