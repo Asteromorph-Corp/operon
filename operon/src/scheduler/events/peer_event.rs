@@ -18,15 +18,15 @@ pub enum PeerEvent<J: JobEnum, R: ResolutionEnum, T: TicketEnum> {
 }
 
 pub type PeerEventSender<J, R, T> = tokio::sync::mpsc::Sender<PeerEvent<J, R, T>>;
-pub type PeerEventReceiver<J, R, T> = tokio::sync::mpsc::Receiver<PeerEvent<J, R, T>>;
+pub(crate) type PeerEventReceiver<J, R, T> = tokio::sync::mpsc::Receiver<PeerEvent<J, R, T>>;
 pub type PeerEventSenderMap<J, R, T> = HashMap<&'static str, PeerEventSender<J, R, T>>;
 
-pub type ServicePeerEventReceiver<Svc> = PeerEventReceiver<
+pub(crate) type ServicePeerEventReceiver<Svc> = PeerEventReceiver<
     <Svc as OperonService>::JobEnum,
     <Svc as OperonService>::ResolutionEnum,
     <Svc as OperonService>::TicketEnum,
 >;
-pub type ServicePeerEventSenderMap<Svc> = PeerEventSenderMap<
+pub(crate) type ServicePeerEventSenderMap<Svc> = PeerEventSenderMap<
     <Svc as OperonService>::JobEnum,
     <Svc as OperonService>::ResolutionEnum,
     <Svc as OperonService>::TicketEnum,

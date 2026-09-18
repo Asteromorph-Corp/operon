@@ -5,13 +5,13 @@ use crate::ui::{UiMode, UiOptions};
 /// Surface-level settings for a run: UI mode, internal channel sizing, and logging.
 pub struct OperonOptions {
     // UI options
-    pub(crate) ui_mode: UiMode,
+    pub(super) ui_mode: UiMode,
     // Scheduler options
-    pub(crate) internal_channel_size: usize,
+    pub(super) internal_channel_size: usize,
     // Log options
-    pub(crate) log_level: tracing::Level,
-    pub(crate) log_buffer_size: usize,
-    pub(crate) log_dump: Option<String>,
+    pub(super) log_level: tracing::Level,
+    pub(super) log_buffer_size: usize,
+    pub(super) log_dump: Option<String>,
 }
 
 impl Default for OperonOptions {
@@ -57,7 +57,7 @@ impl OperonOptions {
         self
     }
 
-    pub(crate) fn split(self) -> (UiOptions, SchedulerOptions, LoggerOptions) {
+    pub(super) fn split(self) -> (UiOptions, SchedulerOptions, LoggerOptions) {
         let ui_options = UiOptions {
             mode: self.ui_mode,
             log_buffer_size: self.log_buffer_size,

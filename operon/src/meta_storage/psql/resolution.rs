@@ -13,7 +13,7 @@ use crate::utils::{
 };
 
 /// The table recording each dimension's shape ID, keyed by dimension ID.
-pub(crate) const DIMENSION_SHAPES: ShapeTable<'static> = ShapeTable {
+pub(super) const DIMENSION_SHAPES: ShapeTable<'static> = ShapeTable {
     table: "_dimension_hash",
     column: "hash",
 };
@@ -249,7 +249,7 @@ impl<const N: usize> std::fmt::Display for CopyInQuery<'_, N> {
 }
 
 /// Helper struct to generate the SQL query for inserting a resolution for a dimension.
-pub struct PutResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
+pub(super) struct PutResolutionQuery<'a, const N: usize>(SchemaPrefix<'a>, DimensionMetadata<N>);
 
 impl<const N: usize> std::fmt::Display for PutResolutionQuery<'_, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

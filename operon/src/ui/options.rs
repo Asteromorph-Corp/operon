@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy)]
-pub struct UiOptions {
+pub(crate) struct UiOptions {
     pub log_buffer_size: usize,
     pub mode: UiMode,
 }

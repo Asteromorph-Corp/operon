@@ -1,8 +1,8 @@
 mod logger;
-pub use logger::UiBroadcastLayer;
+pub(crate) use logger::UiBroadcastLayer;
 
 mod options;
-pub use options::LoggerOptions;
+pub(crate) use options::LoggerOptions;
 
 mod log_record;
 pub(crate) use log_record::{LogRecord, LogRecordReceiver, LogRecordSender, SourceType};

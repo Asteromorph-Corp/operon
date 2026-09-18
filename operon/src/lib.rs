@@ -1,4 +1,5 @@
 #![allow(clippy::module_inception)]
+#![warn(unreachable_pub)]
 
 mod logger;
 mod meta_storage;

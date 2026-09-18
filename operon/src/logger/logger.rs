@@ -15,14 +15,14 @@ use crate::ui::UiError;
 struct SpanFields(Vec<(String, String)>);
 
 #[derive(Debug)]
-pub struct UiBroadcastLayer {
+pub(crate) struct UiBroadcastLayer {
     sender: LogRecordSender,
     level: tracing::Level,
     dump: Option<String>,
 }
 
 impl UiBroadcastLayer {
-    pub fn new(sender: LogRecordSender, options: LoggerOptions) -> Self {
+    pub(crate) fn new(sender: LogRecordSender, options: LoggerOptions) -> Self {
         Self {
             sender,
             level: options.level,
@@ -30,7 +30,7 @@ impl UiBroadcastLayer {
         }
     }
 
-    pub fn setup(self) -> Result<(), UiError> {
+    pub(crate) fn setup(self) -> Result<(), UiError> {
         use tracing_subscriber::prelude::*;
 
         // Bridge the `log` crate so third-party crates using `log` are captured.

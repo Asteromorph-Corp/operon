@@ -59,7 +59,7 @@ pub(super) struct TransitionState<E> {
 }
 
 impl<E: Error + Send + Sync + 'static> TransitionState<E> {
-    pub fn new<T: SchedulerTransition<Error = E>>(transition: T) -> Self {
+    pub(super) fn new<T: SchedulerTransition<Error = E>>(transition: T) -> Self {
         let warn_msg = transition.warn_msg();
         let handle =
             AbortOnDropHandle::new(tokio::task::spawn(

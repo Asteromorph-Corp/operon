@@ -1,8 +1,8 @@
 mod storage;
 pub use storage::OperonStorage;
 
-pub mod mem;
-pub mod psql;
+pub(crate) mod mem;
+pub(crate) mod psql;
 
 mod options;
 #[allow(deprecated)]

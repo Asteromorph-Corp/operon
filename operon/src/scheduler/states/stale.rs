@@ -17,7 +17,7 @@ use crate::service::OperonService;
 use crate::storage::OperonStorage;
 use crate::ui::UiMode;
 
-pub struct StaleState<Svc, Sto, MSto>
+pub(super) struct StaleState<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -32,14 +32,14 @@ where
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum StaleKind {
+pub(super) enum StaleKind {
     Complete,
     GracefulStop,
     Abort { shape_changed: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RunMode {
+pub(super) enum RunMode {
     Clean,
     Rebuild { skip: HashSet<String> },
     Restore,
@@ -51,7 +51,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(super) fn new(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         ui_mode: UiMode,
         channel_size: usize,

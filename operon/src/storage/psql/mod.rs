@@ -12,4 +12,4 @@ pub use client::StorageClient;
 
 mod error;
 pub use error::PsqlStorageError;
-pub(crate) use error::PsqlStorageResult;
+pub(super) use error::PsqlStorageResult;

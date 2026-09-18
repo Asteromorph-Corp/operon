@@ -6,7 +6,7 @@
 //! The rest of the crate speaks to it only through the backend-agnostic enums.
 
 mod client;
-pub use client::{PsqlClient, PsqlConn, PsqlTx};
+pub(super) use client::{PsqlClient, PsqlConn, PsqlTx};
 
 mod error;
 pub use error::PsqlMetaError;
@@ -22,5 +22,5 @@ mod resolution;
 mod schema;
 mod ticket;
 
-pub use resolution::PsqlResolutionQueryBuilder;
-pub use ticket::PsqlTicketQueryBuilder;
+pub(super) use resolution::PsqlResolutionQueryBuilder;
+pub(super) use ticket::PsqlTicketQueryBuilder;

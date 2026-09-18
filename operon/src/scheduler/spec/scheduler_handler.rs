@@ -268,7 +268,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(crate) fn new(
         handlers_with_rx: Vec<HandlerWithRx<'a, Svc, Sto, MSto>>,
         peer_txs: ServicePeerEventSenderMap<Svc>,
     ) -> Self {
@@ -278,7 +278,7 @@ where
         }
     }
 
-    pub fn run_schedulers(
+    pub(crate) fn run_schedulers(
         self,
         service: &Arc<Svc>,
         storage: &Arc<Sto>,
@@ -323,7 +323,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(crate) fn new(
         handler: &'a dyn TaskHandler<Svc, Sto, MSto>,
         peer_rx: ServicePeerEventReceiver<Svc>,
     ) -> Self {
@@ -332,7 +332,7 @@ where
 }
 
 impl ControlChannel {
-    pub fn new(
+    pub(crate) fn new(
         task_id: &'static str,
         upstream_tasks: Vec<&'static str>,
         tx: IndividualControlEventSender,

@@ -87,11 +87,13 @@ impl SqlParam for TicketStatus {
 pub(crate) struct SqlParams(Vec<Box<dyn SqlParam>>);
 
 impl SqlParams {
-    pub fn new(params: Vec<Box<dyn SqlParam>>) -> Self {
+    pub(crate) fn new(params: Vec<Box<dyn SqlParam>>) -> Self {
         Self(params)
     }
 
-    pub fn from_usize(items: impl IntoIterator<Item = usize>) -> Result<Self, TryFromIntError> {
+    pub(crate) fn from_usize(
+        items: impl IntoIterator<Item = usize>,
+    ) -> Result<Self, TryFromIntError> {
         let items = items
             .into_iter()
             .map(|item| i64::try_from(item).map(box_sql))
@@ -99,16 +101,16 @@ impl SqlParams {
         Ok(Self(items))
     }
 
-    pub fn extend(mut self, params: Vec<Box<dyn SqlParam>>) -> Self {
+    pub(crate) fn extend(mut self, params: Vec<Box<dyn SqlParam>>) -> Self {
         self.0.extend(params);
         self
     }
 
-    pub fn borrow(&self) -> Vec<&(dyn ToSql + Sync + 'static)> {
+    pub(crate) fn borrow(&self) -> Vec<&(dyn ToSql + Sync + 'static)> {
         self.0.iter().map(|x| x.as_param()).collect()
     }
 
-    pub fn to_copy_string(&self) -> String {
+    pub(crate) fn to_copy_string(&self) -> String {
         let mut out = self
             .0
             .iter()
@@ -120,12 +122,12 @@ impl SqlParams {
     }
 }
 
-pub fn box_sql<T: SqlParam>(value: T) -> Box<dyn SqlParam> {
+pub(crate) fn box_sql<T: SqlParam>(value: T) -> Box<dyn SqlParam> {
     Box::new(value)
 }
 
 /// Renders `values` as a quoted, comma-separated SQL list.
-pub fn sql_value_list<T: Display>(values: impl IntoIterator<Item = T>) -> String {
+pub(crate) fn sql_value_list<T: Display>(values: impl IntoIterator<Item = T>) -> String {
     values
         .into_iter()
         .map(|value| format!("'{value}'"))
@@ -134,7 +136,7 @@ pub fn sql_value_list<T: Display>(values: impl IntoIterator<Item = T>) -> String
 }
 
 /// Compacts metadata of any length into a shape ID.
-pub fn hash_metadata<T: Hash>(metadata: &T) -> String {
+pub(crate) fn hash_metadata<T: Hash>(metadata: &T) -> String {
     let mut hasher = XxHash3_64::new();
     metadata.hash(&mut hasher);
     format!("{:016x}", hasher.finish())
@@ -142,7 +144,7 @@ pub fn hash_metadata<T: Hash>(metadata: &T) -> String {
 
 /// The table the shape IDs are recorded in.
 #[derive(Debug, Clone, Copy)]
-pub struct ShapeTable<'a> {
+pub(crate) struct ShapeTable<'a> {
     /// The table the shape IDs are recorded in.
     pub table: &'a str,
     /// The column a shape ID is held in.
@@ -151,14 +153,14 @@ pub struct ShapeTable<'a> {
 
 impl<'a> ShapeTable<'a> {
     /// The row of this table holding `id`'s shape ID.
-    pub const fn record(self, id: &'a str) -> ShapeRecord<'a> {
+    pub(crate) const fn record(self, id: &'a str) -> ShapeRecord<'a> {
         ShapeRecord { table: self, id }
     }
 }
 
 /// The specification to find a shape ID in the database.
 #[derive(Debug, Clone, Copy)]
-pub struct ShapeRecord<'a> {
+pub(crate) struct ShapeRecord<'a> {
     /// The table the shape ID is recorded in.
     pub table: ShapeTable<'a>,
     /// The primary key value to match in `WHERE id = {id}`.
@@ -169,13 +171,13 @@ pub struct ShapeRecord<'a> {
 ///
 /// Giving each storage a different [`record`](ShapeTable::record) lets one schema hold both
 /// footprints.
-pub const FOOTPRINT_SHAPES: ShapeTable<'static> = ShapeTable {
+pub(crate) const FOOTPRINT_SHAPES: ShapeTable<'static> = ShapeTable {
     table: "_footprint_version",
     column: "version",
 };
 
 /// Creates the table shape IDs are recorded in.
-pub fn init_shape_table_query(
+pub(crate) fn init_shape_table_query(
     shape_table: ShapeTable<'_>,
     schema_prefix: SchemaPrefix<'_>,
 ) -> String {
@@ -236,7 +238,7 @@ impl TablesPresent {
 /// The query for the shape ID `record` points to and which of `tables` exist.
 ///
 /// Returns one row, with the columns `shape_id`, `any_present`, and `all_present`.
-pub fn shape_query(
+pub(crate) fn shape_query(
     record: ShapeRecord<'_>,
     tables: &[&str],
     schema_prefix: SchemaPrefix<'_>,
@@ -312,7 +314,7 @@ impl From<ShapeAction> for TableShape {
 /// - [`Build`](`ShapeAction::Build`): Runs `init_query` and records `shape_id`.
 /// - [`Rebuild`](`ShapeAction::Rebuild`): Drops the tables in `tables`, runs `init_query`, and
 ///   records `shape_id`.
-pub fn build_tables(
+pub(crate) fn build_tables(
     record: ShapeRecord<'_>,
     tables: &[&str],
     shape_id: &str,
@@ -346,7 +348,7 @@ pub fn build_tables(
 }
 
 #[cfg(test)]
-pub mod fixtures {
+pub(crate) mod fixtures {
     use std::fmt::Display;
     use std::path::{Path, PathBuf};
 
@@ -359,7 +361,7 @@ pub mod fixtures {
     const BLESS: &str = "BLESS_FOOTPRINT_SHAPE";
 
     #[derive(Debug, Clone, Copy)]
-    pub enum FootprintStore {
+    pub(crate) enum FootprintStore {
         Data,
         Meta,
     }
@@ -382,7 +384,7 @@ pub mod fixtures {
     /// A version that already has a fixture keeps it.
     /// Changing the shape of a released version therefore needs a version bump, since schemas
     /// built by that release still hold the old shape.
-    pub fn assert_footprint_shape(store: FootprintStore, stmt: &str) {
+    pub(crate) fn assert_footprint_shape(store: FootprintStore, stmt: &str) {
         let path = fixture_path(FOOTPRINT_VERSION, store);
         let blessing = std::env::var_os(BLESS).is_some();
 

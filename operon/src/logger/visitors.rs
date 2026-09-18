@@ -15,7 +15,7 @@ pub(super) struct LogBridgedMeta {
 
 impl LogBridgedMeta {
     /// Resolve each field, preferring the bridged value over tracing metadata.
-    pub fn resolve(
+    pub(super) fn resolve(
         self,
         metadata: &tracing::Metadata<'_>,
     ) -> (String, Option<String>, Option<String>, Option<u32>) {

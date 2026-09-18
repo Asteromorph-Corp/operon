@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 use crate::ui::command::Command;
 
 #[derive(Default, Debug, Clone)]
-pub struct CommandPrompt {
+pub(super) struct CommandPrompt {
     input: String,
 }
 

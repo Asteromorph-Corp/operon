@@ -10,7 +10,7 @@ use crate::schema::{RunFootprint, RunState};
 use crate::service::OperonService;
 use crate::storage::OperonStorage;
 
-pub struct StartTransition<Svc, Sto, MSto>
+pub(super) struct StartTransition<Svc, Sto, MSto>
 where
     Svc: OperonService,
     Sto: OperonStorage,
@@ -28,7 +28,7 @@ where
     Sto: OperonStorage,
     MSto: MetaBackend,
 {
-    pub fn new(
+    pub(super) fn new(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,
@@ -42,7 +42,7 @@ where
         }
     }
 
-    pub fn state(
+    pub(super) fn state(
         ctx: SchedulerContext<Svc, Sto, MSto>,
         channel_size: usize,
         run_id: Uuid,

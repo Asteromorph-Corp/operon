@@ -14,7 +14,7 @@ use crate::utils::{
 };
 
 /// The table recording each entity's shape ID, keyed by entity ID.
-pub(crate) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
+pub(super) const ENTITY_SHAPES: ShapeTable<'static> = ShapeTable {
     table: "_entity_hash",
     column: "hash",
 };
