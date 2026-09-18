@@ -146,6 +146,9 @@ const PSQL_MAX_IDENTIFIER_LENGTH: usize = 63;
 /// The number of characters to take from the original ID for human readability.
 const PSQL_ID_PREFIX_LENGTH: usize = 4;
 
+/// The length threshold above which IDs are hashed to fit within PostgreSQL's identifier limit.
+const PSQL_ID_CLAMP_THRESHOLD: usize = 20;
+
 /// Generates a PostgreSQL-safe identifier from a user-provided ID.
 ///
 /// Postgres limits identifiers to 63 bytes, so this function hashes the ID to ensure it fits.
@@ -156,10 +159,15 @@ const PSQL_ID_PREFIX_LENGTH: usize = 4;
 ///
 /// in the format `{prefix}_{id_prefix}_{hash}`.
 pub(crate) fn psql_identifier(prefix: &str, id: &str) -> String {
-    let id_prefix: String = id.chars().take(PSQL_ID_PREFIX_LENGTH).collect();
-    let hash = hash_str(id);
-    let result = format!("{prefix}_{id_prefix}_{hash}");
+    let id = if id.len() <= PSQL_ID_CLAMP_THRESHOLD {
+        id.to_owned()
+    } else {
+        let id_prefix: String = id.chars().take(PSQL_ID_PREFIX_LENGTH).collect();
+        let hash = hash_str(id);
+        format!("{id_prefix}_{hash}")
+    };
 
+    let result = format!("{prefix}_{id}");
     debug_assert!(
         result.len() <= PSQL_MAX_IDENTIFIER_LENGTH,
         "PSQL identifier may exceed 63 bytes: {result} (length: {})",
@@ -492,43 +500,15 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_psql_identifier_format() {
-        // Check that the identifier has the expected format: prefix_id_prefix_hash
-        let result = psql_identifier("ticket", "my_task");
-        assert!(result.starts_with("ticket_my_t_"));
-        assert_eq!(result.len(), "ticket_my_t_".len() + 16); // 16 hex chars for hash
-    }
-
-    #[test]
-    fn test_psql_identifier_short_id() {
-        // IDs shorter than 4 chars should use the full ID
-        let result = psql_identifier("ticket", "ab");
-        assert!(result.starts_with("ticket_ab_"));
-    }
-
-    #[test]
-    fn test_psql_identifier_deterministic() {
-        // Same input should produce same output
-        let result1 = psql_identifier("ticket", "my_task");
-        let result2 = psql_identifier("ticket", "my_task");
-        assert_eq!(result1, result2);
-    }
-
-    #[test]
-    fn test_psql_identifier_uniqueness() {
-        // Different IDs should produce different identifiers
-        let result1 = psql_identifier("ticket", "task_a");
-        let result2 = psql_identifier("ticket", "task_b");
-        assert_ne!(result1, result2);
-    }
-
-    #[test]
-    fn test_psql_identifier_long_id_fits() {
-        // Even very long IDs should produce identifiers within 63 bytes
-        let long_id = "this_is_a_very_long_task_name_that_would_exceed_postgresql_limits";
-        let result = psql_identifier("ticket", long_id);
-        assert!(result.len() <= 63);
+    #[rstest]
+    #[case::short("short_id", "ticket_short_id")]
+    #[case::long(
+        "this_is_a_very_long_task_name_that_would_exceed_postgresql_limits",
+        "ticket_this_738f27982fd1f340"
+    )]
+    fn test_psql_identifier_long_id_fits(#[case] id: &str, #[case] expected: &str) {
+        let result = psql_identifier("ticket", id);
+        assert_eq!(result, expected);
     }
 
     #[rstest]

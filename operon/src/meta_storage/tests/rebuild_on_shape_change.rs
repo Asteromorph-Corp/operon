@@ -240,7 +240,7 @@ async fn resolution_table_is_rebuilt_when_a_dimension_gains_a_dependency() {
     );
 
     assert_eq!(
-        columns(client, DIMENSION_SCHEMA, "dimension_j_0ba8200fda5f47f7").await,
+        columns(client, DIMENSION_SCHEMA, "dimension_j").await,
         ["i", "ub"]
     );
 

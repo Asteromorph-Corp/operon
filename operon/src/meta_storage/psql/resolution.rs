@@ -212,7 +212,7 @@ mod tests {
     #[case::simple(
         dimension_i(),
         indoc! {"
-            CREATE TABLE IF NOT EXISTS test_meta.dimension_i_b61efb9fe0d18f80 (
+            CREATE TABLE IF NOT EXISTS test_meta.dimension_i (
                 ub BIGINT NOT NULL
             );"
         },
@@ -220,7 +220,7 @@ mod tests {
     #[case::with_dependency(
         dimension_j(),
         indoc! {"
-            CREATE TABLE IF NOT EXISTS test_meta.dimension_j_0ba8200fda5f47f7 (
+            CREATE TABLE IF NOT EXISTS test_meta.dimension_j (
                 i BIGINT,
                 ub BIGINT NOT NULL,
                 PRIMARY KEY (i)
@@ -237,10 +237,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case::simple(
-        dimension_i(),
-        "TRUNCATE TABLE test_meta.dimension_i_b61efb9fe0d18f80;"
-    )]
+    #[case::simple(dimension_i(), "TRUNCATE TABLE test_meta.dimension_i;")]
     fn test_clear_resolution_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
         #[case] metadata: DimensionMetadata<N>,
@@ -251,14 +248,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case::simple(
-        dimension_i(),
-        "SELECT ub FROM test_meta.dimension_i_b61efb9fe0d18f80;"
-    )]
-    #[case::with_dependency(
-        dimension_j(),
-        "SELECT ub FROM test_meta.dimension_j_0ba8200fda5f47f7 WHERE i = $1;"
-    )]
+    #[case::simple(dimension_i(), "SELECT ub FROM test_meta.dimension_i;")]
+    #[case::with_dependency(dimension_j(), "SELECT ub FROM test_meta.dimension_j WHERE i = $1;")]
     fn test_get_resolution_query<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
         #[case] metadata: DimensionMetadata<N>,
@@ -271,11 +262,11 @@ mod tests {
     #[rstest]
     #[case::simple(
         dimension_i(),
-        "INSERT INTO test_meta.dimension_i_b61efb9fe0d18f80 (ub) VALUES ($1) ON CONFLICT DO NOTHING;"
+        "INSERT INTO test_meta.dimension_i (ub) VALUES ($1) ON CONFLICT DO NOTHING;"
     )]
     #[case::with_dependency(
         dimension_j(),
-        "INSERT INTO test_meta.dimension_j_0ba8200fda5f47f7 (i, ub) VALUES ($1, $2) ON CONFLICT DO NOTHING;"
+        "INSERT INTO test_meta.dimension_j (i, ub) VALUES ($1, $2) ON CONFLICT DO NOTHING;"
     )]
     fn test_put_resolution_query_no_dependency<const N: usize>(
         schema_prefix: SchemaPrefix<'static>,
