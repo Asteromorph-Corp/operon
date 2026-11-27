@@ -10,25 +10,51 @@ use crate::configs::{
     TaskArg, TaskConfig, TaskConfigMap,
 };
 
-#[allow(single_use_lifetimes)]
-fn validate_downwards_closed<'a>(
-    dims: impl IntoIterator<Item = &'a syn::Ident>,
-    configs: &DimensionConfigMap,
-) -> Result<(), String> {
-    let dims_set: HashSet<&syn::Ident> = HashSet::from_iter(dims);
-    for dim in &dims_set {
-        let Some(config) = configs.get(*dim) else {
-            return Err(format!("Dimension '{dim}' is not defined"));
-        };
-        for dep in &config.depends_on {
-            if !dims_set.contains(dep) {
-                return Err(format!(
-                    "Cannot iterate over '{dim}' without iterating over '{dep}'"
-                ));
-            }
-        }
+/// Quotes the dimensions of `dims` in canonical order and joins them with commas.
+fn describe_dims(dims: &HashSet<&syn::Ident>, configs: &DimensionConfigMap) -> String {
+    let quoted = configs
+        .keys()
+        .filter(|dim| dims.contains(dim))
+        .map(|dim| format!("'{dim}'"))
+        .collect::<Vec<_>>();
+    if quoted.is_empty() {
+        "no dimension".to_owned()
+    } else {
+        quoted.join(", ")
     }
-    Ok(())
+}
+
+/// Checks that every dimension in `dims` comes with all the dimensions it depends on.
+/// Reports one error per offending dimension, in canonical order.
+fn validate_downwards_closed(
+    dims: &HashSet<&syn::Ident>,
+    configs: &DimensionConfigMap,
+    span: proc_macro2::Span,
+) -> syn::Result<()> {
+    configs
+        .iter()
+        .filter(|(dim, _)| dims.contains(dim))
+        .filter_map(|(dim, config)| {
+            let missing = config
+                .depends_on
+                .iter()
+                .filter(|dep| !dims.contains(dep))
+                .collect::<HashSet<_>>();
+            (!missing.is_empty()).then(|| {
+                syn::Error::new(
+                    span,
+                    format!(
+                        "Cannot iterate over '{dim}' without also iterating over {}",
+                        describe_dims(&missing, configs)
+                    ),
+                )
+            })
+        })
+        .reduce(|mut acc, err| {
+            acc.combine(err);
+            acc
+        })
+        .map_or(Ok(()), Err)
 }
 
 #[allow(single_use_lifetimes)]
@@ -147,11 +173,8 @@ impl Parse for AllConfig {
                 }
 
                 // Constraint 4d: A \ B must be downwards closed.
-                if let Err(err) =
-                    validate_downwards_closed(a_set.difference(&b_set).cloned(), &dimensions)
-                {
-                    return Err(syn::Error::new(arg_entity._span, err));
-                }
+                let remaining = a_set.difference(&b_set).cloned().collect();
+                validate_downwards_closed(&remaining, &dimensions, arg_entity._span)?;
             }
             // Constraint 5: Dimensions must be predefined and downwards closed.
             for dim in &dims {
@@ -184,22 +207,17 @@ impl Parse for AllConfig {
             let task_dims: HashSet<&syn::Ident> = HashSet::from_iter(&dims);
 
             if task_dims != bigcup {
-                let expected = bigcup.iter().map(|d| d.to_string()).collect::<Vec<_>>();
-                let err_msg = if expected.is_empty() {
-                    format!("Task {} expected no dimensions", task.id)
-                } else {
+                return Err(syn::Error::new(
+                    task._span,
                     format!(
-                        "Task {} expected dimensions: {}",
+                        "Task '{}' must iterate over {}",
                         task.id,
-                        expected.join(", ")
-                    )
-                };
-                return Err(syn::Error::new(task._span, err_msg));
+                        describe_dims(&bigcup, &dimensions),
+                    ),
+                ));
             }
 
-            if let Err(err) = validate_downwards_closed(&dims, &dimensions) {
-                return Err(syn::Error::new(task._span, err));
-            }
+            validate_downwards_closed(&task_dims, &dimensions, task._span)?;
 
             // Add the new configs
             let new_entity_dims = dims
@@ -259,5 +277,56 @@ mod tests {
             }";
         let parsed: AllConfig = syn::parse_str(input).expect("Failed to parse config");
         assert_eq!(parsed.service_id, "splitter");
+    }
+
+    fn parse_errors(input: &str) -> Vec<String> {
+        match syn::parse_str::<AllConfig>(input) {
+            Ok(_) => panic!("Expected the config to be rejected"),
+            Err(err) => err.into_iter().map(|e| e.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn test_mismatched_dims_in_canonical_order() {
+        let errors = parse_errors(
+            "broken = {
+                A<i> = create_a();
+                B<j> = create_b(A) for i;
+                C = create_c(B) for i;
+            }",
+        );
+        assert_eq!(errors, ["Task 'create_c' must iterate over 'i', 'j'"]);
+    }
+
+    #[test]
+    fn test_mismatched_dims_when_none_expected() {
+        let errors = parse_errors(
+            "broken = {
+                A<i> = create_a();
+                B = create_b(A<i>) for i;
+            }",
+        );
+        assert_eq!(errors, ["Task 'create_b' must iterate over no dimension"]);
+    }
+
+    #[test]
+    fn test_reports_every_closure_violation_in_canonical_order() {
+        let errors = parse_errors(
+            "broken = {
+                A<i> = create_a();
+                B<j> = create_b(A) for i;
+                C<k> = create_c(A) for i;
+                D = create_d(B, C) for i, j, k;
+                E<l> = create_e(D) for k, j, i;
+                F = create_f(E<i, j>) for k, l;
+            }",
+        );
+        assert_eq!(
+            errors,
+            [
+                "Cannot iterate over 'k' without also iterating over 'i'",
+                "Cannot iterate over 'l' without also iterating over 'i', 'j'",
+            ]
+        );
     }
 }

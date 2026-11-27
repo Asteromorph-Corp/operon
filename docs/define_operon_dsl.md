@@ -435,7 +435,7 @@ B = create_b(A) for ...;
 **Dimension rule violation**:
 
 ```rust
-// ERROR: Task create_c expected dimensions: i, j
+// ERROR: Task 'create_c' must iterate over 'i', 'j'
 // (`B` is left with a hanging `j`, which `create_c` neither iterates over nor aggregates)
 B<j> = create_b(A) for i;
 C = create_c(B) for i;
