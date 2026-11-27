@@ -295,10 +295,7 @@ mod tests {
                 C = create_c(B) for i;
             }",
         );
-        assert_eq!(
-            errors,
-            ["Task 'create_c' must iterate over 'i', 'j'"]
-        );
+        assert_eq!(errors, ["Task 'create_c' must iterate over 'i', 'j'"]);
     }
 
     #[test]
@@ -309,10 +306,7 @@ mod tests {
                 B = create_b(A<i>) for i;
             }",
         );
-        assert_eq!(
-            errors,
-            ["Task 'create_b' must iterate over no dimension"]
-        );
+        assert_eq!(errors, ["Task 'create_b' must iterate over no dimension"]);
     }
 
     #[test]
